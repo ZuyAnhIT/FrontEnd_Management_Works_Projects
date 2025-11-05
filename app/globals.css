@@ -38,3 +38,10 @@ body {
         .animate-fadeDown {
           animation: fadeDown 0.35s ease-out;
         }
+@keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+@keyframes fadeInUp { from { opacity: 0; transform: translateY(20px) } to { opacity: 1; transform: translateY(0) } }
+@keyframes slideUp { from { opacity: 0; transform: translateY(40px) } to { opacity: 1; transform: translateY(0) } }
+
+.animate-fadeIn { animation: fadeIn 1s ease-out both; }
+.animate-fadeInUp { animation: fadeInUp 1s ease-out both; }
+.animate-slideUp { animation: slideUp 1s ease-out both; }
