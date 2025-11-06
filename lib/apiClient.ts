@@ -43,6 +43,7 @@ apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
+    console.log(error)
 
     // Nếu lỗi 401 (token hết hạn) và chưa retry
     if (error.response?.status === 401 && !originalRequest._retry) {
@@ -51,7 +52,7 @@ apiClient.interceptors.response.use(
 
       if (!refreshToken) {
         localStorage.clear();
-        window.location.href = "/login";
+        //window.location.href = "/login";
         return Promise.reject(error);
       }
 
@@ -83,10 +84,10 @@ apiClient.interceptors.response.use(
         originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
         return apiClient(originalRequest);
       } catch (err) {
-        // Refresh token invalid → logout toàn bộ
+        //Refresh token invalid → logout toàn bộ
         isRefreshing = false;
         localStorage.clear();
-        window.location.href = "/login";
+        //window.location.href = "/login";
         return Promise.reject(err);
       }
     }
