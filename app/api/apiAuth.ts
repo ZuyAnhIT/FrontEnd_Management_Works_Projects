@@ -32,7 +32,7 @@ export const loginUser = async (payload: { email: string; matKhau: string }) => 
   const res = await apiClient.post("/auth/login", payload);
   const data = res.data;
 
-  if (data.code && data.code !== 200) throw new Error(data.message);
+  if (data.code && data.code !== 200) throw new Error(data.message)
 
   if (data.data?.accessToken && data.data?.refreshToken) {
     localStorage.setItem("accessToken", data.data.accessToken);

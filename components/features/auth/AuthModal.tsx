@@ -53,9 +53,9 @@ export default function AuthModal({
 
   const handleChange =
     (field: keyof AuthFormData) =>
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      setForm((prev) => ({ ...prev, [field]: e.target.value }));
-    };
+      (e: React.ChangeEvent<HTMLInputElement>) => {
+        setForm((prev) => ({ ...prev, [field]: e.target.value }));
+      };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -63,49 +63,52 @@ export default function AuthModal({
 
     try {
       if (tab === "login") {
-  if (!form.email || !form.password) {
-    showToast("Vui lòng nhập email và mật khẩu!", "warning");
-    return;
-  }
+        if (!form.email || !form.password) {
+          showToast("Vui lòng nhập email và mật khẩu!", "warning");
+          return;
+        }
 
-  try {
-    const res = await loginUser({
-      email: form.email.trim(),
-      matKhau: form.password.trim(),
-    });
+        try {
+          const res = await loginUser({
+            email: form.email.trim(),
+            matKhau: form.password.trim(),
+          });
+          console.log("fddfdfdsf", res)
 
-    if (!res?.data?.accessToken) {
-      showToast(res.message || "Đăng nhập thất bại!", "error");
-      onClose();
-    }
+          if (!res?.data?.accessToken) {
+            showToast(res.message || "Đăng nhập thất bại!", "error");
+            return;
+          }
 
-    showToast("Đăng nhập thành công!", "success");
-    router.push("/admin"); 
-  } catch (err: any) {
-    showToast(err.response?.data?.message || "Sai thông tin đăng nhập!", "error");
-    onClose();
-  }
-}
+          showToast("Đăng nhập thành công!", "success");
+          localStorage.setItem("accessToken", res.data.accessToken);
+          router.push("/admin");
+        } catch (err: any) {
+           setIsLoading(false);
+          showToast(err.response?.data?.message || "Sai thông tin đăng nhập!", "error");
+          return;
+        }
+      }
 
 
       else if (tab === "register") {
         if (!form.name || !form.email || !form.password || !form.confirmPassword) {
-    showToast("Vui lòng nhập đầy đủ thông tin!", "warning");
-    return;
-  }
+          showToast("Vui lòng nhập đầy đủ thông tin!", "warning");
+          return;
+        }
 
-  if (form.password !== form.confirmPassword) {
-    showToast("Mật khẩu xác nhận không khớp!", "error");
-    return;
-  }
+        if (form.password !== form.confirmPassword) {
+          showToast("Mật khẩu xác nhận không khớp!", "error");
+          return;
+        }
 
-  const res = await registerUser({
-    hoTen: form.name.trim(),
-    email: form.email.trim(),
-    matKhau: form.password.trim(),
-  });
-  showToast(res.message || "Vui lòng kiểm tra email để lấy mã OTP!", "info");
-  setTab("verify");
+        const res = await registerUser({
+          hoTen: form.name.trim(),
+          email: form.email.trim(),
+          matKhau: form.password.trim(),
+        });
+        showToast(res.message || "Vui lòng kiểm tra email để lấy mã OTP!", "info");
+        setTab("verify");
       }
 
       else if (tab === "verify") {
