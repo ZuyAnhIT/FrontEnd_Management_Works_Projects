@@ -7,6 +7,7 @@ interface LoadingButtonProps {
   type?: "button" | "submit";
   className?: string;
   onClick?: () => void;
+  
 }
 
 export default function LoadingButton({

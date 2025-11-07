@@ -5,9 +5,9 @@ import apiClient from "@/lib/apiClient";
 // 🧩 Đăng ký tài khoản mới
 // ===================================================
 export const registerUser = async (payload: {
-  hoTen: string;
+  fullName: string;
   email: string;
-  matKhau: string;
+  password: string;
 }) => {
   const res = await apiClient.post("/auth/register", payload);
   const data = res.data;
@@ -28,11 +28,11 @@ export const verifyEmail = async (payload: { email: string; otp: string }) => {
 // ===================================================
 // 🧩 Đăng nhập tài khoản
 // ===================================================
-export const loginUser = async (payload: { email: string; matKhau: string }) => {
+export const loginUser = async (payload: { email: string; password: string }) => {
   const res = await apiClient.post("/auth/login", payload);
   const data = res.data;
 
-  if (data.code && data.code !== 200) throw new Error(data.message)
+  if (!data.success) throw new Error(data.message || "Đăng nhập thất bại!");  
 
   if (data.data?.accessToken && data.data?.refreshToken) {
     localStorage.setItem("accessToken", data.data.accessToken);
@@ -63,8 +63,8 @@ export const logoutUser = async () => {
 // 🧩 Đăng ký từ lời mời
 // ===================================================
 export const registerFromInvite = async (payload: {
-  hoTen: string;
-  matKhau: string;
+  fullName: string;
+  password: string;
   invitationToken: string;
 }) => {
   const res = await apiClient.post("/auth/register-from-invite", payload);
@@ -82,3 +82,21 @@ export const registerFromInvite = async (payload: {
 
   return data;
 };
+
+// ===================================================
+// 🧩 Quên mật khẩu
+// ===================================================
+export const forgotPassword = async (email: string) => {
+  const res = await apiClient.post("/auth/forgot-password", { email });
+  return res.data; // response { success, message, data }
+};
+
+// ===================================================
+// 🧩 Đặt lại mật khẩu
+// ===================================================
+export const resetPassword = async (payload: { token: string; newPassword: string }) => {
+  const res = await apiClient.post("/auth/reset-password", payload);
+  return res.data; // response { success, message, data }
+};
+
+
