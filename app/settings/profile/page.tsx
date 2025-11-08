@@ -12,6 +12,7 @@ interface ProfileForm {
   phoneNumber: string;
   dateOfBirth: string;
   gender: GenderType;
+  email?: string; // để hiển thị thêm email từ API
 }
 
 export default function ProfilePage() {
@@ -25,6 +26,7 @@ export default function ProfilePage() {
     phoneNumber: "",
     dateOfBirth: "",
     gender: "MALE",
+    email: "",
   });
 
   // 🧩 Lấy thông tin người dùng hiện tại
@@ -38,6 +40,7 @@ export default function ProfilePage() {
           phoneNumber: user.phoneNumber || "",
           dateOfBirth: user.dateOfBirth || "",
           gender: (user.gender as GenderType) || "MALE",
+          email: user.email || "",
         });
       } catch (err: any) {
         showToast(err.message || "Không thể tải thông tin cá nhân", "error");
@@ -54,7 +57,6 @@ export default function ProfilePage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
     if (!form.fullName) {
       showToast("Vui lòng nhập họ và tên!", "warning");
       return;
@@ -63,8 +65,11 @@ export default function ProfilePage() {
     try {
       setSaving(true);
       await updateUserProfile({
-        ...form,
-        gender: form.gender as GenderType, // ✅ fix kiểu chính xác
+        fullName: form.fullName,
+        avatarUrl: form.avatarUrl,
+        phoneNumber: form.phoneNumber,
+        dateOfBirth: form.dateOfBirth,
+        gender: form.gender as GenderType,
       });
       showToast("✅ Cập nhật thông tin thành công!", "success");
     } catch (err: any) {
@@ -82,6 +87,7 @@ export default function ProfilePage() {
   return (
     <div className="p-6 max-w-3xl mx-auto">
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        {/* 🧍 Header thông tin */}
         <div className="flex items-center gap-3 mb-6">
           <div className="w-12 h-12 bg-blue-100 flex items-center justify-center rounded-lg">
             <User className="w-6 h-6 text-blue-600" />
@@ -94,7 +100,23 @@ export default function ProfilePage() {
           </div>
         </div>
 
+        {/* ✍️ Form cập nhật */}
         <form onSubmit={handleSubmit} className="space-y-5">
+          {/* Email (không chỉnh sửa) */}
+          {form.email && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700">
+                Email
+              </label>
+              <input
+                type="email"
+                value={form.email}
+                disabled
+                className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 bg-gray-100 text-gray-600 cursor-not-allowed"
+              />
+            </div>
+          )}
+
           {/* Họ tên */}
           <div>
             <label className="block text-sm font-medium text-gray-700">
@@ -178,6 +200,17 @@ export default function ProfilePage() {
                 className="pl-9 w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500"
               />
             </div>
+
+            {/* 🔍 Preview ảnh */}
+            {form.avatarUrl && (
+              <div className="mt-3 flex justify-center">
+                <img
+                  src={form.avatarUrl}
+                  alt="Avatar Preview"
+                  className="w-24 h-24 rounded-full object-cover border"
+                />
+              </div>
+            )}
           </div>
 
           {/* Nút lưu */}

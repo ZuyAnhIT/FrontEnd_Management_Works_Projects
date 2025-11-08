@@ -67,7 +67,7 @@ export const changeUserPassword = async (payload: {
   if (!token) throw new Error("Người dùng chưa đăng nhập.");
 
   try {
-    const res = await apiClient.put("/users/me/change-password", payload, {
+    const res = await apiClient.post("/users/me/change-password", payload, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
