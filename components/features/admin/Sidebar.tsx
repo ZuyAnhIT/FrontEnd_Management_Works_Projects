@@ -44,6 +44,7 @@ export default function Sidebar({
   // 🏢 Sidebar cho quản trị công ty
   const companyMenu = [
     { id: "dashboard", icon: LayoutDashboard, label: "Tổng quan", path: "/admin/company/dashboard" },
+    { id: "info", icon: CreditCard, label: "Thông tin", path: "/admin/company/companyinfo" },
     { id: "members", icon: Users, label: "Thành viên", path: "/admin/company/members" },
     { id: "workspaces", icon: FolderKanban, label: "Không gian làm việc", path: "/admin/company/workspaces" },
     { id: "billing", icon: CreditCard, label: "Thanh toán", path: "/admin/company/billing" },
