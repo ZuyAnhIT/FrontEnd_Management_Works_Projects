@@ -15,8 +15,8 @@ export default function AuthFormRegister({ form, handleChange, isLoading }: any)
       <InputField
         label="Họ và tên"
         icon={<User className="w-4 h-4 text-gray-400" />}
-        value={form.name}
-        onChange={handleChange("name")}
+        value={form.fullName}
+        onChange={handleChange("fullName")}
         placeholder="Nguyễn Văn A"
         required
       />
