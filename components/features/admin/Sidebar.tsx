@@ -11,8 +11,10 @@ import {
   CreditCard,
   LayoutDashboard,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { getCompanyWorkspaces } from "@/app/api/apiWorkspace"; // ✅ import API
+import { useToast } from "@/components/ui/ToastProvider";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -28,12 +30,17 @@ export default function Sidebar({
   setActiveMenu,
 }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
+  const [workspaces, setWorkspaces] = useState<any[]>([]); // ✅ danh sách workspace
+  const [loadingWs, setLoadingWs] = useState(false);
+
   const pathname = usePathname();
   const router = useRouter();
+  const { showToast } = useToast();
 
   // ✅ Xác định sidebar kiểu nào hiển thị
   const isCompanyAdmin = pathname?.startsWith("/admin/company");
   const isUserAdmin = pathname?.startsWith("/admin") && !isCompanyAdmin;
+  const companyId = 1; // ⚙️ TODO: Lấy từ user hoặc token
 
   // 🧭 Sidebar mặc định cho user
   const defaultMenu = [
@@ -50,14 +57,24 @@ export default function Sidebar({
     { id: "billing", icon: CreditCard, label: "Thanh toán", path: "/admin/company/billing" },
   ];
 
-  const departments = [
-    { id: "tech", label: "Phòng Kỹ thuật" },
-    { id: "marketing", label: "Phòng Marketing" },
-    { id: "hr", label: "Phòng Nhân sự" },
-  ];
-
-  // 🧩 Chọn danh sách menu dựa theo route
   const menuItems = isCompanyAdmin ? companyMenu : defaultMenu;
+
+  // ✅ Gọi API để lấy workspace (dùng làm "Phòng ban")
+  useEffect(() => {
+    if (!isUserAdmin) return; // chỉ gọi nếu ở admin chính, không phải company admin
+    const fetchWorkspaces = async () => {
+      try {
+        setLoadingWs(true);
+        const data = await getCompanyWorkspaces(companyId);
+        setWorkspaces(data || []);
+      } catch (err: any) {
+        showToast(err.message || "Không thể tải danh sách phòng ban", "error");
+      } finally {
+        setLoadingWs(false);
+      }
+    };
+    fetchWorkspaces();
+  }, [isUserAdmin]);
 
   return (
     <>
@@ -75,7 +92,7 @@ export default function Sidebar({
         ${isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"} 
         flex flex-col`}
       >
-        {/* ===== Header Công ty + Nút thu gọn ===== */}
+        {/* ===== Header ===== */}
         <div className="p-4 border-b border-gray-200 flex items-center justify-between relative">
           <div
             className={`flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-lg transition-all ${
@@ -90,7 +107,7 @@ export default function Sidebar({
             )}
           </div>
 
-          {/* 🔽 Nút thu gọn sidebar */}
+          {/* 🔽 Nút thu gọn */}
           <button
             onClick={() => setCollapsed(!collapsed)}
             className="p-2 rounded-lg hover:bg-gray-100 transition-all duration-300 absolute top-1/2 right-3 -translate-y-1/2"
@@ -126,37 +143,51 @@ export default function Sidebar({
             ))}
           </div>
 
-          {/* ===== Phòng ban chỉ hiện ở sidebar thường ===== */}
+          {/* ===== Danh sách Workspaces (Phòng ban) ===== */}
           {isUserAdmin && !collapsed && (
             <>
               <div className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase">
                 Phòng ban
               </div>
-              <div className="space-y-1">
-                {departments.map((dept) => (
-                  <button
-                    key={dept.id}
-                    onClick={() => setActiveMenu(dept.id)}
-                    className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
-                      activeMenu === dept.id
-                        ? "bg-blue-50 text-blue-600"
-                        : "text-gray-700 hover:bg-gray-50"
-                    }`}
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                    <span className="flex-1 text-left">{dept.label}</span>
-                  </button>
-                ))}
-                <button className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-50">
-                  <Plus className="w-4 h-4" />
-                  <span>Tạo phòng ban mới</span>
-                </button>
-              </div>
+
+              {loadingWs ? (
+                <p className="text-gray-400 text-sm px-3 py-2">Đang tải...</p>
+              ) : workspaces.length > 0 ? (
+                <div className="space-y-1">
+                  {workspaces.map((ws) => (
+                    <button
+                      key={ws.workspaceId}
+                      onClick={() => router.push(`/admin/workspaces/${ws.workspaceId}`)}
+                      className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
+                        pathname === `/admin/workspaces/${ws.workspaceId}`
+                          ? "bg-blue-50 text-blue-600"
+                          : "text-gray-700 hover:bg-gray-50"
+                      }`}
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                      <span className="flex-1 text-left">{ws.workspaceName}</span>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-gray-400 text-sm px-3 py-2">
+                  Chưa có phòng ban nào
+                </p>
+              )}
+
+              {/* Nút thêm mới */}
+              <button
+                onClick={() => router.push("/admin/company/workspaces")}
+                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-50 mt-2"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Tạo phòng ban mới</span>
+              </button>
             </>
           )}
         </nav>
 
-        {/* ===== Footer gói dịch vụ ===== */}
+        {/* ===== Footer ===== */}
         <div className="p-4 border-t border-gray-200">
           {!collapsed ? (
             <div className="text-xs text-gray-500">
@@ -167,9 +198,7 @@ export default function Sidebar({
             </div>
           ) : (
             <div className="flex justify-center">
-              <span className="text-[10px] text-blue-600 font-semibold">
-                VIP
-              </span>
+              <span className="text-[10px] text-blue-600 font-semibold">VIP</span>
             </div>
           )}
         </div>
