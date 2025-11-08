@@ -36,12 +36,12 @@ export default function UserMenu({ user, onClose, onLogout }: UserMenuProps) {
                 <div className="text-sm text-gray-500">{user?.email}</div>
             </div>
 
-            <button onClick={() => handleNavigate("/admin/company/settings/profile")} className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-50 text-left">
+            <button onClick={() => handleNavigate("/settings/profile")} className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-50 text-left">
                 <User className="w-4 h-4 text-gray-500" />
                 <span className="text-gray-700">Thông tin cá nhân</span>
             </button>
 
-            <button onClick={() => handleNavigate("/admin/company/settings/account")} className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-50 text-left">
+            <button onClick={() => handleNavigate("/settings/account")} className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-50 text-left">
                 <Shield className="w-4 h-4 text-gray-500" />
                 <span className="text-gray-700">Đổi mật khẩu</span>
             </button>
