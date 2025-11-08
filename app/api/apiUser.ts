@@ -5,20 +5,20 @@ import apiClient from "@/lib/apiClient";
 // 🧩 Lấy thông tin người dùng hiện tại
 // ===================================================
 export const getCurrentUser = async () => {
-    const token = localStorage.getItem("accessToken");
-    if (!token) throw new Error("Người dùng chưa đăng nhập.");
+  const token = localStorage.getItem("accessToken");
+  if (!token) throw new Error("Người dùng chưa đăng nhập.");
 
-    const res = await apiClient.get("/users/me", {
-        headers: {
-            Authorization: `Bearer ${token}`,
-        },
-    });
+  const res = await apiClient.get("/users/me", {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
 
-    const data = res.data;
+  const data = res.data;
 
-    if (!data.success) throw new Error(data.message || "Không thể lấy thông tin người dùng.");
+  if (!data.success) throw new Error(data.message || "Không thể lấy thông tin người dùng.");
 
-    return data.data; // Trả về đối tượng user
+  return data.data; // Trả về đối tượng user
 };
 
 
