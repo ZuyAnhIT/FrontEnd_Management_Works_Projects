@@ -129,7 +129,7 @@ export default function AuthModal({
             router.push("/projects");
             break;
           default:
-            router.push("/home");
+            router.push("/member");
             break;
         }
 
