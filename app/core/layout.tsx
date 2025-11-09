@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
-import Header from "@/components/features/admin/Header";
-import Sidebar from "@/components/features/admin/Sidebar";
+import Header from "@/components/features/core/Header";
+import Sidebar from "@/components/features/core/Sidebar";
 import { getCurrentUser } from "@/app/api/apiUser";
 import { useToast } from "@/components/ui/ToastProvider";
 

@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/ToastProvider";
 import { loginUser, registerUser, verifyEmail } from "@/app/api/apiAuth";
-import { getCurrentUser } from "@/app/api/apiUser";
+import { getCurrentUser } from "@/app/api/apiUser"; // ✅ đảm bảo import đúng
 
 import AuthHeader from "./AuthHeader";
 import AuthTabs from "./AuthTabs";
@@ -13,14 +13,13 @@ import AuthFormVerify from "./AuthFormVerify";
 import AuthFormForgot from "./AuthFormForgot";
 import AuthSocialButtons from "./AuthSocialButtons";
 
-// 🔹 Kiểu dữ liệu form
 type AuthFormData = {
   fullName: string;
   email: string;
   password: string;
   confirmPassword: string;
   otp: string;
-  token: string;                 // ✅ THÊM FIELD NÀY
+  token: string;
   newPassword: string;
   confirmNewPassword: string;
 };
@@ -39,91 +38,105 @@ export default function AuthModal({
   const [tab, setTab] = useState<AuthTab>("login");
   const [isLoading, setIsLoading] = useState(false);
 
-  // ✅ Cập nhật state form đầy đủ
   const [form, setForm] = useState<AuthFormData>({
     fullName: "",
     email: "",
     password: "",
     confirmPassword: "",
     otp: "",
-    token: "",                     // ✅ THÊM FIELD NÀY
+    token: "",
     newPassword: "",
     confirmNewPassword: "",
   });
 
   const handleChange =
     (field: keyof AuthFormData) =>
-      (e: React.ChangeEvent<HTMLInputElement>) => {
-        setForm((prev) => ({ ...prev, [field]: e.target.value }));
-      };
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      setForm((prev) => ({ ...prev, [field]: e.target.value }));
+    };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
 
     try {
+      // 🔹 Đăng nhập
       if (tab === "login") {
         if (!form.email || !form.password) {
           showToast("Vui lòng nhập email và mật khẩu!", "warning");
           return;
         }
 
-        try {
-          // 🟢 1. Gọi API login
-          const res = await loginUser({
-            email: form.email.trim(),
-            password: form.password.trim(),
-          });
+        // 🟢 1. Gọi API login
+        const res = await loginUser({
+          email: form.email.trim(),
+          password: form.password.trim(),
+        });
 
-          if (!res?.data?.accessToken) {
-            showToast(res.message || "Đăng nhập thất bại!", "error");
-            return;
-          }
-
-          // 🟢 2. Lưu token
-          localStorage.setItem("accessToken", res.data.accessToken);
-          localStorage.setItem("refreshToken", res.data.refreshToken);
-
-          // 🟢 3. Gọi API lấy thông tin user
-          const user = await getCurrentUser();
-          localStorage.setItem("users", JSON.stringify(user));
-
-          // 🟢 4. Xác định role chính
-          const role =
-            user.systemRoles?.[0] ||
-            user.companyMemberships?.[0]?.roleCode ||
-            user.workspaceMemberships?.[0]?.roleCode ||
-            "USER";
-
-          localStorage.setItem("userRole", role);
-
-          // 🟢 5. Phân hướng dashboard
-          switch (role) {
-            case "SYSTEM_ADMIN":
-              router.push("/adminss/dashboard");
-              break;
-            case "COMPANY_ADMIN":
-            case "COMPANY_MEMBER":
-              router.push("/admin");
-              break;
-            case "WORKSPACE_ADMIN":
-            case "WORKSPACE_MEMBER":
-              router.push("/workspace");
-              break;
-            default:
-              router.push("/home");
-              break;
-          }
-
-          showToast("Đăng nhập thành công!", "success");
-        } catch (err: any) {
-          showToast(
-            err.response?.data?.message || "Sai thông tin đăng nhập!",
-            "error"
-          );
+        if (!res?.data?.accessToken) {
+          showToast(res.message || "Đăng nhập thất bại!", "error");
           return;
         }
+
+        // 🟢 2. Lưu token
+        localStorage.setItem("accessToken", res.data.accessToken);
+        localStorage.setItem("refreshToken", res.data.refreshToken);
+
+        // 🟢 3. Lấy thông tin user
+        const user = await getCurrentUser();
+        localStorage.setItem("user", JSON.stringify(user));
+
+        // 🟢 4. Xác định vai trò chính theo thứ tự ưu tiên
+        let mainRole = "USER";
+
+        if (user.systemRoles?.length) {
+          mainRole = user.systemRoles[0];
+        } else if (user.company?.roleCode === "COMPANY_ADMIN") {
+          mainRole = "COMPANY_ADMIN";
+        } else if (
+          user.workspaces?.some((w: any) => w.roleCode === "WORKSPACE_ADMIN")
+        ) {
+          mainRole = "WORKSPACE_ADMIN";
+        } else if (user.company?.roleCode === "COMPANY_MEMBER") {
+          mainRole = "COMPANY_MEMBER";
+        } else if (
+          user.workspaces?.some((w: any) => w.roleCode === "WORKSPACE_MEMBER")
+        ) {
+          mainRole = "WORKSPACE_MEMBER";
+        } else if (
+          user.projects?.some((p: any) => p.roleCode === "GUEST_PROJECT")
+        ) {
+          mainRole = "GUEST_PROJECT";
+        }
+
+        localStorage.setItem("userRole", mainRole);
+        console.log("🎯 ROLE DETECTED:", mainRole);
+
+        // 🟢 5. Phân hướng dashboard
+        switch (mainRole) {
+          case "SYSTEM_ADMIN":
+            router.push("/adminss/dashboard");
+            break;
+          case "COMPANY_ADMIN":
+          case "COMPANY_MEMBER":
+            router.push("/admin");
+            break;
+          case "WORKSPACE_ADMIN":
+          case "WORKSPACE_MEMBER":
+            router.push("/core");
+            break;
+          case "GUEST_PROJECT":
+            router.push("/projects");
+            break;
+          default:
+            router.push("/home");
+            break;
+        }
+
+        showToast("Đăng nhập thành công!", "success");
       }
+
+      // 🔹 Đăng ký
       else if (tab === "register") {
         if (
           !form.fullName ||
@@ -145,20 +158,26 @@ export default function AuthModal({
           email: form.email.trim(),
           password: form.password.trim(),
         });
+
         showToast(
           res.message || "Vui lòng kiểm tra email để lấy mã OTP!",
           "info"
         );
         setTab("verify");
-      } else if (tab === "verify") {
+      }
+
+      // 🔹 Xác thực email
+      else if (tab === "verify") {
         const res = await verifyEmail({
           email: form.email.trim(),
           otp: form.otp.trim(),
         });
         showToast(res.message || "Xác thực thành công!", "success");
         setTab("login");
-      } else if (tab === "forgot") {
-        // ✅ Logic forgot giờ xử lý trong AuthFormForgot
+      }
+
+      // 🔹 Quên mật khẩu
+      else if (tab === "forgot") {
         showToast("Vui lòng nhập thông tin đặt lại mật khẩu!", "info");
       }
     } catch (error: any) {
