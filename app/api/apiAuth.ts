@@ -106,9 +106,19 @@ export const resetPassword = async (payload: { token: string; newPassword: strin
 };
 
 
-/**
- * 🧩 Đăng ký tài khoản mới từ lời mời
- * Endpoint: POST /auth/register-from-invite
- * Input: { fullName, password, invitationToken }
- * Output: accessToken, refreshToken, tokenType
- */
+// 🧩 Đăng nhập bằng Google
+// ===================================================
+export const loginWithGoogle = async (googleToken: string) => {
+  const res = await apiClient.post("/auth/google", { googleToken });
+  const data = res.data;
+
+  if (!data.success) throw new Error(data.message || "Đăng nhập Google thất bại!");
+
+  if (data.data?.accessToken && data.data?.refreshToken) {
+    localStorage.setItem("accessToken", data.data.accessToken);
+    localStorage.setItem("refreshToken", data.data.refreshToken);
+  }
+
+  return data;
+};
+
