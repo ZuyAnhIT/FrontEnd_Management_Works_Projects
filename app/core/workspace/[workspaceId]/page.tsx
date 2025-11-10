@@ -131,16 +131,6 @@ export default function WorkspaceOverviewPage() {
                 <Settings className="w-5 h-5" />
                 <span className="hidden sm:inline">Cài đặt</span>
               </button>
-
-              <button
-                onClick={() =>
-                  showToast("API tạo dự án chưa sẵn sàng 🚧", "warning")
-                }
-                className="flex items-center gap-2 px-6 py-3 bg-white text-green-600 rounded-xl hover:bg-gray-50 font-semibold shadow-lg hover:shadow-xl transition-all hover:scale-105"
-              >
-                <Plus className="w-5 h-5" />
-                Tạo dự án
-              </button>
             </div>
           </div>
 
@@ -270,40 +260,6 @@ export default function WorkspaceOverviewPage() {
           </div>
         )}
 
-        {/* 🔹 Danh sách dự án (Empty state) */}
-        <div className="bg-white rounded-2xl shadow-lg border-2 border-dashed border-gray-200 animate-fadeInUp delay-150">
-          <div className="flex flex-col items-center justify-center p-16 text-center">
-            {/* Animated Icon */}
-            <div className="relative mb-6">
-              <div className="absolute inset-0 bg-gradient-to-br from-blue-200 to-cyan-200 rounded-full blur-2xl opacity-30 animate-pulse"></div>
-              <div className="relative w-24 h-24 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full flex items-center justify-center">
-                <FolderKanban className="w-12 h-12 text-gray-400" />
-              </div>
-            </div>
-
-            {/* Text */}
-            <h3 className="text-xl font-bold text-gray-900 mb-2">
-              Chưa có dự án nào
-            </h3>
-            <p className="text-gray-500 mb-6 max-w-md">
-              Bắt đầu tạo dự án đầu tiên để quản lý công việc và cộng tác với team của bạn
-            </p>
-
-            {/* CTA Button */}
-            <button
-              onClick={() => showToast("API tạo dự án chưa sẵn sàng 🚧", "warning")}
-              className="group flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all hover:scale-105"
-            >
-              <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform" />
-              Tạo dự án đầu tiên
-            </button>
-
-            {/* Helper text */}
-            <p className="text-xs text-gray-400 mt-4">
-              Hoặc liên hệ admin để được thêm vào dự án hiện có
-            </p>
-          </div>
-        </div>
 
         {/* 💡 Quick Actions (Optional) */}
         <div className="grid md:grid-cols-3 gap-4 animate-fadeInUp delay-200">

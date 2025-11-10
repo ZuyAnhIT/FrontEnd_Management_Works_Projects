@@ -41,7 +41,6 @@ export default function CoreSidebar({
     const [companyId, setCompanyId] = useState<number | null>(null);
     const [workspaces, setWorkspaces] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
-    const [showProjects, setShowProjects] = useState(false);
 
     const router = useRouter();
     const pathname = usePathname();
@@ -49,7 +48,6 @@ export default function CoreSidebar({
     const workspaceId = params.workspaceId;
     const { showToast } = useToast();
 
-    // Kiểm tra đang ở workspace nào
     const isWorkspaceView = pathname?.startsWith("/core/workspace/");
 
     // 🧩 Lấy companyId
@@ -91,16 +89,7 @@ export default function CoreSidebar({
     // 🔹 Menu khi đã vào 1 workspace
     const workspaceMenu = [
         { id: "overview", icon: Home, label: "Tổng quan", path: `/core/workspace/${workspaceId}` },
-        {
-            id: "projects",
-            icon: FolderKanban,
-            label: "Dự án",
-            children: [
-                { name: "Dự án A", path: `/core/workspace/${workspaceId}/project-a` },
-                { name: "Dự án B", path: `/core/workspace/${workspaceId}/project-b` },
-            ],
-        },
-        { id: "create", icon: PlusCircle, label: "Tạo dự án", path: `/core/workspace/${workspaceId}/create-project` },
+        { id: "project", icon: FolderKanban, label: "Dự án", path: `/core/workspace/${workspaceId}/project` },
         { id: "members", icon: ClipboardCheck, label: "Thành viên", path: `/core/workspace/${workspaceId}/members` },
         { id: "settings", icon: Settings, label: "Cài đặt", path: `/core/workspace/${workspaceId}/settings` },
     ];
@@ -124,15 +113,13 @@ export default function CoreSidebar({
         ${isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"} 
         flex flex-col`}
             >
-                {/* ===== Header with Gradient ===== */}
+                {/* ===== Header ===== */}
                 <div className="relative overflow-hidden bg-gradient-to-br from-green-500 via-emerald-500 to-cyan-500 p-4 shadow-lg">
-                    {/* Background decoration */}
                     <div className="absolute inset-0 bg-grid-white/10"></div>
                     <div className="absolute -right-4 -top-4 w-24 h-24 bg-white/10 rounded-full blur-2xl"></div>
                     <div className="absolute -left-4 -bottom-4 w-20 h-20 bg-white/10 rounded-full blur-2xl"></div>
 
                     <div className="relative z-10 flex items-center justify-between">
-                        {/* Logo & Title */}
                         <div className={`flex items-center gap-3 ${collapsed ? "justify-center w-full" : ""}`}>
                             <div className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center shadow-lg">
                                 {isWorkspaceView ? (
@@ -156,7 +143,6 @@ export default function CoreSidebar({
                             )}
                         </div>
 
-                        {/* Collapse button */}
                         {!collapsed && (
                             <button
                                 onClick={() => setCollapsed(!collapsed)}
@@ -167,7 +153,6 @@ export default function CoreSidebar({
                         )}
                     </div>
 
-                    {/* Expand button when collapsed */}
                     {collapsed && (
                         <button
                             onClick={() => setCollapsed(false)}
@@ -177,7 +162,6 @@ export default function CoreSidebar({
                         </button>
                     )}
 
-                    {/* Mobile close button */}
                     <button
                         onClick={onClose}
                         className="lg:hidden absolute top-4 right-4 p-2 rounded-lg bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all"
@@ -186,12 +170,11 @@ export default function CoreSidebar({
                     </button>
                 </div>
 
-                {/* ===== Menu chính ===== */}
+                {/* ===== Menu ===== */}
                 <nav className="flex-1 overflow-y-auto p-4 space-y-6 custom-scrollbar">
-                    {/* 🔸 Nếu đang ở core (chưa vào workspace) */}
                     {!isWorkspaceView && (
                         <>
-                            {/* Main Navigation */}
+                            {/* Core menu */}
                             <div className="space-y-1">
                                 {!collapsed && (
                                     <div className="px-3 py-2 text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
@@ -210,28 +193,20 @@ export default function CoreSidebar({
                                                 router.push(item.path);
                                                 if (window.innerWidth < 1024) onClose();
                                             }}
-                                            className={`group w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 animate-fadeInUp ${
-                                                isActive
-                                                    ? "bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-lg shadow-green-500/30 scale-[1.02]"
+                                            className={`group w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 ${isActive
+                                                    ? "bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-lg scale-[1.02]"
                                                     : "text-gray-700 hover:bg-white hover:shadow-md"
-                                            } ${collapsed ? "justify-center" : ""}`}
+                                                } ${collapsed ? "justify-center" : ""}`}
                                             style={{ animationDelay: `${index * 50}ms` }}
                                         >
-                                            <item.icon className={`w-5 h-5 transition-transform ${!isActive && "group-hover:scale-110"}`} />
-                                            {!collapsed && (
-                                                <span className={`flex-1 text-left font-medium ${isActive ? "font-semibold" : ""}`}>
-                                                    {item.label}
-                                                </span>
-                                            )}
-                                            {!collapsed && isActive && (
-                                                <ChevronRight className="w-4 h-4 animate-pulse" />
-                                            )}
+                                            <item.icon className="w-5 h-5" />
+                                            {!collapsed && <span>{item.label}</span>}
                                         </button>
                                     );
                                 })}
                             </div>
 
-                            {/* Danh sách phòng ban */}
+                            {/* Workspace list */}
                             {!collapsed && (
                                 <div className="space-y-2">
                                     <div className="px-3 py-2 text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
@@ -256,21 +231,17 @@ export default function CoreSidebar({
                                                             router.push(`/core/workspace/${ws.workspaceId}`);
                                                             if (window.innerWidth < 1024) onClose();
                                                         }}
-                                                        className={`group w-full flex items-center gap-2 px-3 py-2.5 rounded-lg transition-all duration-200 ${
-                                                            isActive
+                                                        className={`group w-full flex items-center gap-2 px-3 py-2.5 rounded-lg transition-all duration-200 ${isActive
                                                                 ? "bg-green-50 text-green-600 border border-green-200 shadow-sm"
                                                                 : "hover:bg-gray-50 text-gray-700 border border-transparent"
-                                                        }`}
-                                                        style={{ animationDelay: `${index * 30}ms` }}
+                                                            }`}
                                                     >
                                                         <FolderKanban className="w-4 h-4 flex-shrink-0" />
-                                                        <span className={`flex-1 text-left text-sm truncate ${
-                                                            isActive ? "font-semibold" : ""
-                                                        }`}>
+                                                        <span className={`flex-1 text-left text-sm truncate ${isActive ? "font-semibold" : ""}`}>
                                                             {ws.workspaceName}
                                                         </span>
                                                         {isAdmin && (
-                                                            <span className="flex-shrink-0 text-xs bg-gradient-to-r from-yellow-400 to-orange-400 text-white px-2 py-0.5 rounded-full font-semibold shadow-sm flex items-center gap-1">
+                                                            <span className="text-xs bg-gradient-to-r from-yellow-400 to-orange-400 text-white px-2 py-0.5 rounded-full font-semibold shadow-sm">
                                                                 <Crown className="w-3 h-3" />
                                                             </span>
                                                         )}
@@ -279,16 +250,14 @@ export default function CoreSidebar({
                                             })}
                                         </div>
                                     ) : (
-                                        <div className="px-3 py-2 text-gray-400 text-sm">
-                                            Chưa có phòng ban nào
-                                        </div>
+                                        <div className="px-3 py-2 text-gray-400 text-sm">Chưa có phòng ban nào</div>
                                     )}
                                 </div>
                             )}
                         </>
                     )}
 
-                    {/* 🔹 Nếu đang ở trong workspace */}
+                    {/* Workspace menu */}
                     {isWorkspaceView && (
                         <div className="space-y-1">
                             {!collapsed && (
@@ -300,85 +269,32 @@ export default function CoreSidebar({
 
                             {workspaceMenu.map((item, index) => {
                                 const isActive = pathname === item.path;
-                                const hasChildren = !!item.children;
-
                                 return (
-                                    <div key={item.id}>
-                                        <button
-                                            onClick={() => {
-                                                if (hasChildren) {
-                                                    setShowProjects(!showProjects);
-                                                } else if (item.path) {
-                                                    router.push(item.path);
-                                                    if (window.innerWidth < 1024) onClose();
-                                                }
-                                            }}
-                                            className={`group w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 animate-fadeInUp ${
-                                                isActive
-                                                    ? "bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-lg shadow-green-500/30 scale-[1.02]"
-                                                    : "text-gray-700 hover:bg-white hover:shadow-md"
+                                    <button
+                                        key={item.id}
+                                        onClick={() => {
+                                            router.push(item.path);
+                                            if (window.innerWidth < 1024) onClose();
+                                        }}
+                                        className={`group w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 ${isActive
+                                                ? "bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-lg scale-[1.02]"
+                                                : "text-gray-700 hover:bg-white hover:shadow-md"
                                             } ${collapsed ? "justify-center" : ""}`}
-                                            style={{ animationDelay: `${index * 50}ms` }}
-                                        >
-                                            <item.icon className={`w-5 h-5 transition-transform ${!isActive && "group-hover:scale-110"}`} />
-                                            {!collapsed && (
-                                                <span className={`flex-1 text-left font-medium ${isActive ? "font-semibold" : ""}`}>
-                                                    {item.label}
-                                                </span>
-                                            )}
-                                            {!collapsed && hasChildren && (
-                                                showProjects ? (
-                                                    <ChevronUp className="w-4 h-4 transition-transform" />
-                                                ) : (
-                                                    <ChevronDown className="w-4 h-4 transition-transform" />
-                                                )
-                                            )}
-                                        </button>
-
-                                        {/* Submenu dự án */}
-                                        {!collapsed && hasChildren && showProjects && (
-                                            <div className="ml-9 mt-1 space-y-1 animate-fadeInUp">
-                                                {item.children?.map((sub, subIndex) => {
-                                                    const isSubActive = pathname === sub.path;
-                                                    return (
-                                                        <button
-                                                            key={sub.path}
-                                                            onClick={() => {
-                                                                router.push(sub.path);
-                                                                if (window.innerWidth < 1024) onClose();
-                                                            }}
-                                                            className={`block w-full text-left text-sm px-3 py-2 rounded-lg transition-all ${
-                                                                isSubActive
-                                                                    ? "bg-green-100 text-green-700 font-semibold shadow-sm"
-                                                                    : "text-gray-600 hover:bg-gray-50"
-                                                            }`}
-                                                            style={{ animationDelay: `${subIndex * 30}ms` }}
-                                                        >
-                                                            <div className="flex items-center gap-2">
-                                                                <div className={`w-1.5 h-1.5 rounded-full ${
-                                                                    isSubActive ? "bg-green-500" : "bg-gray-400"
-                                                                }`}></div>
-                                                                {sub.name}
-                                                            </div>
-                                                        </button>
-                                                    );
-                                                })}
-                                            </div>
-                                        )}
-                                    </div>
+                                        style={{ animationDelay: `${index * 50}ms` }}
+                                    >
+                                        <item.icon className="w-5 h-5" />
+                                        {!collapsed && <span>{item.label}</span>}
+                                    </button>
                                 );
                             })}
                         </div>
                     )}
                 </nav>
 
-                {/* ===== Footer - Status Badge ===== */}
+                {/* ===== Footer ===== */}
                 <div className="p-4 border-t border-gray-200/50">
                     {!collapsed ? (
                         <div className="relative overflow-hidden bg-gradient-to-br from-green-400 via-emerald-400 to-cyan-500 rounded-xl p-4 shadow-lg">
-                            {/* Shine effect */}
-                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 animate-shine"></div>
-
                             <div className="relative z-10 flex items-center gap-3">
                                 <div className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
                                     {isWorkspaceView ? (
@@ -416,32 +332,15 @@ export default function CoreSidebar({
                 .custom-scrollbar::-webkit-scrollbar {
                     width: 4px;
                 }
-                .custom-scrollbar::-webkit-scrollbar-track {
-                    background: transparent;
-                }
                 .custom-scrollbar::-webkit-scrollbar-thumb {
                     background: #cbd5e1;
                     border-radius: 10px;
-                }
-                .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-                    background: #94a3b8;
                 }
                 .bg-grid-white\/10 {
                     background-image: linear-gradient(white 1px, transparent 1px),
                         linear-gradient(90deg, white 1px, transparent 1px);
                     background-size: 20px 20px;
                     opacity: 0.1;
-                }
-                @keyframes shine {
-                    0% {
-                        transform: translateX(-100%) skewX(-12deg);
-                    }
-                    100% {
-                        transform: translateX(200%) skewX(-12deg);
-                    }
-                }
-                .animate-shine {
-                    animation: shine 3s infinite;
                 }
             `}</style>
         </>

@@ -58,6 +58,7 @@ export default function AdminSidebar({
     { id: "info", icon: CreditCard, label: "Thông tin", path: "/admin/company/companyinfo" },
     { id: "members", icon: Users, label: "Thành viên", path: "/admin/company/members" },
     { id: "workspaces", icon: FolderKanban, label: "Phòng ban", path: "/admin/company/workspaces" },
+    { id: "project", icon: FolderKanban, label: "Dự án", path: "/admin/company/project" },
     { id: "billing", icon: CreditCard, label: "Thanh toán", path: "/admin/company/billing" },
   ];
 
