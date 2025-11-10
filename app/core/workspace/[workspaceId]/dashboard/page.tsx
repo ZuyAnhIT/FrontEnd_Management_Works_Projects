@@ -8,7 +8,7 @@ export default function DashboardPage() {
     <div className="p-6 space-y-6">
       {/* Welcome Banner */}
       <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl p-6 text-white">
-        <h1 className="text-2xl font-bold">Chào mừng trở lại, {user?.name}! 👋</h1>
+        <h1 className="text-2xl font-bold">Chào mừng trở lại, {user?.fullName}! 👋</h1>
         <p className="mt-2 opacity-90">Tổng quan về Công ty ABC</p>
       </div>
 

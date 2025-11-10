@@ -10,6 +10,10 @@ import {
   Calendar,
   User,
   Flag,
+  Target,
+  Image as ImageIcon,
+  BarChart,
+  Layers,
   Trash2,
 } from "lucide-react";
 import {
@@ -42,7 +46,7 @@ export default function ProjectPage() {
     dueDate: "",
   });
 
-  // 🧩 1️⃣ Lấy danh sách dự án và dự án đã xoá
+  // 🧩 1️⃣ Lấy danh sách dự án
   const loadProjects = async () => {
     try {
       setLoading(true);
@@ -65,7 +69,6 @@ export default function ProjectPage() {
   // 🧩 2️⃣ Tạo dự án mới
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-
     if (!form.name.trim() || !form.projectCode.trim()) {
       showToast("Vui lòng nhập đầy đủ tên và mã dự án!", "warning");
       return;
@@ -116,8 +119,16 @@ export default function ProjectPage() {
   const renderCard = (p: any, isTrash = false) => (
     <div
       key={p.id}
-      className="group relative bg-white rounded-2xl border border-gray-200 overflow-hidden hover:shadow-2xl transition-all duration-300 hover:-translate-y-1"
+      className="group bg-white rounded-2xl border border-gray-200 overflow-hidden hover:shadow-2xl transition-all duration-300 hover:-translate-y-1"
     >
+      {p.coverImageUrl && (
+        <img
+          src={p.coverImageUrl}
+          alt="cover"
+          className="w-full h-40 object-cover"
+        />
+      )}
+
       <div
         className={`h-1 w-full ${
           p.priority === "HIGH"
@@ -130,32 +141,59 @@ export default function ProjectPage() {
 
       <div className="p-6">
         <div className="flex items-start justify-between mb-4">
-          <div className="w-14 h-14 rounded-xl flex items-center justify-center shadow-lg bg-green-100">
-            <FolderKanban className="w-7 h-7 text-green-600" />
+          <div className="flex items-center gap-2">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg bg-green-100">
+              <FolderKanban className="w-6 h-6 text-green-600" />
+            </div>
+            <div>
+              <h3 className="font-bold text-lg text-gray-900 group-hover:text-green-600 transition-colors">
+                {p.name}
+              </h3>
+              <p className="text-sm text-gray-500 font-mono">{p.projectCode}</p>
+            </div>
           </div>
-          <div className="flex items-center gap-1 px-2 py-1 bg-gray-50 rounded-full border border-gray-200 text-xs font-semibold text-gray-600">
-            <Flag className="w-3 h-3 text-gray-500" /> {p.priority}
-          </div>
+          <span
+            className={`px-3 py-1 text-xs rounded-full font-semibold ${
+              p.status === "ACTIVE"
+                ? "bg-green-50 text-green-600"
+                : "bg-gray-100 text-gray-500"
+            }`}
+          >
+            {p.status || "UNKNOWN"}
+          </span>
         </div>
 
-        <h3 className="font-bold text-xl text-gray-900 mb-1 group-hover:text-green-600 transition-colors">
-          {p.name}
-        </h3>
-        <p className="text-sm text-gray-500 mb-2">
-          Mã: <span className="font-mono">{p.projectCode}</span>
-        </p>
-        <p className="text-sm text-gray-600 mb-4 line-clamp-2 min-h-[2.5rem]">
+        <p className="text-sm text-gray-600 mb-3 line-clamp-2 min-h-[2.5rem]">
           {p.description || "Không có mô tả"}
         </p>
 
-        <div className="flex items-center justify-between text-sm text-gray-500 border-t pt-3">
-          <div className="flex items-center gap-1.5">
-            <User className="w-4 h-4 text-gray-400" />
-            {p.managerName || "Chưa có quản lý"}
+        <div className="flex items-center gap-2 text-sm text-gray-600 mb-2">
+          <Target className="w-4 h-4 text-green-500" />
+          {p.goal || "Không có mục tiêu"}
+        </div>
+
+        <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
+          <div className="flex items-center gap-1">
+            <User className="w-3.5 h-3.5" /> {p.managerName || "Chưa có QL"}
           </div>
-          <div className="flex items-center gap-1.5">
-            <Calendar className="w-4 h-4 text-gray-400" />
-            {new Date(p.startDate).toLocaleDateString("vi-VN")}
+          <div className="flex items-center gap-1">
+            <Flag className="w-3.5 h-3.5" /> {p.priority}
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between text-xs text-gray-500">
+          <div className="flex items-center gap-1">
+            <Calendar className="w-3.5 h-3.5" />
+            {p.startDate
+              ? new Date(p.startDate).toLocaleDateString("vi-VN")
+              : "--"}
+            {" → "}
+            {p.dueDate
+              ? new Date(p.dueDate).toLocaleDateString("vi-VN")
+              : "--"}
+          </div>
+          <div className="flex items-center gap-1">
+            <BarChart className="w-3.5 h-3.5" /> {p.progress || 0}%
           </div>
         </div>
 
@@ -164,17 +202,14 @@ export default function ProjectPage() {
             onClick={() => handleDelete(p.id)}
             className="mt-4 w-full flex items-center justify-center gap-2 text-red-600 border border-red-200 py-2 rounded-lg hover:bg-red-50 transition-all"
           >
-            <Trash2 className="w-4 h-4" /> Xóa
+            <Trash2 className="w-4 h-4" /> Xóa dự án
           </button>
         )}
       </div>
     </div>
   );
 
-  const list =
-    activeTab === "active"
-      ? projects
-      : trashedProjects;
+  const list = activeTab === "active" ? projects : trashedProjects;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-white via-green-50/40 to-white py-8">
@@ -188,7 +223,7 @@ export default function ProjectPage() {
             <div>
               <h1 className="text-3xl font-bold">Dự án / Projects</h1>
               <p className="text-white/80 text-sm">
-                Quản lý danh sách dự án trong workspace
+                Quản lý và tạo mới dự án trong workspace
               </p>
             </div>
           </div>
@@ -210,7 +245,7 @@ export default function ProjectPage() {
                 : "text-gray-500"
             }`}
           >
-            Tất cả dự án ({projects.length})
+            Dự án hiện tại ({projects.length})
           </button>
           <button
             onClick={() => setActiveTab("trash")}
@@ -243,7 +278,7 @@ export default function ProjectPage() {
         {/* Modal tạo dự án */}
         {showModal && (
           <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden">
               <div className="bg-gradient-to-r from-green-500 to-emerald-500 p-6 flex items-center justify-between text-white">
                 <h2 className="text-lg font-semibold flex items-center gap-2">
                   <Plus className="w-5 h-5" /> Tạo dự án mới
@@ -256,8 +291,8 @@ export default function ProjectPage() {
                 </button>
               </div>
 
-              <form onSubmit={handleCreate} className="p-6 space-y-5">
-                <div>
+              <form onSubmit={handleCreate} className="p-6 grid grid-cols-2 gap-4">
+                <div className="col-span-2">
                   <label className="block text-sm font-semibold mb-1">
                     Tên dự án
                   </label>
@@ -265,9 +300,10 @@ export default function ProjectPage() {
                     value={form.name}
                     onChange={(e) => setForm({ ...form, name: e.target.value })}
                     placeholder="Nhập tên dự án"
-                    className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:border-green-500 focus:ring-2 focus:ring-green-100 outline-none"
+                    className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:border-green-500 outline-none"
                   />
                 </div>
+
                 <div>
                   <label className="block text-sm font-semibold mb-1">
                     Mã dự án
@@ -278,10 +314,68 @@ export default function ProjectPage() {
                       setForm({ ...form, projectCode: e.target.value })
                     }
                     placeholder="VD: ENG001"
-                    className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:border-green-500 focus:ring-2 focus:ring-green-100 outline-none"
+                    className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:border-green-500 outline-none"
                   />
                 </div>
+
                 <div>
+                  <label className="block text-sm font-semibold mb-1">
+                    Mức độ ưu tiên
+                  </label>
+                  <select
+                    value={form.priority}
+                    onChange={(e) =>
+                      setForm({ ...form, priority: e.target.value })
+                    }
+                    className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:border-green-500 outline-none"
+                  >
+                    <option value="LOW">Thấp</option>
+                    <option value="MEDIUM">Trung bình</option>
+                    <option value="HIGH">Cao</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold mb-1">
+                    Ngày bắt đầu
+                  </label>
+                  <input
+                    type="date"
+                    value={form.startDate}
+                    onChange={(e) =>
+                      setForm({ ...form, startDate: e.target.value })
+                    }
+                    className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:border-green-500 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold mb-1">
+                    Ngày kết thúc
+                  </label>
+                  <input
+                    type="date"
+                    value={form.dueDate}
+                    onChange={(e) =>
+                      setForm({ ...form, dueDate: e.target.value })
+                    }
+                    className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:border-green-500 outline-none"
+                  />
+                </div>
+
+                <div className="col-span-2">
+                  <label className="block text-sm font-semibold mb-1">
+                    Mục tiêu (Goal)
+                  </label>
+                  <input
+                    value={form.goal}
+                    onChange={(e) => setForm({ ...form, goal: e.target.value })}
+                    placeholder="VD: Hoàn thành MVP trong 3 tháng"
+                    className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:border-green-500 outline-none"
+                  />
+                </div>
+
+                <div className="col-span-2">
                   <label className="block text-sm font-semibold mb-1">
                     Mô tả
                   </label>
@@ -292,23 +386,37 @@ export default function ProjectPage() {
                     }
                     rows={3}
                     placeholder="Mô tả ngắn gọn..."
-                    className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:border-green-500 focus:ring-2 focus:ring-green-100 outline-none resize-none"
+                    className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:border-green-500 outline-none resize-none"
                   />
                 </div>
 
-                <div className="flex gap-3 pt-2">
+                <div className="col-span-2">
+                  <label className="block text-sm font-semibold mb-1">
+                    Ảnh bìa (URL)
+                  </label>
+                  <input
+                    value={form.coverImageUrl}
+                    onChange={(e) =>
+                      setForm({ ...form, coverImageUrl: e.target.value })
+                    }
+                    placeholder="https://example.com/image.jpg"
+                    className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:border-green-500 outline-none"
+                  />
+                </div>
+
+                <div className="col-span-2 flex gap-3 pt-2">
                   <button
                     type="button"
                     onClick={() => setShowModal(false)}
-                    className="flex-1 px-4 py-3 border-2 border-gray-200 rounded-xl hover:bg-gray-50 font-semibold transition-all duration-300"
+                    className="flex-1 border-2 border-gray-200 rounded-xl py-3 hover:bg-gray-50 font-semibold"
                   >
                     Hủy
                   </button>
                   <button
                     type="submit"
-                    className="flex-1 px-4 py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-xl hover:from-green-600 hover:to-emerald-600 font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
+                    className="flex-1 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-xl py-3 hover:from-green-600 hover:to-emerald-600 font-semibold"
                   >
-                    Tạo
+                    Tạo dự án
                   </button>
                 </div>
               </form>

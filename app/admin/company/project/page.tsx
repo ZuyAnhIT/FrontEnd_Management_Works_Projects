@@ -1,5 +1,4 @@
 "use client";
-
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import {
@@ -12,9 +11,16 @@ import {
   User,
   Target,
   Flag,
+  Trash2,
+  RefreshCw,
 } from "lucide-react";
 import { getCurrentUser } from "@/app/api/apiUser";
-import { getProjects, createProject } from "@/app/api/apiProject";
+import {
+  getProjects,
+  createProject,
+  deleteProject,
+  getTrashedProjects,
+} from "@/app/api/apiProject";
 import { useToast } from "@/components/ui/ToastProvider";
 
 export default function ProjectPage() {
@@ -24,8 +30,10 @@ export default function ProjectPage() {
 
   const [companyId, setCompanyId] = useState<number | null>(null);
   const [projects, setProjects] = useState<any[]>([]);
+  const [trashed, setTrashed] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [showTrash, setShowTrash] = useState(false); // 🔁 toggle Thùng rác
 
   const [form, setForm] = useState({
     name: "",
@@ -54,23 +62,25 @@ export default function ProjectPage() {
     fetchCompanyId();
   }, [showToast]);
 
-  // 🧩 2️⃣ Lấy danh sách dự án khi có workspaceId
+  // 🧩 2️⃣ Lấy danh sách dự án (hoặc thùng rác)
   useEffect(() => {
     if (!companyId || !workspaceId) return;
 
-    const fetchProjects = async () => {
+    const fetchData = async () => {
       try {
         setLoading(true);
-        const data = await getProjects(workspaceId);
-        setProjects(data);
+        const data = showTrash
+          ? await getTrashedProjects(workspaceId)
+          : await getProjects(workspaceId);
+        showTrash ? setTrashed(data) : setProjects(data);
       } catch (err: any) {
         showToast(err.message || "Không thể tải danh sách dự án", "error");
       } finally {
         setLoading(false);
       }
     };
-    fetchProjects();
-  }, [companyId, workspaceId, showToast]);
+    fetchData();
+  }, [companyId, workspaceId, showTrash, showToast]);
 
   // 🧩 3️⃣ Tạo dự án mới
   const handleCreate = async (e: React.FormEvent) => {
@@ -99,7 +109,20 @@ export default function ProjectPage() {
     }
   };
 
-  // 🧭 4️⃣ Render
+  // 🗑️ 4️⃣ Xóa dự án
+  const handleDelete = async (projectId: number) => {
+    const confirm = window.confirm("Bạn có chắc muốn xóa dự án này?");
+    if (!confirm) return;
+    try {
+      await deleteProject(workspaceId, projectId);
+      setProjects((prev) => prev.filter((p) => p.id !== projectId));
+      showToast("Đã chuyển dự án vào thùng rác.", "success");
+    } catch (err: any) {
+      showToast(err.message || "Không thể xóa dự án!", "error");
+    }
+  };
+
+  // 🧭 5️⃣ Render
   if (loading)
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -109,13 +132,14 @@ export default function ProjectPage() {
       </div>
     );
 
+  const currentList = showTrash ? trashed : projects;
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-white via-green-50/40 to-white py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="relative overflow-hidden bg-gradient-to-br from-green-500 via-emerald-500 to-cyan-500 rounded-3xl p-8 mb-8 shadow-2xl">
           <div className="absolute inset-0 bg-grid-white/10"></div>
-          <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
 
           <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div className="flex items-center gap-4">
@@ -135,37 +159,62 @@ export default function ProjectPage() {
               </div>
             </div>
 
-            <button
-              onClick={() => setShowModal(true)}
-              className="group flex items-center gap-2 px-6 py-3 bg-white text-green-600 rounded-xl hover:bg-gray-50 transition-all duration-300 shadow-lg hover:shadow-xl font-semibold hover:scale-105"
-            >
-              <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform duration-300" />
-              Tạo dự án mới
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setShowTrash(!showTrash)}
+                className="flex items-center gap-2 px-5 py-3 bg-white text-green-600 rounded-xl hover:bg-gray-50 font-semibold shadow-lg hover:shadow-xl transition-all"
+              >
+                {showTrash ? (
+                  <>
+                    <RefreshCw className="w-5 h-5" /> Quay lại danh sách
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-5 h-5" /> Thùng rác
+                  </>
+                )}
+              </button>
+
+              {!showTrash && (
+                <button
+                  onClick={() => setShowModal(true)}
+                  className="group flex items-center gap-2 px-6 py-3 bg-white text-green-600 rounded-xl hover:bg-gray-50 transition-all duration-300 shadow-lg hover:shadow-xl font-semibold hover:scale-105"
+                >
+                  <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform duration-300" />
+                  Tạo dự án mới
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
         {/* Projects Grid */}
-        {projects.length === 0 ? (
+        {currentList.length === 0 ? (
           <div className="bg-white rounded-2xl shadow-xl border-2 border-dashed border-gray-200 p-16 text-center animate-fadeInUp">
             <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full flex items-center justify-center">
               <FolderKanban className="w-10 h-10 text-gray-400" />
             </div>
             <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              Chưa có dự án nào
+              {showTrash ? "Thùng rác trống" : "Chưa có dự án nào"}
             </h3>
-            <p className="text-gray-500 mb-6">Tạo dự án đầu tiên để bắt đầu</p>
-            <button
-              onClick={() => setShowModal(true)}
-              className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
-            >
-              <Plus className="w-5 h-5" />
-              Tạo dự án đầu tiên
-            </button>
+            <p className="text-gray-500 mb-6">
+              {showTrash
+                ? "Không có dự án nào trong thùng rác"
+                : "Tạo dự án đầu tiên để bắt đầu"}
+            </p>
+            {!showTrash && (
+              <button
+                onClick={() => setShowModal(true)}
+                className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+              >
+                <Plus className="w-5 h-5" />
+                Tạo dự án đầu tiên
+              </button>
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fadeInUp">
-            {projects.map((p, i) => (
+            {currentList.map((p, i) => (
               <div
                 key={p.id}
                 className="group relative bg-white rounded-2xl border border-gray-200 overflow-hidden hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 cursor-pointer"
@@ -205,6 +254,15 @@ export default function ProjectPage() {
                       {new Date(p.startDate).toLocaleDateString("vi-VN")}
                     </div>
                   </div>
+
+                  {!showTrash && (
+                    <button
+                      onClick={() => handleDelete(p.id)}
+                      className="absolute top-3 right-3 bg-red-50 hover:bg-red-100 text-red-600 p-2 rounded-lg transition-all"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
@@ -215,7 +273,6 @@ export default function ProjectPage() {
         {showModal && (
           <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-slideUp">
-              {/* Header */}
               <div className="bg-gradient-to-r from-green-500 to-emerald-500 p-6 flex items-center justify-between">
                 <h2 className="text-white text-lg font-semibold flex items-center gap-2">
                   <Plus className="w-5 h-5" /> Tạo dự án mới
@@ -228,58 +285,42 @@ export default function ProjectPage() {
                 </button>
               </div>
 
-              {/* Body */}
               <form onSubmit={handleCreate} className="p-6 space-y-5">
                 <div>
-                  <label className="block text-sm font-semibold mb-1">
-                    Tên dự án
-                  </label>
+                  <label className="block text-sm font-semibold mb-1">Tên dự án</label>
                   <input
                     value={form.name}
                     onChange={(e) => setForm({ ...form, name: e.target.value })}
                     placeholder="Nhập tên dự án"
-                    className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:border-green-500 focus:ring-2 focus:ring-green-100 outline-none"
+                    className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:border-green-500 outline-none"
                   />
                 </div>
-
                 <div>
-                  <label className="block text-sm font-semibold mb-1">
-                    Mã dự án
-                  </label>
+                  <label className="block text-sm font-semibold mb-1">Mã dự án</label>
                   <input
                     value={form.projectCode}
-                    onChange={(e) =>
-                      setForm({ ...form, projectCode: e.target.value })
-                    }
+                    onChange={(e) => setForm({ ...form, projectCode: e.target.value })}
                     placeholder="VD: ENG001"
-                    className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:border-green-500 focus:ring-2 focus:ring-green-100 outline-none"
+                    className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:border-green-500 outline-none"
                   />
                 </div>
-
                 <div>
-                  <label className="block text-sm font-semibold mb-1">
-                    Mô tả
-                  </label>
+                  <label className="block text-sm font-semibold mb-1">Mô tả</label>
                   <textarea
                     value={form.description}
-                    onChange={(e) =>
-                      setForm({ ...form, description: e.target.value })
-                    }
+                    onChange={(e) => setForm({ ...form, description: e.target.value })}
                     rows={3}
                     placeholder="Mô tả ngắn gọn..."
-                    className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:border-green-500 focus:ring-2 focus:ring-green-100 outline-none resize-none"
+                    className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:border-green-500 outline-none resize-none"
                   />
                 </div>
-
                 <div>
-                  <label className="block text-sm font-semibold mb-1">
-                    Mục tiêu (Goal)
-                  </label>
+                  <label className="block text-sm font-semibold mb-1">Mục tiêu (Goal)</label>
                   <input
                     value={form.goal}
                     onChange={(e) => setForm({ ...form, goal: e.target.value })}
                     placeholder="VD: Hoàn thiện MVP trong 3 tháng"
-                    className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:border-green-500 focus:ring-2 focus:ring-green-100 outline-none"
+                    className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:border-green-500 outline-none"
                   />
                 </div>
 
@@ -287,13 +328,13 @@ export default function ProjectPage() {
                   <button
                     type="button"
                     onClick={() => setShowModal(false)}
-                    className="flex-1 px-4 py-3 border-2 border-gray-200 rounded-xl hover:bg-gray-50 font-semibold transition-all duration-300"
+                    className="flex-1 border-2 border-gray-200 rounded-xl py-3 hover:bg-gray-50 font-semibold"
                   >
                     Hủy
                   </button>
                   <button
                     type="submit"
-                    className="flex-1 px-4 py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-xl hover:from-green-600 hover:to-emerald-600 font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
+                    className="flex-1 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-xl py-3 hover:from-green-600 hover:to-emerald-600 font-semibold"
                   >
                     Tạo
                   </button>
@@ -303,28 +344,6 @@ export default function ProjectPage() {
           </div>
         )}
       </div>
-
-      <style jsx>{`
-        .bg-grid-white\\/10 {
-          background-image: linear-gradient(white 1px, transparent 1px),
-            linear-gradient(90deg, white 1px, transparent 1px);
-          background-size: 20px 20px;
-          opacity: 0.1;
-        }
-        @keyframes slideUp {
-          from {
-            opacity: 0;
-            transform: translateY(20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        .animate-slideUp {
-          animation: slideUp 0.3s ease-out;
-        }
-      `}</style>
     </div>
   );
 }
