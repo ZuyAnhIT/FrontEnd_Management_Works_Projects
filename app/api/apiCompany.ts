@@ -178,7 +178,43 @@ export const getCompanyMembers = async (
     );
   }
 };
+ // ===================================================
+// 🔹 5️⃣ Lấy danh chi tiết sách thành viên công ty
+// ===================================================
+export const getDetailCompanyMembers = async (
+  companyId: number,
+  memberId: number
+): Promise<CompanyMember[]> => {
+  if (!companyId || companyId <= 0)
+    throw new Error("Thiếu hoặc sai ID công ty.");
+  if (!memberId || memberId <= 0)
+    throw new Error("Thiếu hoặc sai ID thành viên.");
 
+  const token = localStorage.getItem("accessToken");
+  if (!token) throw new Error("Người dùng chưa đăng nhập.");
+
+  try {
+    const res = await apiClient.get(
+      `/companies/${companyId}/members/${memberId}`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
+
+    const data = res.data;
+    if (!data.success)
+      throw new Error(data.message || "Không thể lấy danh sách thành viên.");
+
+    return data.data as CompanyMember[];
+  } catch (err: any) {
+    console.error(" Lỗi lấy danh sách thành viên:", err);
+    throw new Error(
+      err.response?.data?.message ??
+        err.message ??
+        "Lỗi hệ thống, không thể tải danh sách thành viên."
+    );
+  }
+};
 // ===================================================
 // 🔹 6️⃣ Xóa thành viên khỏi công ty
 // ===================================================
