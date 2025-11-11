@@ -18,13 +18,17 @@ export const getCompanyWorkspaces = async (companyId: number) => {
     const data = res.data;
 
     if (!data.success) {
-      throw new Error(data.message || "Không thể lấy danh sách không gian làm việc.");
+      throw new Error(
+        data.message || "Không thể lấy danh sách không gian làm việc."
+      );
     }
 
     return data.data; // Trả về mảng workspace
   } catch (err: any) {
     console.error(" Lỗi lấy danh sách workspace:", err);
-    throw new Error(err.response?.data?.message || "Lỗi hệ thống, vui lòng thử lại.");
+    throw new Error(
+      err.response?.data?.message || "Lỗi hệ thống, vui lòng thử lại."
+    );
   }
 };
 
@@ -44,11 +48,15 @@ export const createWorkspace = async (
   if (!token) throw new Error("Người dùng chưa đăng nhập.");
 
   try {
-    const res = await apiClient.post(`/companies/${companyId}/workspaces`, payload, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
+    const res = await apiClient.post(
+      `/companies/${companyId}/workspaces`,
+      payload,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
 
     const data = res.data;
 
@@ -59,7 +67,9 @@ export const createWorkspace = async (
     return data.data; // Trả về workspace vừa tạo
   } catch (err: any) {
     console.error(" Lỗi tạo workspace:", err);
-    throw new Error(err.response?.data?.message || "Lỗi hệ thống, vui lòng thử lại.");
+    throw new Error(
+      err.response?.data?.message || "Lỗi hệ thống, vui lòng thử lại."
+    );
   }
 };
 
@@ -101,7 +111,7 @@ export const getWorkspaceDetail = async (
     console.error(" Lỗi lấy chi tiết workspace:", err);
     throw new Error(
       err.response?.data?.message ||
-      "Lỗi hệ thống, không thể lấy chi tiết workspace."
+        "Lỗi hệ thống, không thể lấy chi tiết workspace."
     );
   }
 };
@@ -150,7 +160,7 @@ export const updateWorkspace = async (
     console.error(" Lỗi cập nhật workspace:", err);
     throw new Error(
       err.response?.data?.message ||
-      "Lỗi hệ thống, không thể cập nhật thông tin workspace."
+        "Lỗi hệ thống, không thể cập nhật thông tin workspace."
     );
   }
 };
@@ -184,51 +194,28 @@ export const deleteWorkspace = async (
   } catch (err: any) {
     console.error(" Lỗi xóa workspace:", err);
     throw new Error(
-      err.response?.data?.message ||
-      "Lỗi hệ thống, không thể xóa workspace."
+      err.response?.data?.message || "Lỗi hệ thống, không thể xóa workspace."
     );
   }
 };
 
-// ===================================================
-// 🔹 Mời thành viên vào workspace
-// ===================================================
 export const inviteMemberToWorkspace = async (
   companyId: number,
   workspaceId: number,
-  payload: {
-    email: string;
-    roleId: number;
-  }
-): Promise<{ success: boolean; message: string }> => {
-  const token = localStorage.getItem("accessToken");
-  if (!token) throw new Error("Người dùng chưa đăng nhập.");
-
+  payload: { email: string; roleCode: string } // <-- Sửa từ roleId sang roleCode
+) => {
   try {
     const res = await apiClient.post(
       `/companies/${companyId}/workspaces/${workspaceId}/invite-members`,
-      payload,
-      {
-        headers: { Authorization: `Bearer ${token}` },
-      }
+      payload // Gửi payload { email, roleCode }
     );
-
-    const data = res.data;
-    if (!data.success)
-      throw new Error(data.message || "Không thể gửi lời mời thành viên.");
-
-    return {
-      success: true,
-      message: data.message || "Đã gửi lời mời thành viên thành công.",
-    };
+    return res.data;
   } catch (err: any) {
-    console.error(" Lỗi gửi lời mời thành viên workspace:", err);
-    throw new Error(
-      err.response?.data?.message ||
-      "Lỗi hệ thống, không thể gửi lời mời thành viên."
-    );
+    console.error("LỖI API:", err.response?.data || err.message);
+    throw err;
   }
 };
+
 // ===================================================
 // 🔹 Cập nhật trạng thái workspace (ACTIVE / INACTIVE / ARCHIVED)
 // ===================================================
@@ -269,7 +256,9 @@ export const updateWorkspaceStatus = async (
     const data = res.data;
 
     if (!data.success)
-      throw new Error(data.message || "Không thể cập nhật trạng thái workspace.");
+      throw new Error(
+        data.message || "Không thể cập nhật trạng thái workspace."
+      );
 
     return data;
   } catch (err: any) {
@@ -331,7 +320,9 @@ export const updatMembereWorkspaceStatus = async (
 
     const data = res.data;
     if (!data.success)
-      throw new Error(data.message || "Không thể cập nhật trạng thái workspace.");
+      throw new Error(
+        data.message || "Không thể cập nhật trạng thái workspace."
+      );
 
     return data;
   } catch (err: any) {
@@ -371,7 +362,9 @@ export const updateWorkspaceMemberStatus = async (
 
     const data = res.data;
     if (!data.success)
-      throw new Error(data.message || "Không thể cập nhật trạng thái thành viên.");
+      throw new Error(
+        data.message || "Không thể cập nhật trạng thái thành viên."
+      );
 
     return data;
   } catch (err: any) {
@@ -404,7 +397,9 @@ export const getWorkspaceMembers = async (
 
     const data = res.data;
     if (!data.success)
-      throw new Error(data.message || "Không thể lấy danh sách thành viên workspace.");
+      throw new Error(
+        data.message || "Không thể lấy danh sách thành viên workspace."
+      );
 
     return data.data as WorkspaceMember[];
   } catch (err: any) {

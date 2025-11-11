@@ -1,7 +1,7 @@
 "use client";
 
 import apiClient from "@/lib/apiClient";
-import { getCurrentUser } from "@/app/api/apiUser";
+import { getCurrentUser } from "@/services/apiUser";
 
 // ===================================================
 // 🔹 Interface kiểu dữ liệu project
@@ -36,9 +36,7 @@ export const getProjects = async (workspaceId: number): Promise<Project[]> => {
   if (!token) throw new Error("Người dùng chưa đăng nhập.");
 
   const user = await getCurrentUser();
-  const companyId = 
-  user.company?.companyId ||
-  user.workspaces?.[0].companyId;
+  const companyId = user.company?.companyId || user.workspaces?.[0].companyId;
   if (!companyId) throw new Error("Không tìm thấy ID công ty.");
 
   try {
@@ -55,7 +53,8 @@ export const getProjects = async (workspaceId: number): Promise<Project[]> => {
   } catch (err: any) {
     console.error("❌ Lỗi lấy danh sách dự án:", err);
     throw new Error(
-      err.response?.data?.message || "Lỗi hệ thống, không thể tải danh sách dự án."
+      err.response?.data?.message ||
+        "Lỗi hệ thống, không thể tải danh sách dự án."
     );
   }
 };
@@ -160,15 +159,16 @@ export const deleteProject = async (
     );
 
     const data = res.data;
-    if (!data.success)
-      throw new Error(data.message || "Không thể xóa dự án.");
+    if (!data.success) throw new Error(data.message || "Không thể xóa dự án.");
 
-    return { success: true, message: data.message || "Đã xóa dự án thành công." };
+    return {
+      success: true,
+      message: data.message || "Đã xóa dự án thành công.",
+    };
   } catch (err: any) {
     console.error(" Lỗi xóa dự án:", err);
     throw new Error(
-      err.response?.data?.message ||
-        "Lỗi hệ thống, không thể xóa dự án."
+      err.response?.data?.message || "Lỗi hệ thống, không thể xóa dự án."
     );
   }
 };

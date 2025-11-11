@@ -11,14 +11,20 @@ import {
   Globe,
   Save,
   Sparkles,
+  Loader2,
 } from "lucide-react";
-import { createCompany } from "@/app/api/apiCompany";
-import { getCurrentUser } from "@/app/api/apiUser";
+// ⛔️ Sửa đường dẫn nếu cần
+import { createCompany } from "@/services/apiCompany";
+// ✅ TỐI ƯU: Dùng useAuth
+import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/components/ui/ToastProvider";
+import LoadingButton from "@/components/ui/LoadingButton"; // Dùng LoadingButton
 
 export default function CreateCompanyPage() {
   const router = useRouter();
   const { showToast } = useToast();
+  // ✅ TỐI ƯU: Lấy hàm refreshUser từ Context
+  const { refreshUser } = useAuth();
 
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
@@ -34,6 +40,9 @@ export default function CreateCompanyPage() {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
 
+  // ----------------------------------------------------------------
+  // ✅ HÀM SUBMIT ĐÃ ĐƯỢC TỐI ƯU
+  // ----------------------------------------------------------------
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -46,16 +55,16 @@ export default function CreateCompanyPage() {
       setLoading(true);
       const newCompany = await createCompany(form);
 
-      // 🧩 Cập nhật quyền trong localStorage
-      const user = await getCurrentUser();
-      user.company = newCompany;
-      localStorage.setItem("user", JSON.stringify(user));
-      localStorage.setItem("userRole", "COMPANY_ADMIN");
+      showToast("Tạo công ty thành công! Đang chuyển hướng...", "success");
 
-      showToast("Tạo công ty thành công! Bạn đã trở thành Quản trị công ty.", "success");
+      // 🧩 BÁO CHO CONTEXT: "Tôi xong rồi, cập nhật user đi!"
+      // AuthContext sẽ tự lấy user mới (đã có role COMPANY_ADMIN)
+      // và logic Guard (trong useEffect) sẽ tự động
+      // chuyển hướng bạn đến /admin.
+      await refreshUser();
 
-      // 🔁 Điều hướng sang trang quản trị công ty
-      router.push("/admin");
+      // ❌ XÓA BỎ: logic gọi getCurrentUser, localStorage, router.push
+      // ... (Đã xóa)
     } catch (err: any) {
       showToast(err.message || "Không thể tạo công ty mới.", "error");
     } finally {
@@ -63,6 +72,7 @@ export default function CreateCompanyPage() {
     }
   };
 
+  // (Giao diện của bạn đã rất đẹp, giữ nguyên)
   return (
     <div className="min-h-screen bg-gradient-to-b from-white via-blue-50/40 to-white py-10">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -83,7 +93,7 @@ export default function CreateCompanyPage() {
                 <Sparkles className="w-5 h-5 text-yellow-300 animate-pulse" />
               </div>
               <p className="text-white/80">
-                Điền thông tin bên dưới để khởi tạo công ty của bạn
+                Bước cuối cùng! Điền thông tin để khởi tạo công ty của bạn.
               </p>
             </div>
           </div>
@@ -96,7 +106,7 @@ export default function CreateCompanyPage() {
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
                 <Building2 className="w-4 h-4 text-blue-500" />
-                Tên công ty
+                Tên công ty <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
@@ -104,6 +114,7 @@ export default function CreateCompanyPage() {
                 onChange={(e) => handleChange("companyName", e.target.value)}
                 placeholder="Nhập tên công ty"
                 className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
+                required
               />
             </div>
 
@@ -183,23 +194,14 @@ export default function CreateCompanyPage() {
 
             {/* Submit */}
             <div className="pt-6">
-              <button
+              <LoadingButton
                 type="submit"
-                disabled={loading}
-                className="group relative w-full md:w-auto flex items-center justify-center gap-3 px-8 py-4 bg-gradient-to-r from-blue-500 via-cyan-500 to-blue-600 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all disabled:opacity-60"
-              >
-                {loading ? (
-                  <div className="flex items-center gap-2">
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    <span>Đang tạo công ty...</span>
-                  </div>
-                ) : (
-                  <>
-                    <Save className="w-5 h-5" />
-                    <span>Tạo công ty</span>
-                  </>
-                )}
-              </button>
+                isLoading={loading}
+                text="Tạo công ty & Bắt đầu"
+                loadingText="Đang tạo công ty..."
+                className="w-full md:w-auto px-8 py-4"
+                icon={<Save className="w-5 h-5" />}
+              />
             </div>
           </form>
         </div>

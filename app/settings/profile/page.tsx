@@ -1,8 +1,10 @@
 "use client";
 import { useEffect, useState } from "react";
-import { getCurrentUser, updateUserProfile } from "@/app/api/apiUser";
+// ⛔️ SỬA LỖI: Import từ 'services/'
+import { updateUserProfile } from "@/services/apiUser";
 import { useToast } from "@/components/ui/ToastProvider";
-import { User, Calendar, Phone, ImageIcon, Save } from "lucide-react";
+import { User, Calendar, Phone, ImageIcon, Save, Loader2 } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 
 type GenderType = "MALE" | "FEMALE" | "OTHER";
 
@@ -12,14 +14,14 @@ interface ProfileForm {
   phoneNumber: string;
   dateOfBirth: string;
   gender: GenderType;
-  email?: string; // để hiển thị thêm email từ API
+  email?: string;
 }
 
 export default function ProfilePage() {
   const { showToast } = useToast();
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const { user, isLoading: isAuthLoading } = useAuth(); // Lấy từ Context
 
+  const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<ProfileForm>({
     fullName: "",
     avatarUrl: "",
@@ -29,27 +31,19 @@ export default function ProfilePage() {
     email: "",
   });
 
-  // 🧩 Lấy thông tin người dùng hiện tại
+  // Set form khi user từ Context đã sẵn sàng
   useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        const user = await getCurrentUser();
-        setForm({
-          fullName: user.fullName || "",
-          avatarUrl: user.avatarUrl || "",
-          phoneNumber: user.phoneNumber || "",
-          dateOfBirth: user.dateOfBirth || "",
-          gender: (user.gender as GenderType) || "MALE",
-          email: user.email || "",
-        });
-      } catch (err: any) {
-        showToast(err.message || "Không thể tải thông tin cá nhân", "error");
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchProfile();
-  }, [showToast]);
+    if (user) {
+      setForm({
+        fullName: user.fullName || "",
+        avatarUrl: user.avatarUrl || "",
+        phoneNumber: user.phoneNumber || "",
+        dateOfBirth: user.dateOfBirth ? user.dateOfBirth.split("T")[0] : "",
+        gender: (user.gender as GenderType) || "MALE",
+        email: user.email || "",
+      });
+    }
+  }, [user]);
 
   const handleChange = (field: keyof ProfileForm, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -69,7 +63,7 @@ export default function ProfilePage() {
         avatarUrl: form.avatarUrl,
         phoneNumber: form.phoneNumber,
         dateOfBirth: form.dateOfBirth,
-        gender: form.gender as GenderType,
+        gender: form.gender,
       });
       showToast("✅ Cập nhật thông tin thành công!", "success");
     } catch (err: any) {
@@ -79,97 +73,102 @@ export default function ProfilePage() {
     }
   };
 
-  if (loading)
+  if (isAuthLoading)
     return (
-      <div className="p-6 text-gray-500 text-center">Đang tải thông tin...</div>
+      <div className="bg-white rounded-xl shadow-xl border border-gray-200 p-6 flex justify-center items-center h-96">
+        <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
+      </div>
     );
 
+  // 🎨 CHỈ RETURN CARD (Nội dung)
+  // Bỏ div bọc 'p-6 max-w-3xl'
   return (
-    <div className="p-6 max-w-3xl mx-auto">
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        {/* 🧍 Header thông tin */}
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-12 h-12 bg-blue-100 flex items-center justify-center rounded-lg">
-            <User className="w-6 h-6 text-blue-600" />
-          </div>
-          <div>
-            <h1 className="text-xl font-semibold text-gray-900">Hồ sơ cá nhân</h1>
-            <p className="text-sm text-gray-500">
-              Cập nhật thông tin tài khoản của bạn tại đây
-            </p>
-          </div>
+    <div className="bg-white rounded-xl shadow-xl border border-gray-200 p-6 sm:p-8 animate-fadeInUp">
+      {/* 🧍 Header thông tin */}
+      <div className="flex items-center gap-4 mb-6 pb-6 border-b border-gray-100">
+        <div className="w-12 h-12 bg-blue-100 flex items-center justify-center rounded-lg">
+          <User className="w-6 h-6 text-blue-600" />
         </div>
+        <div>
+          <h1 className="text-xl font-semibold text-gray-900">Hồ sơ cá nhân</h1>
+          <p className="text-sm text-gray-500">
+            Cập nhật thông tin tài khoản của bạn tại đây
+          </p>
+        </div>
+      </div>
 
-        {/* ✍️ Form cập nhật */}
-        <form onSubmit={handleSubmit} className="space-y-5">
-          {/* Email (không chỉnh sửa) */}
-          {form.email && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700">
-                Email
-              </label>
-              <input
-                type="email"
-                value={form.email}
-                disabled
-                className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 bg-gray-100 text-gray-600 cursor-not-allowed"
-              />
-            </div>
-          )}
+      {/* ✍️ Form cập nhật */}
+      <form onSubmit={handleSubmit} className="space-y-5">
+        {/* Email (không chỉnh sửa) */}
+        {form.email && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Email
+            </label>
+            <input
+              type="email"
+              value={form.email}
+              disabled
+              className="mt-1 w-full border-2 border-gray-200 rounded-xl px-4 py-3 bg-gray-100 text-gray-600 cursor-not-allowed"
+            />
+          </div>
+        )}
 
+        {/* 🎨 Grid cho các trường */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           {/* Họ tên */}
           <div>
-            <label className="block text-sm font-medium text-gray-700">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
               Họ và tên
             </label>
-            <div className="relative mt-1">
-              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <div className="relative">
+              <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
                 type="text"
                 value={form.fullName}
                 onChange={(e) => handleChange("fullName", e.target.value)}
                 placeholder="Nhập họ và tên"
-                className="pl-9 w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500"
+                className="pl-10 pr-4 py-3 w-full border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
               />
             </div>
           </div>
 
           {/* Số điện thoại */}
           <div>
-            <label className="block text-sm font-medium text-gray-700">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
               Số điện thoại
             </label>
-            <div className="relative mt-1">
-              <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <div className="relative">
+              <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
                 type="text"
                 value={form.phoneNumber}
                 onChange={(e) => handleChange("phoneNumber", e.target.value)}
                 placeholder="Nhập số điện thoại"
-                className="pl-9 w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500"
+                className="pl-10 pr-4 py-3 w-full border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
               />
             </div>
           </div>
 
           {/* Ngày sinh */}
           <div>
-            <label className="block text-sm font-medium text-gray-700">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
               Ngày sinh
             </label>
-            <div className="relative mt-1">
-              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <div className="relative">
+              <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
                 type="date"
                 value={form.dateOfBirth || ""}
                 onChange={(e) => handleChange("dateOfBirth", e.target.value)}
-                className="pl-9 w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500"
+                className="pl-10 pr-4 py-3 w-full border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
               />
             </div>
           </div>
 
           {/* Giới tính */}
           <div>
-            <label className="block text-sm font-medium text-gray-700">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
               Giới tính
             </label>
             <select
@@ -177,59 +176,57 @@ export default function ProfilePage() {
               onChange={(e) =>
                 handleChange("gender", e.target.value as GenderType)
               }
-              className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500"
+              className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
             >
               <option value="MALE">Nam</option>
               <option value="FEMALE">Nữ</option>
               <option value="OTHER">Khác</option>
             </select>
           </div>
+        </div>
 
-          {/* Ảnh đại diện */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700">
-              Ảnh đại diện (URL)
-            </label>
-            <div className="relative mt-1">
-              <ImageIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input
-                type="text"
-                value={form.avatarUrl}
-                onChange={(e) => handleChange("avatarUrl", e.target.value)}
-                placeholder="Dán URL ảnh đại diện"
-                className="pl-9 w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500"
+        {/* Ảnh đại diện */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Ảnh đại diện (URL)
+          </label>
+          <div className="relative">
+            <ImageIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              value={form.avatarUrl}
+              onChange={(e) => handleChange("avatarUrl", e.target.value)}
+              placeholder="Dán URL ảnh đại diện"
+              className="pl-10 pr-4 py-3 w-full border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            />
+          </div>
+          {form.avatarUrl && (
+            <div className="mt-3">
+              <img
+                src={form.avatarUrl}
+                alt="Avatar Preview"
+                className="w-24 h-24 rounded-full object-cover border-2 border-gray-200 p-1"
               />
             </div>
+          )}
+        </div>
 
-            {/* 🔍 Preview ảnh */}
-            {form.avatarUrl && (
-              <div className="mt-3 flex justify-center">
-                <img
-                  src={form.avatarUrl}
-                  alt="Avatar Preview"
-                  className="w-24 h-24 rounded-full object-cover border"
-                />
-              </div>
-            )}
-          </div>
-
-          {/* Nút lưu */}
-          <div className="pt-3">
-            <button
-              type="submit"
-              disabled={saving}
-              className={`flex items-center justify-center gap-2 w-full md:w-auto bg-blue-600 text-white px-5 py-2.5 rounded-lg transition ${
-                saving
-                  ? "opacity-70 cursor-not-allowed"
-                  : "hover:bg-blue-700 active:scale-[0.98]"
-              }`}
-            >
-              <Save className="w-4 h-4" />
-              {saving ? "Đang lưu..." : "Lưu thay đổi"}
-            </button>
-          </div>
-        </form>
-      </div>
+        {/* Nút lưu */}
+        <div className="pt-4 border-t border-gray-100">
+          <button
+            type="submit"
+            disabled={saving}
+            className={`flex items-center justify-center gap-2 w-full md:w-auto bg-blue-600 text-white px-6 py-3 rounded-xl font-semibold transition ${
+              saving
+                ? "opacity-70 cursor-not-allowed"
+                : "hover:bg-blue-700 active:scale-[0.98] shadow-lg shadow-blue-500/30"
+            }`}
+          >
+            <Save className="w-4 h-4" />
+            {saving ? "Đang lưu..." : "Lưu thay đổi"}
+          </button>
+        </div>
+      </form>
     </div>
   );
 }

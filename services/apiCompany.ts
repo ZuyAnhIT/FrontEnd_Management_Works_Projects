@@ -89,16 +89,17 @@ export const updateCompany = async (
 };
 
 // ===================================================
-// 🔹 3️⃣ Tạo công ty mới
+// 🔹 3️⃣ Tạo công ty mới (PHIÊN BẢN SỬA LỖI)
 // ===================================================
-export const createCompany = async (payload: Partial<Company>): Promise<Company> => {
-  const token = localStorage.getItem("accessToken");
-  if (!token) throw new Error("Người dùng chưa đăng nhập.");
+export const createCompany = async (
+  payload: Partial<Company>
+): Promise<Company> => {
+  // ❌ KHÔNG LẤY TOKEN Ở ĐÂY. apiClient (interceptor) sẽ tự làm.
+  // const token = localStorage.getItem("accessToken");
 
   try {
-    const res = await apiClient.post(`/companies`, payload, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    // Chỉ cần gọi post. apiClient sẽ tự gắn Header Authorization
+    const res = await apiClient.post(`/companies`, payload);
 
     const data = res.data;
     if (!data.success)
@@ -124,12 +125,11 @@ export const inviteMemberToCompany = async (
 ) => {
   const token = localStorage.getItem("accessToken");
   if (!token) throw new Error("Người dùng chưa đăng nhập.");
-  const roleCode= 
-  payload.roleId===2 ? "COMPANY_ADMIN" : "COMPANY_MEMBER";
-  const body={
+  const roleCode = payload.roleId === 2 ? "COMPANY_ADMIN" : "COMPANY_MEMBER";
+  const body = {
     email: payload.email,
     roleCode,
-  }
+  };
   try {
     const res = await apiClient.post(
       `/companies/${companyId}/invitations`,
@@ -183,7 +183,7 @@ export const getCompanyMembers = async (
     );
   }
 };
- // ===================================================
+// ===================================================
 // 🔹 5️⃣ Lấy danh chi tiết sách thành viên công ty
 // ===================================================
 export const getDetailCompanyMembers = async (
@@ -223,7 +223,10 @@ export const getDetailCompanyMembers = async (
 // ===================================================
 // 🔹 6️⃣ Xóa thành viên khỏi công ty
 // ===================================================
-export const removeCompanyMember = async (companyId: number, userId: number) => {
+export const removeCompanyMember = async (
+  companyId: number,
+  userId: number
+) => {
   if (!companyId || !userId)
     throw new Error("Thiếu thông tin công ty hoặc người dùng.");
 
@@ -249,4 +252,18 @@ export const removeCompanyMember = async (companyId: number, userId: number) => 
         "Lỗi hệ thống, không thể xóa thành viên."
     );
   }
+};
+
+// ✅ HÀM MỚI: Cập nhật trạng thái thành viên
+export const updateCompanyMemberStatus = async (
+  companyId: number,
+  userId: number,
+  newStatus: string
+) => {
+  const res = await apiClient.put(
+    `/companies/${companyId}/members/${userId}/status`,
+    { newStatus }
+  );
+  // Giả sử API trả về { success: true, message: "...", data: updatedMember }
+  return res.data.data;
 };

@@ -2,20 +2,21 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { getCurrentUser } from "@/app/api/apiUser";
-import { getWorkspaceDetail } from "@/app/api/apiWorkspace";
-import { 
-  Settings, 
-  Plus, 
-  FolderKanban, 
-  Users, 
-  CheckCircle2, 
+// ✅ Lấy user từ Context
+import { useAuth } from "@/context/AuthContext";
+// ⛔️ SỬA LỖI: Import từ 'services/'
+import { getWorkspaceDetail } from "@/services/apiWorkspace";
+import {
+  Settings,
+  FolderKanban,
+  Users,
   Clock,
-  TrendingUp,
   Sparkles,
-  BarChart3,
-  Calendar,
-  Target
+  Target,
+  Loader2,
+  TrendingUp, // ✅ Thêm icon
+  Calendar, // ✅ Thêm icon
+  BarChart3, // ✅ Thêm icon
 } from "lucide-react";
 import { useToast } from "@/components/ui/ToastProvider";
 
@@ -24,46 +25,38 @@ export default function WorkspaceOverviewPage() {
   const params = useParams();
   const workspaceId = Number(params.workspaceId);
 
+  // ✅ Lấy user từ Context
+  const { user, isLoading: isAuthLoading } = useAuth();
+  const companyId = user?.company?.companyId || null; // Lấy companyId
+
   const [loading, setLoading] = useState(true);
-  const [companyId, setCompanyId] = useState<number | null>(null);
+  const [workspace, setWorkspace] = useState<any>(null); // Khởi tạo là null
 
-  const [workspace, setWorkspace] = useState({
-    workspaceName: "",
-    description: "",
-    memberCount: 0,
-    projectCount: 0,
-    taskCount: 0,
-    completionRate: 0,
-  });
-
-  // 🧩 1️⃣ Lấy companyId từ user hiện tại
+  // 🧩 Lấy thông tin chi tiết workspace
   useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const user = await getCurrentUser();
-        setCompanyId(user.company?.companyId || null);
-      } catch (err: any) {
-        showToast("Không thể tải thông tin người dùng", "error");
-      }
-    };
-    fetchUser();
-  }, [showToast]);
+    // Chờ Auth và companyId sẵn sàng
+    if (isAuthLoading) return;
+    if (!companyId || !workspaceId) {
+      if (!isAuthLoading)
+        showToast("Không thể tải thông tin phòng ban!", "error");
+      setLoading(false);
+      return;
+    }
 
-  // 🧩 2️⃣ Lấy thông tin chi tiết workspace
-  useEffect(() => {
-    if (!companyId || !workspaceId) return;
     const fetchWorkspace = async () => {
       try {
+        setLoading(true);
         const data = await getWorkspaceDetail(companyId, workspaceId);
 
-        // ⚙️ Giả lập số liệu thống kê (khi backend chưa có)
+        // ⚙️ Giả lập số liệu thống kê (nếu cần)
         setWorkspace({
           workspaceName: data.workspaceName,
           description: data.description || "Chưa có mô tả",
-          memberCount: Math.floor(Math.random() * 15) + 5, // 5–20
-          projectCount: Math.floor(Math.random() * 10) + 1,
-          taskCount: Math.floor(Math.random() * 150) + 20,
-          completionRate: Math.floor(Math.random() * 100),
+          memberCount: data.memberCount || Math.floor(Math.random() * 15) + 5,
+          projectCount: data.projectCount || Math.floor(Math.random() * 10) + 1,
+          taskCount: data.taskCount || Math.floor(Math.random() * 150) + 20,
+          completionRate:
+            data.completionRate || Math.floor(Math.random() * 100),
         });
       } catch (err: any) {
         showToast(err.message || "Không thể tải thông tin phòng ban!", "error");
@@ -72,20 +65,28 @@ export default function WorkspaceOverviewPage() {
       }
     };
     fetchWorkspace();
-  }, [companyId, workspaceId, showToast]);
+  }, [companyId, workspaceId, isAuthLoading, showToast]); // Thêm isAuthLoading
 
-  if (loading)
+  if (isAuthLoading || loading)
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-white via-blue-50/40 to-white">
-        <div className="text-center space-y-4 animate-pulse">
-          <div className="w-16 h-16 mx-auto rounded-full bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center">
-            <Sparkles className="w-8 h-8 text-white animate-spin" />
-          </div>
-          <p className="text-gray-600 font-medium">Đang tải dữ liệu workspace...</p>
+      <div className="min-h-[80vh] flex items-center justify-center bg-gradient-to-b from-white via-blue-50/40 to-white">
+        <div className="text-center space-y-4">
+          <Loader2 className="w-12 h-12 mx-auto text-green-500 animate-spin" />
+          <p className="text-gray-600 font-medium">
+            Đang tải dữ liệu workspace...
+          </p>
         </div>
       </div>
     );
 
+  if (!workspace)
+    return (
+      <div className="p-8 text-center text-red-500">
+        Không thể tải dữ liệu phòng ban.
+      </div>
+    );
+
+  // 🎨 Giao diện đầy đủ của bạn
   return (
     <div className="min-h-screen bg-gradient-to-b from-white via-blue-50/40 to-white">
       {/* 🎨 Background decoration */}
@@ -98,18 +99,20 @@ export default function WorkspaceOverviewPage() {
         {/* 🔹 Hero Header */}
         <div className="relative overflow-hidden bg-gradient-to-br from-green-500 via-emerald-500 to-cyan-500 rounded-3xl p-8 shadow-2xl animate-fadeIn">
           <div className="absolute inset-0 bg-grid-white/10"></div>
-          
+
           <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
             {/* Left side */}
             <div className="flex items-center gap-4 flex-1">
               <div className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center shadow-lg">
                 <FolderKanban className="w-8 h-8 text-white" />
               </div>
-              
+
               <div>
                 <div className="flex items-center gap-2 mb-1">
                   <Sparkles className="w-5 h-5 text-yellow-300 animate-pulse" />
-                  <span className="text-white/80 text-sm font-medium">Workspace</span>
+                  <span className="text-white/80 text-sm font-medium">
+                    Workspace
+                  </span>
                 </div>
                 <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
                   {workspace.workspaceName}
@@ -144,7 +147,7 @@ export default function WorkspaceOverviewPage() {
           {/* Dự án */}
           <div className="group relative overflow-hidden bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
             <div className="absolute inset-0 bg-gradient-to-br from-blue-50 to-cyan-50 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-            
+
             <div className="relative z-10">
               <div className="flex items-center justify-between mb-4">
                 <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center shadow-md">
@@ -154,12 +157,14 @@ export default function WorkspaceOverviewPage() {
                   Projects
                 </span>
               </div>
-              
+
               <h3 className="text-3xl font-bold text-gray-900 mb-1">
                 {workspace.projectCount}
               </h3>
-              <p className="text-sm text-gray-600 font-medium">Dự án đang hoạt động</p>
-              
+              <p className="text-sm text-gray-600 font-medium">
+                Dự án đang hoạt động
+              </p>
+
               <div className="mt-3 flex items-center gap-1 text-xs text-blue-600">
                 <TrendingUp className="w-3 h-3" />
                 <span>+2 tuần này</span>
@@ -170,7 +175,7 @@ export default function WorkspaceOverviewPage() {
           {/* Thành viên */}
           <div className="group relative overflow-hidden bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
             <div className="absolute inset-0 bg-gradient-to-br from-green-50 to-emerald-50 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-            
+
             <div className="relative z-10">
               <div className="flex items-center justify-between mb-4">
                 <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-500 rounded-xl flex items-center justify-center shadow-md">
@@ -180,12 +185,14 @@ export default function WorkspaceOverviewPage() {
                   Members
                 </span>
               </div>
-              
+
               <h3 className="text-3xl font-bold text-gray-900 mb-1">
                 {workspace.memberCount}
               </h3>
-              <p className="text-sm text-gray-600 font-medium">Thành viên trong team</p>
-              
+              <p className="text-sm text-gray-600 font-medium">
+                Thành viên trong team
+              </p>
+
               <div className="mt-3 flex items-center gap-1 text-xs text-green-600">
                 <TrendingUp className="w-3 h-3" />
                 <span>+3 thành viên mới</span>
@@ -196,7 +203,7 @@ export default function WorkspaceOverviewPage() {
           {/* Công việc */}
           <div className="group relative overflow-hidden bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
             <div className="absolute inset-0 bg-gradient-to-br from-purple-50 to-pink-50 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-            
+
             <div className="relative z-10">
               <div className="flex items-center justify-between mb-4">
                 <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center shadow-md">
@@ -206,12 +213,14 @@ export default function WorkspaceOverviewPage() {
                   Tasks
                 </span>
               </div>
-              
+
               <h3 className="text-3xl font-bold text-gray-900 mb-1">
                 {workspace.taskCount}
               </h3>
-              <p className="text-sm text-gray-600 font-medium">Công việc tổng cộng</p>
-              
+              <p className="text-sm text-gray-600 font-medium">
+                Công việc tổng cộng
+              </p>
+
               <div className="mt-3 flex items-center gap-1 text-xs text-purple-600">
                 <Calendar className="w-3 h-3" />
                 <span>12 deadline tuần này</span>
@@ -222,7 +231,7 @@ export default function WorkspaceOverviewPage() {
           {/* Hoàn thành */}
           <div className="group relative overflow-hidden bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
             <div className="absolute inset-0 bg-gradient-to-br from-orange-50 to-yellow-50 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-            
+
             <div className="relative z-10">
               <div className="flex items-center justify-between mb-4">
                 <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-yellow-500 rounded-xl flex items-center justify-center shadow-md">
@@ -232,15 +241,17 @@ export default function WorkspaceOverviewPage() {
                   Progress
                 </span>
               </div>
-              
+
               <h3 className="text-3xl font-bold bg-gradient-to-r from-orange-500 to-yellow-500 bg-clip-text text-transparent mb-1">
                 {workspace.completionRate}%
               </h3>
-              <p className="text-sm text-gray-600 font-medium">Tỷ lệ hoàn thành</p>
-              
+              <p className="text-sm text-gray-600 font-medium">
+                Tỷ lệ hoàn thành
+              </p>
+
               {/* Progress bar */}
               <div className="mt-3 h-2 bg-gray-100 rounded-full overflow-hidden">
-                <div 
+                <div
                   className="h-full bg-gradient-to-r from-orange-500 to-yellow-500 rounded-full transition-all duration-1000"
                   style={{ width: `${workspace.completionRate}%` }}
                 ></div>
@@ -254,16 +265,19 @@ export default function WorkspaceOverviewPage() {
           <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 animate-fadeInUp delay-100">
             <div className="flex items-center gap-2 mb-3">
               <BarChart3 className="w-5 h-5 text-gray-600" />
-              <h2 className="text-lg font-semibold text-gray-900">Mô tả workspace</h2>
+              <h2 className="text-lg font-semibold text-gray-900">
+                Mô tả workspace
+              </h2>
             </div>
-            <p className="text-gray-600 leading-relaxed">{workspace.description}</p>
+            <p className="text-gray-600 leading-relaxed">
+              {workspace.description}
+            </p>
           </div>
         )}
 
-
         {/* 💡 Quick Actions (Optional) */}
         <div className="grid md:grid-cols-3 gap-4 animate-fadeInUp delay-200">
-          <button 
+          <button
             onClick={() => showToast("Chức năng đang phát triển", "info")}
             className="p-4 bg-white rounded-xl border border-gray-200 hover:border-blue-300 hover:shadow-lg transition-all text-left group"
           >
@@ -271,12 +285,16 @@ export default function WorkspaceOverviewPage() {
               <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center group-hover:bg-blue-100 transition-colors">
                 <Users className="w-5 h-5 text-blue-600" />
               </div>
-              <h4 className="font-semibold text-gray-900">Quản lý thành viên</h4>
+              <h4 className="font-semibold text-gray-900">
+                Quản lý thành viên
+              </h4>
             </div>
-            <p className="text-sm text-gray-500">Thêm, xóa hoặc chỉnh sửa quyền thành viên</p>
+            <p className="text-sm text-gray-500">
+              Thêm, xóa hoặc chỉnh sửa quyền thành viên
+            </p>
           </button>
 
-          <button 
+          <button
             onClick={() => showToast("Chức năng đang phát triển", "info")}
             className="p-4 bg-white rounded-xl border border-gray-200 hover:border-green-300 hover:shadow-lg transition-all text-left group"
           >
@@ -284,12 +302,16 @@ export default function WorkspaceOverviewPage() {
               <div className="w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center group-hover:bg-green-100 transition-colors">
                 <BarChart3 className="w-5 h-5 text-green-600" />
               </div>
-              <h4 className="font-semibold text-gray-900">Báo cáo & Thống kê</h4>
+              <h4 className="font-semibold text-gray-900">
+                Báo cáo & Thống kê
+              </h4>
             </div>
-            <p className="text-sm text-gray-500">Xem hiệu suất và tiến độ chi tiết</p>
+            <p className="text-sm text-gray-500">
+              Xem hiệu suất và tiến độ chi tiết
+            </p>
           </button>
 
-          <button 
+          <button
             onClick={() => showToast("Chức năng đang phát triển", "info")}
             className="p-4 bg-white rounded-xl border border-gray-200 hover:border-purple-300 hover:shadow-lg transition-all text-left group"
           >
@@ -297,12 +319,17 @@ export default function WorkspaceOverviewPage() {
               <div className="w-10 h-10 bg-purple-50 rounded-lg flex items-center justify-center group-hover:bg-purple-100 transition-colors">
                 <Settings className="w-5 h-5 text-purple-600" />
               </div>
-              <h4 className="font-semibold text-gray-900">Cấu hình Workspace</h4>
+              <h4 className="font-semibold text-gray-900">
+                Cấu hình Workspace
+              </h4>
             </div>
-            <p className="text-sm text-gray-500">Tùy chỉnh quy trình và quyền hạn</p>
+            <p className="text-sm text-gray-500">
+              Tùy chỉnh quy trình và quyền hạn
+            </p>
           </button>
         </div>
       </div>
+
     </div>
   );
 }

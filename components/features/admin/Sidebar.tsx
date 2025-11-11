@@ -13,20 +13,19 @@ import {
   LayoutDashboard,
   Crown,
   Sparkles,
-  Menu,
   X,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { getCompanyWorkspaces } from "@/app/api/apiWorkspace";
-import { getCurrentUser } from "@/app/api/apiUser";
-import { useToast } from "@/components/ui/ToastProvider";
+import { useAuth } from "@/context/AuthContext"; // 1. Import useAuth
 
 interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
   activeMenu: string;
   setActiveMenu: (id: string) => void;
+  workspaces: any[]; // 2. Nhận props
+  loadingWs: boolean; // 2. Nhận props
 }
 
 export default function AdminSidebar({
@@ -34,73 +33,81 @@ export default function AdminSidebar({
   onClose,
   activeMenu,
   setActiveMenu,
+  workspaces, // 3. Dùng props
+  loadingWs, // 3. Dùng props
 }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
-  const [workspaces, setWorkspaces] = useState<any[]>([]);
-  const [loadingWs, setLoadingWs] = useState(false);
-  const [companyId, setCompanyId] = useState<number | null>(null);
-
   const pathname = usePathname();
   const router = useRouter();
-  const { showToast } = useToast();
 
-  const isCompanyAdmin = pathname?.startsWith("/admin/company");
-  const isUserAdmin = pathname?.startsWith("/admin") && !isCompanyAdmin;
+  // 4. Lấy role từ Context để kiểm tra
+  const { role } = useAuth();
 
-  // 🧭 Menu chính cho Admin
+  // 5. Logic kiểm tra trang (đã đúng)
+  const isCompanyAdminPage = pathname?.startsWith("/admin/company");
+  const isUserAdminPage = pathname?.startsWith("/admin") && !isCompanyAdminPage;
+
+  // 6. Logic kiểm tra vai trò
+  const isCompanyAdminRole = role === "COMPANY_ADMIN";
+
+  // 7. Menu (đã đúng)
   const defaultMenu = [
-    { id: "home", icon: Home, label: "Trang chủ", path: "/admin/home" },
-    { id: "tasks", icon: UserCheck, label: "Việc của tôi", path: "/admin/tasks" },
+    { id: "home", icon: Home, label: "Trang chủ", path: "/admin" }, // Sửa path
+    {
+      id: "tasks",
+      icon: UserCheck,
+      label: "Việc của tôi",
+      path: "/admin/tasks",
+    },
   ];
-
   const companyMenu = [
-    { id: "dashboard", icon: LayoutDashboard, label: "Tổng quan", path: "/admin/company/dashboard" },
-    { id: "info", icon: CreditCard, label: "Thông tin", path: "/admin/company/companyinfo" },
-    { id: "members", icon: Users, label: "Thành viên", path: "/admin/company/members" },
-    { id: "workspaces", icon: FolderKanban, label: "Phòng ban", path: "/admin/company/workspaces" },
-    { id: "project", icon: FolderKanban, label: "Dự án", path: "/admin/company/project" },
-    { id: "billing", icon: CreditCard, label: "Thanh toán", path: "/admin/company/billing" },
+    {
+      id: "dashboard",
+      icon: LayoutDashboard,
+      label: "Tổng quan",
+      path: "/admin/company/dashboard",
+    },
+    {
+      id: "info",
+      icon: CreditCard,
+      label: "Thông tin",
+      path: "/admin/company/companyinfo",
+    },
+    {
+      id: "members",
+      icon: Users,
+      label: "Thành viên",
+      path: "/admin/company/members",
+    },
+    {
+      id: "workspaces",
+      icon: FolderKanban,
+      label: "Phòng ban",
+      path: "/admin/company/workspaces",
+    },
+    {
+      id: "project",
+      icon: FolderKanban,
+      label: "Dự án",
+      path: "/admin/company/project",
+    },
+    {
+      id: "billing",
+      icon: CreditCard,
+      label: "Thanh toán",
+      path: "/admin/company/billing",
+    },
   ];
 
-  const menuItems = isCompanyAdmin ? companyMenu : defaultMenu;
-
-  // 🧩 1️⃣ Lấy thông tin công ty
-  useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const user = await getCurrentUser();
-        if (user?.company?.companyId) setCompanyId(user.company.companyId);
-      } catch (err: any) {
-        showToast(err.message || "Không thể lấy thông tin người dùng.", "error");
-      }
-    };
-    fetchUser();
-  }, [showToast]);
-
-  // 🧩 2️⃣ Lấy danh sách workspace theo công ty
-  useEffect(() => {
-    if (!isUserAdmin || !companyId) return;
-    const fetchWorkspaces = async () => {
-      try {
-        setLoadingWs(true);
-        const data = await getCompanyWorkspaces(companyId);
-        setWorkspaces(data || []);
-      } catch (err: any) {
-        showToast(err.message || "Không thể tải danh sách phòng ban", "error");
-      } finally {
-        setLoadingWs(false);
-      }
-    };
-    fetchWorkspaces();
-  }, [isUserAdmin, companyId, showToast]);
+  const menuItems = isCompanyAdminPage ? companyMenu : defaultMenu;
 
   return (
     <>
       {/* Overlay for mobile */}
       {isOpen && (
-        <div 
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden animate-fadeIn" 
-          onClick={onClose} 
+        <div
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden animate-fadeIn"
+          onClick={onClose}
         />
       )}
 
@@ -114,27 +121,28 @@ export default function AdminSidebar({
       >
         {/* ===== Header with Gradient ===== */}
         <div className="relative overflow-hidden bg-gradient-to-br from-blue-500 via-cyan-500 to-blue-600 p-4 shadow-lg">
-          {/* Background decoration */}
-          <div className="absolute inset-0 bg-grid-white/10"></div>
-          <div className="absolute -right-4 -top-4 w-24 h-24 bg-white/10 rounded-full blur-2xl"></div>
-          <div className="absolute -left-4 -bottom-4 w-20 h-20 bg-white/10 rounded-full blur-2xl"></div>
-
+          {/* ... (Code UI Header của Sidebar) ... */}
           <div className="relative z-10 flex items-center justify-between">
-            {/* Logo & Title */}
-            <div className={`flex items-center gap-3 ${collapsed ? "justify-center w-full" : ""}`}>
+            <div
+              className={`flex items-center gap-3 ${
+                collapsed ? "justify-center w-full" : ""
+              }`}
+            >
               <div className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center shadow-lg">
                 <Building className="w-5 h-5 text-white" />
               </div>
               {!collapsed && (
                 <div>
                   <div className="flex items-center gap-1.5 mb-0.5">
-                    {isCompanyAdmin && <Crown className="w-3.5 h-3.5 text-yellow-300" />}
+                    {isCompanyAdminRole && (
+                      <Crown className="w-3.5 h-3.5 text-yellow-300" />
+                    )}
                     <span className="font-bold text-white text-sm">
-                      {isCompanyAdmin ? "Admin Panel" : "WorkNet"}
+                      {isCompanyAdminPage ? "Admin Panel" : "WorkNet"}
                     </span>
                   </div>
                   <span className="text-white/80 text-xs">
-                    {isCompanyAdmin ? "Quản trị công ty" : "Dashboard"}
+                    {isCompanyAdminPage ? "Quản trị công ty" : "Dashboard"}
                   </span>
                 </div>
               )}
@@ -180,7 +188,7 @@ export default function AdminSidebar({
                 Menu chính
               </div>
             )}
-            
+
             {menuItems.map((item, index) => {
               const isActive = pathname === item.path;
               return (
@@ -198,9 +206,17 @@ export default function AdminSidebar({
                   } ${collapsed ? "justify-center" : ""}`}
                   style={{ animationDelay: `${index * 50}ms` }}
                 >
-                  <item.icon className={`w-5 h-5 transition-transform ${!isActive && "group-hover:scale-110"}`} />
+                  <item.icon
+                    className={`w-5 h-5 transition-transform ${
+                      !isActive && "group-hover:scale-110"
+                    }`}
+                  />
                   {!collapsed && (
-                    <span className={`flex-1 text-left font-medium ${isActive ? "font-semibold" : ""}`}>
+                    <span
+                      className={`flex-1 text-left font-medium ${
+                        isActive ? "font-semibold" : ""
+                      }`}
+                    >
                       {item.label}
                     </span>
                   )}
@@ -213,7 +229,7 @@ export default function AdminSidebar({
           </div>
 
           {/* ===== Danh sách Workspace ===== */}
-          {isUserAdmin && !isCompanyAdmin && (
+          {isUserAdminPage && isCompanyAdminRole && (
             <div className="space-y-2">
               {!collapsed && (
                 <div className="px-3 py-2 text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
@@ -222,6 +238,7 @@ export default function AdminSidebar({
                 </div>
               )}
 
+              {/* 11. Dùng state từ props */}
               {loadingWs ? (
                 !collapsed && (
                   <div className="flex items-center gap-2 px-3 py-2 text-gray-400 text-sm">
@@ -232,12 +249,14 @@ export default function AdminSidebar({
               ) : workspaces.length > 0 ? (
                 <div className="space-y-1 max-h-64 overflow-y-auto custom-scrollbar">
                   {workspaces.map((ws, index) => {
-                    const isActive = pathname === `/admin/workspaces/${ws.workspaceId}`;
+                    const isActive =
+                      pathname === `/admin/workspaces/${ws.workspaceId}`; // Tạm giữ link admin này
                     return (
                       <button
                         key={ws.workspaceId}
                         onClick={() => {
-                          router.push(`/admin/workspaces/${ws.workspaceId}`);
+                          // TỐI ƯU "NHẬP VAI": Chuyển sang /core/
+                          router.push(`/core/workspace/${ws.workspaceId}`);
                           if (window.innerWidth < 1024) onClose();
                         }}
                         className={`group w-full flex items-center gap-2 px-3 py-2.5 rounded-lg transition-all duration-200 ${
@@ -247,15 +266,19 @@ export default function AdminSidebar({
                         } ${collapsed ? "justify-center" : ""}`}
                         style={{ animationDelay: `${index * 30}ms` }}
                       >
-                        <div className={`w-2 h-2 rounded-full transition-all ${
-                          isActive 
-                            ? "bg-green-500 shadow-lg shadow-green-500/50" 
-                            : "bg-gray-300 group-hover:bg-gray-400"
-                        }`}></div>
+                        <div
+                          className={`w-2 h-2 rounded-full transition-all ${
+                            isActive
+                              ? "bg-green-500 shadow-lg shadow-green-500/50"
+                              : "bg-gray-300 group-hover:bg-gray-400"
+                          }`}
+                        ></div>
                         {!collapsed && (
-                          <span className={`flex-1 text-left text-sm truncate ${
-                            isActive ? "font-semibold" : ""
-                          }`}>
+                          <span
+                            className={`flex-1 text-left text-sm truncate ${
+                              isActive ? "font-semibold" : ""
+                            }`}
+                          >
                             {ws.workspaceName}
                           </span>
                         )}
@@ -264,6 +287,8 @@ export default function AdminSidebar({
                   })}
                 </div>
               ) : (
+                // ✅ ĐÂY LÀ PHẦN SỬA LỖI (Dòng 177 cũ)
+                // Thêm lại code hiển thị "Chưa có phòng ban"
                 !collapsed && (
                   <div className="px-3 py-2 text-gray-400 text-sm">
                     Chưa có phòng ban nào
@@ -274,7 +299,7 @@ export default function AdminSidebar({
               {/* Create new workspace button */}
               <button
                 onClick={() => {
-                  router.push("/admin/company/workspaces");
+                  router.push("/admin/company/workspaces"); // Link này đúng
                   if (window.innerWidth < 1024) onClose();
                 }}
                 className={`group w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-gray-700 hover:bg-gradient-to-r hover:from-blue-50 hover:to-cyan-50 border-2 border-dashed border-gray-300 hover:border-blue-400 transition-all ${
@@ -282,7 +307,9 @@ export default function AdminSidebar({
                 }`}
               >
                 <Plus className="w-4 h-4 group-hover:rotate-90 transition-transform" />
-                {!collapsed && <span className="text-sm font-medium">Tạo phòng ban</span>}
+                {!collapsed && (
+                  <span className="text-sm font-medium">Tạo phòng ban</span>
+                )}
               </button>
             </div>
           )}
@@ -294,15 +321,17 @@ export default function AdminSidebar({
             <div className="relative overflow-hidden bg-gradient-to-br from-yellow-400 via-orange-400 to-pink-500 rounded-xl p-4 shadow-lg">
               {/* Shine effect */}
               <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 animate-shine"></div>
-              
+
               <div className="relative z-10 flex items-center gap-3">
                 <div className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
                   <Crown className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <div className="text-white text-xs font-medium mb-0.5">Gói hiện tại</div>
+                  <div className="text-white text-xs font-medium mb-0.5">
+                    Gói hiện tại
+                  </div>
                   <div className="text-white font-bold text-sm flex items-center gap-1">
-                    {isCompanyAdmin ? "Admin Pro" : "VIP Premium"}
+                    {isCompanyAdminRole ? "Admin Pro" : "VIP Premium"}
                     <Sparkles className="w-3 h-3 animate-pulse" />
                   </div>
                 </div>
@@ -318,6 +347,7 @@ export default function AdminSidebar({
         </div>
       </aside>
 
+      {/* Style (giữ nguyên) */}
       <style jsx>{`
         .custom-scrollbar::-webkit-scrollbar {
           width: 4px;
@@ -348,6 +378,17 @@ export default function AdminSidebar({
         }
         .animate-shine {
           animation: shine 3s infinite;
+        }
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+          }
+          to {
+            opacity: 1;
+          }
+        }
+        .animate-fadeIn {
+          animation: fadeIn 0.3s ease-out;
         }
       `}</style>
     </>
