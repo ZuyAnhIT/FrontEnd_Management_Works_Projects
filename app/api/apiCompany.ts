@@ -124,11 +124,16 @@ export const inviteMemberToCompany = async (
 ) => {
   const token = localStorage.getItem("accessToken");
   if (!token) throw new Error("Người dùng chưa đăng nhập.");
-
+  const roleCode= 
+  payload.roleId===2 ? "COMPANY_ADMIN" : "COMPANY_MEMBER";
+  const body={
+    email: payload.email,
+    roleCode,
+  }
   try {
     const res = await apiClient.post(
       `/companies/${companyId}/invitations`,
-      payload,
+      body,
       { headers: { Authorization: `Bearer ${token}` } }
     );
 

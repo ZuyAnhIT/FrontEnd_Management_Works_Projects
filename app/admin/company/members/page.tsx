@@ -66,7 +66,7 @@ export default function MembersPage() {
     }
 
     try {
-      await inviteMemberToCompany(companyId, { email, roleId });
+      await inviteMemberToCompany(companyId, { email, roleId  });
       showToast("Đã gửi lời mời thành viên thành công!", "success");
       setEmail("");
       setRoleId(2);
@@ -80,7 +80,7 @@ export default function MembersPage() {
     }
   };
 
-  // ❌ 4️⃣ Xóa thành viên
+  //  4️⃣ Xóa thành viên
   const handleRemove = async (userId: number) => {
     if (!companyId) return;
     if (!confirm("Bạn có chắc muốn xóa thành viên này?")) return;
