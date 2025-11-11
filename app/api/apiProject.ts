@@ -36,7 +36,9 @@ export const getProjects = async (workspaceId: number): Promise<Project[]> => {
   if (!token) throw new Error("Người dùng chưa đăng nhập.");
 
   const user = await getCurrentUser();
-  const companyId = user.company?.companyId;
+  const companyId = 
+  user.company?.companyId ||
+  user.workspaces?.[0].companyId;
   if (!companyId) throw new Error("Không tìm thấy ID công ty.");
 
   try {
