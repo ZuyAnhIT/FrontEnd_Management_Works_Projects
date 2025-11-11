@@ -28,7 +28,10 @@ export const verifyEmail = async (payload: { email: string; otp: string }) => {
 // ===================================================
 // 🧩 Đăng nhập tài khoản
 // ===================================================
-export const loginUser = async (payload: { email: string; password: string }) => {
+export const loginUser = async (payload: {
+  email: string;
+  password: string;
+}) => {
   const res = await apiClient.post("/auth/login", payload);
   const data = res.data;
 
@@ -60,7 +63,7 @@ export const logoutUser = async () => {
 };
 
 // ===================================================
-// 🧩 Đăng ký từ lời mời
+// 🧩 Đăng ký từ Lời mời (Trường hợp 1)
 // ===================================================
 export const registerFromInvite = async (payload: {
   fullName: string;
@@ -68,20 +71,17 @@ export const registerFromInvite = async (payload: {
   invitationToken: string;
 }) => {
   try {
-    const res = await apiClient.post(`/auth/register-from-invite`, payload);
+    const res = await apiClient.post("/auth/register-from-invite", payload);
     const data = res.data;
 
     if (!data.success) {
       throw new Error(data.message || "Không thể đăng ký từ lời mời.");
     }
 
-    // ✅ Lưu token vào localStorage để đăng nhập ngay sau khi đăng ký
-    localStorage.setItem("accessToken", data.data.accessToken);
-    localStorage.setItem("refreshToken", data.data.refreshToken);
-
+    // API này trả về tokens để tự động đăng nhập
     return data.data; // { accessToken, refreshToken, tokenType }
   } catch (err: any) {
-    console.error(" Lỗi đăng ký từ lời mời:", err.response || err);
+    console.error("Lỗi đăng ký từ lời mời:", err.response || err);
     throw new Error(
       err.response?.data?.message ||
         "Lỗi hệ thống, không thể đăng ký từ lời mời."
@@ -100,11 +100,13 @@ export const forgotPassword = async (email: string) => {
 // ===================================================
 // 🧩 Đặt lại mật khẩu
 // ===================================================
-export const resetPassword = async (payload: { token: string; newPassword: string }) => {
+export const resetPassword = async (payload: {
+  token: string;
+  newPassword: string;
+}) => {
   const res = await apiClient.post("/auth/reset-password", payload);
   return res.data; // response { success, message, data }
 };
-
 
 // 🧩 Đăng nhập bằng Google
 // ===================================================
@@ -112,7 +114,8 @@ export const loginWithGoogle = async (googleToken: string) => {
   const res = await apiClient.post("/auth/google", { googleToken });
   const data = res.data;
 
-  if (!data.success) throw new Error(data.message || "Đăng nhập Google thất bại!");
+  if (!data.success)
+    throw new Error(data.message || "Đăng nhập Google thất bại!");
 
   if (data.data?.accessToken && data.data?.refreshToken) {
     localStorage.setItem("accessToken", data.data.accessToken);
@@ -121,4 +124,3 @@ export const loginWithGoogle = async (googleToken: string) => {
 
   return data;
 };
-

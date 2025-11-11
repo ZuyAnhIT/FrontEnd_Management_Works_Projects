@@ -1,8 +1,11 @@
 "use client";
+
 import { useState, useEffect } from "react";
 import Header from "@/components/features/admin/Header";
 import Sidebar from "@/components/features/admin/Sidebar";
-import { getCurrentUser } from "@/app/api/apiUser";
+import { useAuth } from "@/context/AuthContext";
+// ⛔️ SỬA ĐƯỜNG DẪN!
+import { getCompanyWorkspaces } from "@/services/apiWorkspace";
 import { useToast } from "@/components/ui/ToastProvider";
 
 export default function AdminLayout({
@@ -12,57 +15,70 @@ export default function AdminLayout({
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeMenu, setActiveMenu] = useState("home");
-  const [user, setUser] = useState<{ name: string; email: string } | null>(null);
-  const [loading, setLoading] = useState(true);
 
+  // 1. Lấy state từ Context, không gọi API
+  const { user, isLoading, isAuthenticated } = useAuth();
   const { showToast } = useToast();
 
-  // 🧩 Lấy thông tin user từ API
+  // 2. Layout chịu trách nhiệm lấy data cho Sidebar
+  const [workspaces, setWorkspaces] = useState<any[]>([]);
+  const [loadingWs, setLoadingWs] = useState(false);
+
   useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const data = await getCurrentUser();
-        // ✅ Chuẩn hóa dữ liệu
-        setUser({
-          name: data.fullName || "Người dùng",
-          email: data.email || "Không có email",
-        });
-      } catch (err: any) {
-        showToast(err.message || "Không thể tải thông tin người dùng", "error");
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchUser();
-  }, [showToast]);
+    // Chỉ fetch khi đã đăng nhập và có companyId
+    if (isAuthenticated && user?.company?.companyId) {
+      const fetchWorkspaces = async () => {
+        try {
+          setLoadingWs(true);
+          // ⛔️ SỬA ĐƯỜNG DẪN!
+          const data = await getCompanyWorkspaces(user.company.companyId);
+          setWorkspaces(data || []);
+        } catch (err: any) {
+          showToast(
+            err.message || "Không thể tải danh sách phòng ban",
+            "error"
+          );
+        } finally {
+          setLoadingWs(false);
+        }
+      };
+      fetchWorkspaces();
+    }
+  }, [isAuthenticated, user, showToast]); // Thêm user, showToast
 
-  // Hiển thị khi đang load
-  if (loading)
+  // 3. Hiển thị loading (do AuthContext cung cấp)
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen text-gray-500">
-        Đang tải thông tin người dùng...
+        Đang tải và xác thực...
       </div>
     );
+  }
 
-  // Nếu chưa đăng nhập (token hết hạn hoặc lỗi)
-  if (!user)
+  // 4. Nếu AuthContext nói chưa đăng nhập (Guard đã chuyển hướng,
+  // nhưng ta vẫn nên có 1 fallback)
+  if (!user) {
     return (
       <div className="flex items-center justify-center h-screen text-gray-500">
-        Không thể tải thông tin người dùng. Vui lòng đăng nhập lại.
+        Vui lòng đăng nhập.
       </div>
     );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* 🧭 Header nhận user động */}
-      <Header onMenuToggle={() => setSidebarOpen(!sidebarOpen)} user={user} />
+      {/* 5. Truyền user xuống Header */}
+      <Header onMenuToggle={() => setSidebarOpen(!sidebarOpen)} />
 
       <div className="flex flex-1 overflow-hidden">
+        {/* 6. Truyền data workspaces xuống Sidebar */}
         <Sidebar
           isOpen={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
           activeMenu={activeMenu}
           setActiveMenu={setActiveMenu}
+          workspaces={workspaces} // <-- Truyền props
+          loadingWs={loadingWs} // <-- Truyền props
         />
 
         <main className="flex-1 overflow-y-auto">{children}</main>

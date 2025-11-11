@@ -2,20 +2,15 @@
 
 import { useState } from "react";
 import InputField from "./InputField";
-import PasswordField from "./PasswordField";
-import { Mail, KeyRound } from "lucide-react";
+import { Mail } from "lucide-react";
 import LoadingButton from "@/components/ui/LoadingButton";
-import { forgotPassword, resetPassword } from "@/app/api/apiAuth";
+// ⛔️ Sửa đường dẫn nếu cần
+import { forgotPassword } from "@/services/apiAuth";
 
 interface AuthFormForgotProps {
-  form: {
-    email: string;
-    token: string;
-    newPassword: string;
-    confirmNewPassword: string;
-  };
+  form: { email: string }; // Chỉ cần email
   handleChange: (
-    field: keyof AuthFormForgotProps["form"]
+    field: "email"
   ) => (e: React.ChangeEvent<HTMLInputElement>) => void;
   isLoading: boolean;
   setTab: (tab: string) => void;
@@ -27,132 +22,82 @@ export default function AuthFormForgot({
   isLoading,
   setTab,
 }: AuthFormForgotProps) {
-  // 🧩 Step: 1 = gửi mail, 2 = nhập token + mật khẩu mới
-  const [step, setStep] = useState<1 | 2>(1);
   const [message, setMessage] = useState<string | null>(null);
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [isError, setIsError] = useState(false);
 
-  // 🧩 Bước 1: Gửi mail có token
+  // ❌ Xóa state loading riêng, dùng isLoading từ AuthModal
+  // const [loading, setLoading] = useState(false);
+  // ❌ Xóa state 'step'
+
   const handleSendEmail = async () => {
     if (!form.email.trim()) {
-      return setMessage(" Vui lòng nhập email hợp lệ.");
+      setMessage("Vui lòng nhập email hợp lệ.");
+      setIsError(true);
+      return;
     }
 
     try {
       setMessage(null);
-      setLoading(true);
+      setIsError(false);
+      // setLoading(true); // Tạm thời dùng prop isLoading từ cha
+      // (Tuy nhiên, logic submit này nên ở AuthModal,
+      // nhưng ta tạm giữ ở đây cho nhanh)
+
       const res = await forgotPassword(form.email);
-      setMessage(res?.message || " Đã gửi liên kết/mã token vào email của bạn.");
-      setStep(2);
+      setMessage(
+        res?.message || "Đã gửi liên kết. Vui lòng kiểm tra email (kể cả Spam)."
+      );
+      setIsError(false);
+
+      // ❌ Không chuyển sang Step 2 nữa
+      // setStep(2);
     } catch (error: any) {
-      setMessage(error.message || " Gửi email thất bại.");
+      setMessage(error.message || "Gửi email thất bại. Thử lại sau.");
+      setIsError(true);
     } finally {
-      setLoading(false);
-    }
-  };
-
-  // 🧩 Bước 2: Gửi token + mật khẩu mới
-  const handleResetPassword = async () => {
-    if (!form.token?.trim()) {
-      return setMessage(" Vui lòng nhập mã token nhận được qua email.");
-    }
-    if (form.newPassword !== form.confirmNewPassword) {
-      return setMessage(" Mật khẩu xác nhận không khớp.");
-    }
-
-    try {
-      setMessage(null);
-      setLoading(true);
-      const res = await resetPassword({
-        token: form.token.trim(),
-        newPassword: form.newPassword,
-      });
-
-      setMessage(res?.message || " Đặt lại mật khẩu thành công!");
-      setTimeout(() => setTab("login"), 1500);
-    } catch (error: any) {
-      setMessage(error.message || " Token không hợp lệ hoặc đã hết hạn.");
-    } finally {
-      setLoading(false);
+      // setLoading(false);
     }
   };
 
   return (
     <div>
-      {/* 🧩 Bước 1: Nhập email */}
-      {step === 1 && (
-        <>
-          <InputField
-            label="Email"
-            icon={<Mail className="w-4 h-4 text-gray-400" />}
-            type="email"
-            value={form.email}
-            onChange={handleChange("email")}
-            placeholder="user@gmail.com"
-            required
-          />
-          <LoadingButton
-            type="button"
-            isLoading={loading}
-            onClick={handleSendEmail}
-            className="w-full mt-4"
-            text="Gửi liên kết / mã token"
-          />
-        </>
-      )}
+      {/* 🧩 Chỉ còn Step 1: Nhập email */}
+      <InputField
+        label="Email"
+        icon={<Mail className="w-4 h-4 text-gray-400" />}
+        type="email"
+        value={form.email}
+        onChange={handleChange("email")}
+        placeholder="user@gmail.com"
+        required
+      />
 
-      {/* 🧩 Bước 2: Nhập token và mật khẩu mới */}
-      {step === 2 && (
-        <>
-          <InputField
-            label="Mã token"
-            icon={<KeyRound className="w-4 h-4 text-gray-400" />}
-            type="text"
-            value={form.token}
-            onChange={handleChange("token")}
-            placeholder="Dán mã token từ email"
-            required
-          />
+      {/* ⛔️ Lưu ý:
+        Để chuyên nghiệp, `isLoading` nên được truyền từ AuthModal.
+        Bạn nên di chuyển logic `handleSendEmail` lên AuthModal
+        giống như `handleSubmit` của Login/Register.
+        
+        Nhưng để "demo gấp" và giữ logic của bạn, chúng ta
+        tạm thời gọi 1 hàm riêng ở đây.
+        Chúng ta sẽ dùng `isLoading` của cha cho nút này.
+      */}
+      <LoadingButton
+        type="button"
+        isLoading={isLoading} // Dùng isLoading của cha
+        onClick={handleSendEmail}
+        className="w-full mt-4"
+        text="Gửi liên kết đặt lại mật khẩu"
+      />
 
-          <PasswordField
-            label="Mật khẩu mới"
-            value={form.newPassword}
-            show={showPassword}
-            toggle={() => setShowPassword(!showPassword)}
-            onChange={handleChange("newPassword")}
-          />
-          <PasswordField
-            label="Xác nhận mật khẩu mới"
-            value={form.confirmNewPassword}
-            show={showConfirm}
-            toggle={() => setShowConfirm(!showConfirm)}
-            onChange={handleChange("confirmNewPassword")}
-          />
-
-          <LoadingButton
-            type="button"
-            isLoading={loading}
-            onClick={handleResetPassword}
-            className="w-full mt-4"
-            text="Đặt lại mật khẩu"
-          />
-
-          <button
-            type="button"
-            onClick={() => setStep(1)}
-            className="w-full text-sm text-blue-600 mt-2 hover:underline"
-          >
-            ← Quay lại bước nhập email
-          </button>
-        </>
-      )}
-
+      {/* 🎨 Hiển thị thông báo */}
       {message && (
-        <p className="mt-3 text-sm text-center text-gray-600 whitespace-pre-line">
+        <div
+          className={`mt-3 text-sm text-center p-3 rounded-lg ${
+            isError ? "bg-red-50 text-red-700" : "bg-blue-50 text-blue-700"
+          }`}
+        >
           {message}
-        </p>
+        </div>
       )}
     </div>
   );

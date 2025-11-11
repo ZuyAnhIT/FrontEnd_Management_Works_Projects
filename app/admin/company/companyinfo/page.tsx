@@ -12,17 +12,25 @@ import {
   Sparkles,
   Image as ImageIcon,
   Check,
+  Loader2, // Import Loader2 cho trạng thái loading
 } from "lucide-react";
-import { getCompanyById, updateCompany } from "@/app/api/apiCompany";
-import { getCurrentUser } from "@/app/api/apiUser";
+
+// ⛔️ SỬA LỖI: Import từ 'services', không phải 'app/api'
+import { getCompanyById, updateCompany } from "@/services/apiCompany";
+// ✅ TỐI ƯU: Import useAuth để lấy thông tin user
+import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/components/ui/ToastProvider";
 
 export default function CompanyInfoPage() {
   const { showToast } = useToast();
+  // ✅ TỐI ƯU: Lấy user và trạng thái loading từ AuthContext
+  const { user, isLoading: isAuthLoading } = useAuth();
 
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true); // State loading riêng của trang
   const [saving, setSaving] = useState(false);
-  const [companyId, setCompanyId] = useState<number | null>(null);
+
+  // ✅ TỐI ƯU: Lấy companyId trực tiếp từ Context
+  const companyId = user?.company?.companyId || null;
 
   const [form, setForm] = useState({
     companyName: "",
@@ -34,34 +42,23 @@ export default function CompanyInfoPage() {
     website: "",
   });
 
-  // 🧩 1️⃣ Lấy ID công ty từ user hiện tại
-  useEffect(() => {
-    const fetchUserCompany = async () => {
-      try {
-        const user = await getCurrentUser();
-        const id = user.company?.companyId || null;
-        if (!id)
-          throw new Error("Tài khoản của bạn chưa thuộc công ty nào.");
-        setCompanyId(id);
-      } catch (err: any) {
-        showToast(
-          err.message || "Không thể lấy thông tin người dùng.",
-          "error"
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchUserCompany();
-  }, [showToast]);
+  // ❌ ĐÃ XÓA: useEffect gọi getCurrentUser() (vì đã có trong AuthContext)
 
-  // 🧩 2️⃣ Lấy thông tin công ty sau khi có companyId
+  // 🧩 Lấy thông tin công ty (Kích hoạt bởi companyId từ Context)
   useEffect(() => {
-    if (!companyId) return;
+    // Chờ AuthContext load xong VÀ phải có companyId
+    if (isAuthLoading) return;
+
+    if (!companyId) {
+      showToast("Tài khoản của bạn chưa thuộc công ty nào.", "error");
+      setLoading(false);
+      return;
+    }
 
     const fetchCompany = async () => {
       try {
         setLoading(true);
+        // ⛔️ SỬA LỖI: Import từ 'services'
         const data = await getCompanyById(companyId);
         setForm({
           companyName: data.companyName || "",
@@ -80,14 +77,14 @@ export default function CompanyInfoPage() {
     };
 
     fetchCompany();
-  }, [companyId, showToast]);
+  }, [companyId, isAuthLoading, showToast]); // Kích hoạt khi companyId/Auth sẵn sàng
 
-  // 🧩 3️⃣ Cập nhật form
+  // 🧩 Cập nhật form
   const handleChange = (field: string, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
 
-  // 🧩 4️⃣ Lưu cập nhật
+  // 🧩 Lưu cập nhật
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -103,10 +100,11 @@ export default function CompanyInfoPage() {
 
     try {
       setSaving(true);
+      // ⛔️ SỬA LỖI: Import từ 'services'
       await updateCompany(companyId, form);
       showToast("Cập nhật thông tin công ty thành công!", "success");
 
-      // 🔄 Reload lại dữ liệu để đảm bảo đồng bộ
+      // 🔄 Reload lại dữ liệu (Logic này đã đúng)
       const updated = await getCompanyById(companyId);
       setForm({
         companyName: updated.companyName || "",
@@ -124,31 +122,38 @@ export default function CompanyInfoPage() {
     }
   };
 
-  // 🧭 5️⃣ Render
-  if (loading)
+  // 🧭 Render
+  // Check cả 2 loading
+  if (isAuthLoading || loading)
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-white via-blue-50/40 to-white">
-        <div className="text-center space-y-4 animate-pulse">
-          <div className="w-16 h-16 mx-auto rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
-            <Sparkles className="w-8 h-8 text-white animate-spin" />
+        <div className="text-center space-y-4">
+          <div className="w-16 h-16 mx-auto rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center animate-pulse">
+            <Loader2 className="w-8 h-8 text-white animate-spin" />
           </div>
-          <p className="text-gray-600 font-medium">Đang tải thông tin công ty...</p>
+          <p className="text-gray-600 font-medium">
+            Đang tải thông tin công ty...
+          </p>
         </div>
       </div>
     );
 
-  if (!companyId)
+  if (!companyId && !isAuthLoading)
+    // Chỉ báo lỗi khi auth xong mà vẫn k có ID
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-white via-blue-50/40 to-white">
         <div className="text-center">
           <div className="w-20 h-20 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
             <Building2 className="w-10 h-10 text-gray-400" />
           </div>
-          <p className="text-gray-500">Bạn chưa thuộc công ty nào để xem thông tin.</p>
+          <p className="text-gray-500">
+            Bạn chưa thuộc công ty nào để xem thông tin.
+          </p>
         </div>
       </div>
     );
 
+  // 🎨 Giao diện (UI) của bạn đã rất đẹp, giữ nguyên
   return (
     <div className="min-h-screen bg-gradient-to-b from-white via-blue-50/40 to-white py-8">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -156,14 +161,16 @@ export default function CompanyInfoPage() {
         <div className="relative overflow-hidden bg-gradient-to-br from-blue-500 via-cyan-500 to-blue-600 rounded-3xl p-8 mb-8 shadow-2xl animate-fadeIn">
           <div className="absolute inset-0 bg-grid-white/10"></div>
           <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
-          
+
           <div className="relative z-10 flex items-center gap-4">
             <div className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center shadow-lg">
               <Building2 className="w-8 h-8 text-white" />
             </div>
             <div>
               <div className="flex items-center gap-2 mb-1">
-                <h1 className="text-3xl font-bold text-white">Thông tin công ty</h1>
+                <h1 className="text-3xl font-bold text-white">
+                  Thông tin công ty
+                </h1>
                 <Sparkles className="w-5 h-5 text-yellow-300 animate-pulse" />
               </div>
               <p className="text-white/80">
@@ -284,7 +291,9 @@ export default function CompanyInfoPage() {
               />
               {form.logo && (
                 <div className="mt-4 p-4 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border-2 border-dashed border-gray-300">
-                  <p className="text-xs text-gray-500 mb-2 font-medium">Preview:</p>
+                  <p className="text-xs text-gray-500 mb-2 font-medium">
+                    Preview:
+                  </p>
                   <img
                     src={form.logo}
                     alt="Company Logo"
@@ -298,11 +307,11 @@ export default function CompanyInfoPage() {
             <div className="pt-4">
               <button
                 type="submit"
-                disabled={saving}
+                disabled={saving || isAuthLoading} // Vô hiệu hóa khi đang lưu hoặc đang xác thực
                 className="group relative w-full md:w-auto flex items-center justify-center gap-3 px-8 py-4 bg-gradient-to-r from-blue-500 via-cyan-500 to-blue-600 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 disabled:opacity-60 disabled:cursor-not-allowed overflow-hidden"
               >
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
-                
+
                 <div className="relative z-10 flex items-center gap-3">
                   {saving ? (
                     <>
