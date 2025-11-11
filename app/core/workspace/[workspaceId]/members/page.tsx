@@ -12,10 +12,14 @@ import {
   Crown,
   Shield,
   X,
+  Eye,
+  Calendar,
+  User,
 } from "lucide-react";
 import {
   getWorkspaceMembers,
   inviteMemberToWorkspace,
+  getWorkspaceMemberDetail,
 } from "@/app/api/apiWorkspace";
 import { getCurrentUser } from "@/app/api/apiUser";
 import { useToast } from "@/components/ui/ToastProvider";
@@ -32,6 +36,11 @@ export default function MembersPage() {
   const [email, setEmail] = useState("");
   const [roleId, setRoleId] = useState(2);
   const [companyId, setCompanyId] = useState<number | null>(null);
+
+  // ✅ Modal xem chi tiết
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [selectedMember, setSelectedMember] = useState<any | null>(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
 
   // 🧩 1️⃣ Lấy companyId từ user hiện tại
   useEffect(() => {
@@ -66,32 +75,21 @@ export default function MembersPage() {
     fetchMembers();
   }, [companyId, workspaceId, showToast]);
 
-  // 📨 3️⃣ Gửi lời mời
-  const handleInvite = async () => {
-    if (!email.trim()) {
-      showToast("Vui lòng nhập email thành viên!", "warning");
-      return;
-    }
-    if (!companyId || !workspaceId) {
-      showToast("Không xác định được công ty hoặc workspace.", "error");
-      return;
-    }
+  // 🧩 3️⃣ Mở modal xem chi tiết
+  const handleViewDetail = async (memberId: number) => {
+    if (!companyId || !workspaceId) return;
 
     try {
-      await inviteMemberToWorkspace(companyId, workspaceId, { email, roleId });
-      showToast("Đã gửi lời mời thành viên thành công!", "success");
-      setEmail("");
-      setRoleId(2);
-      setShowInviteModal(false);
-
-      // 🔁 Reload danh sách
-      const refreshed = await getWorkspaceMembers(companyId, workspaceId);
-      setMembers(refreshed);
+      setLoadingDetail(true);
+      const detail = await getWorkspaceMemberDetail(companyId, workspaceId, memberId);
+      setSelectedMember(detail);
+      setShowDetailModal(true);
     } catch (err: any) {
-      showToast(err.message || "Gửi lời mời thất bại!", "error");
+      showToast(err.message || "Không thể tải chi tiết thành viên.", "error");
+    } finally {
+      setLoadingDetail(false);
     }
   };
-
 
   // 🔍 Lọc danh sách
   const filteredMembers = members.filter(
@@ -215,7 +213,13 @@ export default function MembersPage() {
                           : "—"}
                       </td>
                       <td className="px-6 py-4 text-center">
-                       
+                        <button
+                          onClick={() => handleViewDetail(m.memberId)}
+                          className="inline-flex items-center gap-1 px-3 py-1 text-sm bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 font-medium transition"
+                        >
+                          <Eye className="w-4 h-4" />
+                          Xem
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -232,6 +236,71 @@ export default function MembersPage() {
           </div>
         )}
       </div>
+
+      {/* 🔹 Modal xem chi tiết */}
+      {showDetailModal && selectedMember && (
+        <div
+          className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setShowDetailModal(false)}
+        >
+          <div
+            className="bg-white w-full max-w-md rounded-2xl shadow-2xl p-6 relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setShowDetailModal(false)}
+              className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 transition"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {loadingDetail ? (
+              <div className="py-10 text-center">
+                <Sparkles className="w-8 h-8 text-blue-500 animate-spin mx-auto mb-3" />
+                <p className="text-gray-500">Đang tải thông tin thành viên...</p>
+              </div>
+            ) : (
+              <>
+                <div className="flex flex-col items-center text-center mb-5">
+                  <img
+                    src={selectedMember.avatarUrl || "/default-avatar.png"}
+                    alt={selectedMember.fullName}
+                    className="w-20 h-20 rounded-full border-4 border-blue-100 shadow-md mb-3"
+                  />
+                  <h2 className="text-xl font-semibold text-gray-800">
+                    {selectedMember.fullName}
+                  </h2>
+                  <p className="text-sm text-gray-500">{selectedMember.roleName}</p>
+                </div>
+
+                <div className="space-y-3 text-gray-700">
+                  <div className="flex items-center gap-3">
+                    <Mail className="w-5 h-5 text-blue-500" />
+                    <span>{selectedMember.email}</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Shield className="w-5 h-5 text-yellow-500" />
+                    <span>Vai trò: {selectedMember.roleName || "—"}</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Calendar className="w-5 h-5 text-green-500" />
+                    <span>
+                      Tham gia:{" "}
+                      {selectedMember.joinedAt
+                        ? new Date(selectedMember.joinedAt).toLocaleDateString("vi-VN")
+                        : "—"}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <User className="w-5 h-5 text-purple-500" />
+                    <span>ID: {selectedMember.memberId}</span>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
