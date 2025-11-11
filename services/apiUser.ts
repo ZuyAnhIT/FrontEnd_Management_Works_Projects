@@ -6,7 +6,7 @@ import apiClient from "@/lib/apiClient";
 // 🧩 Lấy thông tin người dùng hiện tại (đầy đủ profile + role các cấp)
 // ===================================================
 export const getCurrentUser = async (): Promise<{
-  userId: number;
+  id: number;
   fullName: string;
   email: string;
   avatarUrl: string | null;
@@ -65,7 +65,7 @@ export const getCurrentUser = async (): Promise<{
     }));
 
     return {
-      userId: user.id,
+      id: user.id,  
       fullName: user.fullName,
       email: user.email,
       avatarUrl: user.avatarUrl || null,
@@ -83,7 +83,7 @@ export const getCurrentUser = async (): Promise<{
       projects,
     };
   } catch (err: any) {
-    console.error("❌ Lỗi khi lấy thông tin người dùng:", err);
+    console.error(" Lỗi khi lấy thông tin người dùng:", err);
     throw new Error(
       err.response?.data?.message ||
       "Không thể tải thông tin người dùng, vui lòng thử lại."

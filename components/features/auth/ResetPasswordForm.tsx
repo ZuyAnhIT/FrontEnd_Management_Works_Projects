@@ -68,7 +68,7 @@ export default function ResetPasswordForm() {
       setMessage(res?.message || "Đặt lại mật khẩu thành công!");
       setIsError(false);
       // Chuyển về trang đăng nhập sau 2 giây
-      setTimeout(() => router.push("/(auth)/log-in-out"), 2000);
+      setTimeout(() => router.push("/log-in-out"), 2000);
     } catch (error: any) {
       setMessage(error.message || "Token không hợp lệ hoặc đã hết hạn.");
       setIsError(true);

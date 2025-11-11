@@ -1,17 +1,20 @@
 import type { Metadata } from "next";
-// 1. Đảm bảo Geist_Mono được import
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ToastProvider } from "@/components/ui/ToastProvider";
 import { AuthProvider } from "@/context/AuthContext";
 import { GoogleOAuthProvider } from "@react-oauth/google";
 
+// ❌ Xóa hai dòng này vì chúng không tồn tại thật sự
+// import { GeistSans } from "geist/font/sans";
+// import { GeistMono } from "geist/font/mono";
+
+// ✅ Đặt biến đúng tên, không cần chữ hoa ở giữa
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
 });
 
-// 2. Đảm bảo hằng số này tồn tại
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
@@ -30,13 +33,13 @@ export default function RootLayout({
   return (
     <html lang="vi">
       <body
-        // 3. Lỗi xảy ra ở đây vì 'geistMono' không được định nghĩa
+        // ✅ Dùng biến đã khai báo đúng tên
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <GoogleOAuthProvider
           clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!}
         >
-          {/* Sửa thứ tự Provider (Toast bên ngoài) */}
+          {/* ✅ ToastProvider nên nằm ngoài AuthProvider */}
           <ToastProvider>
             <AuthProvider>{children}</AuthProvider>
           </ToastProvider>

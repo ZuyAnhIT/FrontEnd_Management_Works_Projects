@@ -1,54 +1,43 @@
 "use client";
+
 import { useState, useEffect } from "react";
-import Header from "@/components/features/core/Header"; // Header mới
-import Sidebar from "@/components/features/core/Sidebar"; // Sidebar mới
-import { useAuth } from "@/context/AuthContext"; // ✅ Lấy từ Context
+import Header from "@/components/features/core/Header";
+import Sidebar from "@/components/features/core/Sidebar";
+import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/components/ui/ToastProvider";
 import { Loader2 } from "lucide-react";
-// ⛔️ SỬA LỖI: Import từ 'services/'
-import { getCompanyWorkspaces } from "@/services/apiWorkspace";
 
 export default function CoreLayout({
-  // Đổi tên từ AdminLayout
   children,
 }: {
   children: React.ReactNode;
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // 1. Lấy user và loading từ Context (KHÔNG GỌI API)
+  // ✅ Lấy thông tin user từ Context
   const { user, isLoading: isAuthLoading, isAuthenticated } = useAuth();
   const { showToast } = useToast();
 
-  // 2. Layout này sẽ chịu trách nhiệm fetch data cho Sidebar
+  // ✅ State cho danh sách workspace mà user quản lý
   const [workspaces, setWorkspaces] = useState<any[]>([]);
   const [loadingWs, setLoadingWs] = useState(true);
 
   useEffect(() => {
-    // Chỉ fetch khi đã đăng nhập và có companyId
-    if (isAuthenticated && user?.company?.companyId) {
-      const fetchWorkspaces = async () => {
-        try {
-          setLoadingWs(true);
-          const data = await getCompanyWorkspaces(user.company.companyId);
-          setWorkspaces(data || []);
-        } catch (err: any) {
-          showToast(
-            err.message || "Không thể tải danh sách phòng ban",
-            "error"
-          );
-        } finally {
-          setLoadingWs(false);
-        }
-      };
-      fetchWorkspaces();
-    } else if (isAuthenticated && !user?.company?.companyId) {
-      // Đã đăng nhập nhưng không thuộc công ty (ví dụ: Gói Thường)
+    // Khi user đã đăng nhập, lấy workspace từ dữ liệu user
+    if (isAuthenticated && user?.workspaces) {
+      // 🔹 Chỉ lọc workspace mà user là WORKSPACE_ADMIN
+      const managedWorkspaces = user.workspaces.filter(
+        (w) => w.roleCode === "WORKSPACE_ADMIN"
+      );
+      setWorkspaces(managedWorkspaces);
+      setLoadingWs(false);
+    } else {
+      setWorkspaces([]);
       setLoadingWs(false);
     }
-  }, [isAuthenticated, user, showToast]);
+  }, [isAuthenticated, user]);
 
-  // 3. Hiển thị loading (do AuthContext cung cấp)
+  // 🌀 Hiển thị trong khi AuthContext đang xác thực
   if (isAuthLoading)
     return (
       <div className="flex items-center justify-center h-screen text-gray-500 gap-2">
@@ -57,7 +46,7 @@ export default function CoreLayout({
       </div>
     );
 
-  // 4. Guard: AuthContext đã xử lý việc này, nhưng thêm 1 lớp an toàn
+  // 🚫 Fallback nếu user chưa đăng nhập
   if (!user)
     return (
       <div className="flex items-center justify-center h-screen text-gray-500">
@@ -65,21 +54,30 @@ export default function CoreLayout({
       </div>
     );
 
+  // ✅ Layout chính
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* 5. Truyền user (đã có) xuống Header */}
-      <Header onMenuToggle={() => setSidebarOpen(!sidebarOpen)} />
+      {/* Header */}
+      <Header
+  onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
+  user={{
+    name: user.fullName || "Người dùng",
+    email: user.email || "Không có email",
+  }}
+/>
+
 
       <div className="flex flex-1 overflow-hidden">
-        {/* 6. Truyền user và data workspaces xuống Sidebar */}
+        {/* Sidebar */}
         <Sidebar
           isOpen={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
-          user={user} // Truyền user
+          user={user}
           workspaces={workspaces}
           loadingWs={loadingWs}
         />
 
+        {/* Nội dung chính */}
         <main className="flex-1 overflow-y-auto">{children}</main>
       </div>
     </div>

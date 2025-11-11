@@ -1,7 +1,7 @@
 import { LucideIcon } from "lucide-react";
 
 // 1. Định nghĩa màu ngữ nghĩa
-type CardColor = "blue" | "green" | "purple" | "orange";
+type CardColor = "blue" | "green" | "purple" | "orange" | string;
 
 interface StatsCardProps {
   icon: LucideIcon;

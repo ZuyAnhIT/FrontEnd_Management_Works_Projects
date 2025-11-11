@@ -41,7 +41,8 @@ export default function CreateWorkspaceModal({
         workspaceName: form.name,
         description: form.description,
         color: form.color,
-        coverImage: form.coverImage || null,
+        coverImage: form.coverImage || undefined,
+
       };
 
       const newWs = await createWorkspace(companyId, payload);
