@@ -1,18 +1,19 @@
 "use client";
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
 import {
   FolderKanban,
   Edit,
   Trash2,
   Calendar,
   Palette,
-  Image as ImageIcon,
   FileText,
   X,
   Loader2,
+  Sparkles,
+  PlusCircle,
 } from "lucide-react";
 import {
+  getCompanyWorkspaces,
   getWorkspaceDetail,
   updateWorkspace,
   updateWorkspaceStatus,
@@ -21,15 +22,16 @@ import {
 import { getCurrentUser } from "@/app/api/apiUser";
 import { useToast } from "@/components/ui/ToastProvider";
 
-export default function WorkspaceDetailPage() {
+export default function CompanyWorkspacesPage() {
   const { showToast } = useToast();
-  const params = useParams();
-  const workspaceId = Number(params.workspaceId);
 
   const [companyId, setCompanyId] = useState<number | null>(null);
-  const [workspace, setWorkspace] = useState<any | null>(null);
+  const [workspaces, setWorkspaces] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showEditModal, setShowEditModal] = useState(false);
+
+  // 📦 Trạng thái modal chi tiết
+  const [selectedWorkspace, setSelectedWorkspace] = useState<any | null>(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
   const [form, setForm] = useState({
@@ -49,75 +51,100 @@ export default function WorkspaceDetailPage() {
         setCompanyId(id);
       } catch (err: any) {
         showToast(err.message || "Không thể tải thông tin người dùng.", "error");
-        setLoading(false);
       }
     };
     fetchUser();
   }, [showToast]);
 
-  // 🧩 2️⃣ Lấy chi tiết workspace
+  // 🧩 2️⃣ Lấy tất cả workspace theo công ty
   useEffect(() => {
-    if (!companyId || !workspaceId) return;
-
-    const fetchDetail = async () => {
+    if (!companyId) return;
+    const fetchWorkspaces = async () => {
       try {
         setLoading(true);
-        const data = await getWorkspaceDetail(companyId, workspaceId);
-        setWorkspace(data);
-        setForm({
-          name: data.workspaceName,
-          description: data.description || "",
-          coverImage: data.coverImage || "",
-          color: data.color || "#3B82F6",
-        });
+        const data = await getCompanyWorkspaces(companyId);
+        setWorkspaces(data);
       } catch (err: any) {
-        showToast(err.message || "Không thể tải chi tiết workspace.", "error");
+        showToast(err.message || "Không thể tải danh sách workspace.", "error");
       } finally {
         setLoading(false);
       }
     };
-    fetchDetail();
-  }, [companyId, workspaceId, showToast]);
+    fetchWorkspaces();
+  }, [companyId, showToast]);
 
-  // 🧩 3️⃣ Cập nhật thông tin workspace
+  // 🧩 3️⃣ Xem chi tiết workspace (mở modal)
+  const openWorkspaceDetail = async (workspaceId: number) => {
+    try {
+      setLoading(true);
+      const data = await getWorkspaceDetail(companyId!, workspaceId);
+      setSelectedWorkspace(data);
+      setForm({
+        name: data.workspaceName,
+        description: data.description || "",
+        coverImage: data.coverImage || "",
+        color: data.color || "#3B82F6",
+      });
+      setShowDetailModal(true);
+    } catch (err: any) {
+      showToast(err.message || "Không thể tải chi tiết workspace.", "error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 🧩 4️⃣ Cập nhật thông tin workspace
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!companyId || !workspaceId) return;
+    if (!companyId || !selectedWorkspace) return;
 
     try {
-      const updated = await updateWorkspace(companyId, workspaceId, form);
-      setWorkspace(updated);
-      setShowEditModal(false);
+      const updated = await updateWorkspace(companyId, selectedWorkspace.workspaceId, form);
+      setSelectedWorkspace(updated);
+      setWorkspaces((prev) =>
+        prev.map((ws) => (ws.workspaceId === updated.workspaceId ? updated : ws))
+      );
       showToast("Cập nhật workspace thành công!", "success");
+      setShowDetailModal(false);
     } catch (err: any) {
       showToast(err.message || "Lỗi khi cập nhật workspace.", "error");
     }
   };
 
-  // 🧩 4️⃣ Cập nhật trạng thái
+  // 🧩 5️⃣ Cập nhật trạng thái
   const handleStatusChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newStatus = e.target.value;
-    if (!companyId || !workspaceId) return;
+    if (!companyId || !selectedWorkspace) return;
     try {
-      const res = await updateWorkspaceStatus(companyId, workspaceId, { newStatus });
-      setWorkspace(res.data);
+      const res = await updateWorkspaceStatus(companyId, selectedWorkspace.workspaceId, { newStatus });
+      setSelectedWorkspace(res.data);
+      setWorkspaces((prev) =>
+        prev.map((ws) =>
+          ws.workspaceId === selectedWorkspace.workspaceId
+            ? { ...ws, status: newStatus }
+            : ws
+        )
+      );
       showToast("Cập nhật trạng thái thành công!", "success");
     } catch (err: any) {
       showToast(err.message || "Lỗi khi cập nhật trạng thái.", "error");
     }
   };
 
-  // 🧩 5️⃣ Xóa workspace
+  // 🧩 6️⃣ Xóa workspace
   const handleDelete = async () => {
-    if (!companyId || !workspaceId) return;
-    const confirm = window.confirm("Bạn có chắc muốn xóa workspace này?");
-    if (!confirm) return;
+    if (!companyId || !selectedWorkspace) return;
+    const confirmDelete = window.confirm("Bạn có chắc muốn xóa workspace này?");
+    if (!confirmDelete) return;
 
     try {
       setIsDeleting(true);
-      await deleteWorkspace(companyId, workspaceId);
+      await deleteWorkspace(companyId, selectedWorkspace.workspaceId);
+      setWorkspaces((prev) =>
+        prev.filter((w) => w.workspaceId !== selectedWorkspace.workspaceId)
+      );
+      setShowDetailModal(false);
       showToast("Đã xóa workspace thành công!", "success");
-      setWorkspace(null); // Ẩn nội dung
     } catch (err: any) {
       showToast(err.message || "Không thể xóa workspace.", "error");
     } finally {
@@ -125,123 +152,126 @@ export default function WorkspaceDetailPage() {
     }
   };
 
-  // 🧭 Loading / Deleted
+  // 🧭 7️⃣ Loading
   if (loading)
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-10 h-10 text-green-500 animate-spin" />
+        <Loader2 className="w-10 h-10 text-blue-500 animate-spin" />
       </div>
     );
 
-  if (!workspace)
-    return (
-      <div className="min-h-screen flex items-center justify-center text-gray-500">
-        Workspace này đã bị xóa hoặc không tồn tại.
-      </div>
-    );
-
+  // 🧭 8️⃣ Giao diện chính
   return (
-    <div className="min-h-screen bg-gradient-to-b from-white via-green-50/40 to-white py-10">
-      <div className="max-w-5xl mx-auto px-4 space-y-8">
+    <div className="min-h-screen bg-gradient-to-b from-white via-blue-50/40 to-white py-10">
+      <div className="max-w-7xl mx-auto px-6 space-y-10">
         {/* Header */}
-        <div className="relative bg-gradient-to-br from-green-500 via-emerald-500 to-cyan-500 rounded-3xl p-8 shadow-2xl">
+        <div className="relative bg-gradient-to-br from-blue-500 via-cyan-500 to-blue-600 rounded-3xl p-8 shadow-2xl">
           <div className="absolute inset-0 bg-grid-white/10"></div>
           <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
             <div className="flex items-center gap-4">
-              <div
-                className="w-16 h-16 rounded-2xl flex items-center justify-center shadow-lg"
-                style={{ backgroundColor: workspace.color }}
-              >
+              <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center shadow-lg">
                 <FolderKanban className="w-8 h-8 text-white" />
               </div>
               <div>
-                <h1 className="text-3xl font-bold text-white">{workspace.workspaceName}</h1>
-                <p className="text-white/80 text-sm">
-                  Tạo ngày {new Date(workspace.createdAt).toLocaleDateString("vi-VN")}
+                <h1 className="text-3xl font-bold text-white">Workspace Công ty</h1>
+                <p className="text-white/80">
+                  Quản lý toàn bộ workspace của công ty bạn
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
-              <select
-                value={workspace.status}
-                onChange={handleStatusChange}
-                className="px-4 py-2 rounded-xl font-semibold bg-white text-green-700 border border-gray-200 shadow-sm hover:bg-gray-50 transition-all"
-              >
-                <option value="ACTIVE">🟢 ACTIVE</option>
-                <option value="INACTIVE">🟡 INACTIVE</option>
-                <option value="ARCHIVED">⚫ ARCHIVED</option>
-              </select>
-
-              <button
-                onClick={() => setShowEditModal(true)}
-                className="px-4 py-2 bg-white rounded-xl flex items-center gap-2 hover:bg-gray-100 font-semibold"
-              >
-                <Edit className="w-4 h-4" /> Sửa
-              </button>
-              <button
-                onClick={handleDelete}
-                disabled={isDeleting}
-                className="px-4 py-2 bg-red-500 text-white rounded-xl flex items-center gap-2 hover:bg-red-600 font-semibold"
-              >
-                <Trash2 className="w-4 h-4" />
-                {isDeleting ? "Đang xóa..." : "Xóa"}
-              </button>
-            </div>
+            <button className="group flex items-center gap-2 px-6 py-3 bg-white text-blue-600 rounded-xl hover:bg-gray-50 transition-all duration-300 shadow-lg hover:shadow-xl font-semibold hover:scale-105">
+              <PlusCircle className="w-5 h-5 group-hover:scale-110 transition-transform" />
+              Tạo workspace mới
+            </button>
           </div>
         </div>
 
-        {/* Content */}
-        <div className="bg-white rounded-2xl shadow-xl p-8 space-y-6 border border-gray-100">
-          {workspace.coverImage && (
-            <img
-              src={workspace.coverImage}
-              alt="cover"
-              className="w-full h-64 object-cover rounded-xl border"
-            />
-          )}
-          <div>
-            <h2 className="text-lg font-bold mb-2 flex items-center gap-2">
-              <FileText className="w-4 h-4 text-blue-500" /> Mô tả
-            </h2>
-            <p className="text-gray-700">
-              {workspace.description || "Chưa có mô tả."}
-            </p>
+        {/* Danh sách workspace */}
+        {workspaces.length === 0 ? (
+          <div className="bg-white rounded-2xl shadow-xl border-2 border-dashed border-gray-200 p-16 text-center">
+            <FolderKanban className="w-10 h-10 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              Chưa có workspace nào
+            </h3>
+            <p className="text-gray-500">Hãy bắt đầu bằng cách tạo mới.</p>
           </div>
-
-          <div className="flex items-center gap-2">
-            <Palette className="w-4 h-4 text-pink-500" />
-            <span className="text-gray-600">Màu chủ đề:</span>
-            <span
-              className="w-6 h-6 rounded-full border shadow-sm"
-              style={{ backgroundColor: workspace.color }}
-            ></span>
-            <span className="text-sm font-mono">{workspace.color}</span>
+        ) : (
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {workspaces.map((ws) => (
+              <div
+                key={ws.workspaceId}
+                className="group bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300"
+              >
+                {ws.coverImage && (
+                  <img
+                    src={ws.coverImage}
+                    alt={ws.workspaceName}
+                    className="w-full h-40 object-cover"
+                  />
+                )}
+                <div className="p-5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-bold text-gray-800 group-hover:text-blue-600">
+                      {ws.workspaceName}
+                    </h3>
+                    <span
+                      className={`px-3 py-1 rounded-full text-xs font-semibold ${ws.status === "ACTIVE"
+                          ? "bg-green-100 text-green-700"
+                          : ws.status === "INACTIVE"
+                            ? "bg-yellow-100 text-yellow-700"
+                            : "bg-gray-200 text-gray-600"
+                        }`}
+                    >
+                      {ws.status}
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-600 line-clamp-2">
+                    {ws.description || "Chưa có mô tả."}
+                  </p>
+                  <div className="flex items-center justify-between text-sm text-gray-500">
+                    <span>
+                      {new Date(ws.createdAt).toLocaleDateString("vi-VN")}
+                    </span>
+                    <span
+                      className="inline-block w-4 h-4 rounded-full"
+                      style={{ backgroundColor: ws.color }}
+                    ></span>
+                  </div>
+                  <button
+                    onClick={() => openWorkspaceDetail(ws.workspaceId)}
+                    className="inline-flex items-center justify-center w-full mt-2 px-4 py-2 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-all font-semibold"
+                  >
+                    Xem chi tiết
+                    <Sparkles className="w-4 h-4 ml-2" />
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
-
-          <div className="flex items-center gap-2 text-gray-500 text-sm">
-            <Calendar className="w-4 h-4" />
-            Ngày tạo:{" "}
-            {new Date(workspace.createdAt).toLocaleDateString("vi-VN")}
-          </div>
-        </div>
+        )}
       </div>
 
-      {/* ✏️ Edit Modal */}
-      {showEditModal && (
+      {/* Modal chi tiết workspace */}
+      {showDetailModal && selectedWorkspace && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-slideUp">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden animate-slideUp">
             {/* Header */}
-            <div className="relative bg-gradient-to-br from-green-500 via-emerald-500 to-cyan-500 p-6">
-              <div className="relative z-10 flex items-center justify-between">
+            <div
+              className="relative p-6 text-white"
+              style={{
+                 background: `linear-gradient(to right, ${selectedWorkspace?.color || "#3B82F6"}, #0ea5e9)`,
+              }}
+            >
+              <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
-                    <Edit className="w-5 h-5 text-white" />
-                  </div>
-                  <h2 className="text-xl font-bold text-white">Chỉnh sửa workspace</h2>
+                  <FolderKanban className="w-6 h-6" />
+                  <h2 className="text-xl font-bold">
+                    {selectedWorkspace.workspaceName}
+                  </h2>
                 </div>
                 <button
-                  onClick={() => setShowEditModal(false)}
+                  onClick={() => setShowDetailModal(false)}
                   className="p-2 hover:bg-white/20 rounded-lg"
                 >
                   <X className="w-5 h-5 text-white" />
@@ -249,15 +279,17 @@ export default function WorkspaceDetailPage() {
               </div>
             </div>
 
-            {/* Form */}
+            {/* Body */}
             <form onSubmit={handleUpdate} className="p-6 space-y-5">
               <div>
-                <label className="block text-sm font-semibold mb-2">Tên workspace</label>
+                <label className="block text-sm font-semibold mb-2">
+                  Tên workspace
+                </label>
                 <input
                   type="text"
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:border-green-500 outline-none"
+                  className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:border-blue-500 outline-none"
                 />
               </div>
 
@@ -270,40 +302,39 @@ export default function WorkspaceDetailPage() {
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-semibold mb-2">Ảnh bìa (URL)</label>
+              <div className="flex items-center gap-3">
+                <Palette className="w-4 h-4 text-pink-500" />
                 <input
-                  type="text"
-                  value={form.coverImage}
-                  onChange={(e) => setForm({ ...form, coverImage: e.target.value })}
-                  className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:border-purple-500 outline-none"
+                  type="color"
+                  value={form.color}
+                  onChange={(e) => setForm({ ...form, color: e.target.value })}
+                  className="w-16 h-10 border rounded"
                 />
+                <span className="text-sm font-mono">{form.color}</span>
               </div>
 
-              <div>
-                <label className="block text-sm font-semibold mb-2">Màu chủ đề</label>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="color"
-                    value={form.color}
-                    onChange={(e) => setForm({ ...form, color: e.target.value })}
-                    className="w-16 h-12 border-2 border-gray-200 rounded-xl cursor-pointer"
-                  />
-                  <span className="font-mono text-sm">{form.color}</span>
-                </div>
-              </div>
+              <select
+                value={selectedWorkspace.status}
+                onChange={handleStatusChange}
+                className="mt-3 px-4 py-2 rounded-xl font-semibold bg-gray-50 border border-gray-200"
+              >
+                <option value="ACTIVE">🟢 ACTIVE</option>
+                <option value="INACTIVE">🟡 INACTIVE</option>
+                <option value="ARCHIVED">⚫ ARCHIVED</option>
+              </select>
 
-              <div className="flex gap-3 pt-3">
+              <div className="flex justify-end gap-3 pt-4">
                 <button
+                  onClick={handleDelete}
                   type="button"
-                  onClick={() => setShowEditModal(false)}
-                  className="flex-1 border-2 border-gray-200 rounded-xl py-3 hover:bg-gray-50 font-semibold"
+                  disabled={isDeleting}
+                  className="px-4 py-2 bg-red-500 text-white rounded-xl hover:bg-red-600 font-semibold"
                 >
-                  Hủy
+                  {isDeleting ? "Đang xóa..." : "Xóa"}
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-xl py-3 hover:scale-105 transition-all font-semibold"
+                  className="px-4 py-2 bg-blue-500 text-white rounded-xl hover:bg-blue-600 font-semibold"
                 >
                   Lưu thay đổi
                 </button>
@@ -312,30 +343,6 @@ export default function WorkspaceDetailPage() {
           </div>
         </div>
       )}
-
-      <style jsx>{`
-        .bg-grid-white\\/10 {
-          background-image: linear-gradient(white 1px, transparent 1px),
-            linear-gradient(90deg, white 1px, transparent 1px);
-          background-size: 20px 20px;
-          opacity: 0.1;
-        }
-
-        @keyframes slideUp {
-          from {
-            opacity: 0;
-            transform: translateY(20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-
-        .animate-slideUp {
-          animation: slideUp 0.3s ease-out;
-        }
-      `}</style>
     </div>
   );
 }
