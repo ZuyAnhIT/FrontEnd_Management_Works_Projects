@@ -6,81 +6,42 @@ import {
   FolderKanban,
   ClipboardCheck,
   Settings,
-  Briefcase,
   ChevronLeft,
   ChevronRight,
-  ChevronDown,
-  ChevronUp,
-  PlusCircle,
-  Crown,
-  Sparkles,
   X,
-  Building2,
   Layers,
+  Sparkles,
+  Crown,
+  Building2,
+  Briefcase,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { usePathname, useRouter, useParams } from "next/navigation";
-import { getCompanyWorkspaces } from "@/services/apiWorkspace";
-import { getCurrentUser } from "@/services/apiUser";
-import { useToast } from "@/components/ui/ToastProvider";
 
 interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
-  activeMenu: string;
-  setActiveMenu: (id: string) => void;
+  user: any; // 👈 Nhận user từ CoreLayout
+  workspaces: any[];
+  loadingWs: boolean;
 }
 
 export default function CoreSidebar({
   isOpen,
   onClose,
-  activeMenu,
-  setActiveMenu,
+  user,
+  workspaces,
+  loadingWs,
 }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
-  const [companyId, setCompanyId] = useState<number | null>(null);
-  const [workspaces, setWorkspaces] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-
   const router = useRouter();
   const pathname = usePathname();
   const params = useParams();
   const workspaceId = params.workspaceId;
-  const { showToast } = useToast();
 
   const isWorkspaceView = pathname?.startsWith("/core/workspace/");
 
-  // 🧩 Lấy companyId
-  useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const user = await getCurrentUser();
-        setCompanyId(user.company?.companyId || null);
-      } catch (err: any) {
-        showToast("Không thể tải thông tin người dùng", "error");
-      }
-    };
-    fetchUser();
-  }, [showToast]);
-
-  // 🧩 Lấy danh sách workspace (khi ở core)
-  useEffect(() => {
-    if (!companyId) return;
-    const fetchWorkspaces = async () => {
-      try {
-        setLoading(true);
-        const data = await getCompanyWorkspaces(companyId);
-        setWorkspaces(data || []);
-      } catch (err: any) {
-        showToast(err.message || "Không thể tải phòng ban", "error");
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchWorkspaces();
-  }, [companyId, showToast]);
-
-  // 🔹 Menu tổng quan (khi chưa chọn workspace)
+  // 🔹 Menu tổng quan (chưa chọn workspace)
   const coreMenu = [
     { id: "home", icon: Home, label: "Trang chủ", path: "/core" },
     {
@@ -91,7 +52,7 @@ export default function CoreSidebar({
     },
   ];
 
-  // 🔹 Menu khi đã vào 1 workspace
+  // 🔹 Menu khi đã vào workspace
   const workspaceMenu = [
     {
       id: "overview",
@@ -121,7 +82,7 @@ export default function CoreSidebar({
 
   return (
     <>
-      {/* Overlay for mobile */}
+      {/* Overlay cho mobile */}
       {isOpen && (
         <div
           className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden animate-fadeIn"
@@ -141,8 +102,6 @@ export default function CoreSidebar({
         {/* ===== Header ===== */}
         <div className="relative overflow-hidden bg-gradient-to-br from-green-500 via-emerald-500 to-cyan-500 p-4 shadow-lg">
           <div className="absolute inset-0 bg-grid-white/10"></div>
-          <div className="absolute -right-4 -top-4 w-24 h-24 bg-white/10 rounded-full blur-2xl"></div>
-          <div className="absolute -left-4 -bottom-4 w-20 h-20 bg-white/10 rounded-full blur-2xl"></div>
 
           <div className="relative z-10 flex items-center justify-between">
             <div
@@ -162,7 +121,7 @@ export default function CoreSidebar({
                   <div className="flex items-center gap-1.5 mb-0.5">
                     <Sparkles className="w-3.5 h-3.5 text-yellow-300" />
                     <span className="font-bold text-white text-sm">
-                      {isWorkspaceView ? "Workspace" : "WorkNet"}
+                      {isWorkspaceView ? "Workspace" : user.company?.companyName || "WorkNet"}
                     </span>
                   </div>
                   <span className="text-white/80 text-xs">
@@ -203,7 +162,7 @@ export default function CoreSidebar({
         <nav className="flex-1 overflow-y-auto p-4 space-y-6 custom-scrollbar">
           {!isWorkspaceView && (
             <>
-              {/* Core menu */}
+              {/* Menu chính */}
               <div className="space-y-1">
                 {!collapsed && (
                   <div className="px-3 py-2 text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
@@ -211,14 +170,12 @@ export default function CoreSidebar({
                     Menu chính
                   </div>
                 )}
-
                 {coreMenu.map((item, index) => {
                   const isActive = pathname === item.path;
                   return (
                     <button
                       key={item.id}
                       onClick={() => {
-                        setActiveMenu(item.id);
                         router.push(item.path);
                         if (window.innerWidth < 1024) onClose();
                       }}
@@ -236,7 +193,7 @@ export default function CoreSidebar({
                 })}
               </div>
 
-              {/* Workspace list */}
+              {/* Danh sách workspace */}
               {!collapsed && (
                 <div className="space-y-2">
                   <div className="px-3 py-2 text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
@@ -244,14 +201,14 @@ export default function CoreSidebar({
                     Phòng ban
                   </div>
 
-                  {loading ? (
+                  {loadingWs ? (
                     <div className="flex items-center gap-2 px-3 py-2 text-gray-400 text-sm">
                       <div className="w-4 h-4 border-2 border-green-500 border-t-transparent rounded-full animate-spin"></div>
                       Đang tải...
                     </div>
                   ) : workspaces.length > 0 ? (
                     <div className="space-y-1 max-h-64 overflow-y-auto custom-scrollbar">
-                      {workspaces.map((ws, index) => {
+                      {workspaces.map((ws) => {
                         const isActive =
                           pathname === `/core/workspace/${ws.workspaceId}`;
                         const isAdmin = ws.roleCode?.includes("ADMIN");
@@ -277,8 +234,8 @@ export default function CoreSidebar({
                               {ws.workspaceName}
                             </span>
                             {isAdmin && (
-                              <span className="text-xs bg-gradient-to-r from-yellow-400 to-orange-400 text-white px-2 py-0.5 rounded-full font-semibold shadow-sm">
-                                <Crown className="w-3 h-3" />
+                              <span className="text-xs bg-gradient-to-r from-yellow-400 to-orange-400 text-white px-2 py-0.5 rounded-full font-semibold shadow-sm flex items-center">
+                                <Crown className="w-3 h-3 mr-1" /> Admin
                               </span>
                             )}
                           </button>
@@ -295,7 +252,7 @@ export default function CoreSidebar({
             </>
           )}
 
-          {/* Workspace menu */}
+          {/* Menu khi đã vào Workspace */}
           {isWorkspaceView && (
             <div className="space-y-1">
               {!collapsed && (
@@ -304,7 +261,6 @@ export default function CoreSidebar({
                   Workspace Menu
                 </div>
               )}
-
               {workspaceMenu.map((item, index) => {
                 const isActive = pathname === item.path;
                 return (
@@ -375,7 +331,7 @@ export default function CoreSidebar({
           background: #cbd5e1;
           border-radius: 10px;
         }
-        .bg-grid-white\/10 {
+        .bg-grid-white\\/10 {
           background-image: linear-gradient(white 1px, transparent 1px),
             linear-gradient(90deg, white 1px, transparent 1px);
           background-size: 20px 20px;

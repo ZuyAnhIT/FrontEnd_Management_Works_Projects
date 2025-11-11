@@ -27,10 +27,13 @@ import {
   inviteMemberToCompany,
   removeCompanyMember,
   updateCompanyMemberStatus,
+  getDetailCompanyMembers,
 } from "@/services/apiCompany";
 
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/components/ui/ToastProvider";
+import MemberDetailModal from "@/components/features/admin/MemberDetailModal";
+
 // ✅ 1. Import Modal mới
 import ConfirmationModal from "@/components/ui/ConfirmationModal";
 
@@ -58,6 +61,12 @@ export default function MembersPage() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [memberToDelete, setMemberToDelete] = useState<any | null>(null);
+
+  // Modal Chi tiết
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [detailMember, setDetailMember] = useState<any | null>(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+
 
   // 🧩 1. Lấy danh sách thành viên
   useEffect(() => {
@@ -129,9 +138,31 @@ export default function MembersPage() {
     }
   };
 
-  // 🧩 5. Các hành động (Xem, Sửa)
-  const handleViewDetails = (member: any) => {
-    showToast(`(Demo) Đang xem chi tiết ${member.fullName}`, "info");
+  const handleViewDetails = async (member: any) => {
+    setLoadingDetail(true);
+    try {
+      setDetailMember(member);
+      setShowDetailModal(true);
+    } catch (err: any) {
+      showToast(err.message || "Không thể tải chi tiết thành viên", "error");
+    } finally {
+      setLoadingDetail(false);
+    }
+  };
+
+  const handleSaveMemberDetail = async (memberId: number, updates: any) => {
+    try {
+      // Ở đây bạn có thể gọi API cập nhật chi tiết nếu backend hỗ trợ
+      // hoặc chỉ cập nhật tạm trong state:
+      setMembers((prev) =>
+        prev.map((m) =>
+          m.userId === memberId ? { ...m, ...updates } : m
+        )
+      );
+      showToast("Đã lưu thay đổi chi tiết!", "success");
+    } catch (err: any) {
+      showToast(err.message || "Không thể lưu thay đổi!", "error");
+    }
   };
 
   const openEditModal = (member: any) => {
@@ -360,11 +391,10 @@ export default function MembersPage() {
                       </td>
                       <td className="px-6 py-4">
                         <div
-                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border ${
-                            m.roleName === "Company Administrator"
+                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border ${m.roleName === "Company Administrator"
                               ? "bg-yellow-50 text-yellow-700 border-yellow-200"
                               : "bg-blue-50 text-blue-700 border-blue-200"
-                          }`}
+                            }`}
                         >
                           {m.roleName === "Company Administrator" ? (
                             <Crown className="w-3.5 h-3.5" />
@@ -585,6 +615,12 @@ export default function MembersPage() {
             </div>
           </div>
         )}
+        <MemberDetailModal
+          isOpen={showDetailModal}
+          onClose={() => setShowDetailModal(false)}
+          member={detailMember}
+          loading={loadingDetail}
+        />
 
         {/* ✅ MỚI: Modal Xác nhận Xóa */}
         <ConfirmationModal

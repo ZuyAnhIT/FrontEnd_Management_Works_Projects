@@ -7,6 +7,7 @@ import { useAuth } from "@/context/AuthContext";
 // ⛔️ SỬA ĐƯỜNG DẪN!
 import { getCompanyWorkspaces } from "@/services/apiWorkspace";
 import { useToast } from "@/components/ui/ToastProvider";
+import { User } from "lucide-react";
 
 export default function AdminLayout({
   children,
@@ -27,11 +28,12 @@ export default function AdminLayout({
   useEffect(() => {
     // Chỉ fetch khi đã đăng nhập và có companyId
     if (isAuthenticated && user?.company?.companyId) {
+      const companyId = user.company.companyId;
       const fetchWorkspaces = async () => {
         try {
           setLoadingWs(true);
           // ⛔️ SỬA ĐƯỜNG DẪN!
-          const data = await getCompanyWorkspaces(user.company.companyId);
+          const data = await getCompanyWorkspaces(companyId);
           setWorkspaces(data || []);
         } catch (err: any) {
           showToast(
