@@ -18,6 +18,7 @@ import {
   updateWorkspace,
   updateWorkspaceStatus,
   deleteWorkspace,
+  createWorkspace,
 } from "@/app/api/apiWorkspace";
 import { getCurrentUser } from "@/app/api/apiUser";
 import { useToast } from "@/components/ui/ToastProvider";
@@ -40,6 +41,9 @@ export default function CompanyWorkspacesPage() {
     coverImage: "",
     color: "#3B82F6",
   });
+   // Modal tạo mới
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [creating, setCreating] = useState(false);
 
   // 🧩 1️⃣ Lấy thông tin user → companyId
   useEffect(() => {
@@ -151,7 +155,33 @@ export default function CompanyWorkspacesPage() {
       setIsDeleting(false);
     }
   };
+ // 🧩 7️⃣ Tạo workspace mới
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!companyId || !form.name.trim()) {
+      showToast("Vui lòng nhập tên phòng ban!", "warning");
+      return;
+    }
 
+    try {
+      setCreating(true);
+      const payload = {
+        workspaceName: form.name,
+        description: form.description,
+        color: form.color,
+        coverImage: form.coverImage,
+      };
+      const newWs = await createWorkspace(companyId, payload);
+      setWorkspaces((prev) => [...prev, newWs]);
+      showToast("Tạo phòng ban mới thành công!", "success");
+      setShowCreateModal(false);
+      setForm({ name: "", description: "", coverImage: "", color: "#3B82F6" });
+    } catch (err: any) {
+      showToast(err.message || "Không thể tạo workspace mới.", "error");
+    } finally {
+      setCreating(false);
+    }
+  };
   // 🧭 7️⃣ Loading
   if (loading)
     return (
@@ -180,9 +210,12 @@ export default function CompanyWorkspacesPage() {
               </div>
             </div>
 
-            <button className="group flex items-center gap-2 px-6 py-3 bg-white text-blue-600 rounded-xl hover:bg-gray-50 transition-all duration-300 shadow-lg hover:shadow-xl font-semibold hover:scale-105">
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="group flex items-center gap-2 px-6 py-3 bg-white text-blue-600 rounded-xl hover:bg-gray-50 transition-all duration-300 shadow-lg hover:shadow-xl font-semibold hover:scale-105"
+            >
               <PlusCircle className="w-5 h-5 group-hover:scale-110 transition-transform" />
-              Tạo workspace mới
+              Tạo phòng ban mới
             </button>
           </div>
         </div>
@@ -253,7 +286,7 @@ export default function CompanyWorkspacesPage() {
       </div>
 
       {/* Modal chi tiết workspace */}
-      {showDetailModal && selectedWorkspace && (
+      {showDetailModal  && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden animate-slideUp">
             {/* Header */}
@@ -278,7 +311,8 @@ export default function CompanyWorkspacesPage() {
                 </button>
               </div>
             </div>
-
+              
+   
             {/* Body */}
             <form onSubmit={handleUpdate} className="p-6 space-y-5">
               <div>
@@ -343,6 +377,50 @@ export default function CompanyWorkspacesPage() {
           </div>
         </div>
       )}
+       {/* 🟢 Modal tạo workspace */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fadeIn">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-slideUp">
+            <div className="bg-gradient-to-br from-blue-500 to-cyan-500 p-6 text-white flex justify-between items-center">
+              <h2 className="text-xl font-bold">Tạo phòng ban mới</h2>
+              <button onClick={() => setShowCreateModal(false)}>
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleCreate} className="p-6 space-y-4">
+              <input
+                type="text"
+                placeholder="Tên phòng ban"
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                className="w-full border rounded-xl px-4 py-3"
+              />
+              <textarea
+                placeholder="Mô tả"
+                value={form.description}
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                className="w-full border rounded-xl px-4 py-3"
+              />
+              <div className="flex items-center gap-2">
+                <Palette className="w-4 h-4 text-blue-500" />
+                <input
+                  type="color"
+                  value={form.color}
+                  onChange={(e) => setForm({ ...form, color: e.target.value })}
+                  className="w-16 h-10 border rounded"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={creating}
+                className="w-full py-3 bg-blue-500 text-white rounded-xl font-semibold hover:bg-blue-600"
+              >
+                {creating ? "Đang tạo..." : "Tạo mới"}
+              </button>
+            </form>
+          </div>
+        </div>
+          )}
     </div>
   );
 }
