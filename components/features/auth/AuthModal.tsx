@@ -1,12 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation"; // Giữ lại để dùng cho trang "Quên mật khẩu"
+import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/ToastProvider";
-// ⛔️ SỬA LỖI: Chỉ import API cho register/verify, KHÔNG import login/getCurrentUser
-// (Đảm bảo đường dẫn này đúng, ví dụ: @/services/apiAuth)
 import { registerUser, verifyEmail } from "@/services/apiAuth";
-// ✅ TỐI ƯU: Import useAuth
 import { useAuth } from "@/context/AuthContext";
 
 import AuthHeader from "./AuthHeader";
@@ -37,13 +34,12 @@ export default function AuthModal({
   isOpen: boolean;
   onClose: () => void;
 }) {
-  const router = useRouter(); // Vẫn dùng cho forgot password
+  const router = useRouter();
   const { showToast } = useToast();
-  // ✅ TỐI ƯU: Lấy hàm login từ Context
   const { login, loginWithTokens, isLoading: isAuthLoading } = useAuth();
 
   const [tab, setTab] = useState<AuthTab>("login");
-  const [isLoading, setIsLoading] = useState(false); // State loading riêng của form
+  const [isLoading, setIsLoading] = useState(false);
 
   const [form, setForm] = useState<AuthFormData>({
     fullName: "",
@@ -62,7 +58,7 @@ export default function AuthModal({
     };
 
   // ----------------------------------------------------------------
-  // ✅ HÀM SUBMIT ĐÃ ĐƯỢC TỐI ƯU
+  // HÀM SUBMIT
   // ----------------------------------------------------------------
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -75,14 +71,15 @@ export default function AuthModal({
           throw new Error("Vui lòng nhập email và mật khẩu!");
         }
 
-        // 🟢 CHỈ CẦN GỌI HÀM LOGIN CỦA CONTEXT
-        // AuthContext sẽ tự xử lý (lấy user, set state, VÀ ĐIỀU HƯỚNG)
+        console.log("📝 Modal: Gọi login từ context...");
+
+        // Gọi login từ context
         await login(form.email.trim(), form.password.trim());
 
-        // ❌ XÓA TẤT CẢ LOGIC (res, localStorage, getCurrentUser, switch/case, router.push)
-        // ... (ĐÃ XÓA)
-
-        // onClose() sẽ được gọi tự động khi trang chuyển hướng
+        // ✅ QUAN TRỌNG: Đóng modal ngay sau khi login thành công
+        // (Guard effect sẽ tự động redirect)
+        console.log("✅ Modal: Login thành công, đóng modal");
+        onClose();
       }
 
       // 🔹 Đăng ký
@@ -115,10 +112,12 @@ export default function AuthModal({
       // 🔹 Xác thực email
       else if (tab === "verify") {
         if (!form.otp) throw new Error("Vui lòng nhập OTP!");
+
         const res = await verifyEmail({
           email: form.email.trim(),
           otp: form.otp.trim(),
         });
+
         showToast(
           res.message || "Xác thực thành công! Vui lòng đăng nhập.",
           "success"
@@ -126,6 +125,7 @@ export default function AuthModal({
         setTab("login");
       }
     } catch (error: any) {
+      console.error("❌ Modal: Lỗi submit:", error);
       showToast(
         error.response?.data?.message || error.message || "Có lỗi xảy ra!",
         "error"
@@ -136,24 +136,30 @@ export default function AuthModal({
   };
 
   // ----------------------------------------------------------------
-  // ✅ HÀM XỬ LÝ SOCIAL LOGIN (TÁI SỬ DỤNG LOGIC)
+  // HÀM XỬ LÝ SOCIAL LOGIN
   // ----------------------------------------------------------------
   const handleSocialLoginSuccess = async (data: {
     accessToken: string;
     refreshToken: string;
   }) => {
     try {
-      // 🟢 GỌI HÀM LOGIN CỦA CONTEXT
+      console.log("📝 Modal: Gọi loginWithTokens từ context...");
+
+      // Gọi loginWithTokens từ context
       await loginWithTokens(data.accessToken, data.refreshToken);
-      // AuthContext sẽ tự động điều hướng
+
+      // ✅ Đóng modal ngay sau khi login thành công
+      console.log("✅ Modal: Social login thành công, đóng modal");
+      onClose();
     } catch (error: any) {
+      console.error("❌ Modal: Lỗi social login:", error);
       showToast(error.message || "Lỗi xử lý đăng nhập Google!", "error");
     }
   };
 
   if (!isOpen) return null;
 
-  // Dùng isAuthLoading (của Context) để biết toàn bộ app đang xử lý (ví dụ: đang điều hướng)
+  // Dùng isAuthLoading để biết context đang xử lý
   const isProcessing = isLoading || isAuthLoading;
 
   return (
@@ -167,7 +173,6 @@ export default function AuthModal({
       >
         <AuthHeader tab={tab} setTab={setTab} onClose={onClose} />
 
-        {/* Sửa lỗi UI "nền trong nền" */}
         <div className="p-5">
           {(tab === "login" || tab === "register") && (
             <AuthTabs tab={tab} setTab={setTab} />
@@ -178,7 +183,7 @@ export default function AuthModal({
               <AuthFormLogin
                 form={form}
                 handleChange={handleChange as any}
-                isLoading={isProcessing} // Dùng state tổng
+                isLoading={isProcessing}
                 setTab={setTab as any}
               />
             )}
@@ -186,21 +191,21 @@ export default function AuthModal({
               <AuthFormRegister
                 form={form}
                 handleChange={handleChange as any}
-                isLoading={isProcessing} // Dùng state tổng
+                isLoading={isProcessing}
               />
             )}
             {tab === "verify" && (
               <AuthFormVerify
                 form={form}
                 handleChange={handleChange as any}
-                isLoading={isProcessing} // Dùng state tổng
+                isLoading={isProcessing}
               />
             )}
             {tab === "forgot" && (
               <AuthFormForgot
                 form={form}
                 handleChange={handleChange as any}
-                isLoading={isProcessing} // Dùng state tổng
+                isLoading={isProcessing}
                 setTab={setTab as any}
               />
             )}
@@ -208,9 +213,9 @@ export default function AuthModal({
 
           {(tab === "login" || tab === "register") && (
             <AuthSocialButtons
-              onAuthSuccess={handleSocialLoginSuccess} // Truyền hàm success
-              onError={(msg) => showToast(msg, "error")} // Truyền hàm error
-              setLoading={setIsLoading} // Truyền hàm set loading
+              onAuthSuccess={handleSocialLoginSuccess}
+              onError={(msg) => showToast(msg, "error")}
+              setLoading={setIsLoading}
             />
           )}
         </div>

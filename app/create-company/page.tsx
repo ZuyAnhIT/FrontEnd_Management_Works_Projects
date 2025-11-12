@@ -18,12 +18,12 @@ import { createCompany } from "@/services/apiCompany";
 // ✅ TỐI ƯU: Dùng useAuth
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/components/ui/ToastProvider";
-import LoadingButton from "@/components/ui/LoadingButton"; // Dùng LoadingButton
+import LoadingButton from "@/components/ui/LoadingButton";
 
 export default function CreateCompanyPage() {
   const router = useRouter();
   const { showToast } = useToast();
-  // ✅ TỐI ƯU: Lấy hàm refreshUser từ Context
+  // ✅ Lấy hàm refreshUser từ Context
   const { refreshUser } = useAuth();
 
   const [loading, setLoading] = useState(false);
@@ -53,18 +53,18 @@ export default function CreateCompanyPage() {
 
     try {
       setLoading(true);
-      const newCompany = await createCompany(form);
+
+      // 1. Tạo công ty (Lúc này user vẫn là 'USER' cũ)
+      await createCompany(form);
 
       showToast("Tạo công ty thành công! Đang chuyển hướng...", "success");
 
-      // 🧩 BÁO CHO CONTEXT: "Tôi xong rồi, cập nhật user đi!"
-      // AuthContext sẽ tự lấy user mới (đã có role COMPANY_ADMIN)
-      // và logic Guard (trong useEffect) sẽ tự động
-      // chuyển hướng bạn đến /admin.
+      // 2. Báo cho AuthContext: "Lấy user mới đi" (User trở thành COMPANY_ADMIN)
       await refreshUser();
 
-      // ❌ XÓA BỎ: logic gọi getCurrentUser, localStorage, router.push
-      // ... (Đã xóa)
+      // 3. ✅ REDIRECT CHỦ ĐỘNG: Chuyển hướng sang trang đích
+      // (Vì AuthContext đã set role, việc này sẽ nhanh hơn chờ Guard chạy)
+      router.push("/admin");
     } catch (err: any) {
       showToast(err.message || "Không thể tạo công ty mới.", "error");
     } finally {
@@ -72,7 +72,6 @@ export default function CreateCompanyPage() {
     }
   };
 
-  // (Giao diện của bạn đã rất đẹp, giữ nguyên)
   return (
     <div className="min-h-screen bg-gradient-to-b from-white via-blue-50/40 to-white py-10">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
