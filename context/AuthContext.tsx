@@ -5,11 +5,13 @@ import {
   useState,
   useEffect,
   ReactNode,
+  useCallback, // ✅ Import
 } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useToast } from "@/components/ui/ToastProvider";
 
 // ✅ Import đúng từ services
+// ⛔️ SỬA LỖI: Đảm bảo bạn import từ /services/
 import { getCurrentUser } from "@/services/apiUser";
 import { loginUser, logoutUser } from "@/services/apiAuth";
 
@@ -51,7 +53,7 @@ type AppRole =
   | "COMPANY_MEMBER"
   | "WORKSPACE_ADMIN"
   | "WORKSPACE_MEMBER"
-  | "USER"
+  | "USER" // (Gói thường, chưa có công ty)
   | "GUEST_PROJECT"
   | null;
 
@@ -66,6 +68,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   loginWithTokens: (accessToken: string, refreshToken: string) => Promise<void>;
   logout: () => Promise<void>;
+  refreshUser: () => Promise<void>; // ✅ HÀM MỚI
   hasPermission: (permission: string) => boolean;
 }
 
@@ -74,7 +77,13 @@ interface AuthContextType {
 // ============================================================
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const PUBLIC_PAGES = ["/", "/log-in-out", "/accept-invitation", "/register-from-invite"];
+const PUBLIC_PAGES = [
+  "/",
+  "/(auth)/log-in-out",
+  "/accept-invitation",
+  "/register-from-invite",
+  "/create-company", // ✅ Thêm trang onboarding
+];
 
 const ROLE_DASHBOARDS: Record<string, string> = {
   SYSTEM_ADMIN: "/adminss/dashboard",
@@ -82,7 +91,7 @@ const ROLE_DASHBOARDS: Record<string, string> = {
   COMPANY_MEMBER: "/admin",
   WORKSPACE_ADMIN: "/core",
   WORKSPACE_MEMBER: "/core",
-  USER: "/member",
+  USER: "/create-company", // ✅ SỬA LỖI: USER mới phải vào trang TẠO CÔNG TY
   GUEST_PROJECT: "/projects",
 };
 
@@ -108,45 +117,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (user.company?.roleCode === "COMPANY_MEMBER") return "COMPANY_MEMBER";
     if (user.workspaces?.some((w) => w.roleCode === "WORKSPACE_MEMBER"))
       return "WORKSPACE_MEMBER";
-    return "USER";
+    return "USER"; // Mặc định là user mới
   };
 
   // ============================================================
-  // 🧩 Helper: Chuẩn hóa dữ liệu user
+  // 🧩 Helper: Chuẩn hóa dữ liệu user (Giữ nguyên)
   // ============================================================
   const normalizeUser = (rawUser: any): User => ({
+    // ... (logic chuẩn hóa của bạn)
     ...rawUser,
     avatarUrl: rawUser.avatarUrl ?? "",
-    systemRoles:
-      Array.isArray(rawUser.systemRoles) && rawUser.systemRoles.length > 0
-        ? rawUser.systemRoles
-        : rawUser.systemRoles
-        ? [rawUser.systemRoles]
-        : [],
+    systemRoles: Array.isArray(rawUser.systemRoles)
+      ? rawUser.systemRoles
+      : rawUser.systemRoles
+      ? [rawUser.systemRoles]
+      : [],
     company: rawUser.company ?? null,
     workspaces: rawUser.workspaces ?? [],
     projects: rawUser.projects ?? [],
   });
 
   // ============================================================
-  // 🧩 Helper: Xử lý đăng nhập (dùng cho email/password + token)
+  // 🧩 Helper: Tải và Set User (Tách ra để tái sử dụng)
   // ============================================================
-  const performLogin = async (accessToken: string, refreshToken: string) => {
-    localStorage.setItem("accessToken", accessToken);
-    localStorage.setItem("refreshToken", refreshToken);
+  const fetchAndSetUser = useCallback(async () => {
+    try {
+      const data = await getCurrentUser();
+      const userNormalized = normalizeUser(data);
+      const mainRole = determineRole(userNormalized);
 
-    const data = await getCurrentUser();
-    const userNormalized = normalizeUser(data);
-    const mainRole = determineRole(userNormalized);
+      setUser(userNormalized);
+      setRole(mainRole);
+      localStorage.setItem("user", JSON.stringify(userNormalized));
+      localStorage.setItem("userRole", mainRole ?? "");
 
-    setUser(userNormalized);
-    setRole(mainRole);
-    localStorage.setItem("user", JSON.stringify(userNormalized));
-    localStorage.setItem("userRole", mainRole ?? "");
-
-
-    return mainRole;
-  };
+      return { user: userNormalized, role: mainRole }; // Trả về
+    } catch (e) {
+      // Token hỏng
+      setUser(null);
+      setRole(null);
+      localStorage.clear();
+      throw e; // Ném lỗi để các hàm khác bắt
+    }
+  }, []); // Thêm mảng dependency trống
 
   // ============================================================
   // 🧩 Tự động kiểm tra trạng thái đăng nhập
@@ -158,39 +171,56 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setIsLoading(false);
         return;
       }
-
       try {
-        const data = await getCurrentUser();
-        const userNormalized = normalizeUser(data);
-        setUser(userNormalized);
-        setRole(localStorage.getItem("userRole") as AppRole);
+        await fetchAndSetUser();
       } catch (err) {
         console.error("Auth check failed:", err);
-        localStorage.clear();
-        setUser(null);
-        setRole(null);
         router.push("/(auth)/log-in-out");
       } finally {
         setIsLoading(false);
       }
     };
-
     checkLogin();
-  }, []);
+  }, [fetchAndSetUser, router]); // Chỉ chạy 1 lần
 
   // ============================================================
-  // 🧩 Guard: Bảo vệ route
+  // 🧩 Guard: Bảo vệ route VÀ Xử lý Onboarding
   // ============================================================
   useEffect(() => {
-    if (isLoading) return;
-    const isPublic = PUBLIC_PAGES.some((p) => pathname.startsWith(p));
-    const isAuthPage = pathname.startsWith("/(auth)/log-in-out");
+    if (isLoading) return; // Chờ checkLogin xong
 
-    if (user) {
-      if (isAuthPage) {
-        const dashboard = ROLE_DASHBOARDS[role || "USER"] || "/member";
-        router.push(dashboard);
+    const isPublic = PUBLIC_PAGES.some((p) => pathname.startsWith(p));
+
+    // 1. ĐÃ ĐĂNG NHẬP
+    if (user && role) {
+      const isOnboardingPage = pathname.startsWith("/create-company");
+
+      // ✅ LOGIC ONBOARDING (ƯU TIÊN HÀNG ĐẦU)
+      const needsOnboarding =
+        role === "USER" &&
+        !user.company &&
+        (!user.workspaces || user.workspaces.length === 0);
+
+      if (needsOnboarding && !isOnboardingPage) {
+        // Ép buộc user phải tạo công ty
+        showToast("Chào mừng! Vui lòng tạo công ty để bắt đầu.", "info");
+        router.push("/create-company");
+        return; // Dừng logic
       }
+
+      if (!needsOnboarding && isOnboardingPage) {
+        // Đã có công ty/role, cấm vào lại trang tạo
+        router.push(ROLE_DASHBOARDS[role] || "/core");
+        return; // Dừng logic
+      }
+
+      // Đã đăng nhập nhưng vào trang auth
+      if (pathname.startsWith("/(auth)/log-in-out")) {
+        router.push(ROLE_DASHBOARDS[role] || "/core");
+        return; // Dừng logic
+      }
+
+      // Logic bảo vệ /admin
       if (
         pathname.startsWith("/admin") &&
         role !== "COMPANY_ADMIN" &&
@@ -199,14 +229,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         showToast("Bạn không có quyền truy cập trang Admin", "error");
         router.push("/core");
       }
+
+      // 2. CHƯA ĐĂNG NHẬP
     } else if (!isPublic) {
+      // Cố vào trang cần bảo vệ
       showToast("Vui lòng đăng nhập để tiếp tục", "warning");
       router.push("/(auth)/log-in-out");
     }
-  }, [isLoading, user, role, pathname]);
+  }, [isLoading, user, role, pathname, router, showToast]); // Chạy mỗi khi state thay đổi
 
   // ============================================================
-  // 🧩 Chức năng Login
+  // 🧩 Helper: Xử lý đăng nhập (dùng cho email/password + token)
+  // ============================================================
+  const performLogin = async (accessToken: string, refreshToken: string) => {
+    localStorage.setItem("accessToken", accessToken);
+    localStorage.setItem("refreshToken", refreshToken);
+    // Tải, chuẩn hóa, set state, lưu localStorage
+    await fetchAndSetUser();
+  };
+
+  // ============================================================
+  // 🧩 Chức năng Login (ĐÃ SỬA LỖI)
   // ============================================================
   const login = async (email: string, password: string) => {
     setIsLoading(true);
@@ -214,27 +257,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const res = await loginUser({ email, password });
       if (!res?.data?.accessToken)
         throw new Error(res.message || "Đăng nhập thất bại!");
-      const newRole = await performLogin(
-        res.data.accessToken,
-        res.data.refreshToken
-      );
+
+      // ✅ SỬA LỖI: Chỉ gọi performLogin.
+      // KHÔNG TỰ ĐIỀU HƯỚNG.
+      await performLogin(res.data.accessToken, res.data.refreshToken);
       showToast("Đăng nhập thành công!", "success");
-      router.push(ROLE_DASHBOARDS[newRole || "USER"] || "/member");
+
+      // `useEffect` (Guard) sẽ tự động bắt state thay đổi và điều hướng
     } catch (err) {
       setIsLoading(false);
       throw err;
     }
+    // Không set isLoading(false) ở đây, để Guard xử lý
   };
 
   // ============================================================
-  // 🧩 Login with Tokens (Google / Invite)
+  // 🧩 Login with Tokens (ĐÃ SỬA LỖI)
   // ============================================================
   const loginWithTokens = async (accessToken: string, refreshToken: string) => {
     setIsLoading(true);
     try {
-      const newRole = await performLogin(accessToken, refreshToken);
+      // ✅ SỬA LỖI: Chỉ gọi performLogin.
+      // KHÔNG TỰ ĐIỀU HƯỚNG.
+      await performLogin(accessToken, refreshToken);
       showToast("Đăng nhập thành công!", "success");
-      router.push(ROLE_DASHBOARDS[newRole || "USER"] || "/member");
+
+      // `useEffect` (Guard) sẽ tự động bắt state thay đổi và điều hướng
     } catch (err) {
       setIsLoading(false);
       throw err;
@@ -242,7 +290,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   // ============================================================
-  // 🧩 Logout
+  // 🧩 HÀM MỚI: Dành cho trang CreateCompany
+  // ============================================================
+  const refreshUser = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      // Tải lại user (lúc này đã có công ty)
+      await fetchAndSetUser();
+      // `useEffect` (Guard) sẽ tự động thấy role mới
+      // và chuyển hướng đến /admin
+    } catch (e) {
+      showToast("Lỗi: Không thể làm mới thông tin user", "error");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [fetchAndSetUser, showToast]); // Cập nhật dependencies
+
+  // ============================================================
+  // 🧩 Logout (Giữ nguyên)
   // ============================================================
   const logout = async () => {
     try {
@@ -273,6 +338,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         loginWithTokens,
         logout,
+        refreshUser, // ✅ Thêm hàm mới
         hasPermission,
       }}
     >
@@ -282,7 +348,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 }
 
 // ============================================================
-// 6️⃣ Hook tiện ích
+// 6️⃣ Hook tiện ích (Giữ nguyên)
 // ============================================================
 export function useAuth() {
   const context = useContext(AuthContext);

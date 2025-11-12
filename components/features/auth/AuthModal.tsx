@@ -1,11 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "next/navigation"; // Giữ lại để dùng cho trang "Quên mật khẩu"
 import { useToast } from "@/components/ui/ToastProvider";
-// ⛔️ ĐÂY LÀ LỖI CŨ, ĐẢM BẢO SỬA ĐƯỜNG DẪN NẾU BẠN DI CHUYỂN
-import { loginUser, registerUser, verifyEmail } from "@/services/apiAuth";
-import { getCurrentUser } from "@/services/apiUser";
+// ⛔️ SỬA LỖI: Chỉ import API cho register/verify, KHÔNG import login/getCurrentUser
+// (Đảm bảo đường dẫn này đúng, ví dụ: @/services/apiAuth)
+import { registerUser, verifyEmail } from "@/services/apiAuth";
+// ✅ TỐI ƯU: Import useAuth
+import { useAuth } from "@/context/AuthContext";
 
 import AuthHeader from "./AuthHeader";
 import AuthTabs from "./AuthTabs";
@@ -13,7 +15,7 @@ import AuthFormLogin from "./AuthFormLogin";
 import AuthFormRegister from "./AuthFormRegister";
 import AuthFormVerify from "./AuthFormVerify";
 import AuthFormForgot from "./AuthFormForgot";
-import AuthSocialButtons from "./AuthSocialButtons"; // <-- Component này đã được nâng cấp
+import AuthSocialButtons from "./AuthSocialButtons";
 
 type AuthFormData = {
   fullName: string;
@@ -35,10 +37,13 @@ export default function AuthModal({
   isOpen: boolean;
   onClose: () => void;
 }) {
-  const router = useRouter();
+  const router = useRouter(); // Vẫn dùng cho forgot password
   const { showToast } = useToast();
+  // ✅ TỐI ƯU: Lấy hàm login từ Context
+  const { login, loginWithTokens, isLoading: isAuthLoading } = useAuth();
+
   const [tab, setTab] = useState<AuthTab>("login");
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false); // State loading riêng của form
 
   const [form, setForm] = useState<AuthFormData>({
     fullName: "",
@@ -57,76 +62,7 @@ export default function AuthModal({
     };
 
   // ----------------------------------------------------------------
-  // ✅ HÀM XỬ LÝ THÀNH CÔNG TÁI SỬ DỤNG
-  // (Được gọi bởi cả Đăng nhập Email VÀ Đăng nhập Google)
-  // ----------------------------------------------------------------
-  const handleAuthSuccess = async (data: {
-    accessToken: string;
-    refreshToken: string;
-  }) => {
-    setIsLoading(true); // Kích hoạt loading toàn modal
-    try {
-      // 1. Lưu token
-      localStorage.setItem("accessToken", data.accessToken);
-      localStorage.setItem("refreshToken", data.refreshToken);
-
-      // 2. Lấy thông tin user
-      const user = await getCurrentUser();
-      localStorage.setItem("user", JSON.stringify(user));
-
-      // 3. Xác định vai trò chính (Logic của bạn đã đúng)
-      let mainRole = "USER";
-      if (user.systemRoles?.length) mainRole = user.systemRoles[0];
-      else if (user.company?.roleCode === "COMPANY_ADMIN")
-        mainRole = "COMPANY_ADMIN";
-      else if (
-        user.workspaces?.some((w: any) => w.roleCode === "WORKSPACE_ADMIN")
-      )
-        mainRole = "WORKSPACE_ADMIN";
-      else if (user.company?.roleCode === "COMPANY_MEMBER")
-        mainRole = "COMPANY_MEMBER";
-      else if (
-        user.workspaces?.some((w: any) => w.roleCode === "WORKSPACE_MEMBER")
-      )
-        mainRole = "WORKSPACE_MEMBER";
-      else if (user.projects?.some((p: any) => p.roleCode === "GUEST_PROJECT"))
-        mainRole = "GUEST_PROJECT";
-
-      localStorage.setItem("userRole", mainRole);
-      console.log("🎯 ROLE DETECTED:", mainRole);
-
-      // 4. Phân hướng dashboard (Logic của bạn đã đúng)
-      switch (mainRole) {
-        case "SYSTEM_ADMIN":
-          router.push("/adminss/dashboard");
-          break;
-        case "COMPANY_ADMIN":
-        case "COMPANY_MEMBER":
-          router.push("/admin");
-          break;
-        case "WORKSPACE_ADMIN":
-        case "WORKSPACE_MEMBER":
-          router.push("/core");
-          break;
-        case "GUEST_PROJECT":
-          router.push("/projects");
-          break;
-        default:
-          router.push("/member");
-          break;
-      }
-
-      showToast("Đăng nhập thành công!", "success");
-    } catch (error: any) {
-      showToast(error.message || "Lỗi lấy thông tin người dùng!", "error");
-      localStorage.clear(); // Xóa token nếu lấy user thất bại
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // ----------------------------------------------------------------
-  // ✅ HÀM SUBMIT FORM CHÍNH
+  // ✅ HÀM SUBMIT ĐÃ ĐƯỢC TỐI ƯU
   // ----------------------------------------------------------------
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -139,22 +75,24 @@ export default function AuthModal({
           throw new Error("Vui lòng nhập email và mật khẩu!");
         }
 
-        const res = await loginUser({
-          email: form.email.trim(),
-          password: form.password.trim(),
-        });
+        // 🟢 CHỈ CẦN GỌI HÀM LOGIN CỦA CONTEXT
+        // AuthContext sẽ tự xử lý (lấy user, set state, VÀ ĐIỀU HƯỚNG)
+        await login(form.email.trim(), form.password.trim());
 
-        if (!res?.data?.accessToken) {
-          throw new Error(res.message || "Đăng nhập thất bại!");
-        }
+        // ❌ XÓA TẤT CẢ LOGIC (res, localStorage, getCurrentUser, switch/case, router.push)
+        // ... (ĐÃ XÓA)
 
-        // 🟢 CHỈ CẦN GỌI HÀM TÁI SỬ DỤNG
-        await handleAuthSuccess(res.data);
+        // onClose() sẽ được gọi tự động khi trang chuyển hướng
       }
 
       // 🔹 Đăng ký
       else if (tab === "register") {
-        if (!form.fullName || !form.email || !form.password) {
+        if (
+          !form.fullName ||
+          !form.email ||
+          !form.password ||
+          !form.confirmPassword
+        ) {
           throw new Error("Vui lòng nhập đầy đủ thông tin!");
         }
         if (form.password !== form.confirmPassword) {
@@ -176,12 +114,15 @@ export default function AuthModal({
 
       // 🔹 Xác thực email
       else if (tab === "verify") {
-        if (!form.otp) throw new Error("Vui lòng nhập mã OTP!");
+        if (!form.otp) throw new Error("Vui lòng nhập OTP!");
         const res = await verifyEmail({
           email: form.email.trim(),
           otp: form.otp.trim(),
         });
-        showToast(res.message || "Xác thực thành công!", "success");
+        showToast(
+          res.message || "Xác thực thành công! Vui lòng đăng nhập.",
+          "success"
+        );
         setTab("login");
       }
     } catch (error: any) {
@@ -194,7 +135,26 @@ export default function AuthModal({
     }
   };
 
+  // ----------------------------------------------------------------
+  // ✅ HÀM XỬ LÝ SOCIAL LOGIN (TÁI SỬ DỤNG LOGIC)
+  // ----------------------------------------------------------------
+  const handleSocialLoginSuccess = async (data: {
+    accessToken: string;
+    refreshToken: string;
+  }) => {
+    try {
+      // 🟢 GỌI HÀM LOGIN CỦA CONTEXT
+      await loginWithTokens(data.accessToken, data.refreshToken);
+      // AuthContext sẽ tự động điều hướng
+    } catch (error: any) {
+      showToast(error.message || "Lỗi xử lý đăng nhập Google!", "error");
+    }
+  };
+
   if (!isOpen) return null;
+
+  // Dùng isAuthLoading (của Context) để biết toàn bộ app đang xử lý (ví dụ: đang điều hướng)
+  const isProcessing = isLoading || isAuthLoading;
 
   return (
     <div
@@ -203,12 +163,11 @@ export default function AuthModal({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-sm bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100 
-                   animate-in slide-in-from-bottom-5 duration-300 ease-out" // <-- Hiệu ứng động
+        className="relative w-full max-w-sm bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100 transition-all animate-in slide-in-from-bottom-5 duration-300 ease-out"
       >
         <AuthHeader tab={tab} setTab={setTab} onClose={onClose} />
 
-        {/* 🎨 SỬA LỖI UI: Bỏ lớp div thừa, áp dụng padding trực tiếp */}
+        {/* Sửa lỗi UI "nền trong nền" */}
         <div className="p-5">
           {(tab === "login" || tab === "register") && (
             <AuthTabs tab={tab} setTab={setTab} />
@@ -219,7 +178,7 @@ export default function AuthModal({
               <AuthFormLogin
                 form={form}
                 handleChange={handleChange as any}
-                isLoading={isLoading}
+                isLoading={isProcessing} // Dùng state tổng
                 setTab={setTab as any}
               />
             )}
@@ -227,32 +186,29 @@ export default function AuthModal({
               <AuthFormRegister
                 form={form}
                 handleChange={handleChange as any}
-                isLoading={isLoading}
-                setTab={setTab as any}
+                isLoading={isProcessing} // Dùng state tổng
               />
             )}
             {tab === "verify" && (
               <AuthFormVerify
                 form={form}
                 handleChange={handleChange as any}
-                isLoading={isLoading}
-                setTab={setTab as any}
+                isLoading={isProcessing} // Dùng state tổng
               />
             )}
             {tab === "forgot" && (
               <AuthFormForgot
                 form={form}
                 handleChange={handleChange as any}
-                isLoading={isLoading} // 'isLoading' của cha
+                isLoading={isProcessing} // Dùng state tổng
                 setTab={setTab as any}
               />
             )}
           </form>
 
-          {/* 🟢 Truyền các hàm xử lý cho SocialButtons */}
           {(tab === "login" || tab === "register") && (
             <AuthSocialButtons
-              onAuthSuccess={handleAuthSuccess} // Truyền hàm success
+              onAuthSuccess={handleSocialLoginSuccess} // Truyền hàm success
               onError={(msg) => showToast(msg, "error")} // Truyền hàm error
               setLoading={setIsLoading} // Truyền hàm set loading
             />
