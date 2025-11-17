@@ -1,11 +1,11 @@
 'use client'
 
 import { useState } from 'react'
-import { X } from 'lucide-react'
+import { X, Sparkles, Calendar, Target, Rocket } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Sprint } from '@/lib/mock-data'
 
 interface CreateSprintModalProps {
@@ -42,78 +42,154 @@ export function CreateSprintModal({ isOpen, onClose, onCreate }: CreateSprintMod
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <Card className="w-full max-w-2xl">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div>
-            <CardTitle>Create New Sprint</CardTitle>
-            <CardDescription>Create a new sprint for your project</CardDescription>
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fadeIn">
+      <Card className="w-full max-w-2xl shadow-2xl border-0 animate-scaleIn overflow-hidden">
+        {/* Header with Gradient */}
+        <CardHeader className="relative overflow-hidden bg-gradient-to-br from-green-500 via-emerald-500 to-green-600 p-8">
+          <div className="absolute inset-0 bg-grid-white/10"></div>
+          <div className="absolute -right-8 -top-8 w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
+          
+          <div className="relative z-10 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center shadow-lg">
+                <Rocket className="w-7 h-7 text-white" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <CardTitle className="text-2xl text-white">Create New Sprint</CardTitle>
+                  <Sparkles className="w-5 h-5 text-yellow-300 animate-pulse" />
+                </div>
+                <p className="text-white/80 text-sm mt-1">Plan your next iteration</p>
+              </div>
+            </div>
+            
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-white/20 rounded-xl transition-all duration-300 hover:scale-110 hover:rotate-90 backdrop-blur-sm"
+            >
+              <X className="w-5 h-5 text-white" />
+            </button>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-          >
-            <X className="w-4 h-4" />
-          </button>
         </CardHeader>
 
-        <CardContent className="space-y-6">
+        <CardContent className="p-8 space-y-6 bg-gradient-to-b from-green-50/30 to-white">
           {/* Sprint Name */}
-          <div>
-            <label className="text-sm font-medium block mb-2">Sprint Name*</label>
+          <div className="group">
+            <label className="text-sm font-semibold flex items-center gap-2 mb-3 text-gray-700">
+              <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-emerald-500 rounded-lg flex items-center justify-center shadow-md">
+                <Sparkles className="w-4 h-4 text-white" />
+              </div>
+              Sprint Name*
+            </label>
             <Input
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               placeholder="e.g., Sprint 3 - Core Features"
-              className="w-full"
+              className="w-full border-2 border-gray-200 focus:border-green-500 rounded-xl px-4 py-3 text-base transition-all duration-300 hover:border-green-300 shadow-sm"
             />
           </div>
 
           {/* Sprint Goal */}
-          <div>
-            <label className="text-sm font-medium block mb-2">Sprint Goal</label>
+          <div className="group">
+            <label className="text-sm font-semibold flex items-center gap-2 mb-3 text-gray-700">
+              <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg flex items-center justify-center shadow-md">
+                <Target className="w-4 h-4 text-white" />
+              </div>
+              Sprint Goal
+            </label>
             <Textarea
               value={formData.goal}
               onChange={(e) => setFormData({ ...formData, goal: e.target.value })}
               placeholder="What is the main goal of this sprint?"
-              rows={3}
-              className="w-full"
+              rows={4}
+              className="w-full border-2 border-gray-200 focus:border-blue-500 rounded-xl px-4 py-3 text-base transition-all duration-300 hover:border-blue-300 shadow-sm resize-none"
             />
           </div>
 
           {/* Date Range */}
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-sm font-medium block mb-2">Start Date*</label>
+            <div className="group">
+              <label className="text-sm font-semibold flex items-center gap-2 mb-3 text-gray-700">
+                <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center shadow-md">
+                  <Calendar className="w-4 h-4 text-white" />
+                </div>
+                Start Date*
+              </label>
               <input
                 type="date"
                 value={formData.startDate}
                 onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-500 transition-all duration-300 hover:border-purple-300 shadow-sm text-base"
               />
             </div>
-            <div>
-              <label className="text-sm font-medium block mb-2">End Date*</label>
+            <div className="group">
+              <label className="text-sm font-semibold flex items-center gap-2 mb-3 text-gray-700">
+                <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-red-500 rounded-lg flex items-center justify-center shadow-md">
+                  <Calendar className="w-4 h-4 text-white" />
+                </div>
+                End Date*
+              </label>
               <input
                 type="date"
                 value={formData.endDate}
                 onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-orange-500 transition-all duration-300 hover:border-orange-300 shadow-sm text-base"
               />
             </div>
           </div>
 
           {/* Actions */}
-          <div className="flex gap-2 justify-end pt-4 border-t border-gray-200">
-            <Button variant="outline" onClick={onClose}>
+          <div className="flex gap-3 justify-end pt-6 border-t-2 border-gray-200">
+            <Button 
+              variant="outline" 
+              onClick={onClose}
+              className="px-6 py-3 h-auto font-semibold border-2 hover:bg-gray-50 transition-all duration-300 hover:scale-105 rounded-xl"
+            >
               Cancel
             </Button>
-            <Button onClick={handleCreate} className="bg-green-600 hover:bg-green-700">
+            <Button 
+              onClick={handleCreate}
+              className="group bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 px-6 py-3 h-auto font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 rounded-xl"
+            >
+              <Rocket className="w-5 h-5 mr-2 group-hover:translate-x-1 transition-transform duration-300" />
               Create Sprint
             </Button>
           </div>
         </CardContent>
       </Card>
+
+      <style jsx>{`
+        .bg-grid-white\/10 {
+          background-image: linear-gradient(white 1px, transparent 1px),
+            linear-gradient(90deg, white 1px, transparent 1px);
+          background-size: 20px 20px;
+          opacity: 0.1;
+        }
+        
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        
+        @keyframes scaleIn {
+          from { 
+            opacity: 0;
+            transform: scale(0.9);
+          }
+          to { 
+            opacity: 1;
+            transform: scale(1);
+          }
+        }
+        
+        .animate-fadeIn {
+          animation: fadeIn 0.3s ease-out;
+        }
+        
+        .animate-scaleIn {
+          animation: scaleIn 0.3s ease-out;
+        }
+      `}</style>
     </div>
   )
 }

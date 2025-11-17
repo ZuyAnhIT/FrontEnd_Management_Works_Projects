@@ -32,7 +32,7 @@ export default function ProjectCoreSidebar({
       id: 'projects',
       icon: FolderKanban,
       label: 'Dự án',
-      path: `/core/workspace/${workspaceId}/project/${projectId}/projects`,
+      path: `/core/workspace/${workspaceId}/project/${projectId}`,
     },
     {
       id: 'members',

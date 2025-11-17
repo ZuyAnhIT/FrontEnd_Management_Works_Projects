@@ -8,3 +8,5 @@ export default function BoardPage() {
 
   return <Board project={project} />
 }
+
+
