@@ -6,26 +6,22 @@ import Sidebar from "@/components/features/core/Sidebar";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/components/ui/ToastProvider";
 import { Loader2 } from "lucide-react";
+import { usePathname } from "next/navigation";
 
-export default function CoreLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function CoreLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-
-  // ✅ Lấy thông tin user từ Context
   const { user, isLoading: isAuthLoading, isAuthenticated } = useAuth();
   const { showToast } = useToast();
-
-  // ✅ State cho danh sách workspace mà user quản lý
   const [workspaces, setWorkspaces] = useState<any[]>([]);
   const [loadingWs, setLoadingWs] = useState(true);
 
+  const pathname = usePathname();
+
+  // 🔥 Chỉ khi vào project mới tắt sidebar + header
+  const insideProject = pathname.includes("/project/");
+
   useEffect(() => {
-    // Khi user đã đăng nhập, lấy workspace từ dữ liệu user
     if (isAuthenticated && user?.workspaces) {
-      // 🔹 Chỉ lọc workspace mà user là WORKSPACE_ADMIN
       const managedWorkspaces = user.workspaces.filter(
         (w) => w.roleCode === "WORKSPACE_ADMIN"
       );
@@ -37,7 +33,6 @@ export default function CoreLayout({
     }
   }, [isAuthenticated, user]);
 
-  // 🌀 Hiển thị trong khi AuthContext đang xác thực
   if (isAuthLoading)
     return (
       <div className="flex items-center justify-center h-screen text-gray-500 gap-2">
@@ -46,7 +41,6 @@ export default function CoreLayout({
       </div>
     );
 
-  // 🚫 Fallback nếu user chưa đăng nhập
   if (!user)
     return (
       <div className="flex items-center justify-center h-screen text-gray-500">
@@ -54,30 +48,34 @@ export default function CoreLayout({
       </div>
     );
 
-  // ✅ Layout chính
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Header */}
-      <Header
-  onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
-  user={{
-    name: user.fullName || "Người dùng",
-    email: user.email || "Không có email",
-  }}
-/>
-
+      
+      {/* 🔥 1) Chỉ hiển thị Header nếu KHÔNG ở trong Project */}
+      {!insideProject && (
+        <Header
+          onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
+          user={{
+            name: user.fullName || "Người dùng",
+            email: user.email || "Không có email",
+          }}
+        />
+      )}
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar */}
-        <Sidebar
-          isOpen={sidebarOpen}
-          onClose={() => setSidebarOpen(false)}
-          user={user}
-          workspaces={workspaces}
-          loadingWs={loadingWs}
-        />
+        
+        {/* 🔥 2) Chỉ hiển thị Sidebar khi KHÔNG ở trong Project */}
+        {!insideProject && (
+          <Sidebar
+            isOpen={sidebarOpen}
+            onClose={() => setSidebarOpen(false)}
+            user={user}
+            workspaces={workspaces}
+            loadingWs={loadingWs}
+          />
+        )}
 
-        {/* Nội dung chính */}
+        {/* Nội dung chính - luôn hiển thị */}
         <main className="flex-1 overflow-y-auto">{children}</main>
       </div>
     </div>
