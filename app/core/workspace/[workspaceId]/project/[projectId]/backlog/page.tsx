@@ -1,10 +1,11 @@
-'use client'
+"use client";
 
-import { Backlog } from '@/components/features/core/project/backlog'
-import { mockProjects } from '@/lib/mock-data'
+import { useParams } from "next/navigation";
+import { Backlog } from "@/components/features/core/project/backlog";
 
 export default function BacklogPage() {
-  const project = mockProjects[0]
+  const params = useParams();
+  const projectId = Number(params.projectId);
 
-  return <Backlog project={project} />
+  return <Backlog projectId={projectId} />;
 }
