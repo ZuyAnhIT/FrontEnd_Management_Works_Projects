@@ -25,6 +25,7 @@ import { useToast } from "@/components/ui/ToastProvider";
 
 import ProjectCard from "@/components/features/core/project/ProjectCard";
 import CreateProjectModal from "@/components/features/core/project/CreateProjectModal";
+import ConfirmationModal from "@/components/ui/ConfirmationModal";
 
 export default function ProjectPage() {
   const { showToast } = useToast();
@@ -40,6 +41,11 @@ export default function ProjectPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [filterPriority, setFilterPriority] = useState<string>("all");
+
+  // ⭐ Thêm state cho modal xoá
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const loadProjects = async () => {
     if (!workspaceId || isNaN(workspaceId)) {
@@ -72,16 +78,34 @@ export default function ProjectPage() {
     showToast("Đã tạo dự án mới!", "success");
   };
 
-  const handleDelete = async (id: number) => {
-    if (!window.confirm("Bạn có chắc muốn xóa dự án này không?")) return;
+  // ⭐ Bấm nút xóa => chỉ mở modal
+  const handleDelete = (id: number) => {
+    setDeleteTargetId(id);
+    setIsDeleteModalOpen(true);
+  };
+
+  // ⭐ Khi người dùng xác nhận trong modal
+  const confirmDelete = async () => {
+    if (!deleteTargetId) return;
+
     try {
-      await deleteProject(workspaceId, id);
+      setDeleteLoading(true);
+
+      await deleteProject(workspaceId, deleteTargetId);
+
       showToast("Đã xóa dự án!", "success");
-      setProjects((prev) => prev.filter((p) => p.id !== id));
+
+      // cập nhật danh sách
+      const data = await getProjects(workspaceId);
       const trash = await getTrashedProjects(workspaceId);
+      setProjects(data);
       setTrashedProjects(trash);
     } catch (err: any) {
       showToast(err.message || "Không thể xóa dự án!", "error");
+    } finally {
+      setDeleteLoading(false);
+      setIsDeleteModalOpen(false);
+      setDeleteTargetId(null);
     }
   };
 
@@ -119,7 +143,7 @@ export default function ProjectPage() {
         <div className="relative bg-white/80 backdrop-blur-xl rounded-3xl p-8 mb-8 shadow-2xl border border-white/50 overflow-hidden group">
           {/* Gradient overlay */}
           <div className="absolute inset-0 bg-gradient-to-br from-green-500/90 via-emerald-500/90 to-teal-500/90 opacity-100 group-hover:opacity-95 transition-opacity"></div>
-          
+
           {/* Animated shine effect */}
           <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-1000">
             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent skew-x-12 translate-x-[-100%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
@@ -186,21 +210,19 @@ export default function ProjectPage() {
             <div className="flex gap-2 bg-gray-50 rounded-xl p-1 border-2 border-gray-200">
               <button
                 onClick={() => setViewMode("grid")}
-                className={`p-2 rounded-lg transition-all ${
-                  viewMode === "grid"
+                className={`p-2 rounded-lg transition-all ${viewMode === "grid"
                     ? "bg-white text-green-600 shadow-md"
                     : "text-gray-500 hover:text-gray-700"
-                }`}
+                  }`}
               >
                 <Grid3x3 className="w-5 h-5" />
               </button>
               <button
                 onClick={() => setViewMode("list")}
-                className={`p-2 rounded-lg transition-all ${
-                  viewMode === "list"
+                className={`p-2 rounded-lg transition-all ${viewMode === "list"
                     ? "bg-white text-green-600 shadow-md"
                     : "text-gray-500 hover:text-gray-700"
-                }`}
+                  }`}
               >
                 <List className="w-5 h-5" />
               </button>
@@ -213,40 +235,35 @@ export default function ProjectPage() {
           <div className="flex gap-2">
             <button
               onClick={() => setActiveTab("active")}
-              className={`group relative flex-1 px-6 py-4 font-bold rounded-xl transition-all duration-300 overflow-hidden ${
-                activeTab === "active"
+              className={`group relative flex-1 px-6 py-4 font-bold rounded-xl transition-all duration-300 overflow-hidden ${activeTab === "active"
                   ? "bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-lg shadow-green-500/30"
                   : "text-gray-600 hover:bg-gray-50"
-              }`}
+                }`}
             >
               {/* Hover effect background */}
-              <div className={`absolute inset-0 bg-gradient-to-r from-green-500/5 to-emerald-500/5 opacity-0 group-hover:opacity-100 transition-opacity ${
-                activeTab === "active" ? "hidden" : ""
-              }`}></div>
-              
+              <div className={`absolute inset-0 bg-gradient-to-r from-green-500/5 to-emerald-500/5 opacity-0 group-hover:opacity-100 transition-opacity ${activeTab === "active" ? "hidden" : ""
+                }`}></div>
+
               <div className="relative z-10 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center transition-all ${
-                    activeTab === "active"
+                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center transition-all ${activeTab === "active"
                       ? "bg-white/20 shadow-inner"
                       : "bg-green-100 text-green-600"
-                  }`}>
+                    }`}>
                     <FolderKanban className="w-5 h-5" />
                   </div>
                   <div className="text-left">
                     <div className="font-bold text-sm">Dự án hiện tại</div>
-                    <div className={`text-xs ${
-                      activeTab === "active" ? "text-white/80" : "text-gray-500"
-                    }`}>
+                    <div className={`text-xs ${activeTab === "active" ? "text-white/80" : "text-gray-500"
+                      }`}>
                       Đang hoạt động
                     </div>
                   </div>
                 </div>
-                <div className={`flex items-center justify-center min-w-[2.5rem] h-10 px-3 rounded-lg font-bold transition-all ${
-                  activeTab === "active"
+                <div className={`flex items-center justify-center min-w-[2.5rem] h-10 px-3 rounded-lg font-bold transition-all ${activeTab === "active"
                     ? "bg-white/20 text-white shadow-inner"
                     : "bg-gray-100 text-gray-700"
-                }`}>
+                  }`}>
                   {projects.length}
                 </div>
               </div>
@@ -254,40 +271,35 @@ export default function ProjectPage() {
 
             <button
               onClick={() => setActiveTab("trash")}
-              className={`group relative flex-1 px-6 py-4 font-bold rounded-xl transition-all duration-300 overflow-hidden ${
-                activeTab === "trash"
+              className={`group relative flex-1 px-6 py-4 font-bold rounded-xl transition-all duration-300 overflow-hidden ${activeTab === "trash"
                   ? "bg-gradient-to-r from-red-500 to-pink-500 text-white shadow-lg shadow-red-500/30"
                   : "text-gray-600 hover:bg-gray-50"
-              }`}
+                }`}
             >
               {/* Hover effect background */}
-              <div className={`absolute inset-0 bg-gradient-to-r from-red-500/5 to-pink-500/5 opacity-0 group-hover:opacity-100 transition-opacity ${
-                activeTab === "trash" ? "hidden" : ""
-              }`}></div>
-              
+              <div className={`absolute inset-0 bg-gradient-to-r from-red-500/5 to-pink-500/5 opacity-0 group-hover:opacity-100 transition-opacity ${activeTab === "trash" ? "hidden" : ""
+                }`}></div>
+
               <div className="relative z-10 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center transition-all ${
-                    activeTab === "trash"
+                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center transition-all ${activeTab === "trash"
                       ? "bg-white/20 shadow-inner"
                       : "bg-red-100 text-red-600"
-                  }`}>
+                    }`}>
                     <Trash2 className="w-5 h-5" />
                   </div>
                   <div className="text-left">
                     <div className="font-bold text-sm">Đã xóa</div>
-                    <div className={`text-xs ${
-                      activeTab === "trash" ? "text-white/80" : "text-gray-500"
-                    }`}>
+                    <div className={`text-xs ${activeTab === "trash" ? "text-white/80" : "text-gray-500"
+                      }`}>
                       Thùng rác
                     </div>
                   </div>
                 </div>
-                <div className={`flex items-center justify-center min-w-[2.5rem] h-10 px-3 rounded-lg font-bold transition-all ${
-                  activeTab === "trash"
+                <div className={`flex items-center justify-center min-w-[2.5rem] h-10 px-3 rounded-lg font-bold transition-all ${activeTab === "trash"
                     ? "bg-white/20 text-white shadow-inner"
                     : "bg-gray-100 text-gray-700"
-                }`}>
+                  }`}>
                   {trashedProjects.length}
                 </div>
               </div>
@@ -305,15 +317,15 @@ export default function ProjectPage() {
               {searchQuery || filterPriority !== "all"
                 ? "Không tìm thấy dự án phù hợp"
                 : activeTab === "trash"
-                ? "Thùng rác trống"
-                : "Chưa có dự án nào"}
+                  ? "Thùng rác trống"
+                  : "Chưa có dự án nào"}
             </h3>
             <p className="text-gray-500 mb-6">
               {searchQuery || filterPriority !== "all"
                 ? "Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm"
                 : activeTab === "active"
-                ? "Bắt đầu bằng cách tạo dự án mới"
-                : "Các dự án đã xóa sẽ xuất hiện ở đây"}
+                  ? "Bắt đầu bằng cách tạo dự án mới"
+                  : "Các dự án đã xóa sẽ xuất hiện ở đây"}
             </p>
             {activeTab === "active" && !searchQuery && filterPriority === "all" && (
               <button
@@ -326,11 +338,10 @@ export default function ProjectPage() {
             )}
           </div>
         ) : (
-          <div className={`animate-fadeInUp ${
-            viewMode === "grid"
+          <div className={`animate-fadeInUp ${viewMode === "grid"
               ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
               : "space-y-4"
-          }`}>
+            }`}>
             {filteredList.map((p, idx) => (
               <div
                 key={p.id}
@@ -339,7 +350,7 @@ export default function ProjectPage() {
               >
                 <ProjectCard
                   p={p}
-                  onDelete={handleDelete}
+                  onDelete={() => handleDelete(p.id)}
                   isTrash={activeTab === "trash"}
                   workspaceId={workspaceId}
                   viewMode={viewMode}
@@ -348,7 +359,18 @@ export default function ProjectPage() {
             ))}
           </div>
         )}
-
+        <ConfirmationModal
+          isOpen={isDeleteModalOpen}
+          onClose={() => {
+            if (!deleteLoading) setIsDeleteModalOpen(false);
+          }}
+          onConfirm={confirmDelete}
+          isLoading={deleteLoading}
+          title="Xóa dự án?"
+          description="Bạn có chắc muốn xóa dự án này? Dự án sẽ được đưa vào thùng rác."
+          confirmText="Xóa ngay"
+          cancelText="Hủy"
+        />
         <CreateProjectModal
           isOpen={showModal}
           onClose={() => setShowModal(false)}
