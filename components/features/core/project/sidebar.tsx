@@ -38,7 +38,7 @@ export default function ProjectCoreSidebar({
       id: 'members',
       icon: Users,
       label: 'Thành viên',
-      path: `/core/workspace/${workspaceId}/project/${projectId}/members`,
+      path: `/core/workspace/${workspaceId}/project/${projectId}/member`,
     },
     {
       id: 'settings',

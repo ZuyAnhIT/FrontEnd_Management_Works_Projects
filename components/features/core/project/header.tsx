@@ -10,21 +10,18 @@ import {
   Share2,
 } from 'lucide-react'
 import { useState } from 'react'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { CreateTaskModal } from './create-task-modal'
 import { CreateSprintModal } from './create-sprint-modal'
 import UserMenu from '@/components/ui/UserMenu'
+import { useAuth } from '@/context/AuthContext'
 
 interface ProjectHeaderProps {
   projectName?: string
   onMenuToggle: () => void
   onTaskCreate?: () => void
   onSprintCreate?: () => void
-  user?: {
-    name: string
-    email: string
-  }
 }
 
 export default function ProjectHeader({
@@ -32,26 +29,31 @@ export default function ProjectHeader({
   onMenuToggle,
   onTaskCreate,
   onSprintCreate,
-  user = { name: 'User', email: 'user@example.com' },
 }: ProjectHeaderProps) {
+  
+  // 🔥 Lấy user thật từ Auth Provider
+  const { user, logout } = useAuth()
+
+  // ⭐ Convert userAuth -> userMenu format
+  const safeUser = {
+    name: user?.fullName || 'User',
+    email: user?.email || 'user@example.com',
+  }
+
   const [searchQuery, setSearchQuery] = useState('')
   const [showTaskModal, setShowTaskModal] = useState(false)
   const [showSprintModal, setShowSprintModal] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
 
   const pathname = usePathname()
-  const router = useRouter()
 
-  const getCreateButtonLabel = () => {
-    return pathname?.includes('/sprints') ? 'New Sprint' : 'New Task'
-  }
+  const getCreateButtonLabel = () =>
+    pathname?.includes('/sprints') ? 'New Sprint' : 'New Task'
 
   const handleCreateClick = () => {
-    if (pathname?.includes('/sprints')) {
-      setShowSprintModal(true)
-    } else {
-      setShowTaskModal(true)
-    }
+    pathname?.includes('/sprints')
+      ? setShowSprintModal(true)
+      : setShowTaskModal(true)
   }
 
   const getPageTitle = () => {
@@ -63,10 +65,8 @@ export default function ProjectHeader({
     return 'Dashboard'
   }
 
-  const handleLogout = () => {
-    localStorage.removeItem('accessToken')
-    localStorage.removeItem('refreshToken')
-    router.push('/')
+  const handleLogout = async () => {
+    await logout()
   }
 
   return (
@@ -141,13 +141,13 @@ export default function ProjectHeader({
                 }}
                 className="relative w-10 h-10 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center text-white font-bold hover:scale-110 transition-all shadow-lg"
               >
-                {user?.name?.charAt(0)?.toUpperCase() || 'U'}
+                {safeUser.name.charAt(0).toUpperCase()}
                 <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-400 border-2 border-white rounded-full"></span>
               </button>
 
               {userMenuOpen && (
                 <UserMenu
-                  user={user}
+                  user={safeUser}
                   onClose={() => setUserMenuOpen(false)}
                   onLogout={handleLogout}
                 />
@@ -161,17 +161,19 @@ export default function ProjectHeader({
       <CreateTaskModal
         isOpen={showTaskModal}
         onClose={() => setShowTaskModal(false)}
-        onCreate={() => {
+        projectId={1}        // ⚠️ Bạn có thể thay bằng useParams()
+        workspaceId={1}      // ⚠️ Bạn có thể thay bằng useParams()
+        onCreated={() => {
           onTaskCreate?.()
           setShowTaskModal(false)
         }}
       />
 
-      {/* SPRINT MODAL — dùng onCreated */}
+      {/* SPRINT MODAL */}
       <CreateSprintModal
         isOpen={showSprintModal}
         onClose={() => setShowSprintModal(false)}
-        projectId={1}  // ⚠ Bạn có thể đổi sang useParams
+        projectId={1}
         onCreated={() => {
           onSprintCreate?.()
           setShowSprintModal(false)
