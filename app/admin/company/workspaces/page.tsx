@@ -23,7 +23,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/components/ui/ToastProvider";
 
 import CreateWorkspaceModal from "@/components/features/admin/CreateWorkspaceModal";
-import WorkspaceCard from "@/components/features/admin/StartsCard";
+import WorkspaceCard from "@/components/features/admin/WorkspaceCard";
 
 export default function CompanyWorkspacesPage() {
   const { showToast } = useToast();
