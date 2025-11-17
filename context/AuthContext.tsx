@@ -65,7 +65,6 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const PUBLIC_PAGES = [
   "/",
-  "/(auth)/log-in-out",
   "/accept-invitation",
   "/register-from-invite",
   "/reset-password",
@@ -181,7 +180,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           await fetchAndSetUser();
         } catch (e) {
           console.error("❌ Auth check failed, logging out:", e);
-          router.push("/(auth)/log-in-out");
+          router.push("/");
         }
       } else {
         console.log("⚠️ Không có token, bỏ qua auth check");
@@ -251,9 +250,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     } else if (!isPublic) {
       // 3. CHƯA ĐĂNG NHẬP
-      console.log("🚀 Guard: Redirect → /(auth)/log-in-out (chưa auth)");
+      console.log("🚀 Guard: Redirect → / (chưa auth)");
       showToast("Vui lòng đăng nhập để tiếp tục", "warning");
-      router.push("/(auth)/log-in-out");
+      router.push("/");
     }
   }, [isLoading, user, role, pathname, router, showToast]);
 
@@ -362,7 +361,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setRole(null);
       localStorage.clear();
       showToast("Đăng xuất thành công!", "success");
-      router.push("/(auth)/log-in-out");
+      router.push("/");
     } catch (error: any) {
       console.error("❌ Lỗi logout:", error);
       showToast("Lỗi khi đăng xuất!", "error");
