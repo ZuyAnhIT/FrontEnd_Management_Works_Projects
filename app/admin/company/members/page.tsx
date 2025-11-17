@@ -32,7 +32,11 @@ import {
 
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/components/ui/ToastProvider";
-import MemberDetailModal from "@/components/features/admin/MemberDetailModal";
+import MemberDetailModalBase from "@/components/ui/MemberDetailModalBase";
+import MemberTable from "@/components/ui/MemberTable";
+import InviteMemberModal from "@/components/ui/InviteMemberModal";
+
+
 
 // ✅ 1. Import Modal mới
 import ConfirmationModal from "@/components/ui/ConfirmationModal";
@@ -225,20 +229,21 @@ export default function MembersPage() {
   };
 
   // 🧩 8. HELPER: Định dạng thời gian (Giờ:Phút Ngày/Tháng/Năm)
-  const formatDateTime = (dateString: string) => {
-    if (!dateString) return "—";
+  const formatDateTime = (date?: string | null): string => {
+    if (!date) return "—";
     try {
-      return new Date(dateString).toLocaleString("vi-VN", {
+      return new Date(date).toLocaleString("vi-VN", {
         day: "2-digit",
         month: "2-digit",
         year: "numeric",
         hour: "2-digit",
         minute: "2-digit",
       });
-    } catch (e) {
+    } catch {
       return "—";
     }
   };
+
 
   // 🔍 Lọc danh sách
   const filteredMembers = members.filter(
@@ -321,132 +326,34 @@ export default function MembersPage() {
         ) : filteredMembers.length > 0 ? (
           <div className="bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden animate-fadeInUp delay-100">
             <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
-                  <tr>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
-                      STT
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
-                      Thành viên
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
-                      Email
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
-                      Vai trò
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
-                      Trạng thái
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
-                      Ngày tham gia
-                    </th>
-                    <th className="px-6 py-4 text-center text-xs font-bold text-gray-600 uppercase tracking-wider">
-                      Thao tác
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {filteredMembers.map((m, index) => (
-                    <tr
-                      key={m.memberId || m.userId || `pending-${index}`}
-                      className="hover:bg-gradient-to-r hover:from-blue-50/50 hover:to-cyan-50/50 transition-all duration-200"
-                    >
-                      <td className="px-6 py-4 text-sm font-medium text-gray-700">
-                        {index + 1}
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="relative">
-                            <img
-                              src={
-                                m.avatarUrl ||
-                                `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                                  m.fullName
-                                )}&background=random`
-                              }
-                              alt={m.fullName}
-                              className="w-12 h-12 rounded-xl border-2 border-gray-200 object-cover shadow-sm"
-                            />
-                            {m.status === "ACTIVE" && (
-                              <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-400 border-2 border-white rounded-full"></span>
-                            )}
-                          </div>
-                          <div>
-                            <div className="font-semibold text-gray-900">
-                              {m.fullName}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              {m.userId ? `ID: ${m.userId}` : `(Chưa xác nhận)`}
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-2 text-gray-700">
-                          <Mail className="w-4 h-4 text-gray-400" />
-                          {m.email}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div
-                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border ${m.roleName === "Company Administrator"
-                              ? "bg-yellow-50 text-yellow-700 border-yellow-200"
-                              : "bg-blue-50 text-blue-700 border-blue-200"
-                            }`}
-                        >
-                          {m.roleName === "Company Administrator" ? (
-                            <Crown className="w-3.5 h-3.5" />
-                          ) : (
-                            <Shield className="w-3.5 h-3.5" />
-                          )}
-                          <span className="text-sm font-semibold">
-                            {m.roleName || "—"}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        {renderStatusBadge(m.status)}
-                      </td>
-                      <td className="px-6 py-4 text-gray-500 text-sm">
-                        {formatDateTime(m.joinedAt)}
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <div className="flex justify-center gap-1">
-                          <button
-                            onClick={() => handleViewDetails(m)}
-                            className="group p-2.5 text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
-                            title="Xem chi tiết"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => openEditModal(m)}
-                            disabled={m.userId === user?.id}
-                            className="group p-2.5 text-green-600 hover:bg-green-50 rounded-xl transition-all
-                                       disabled:text-gray-300 disabled:hover:bg-transparent"
-                            title="Sửa vai trò/trạng thái"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => openDeleteConfirmation(m)}
-                            disabled={
-                              m.userId === user?.id || m.status === "PENDING"
-                            }
-                            className="group p-2.5 text-red-600 hover:bg-red-50 rounded-xl transition-all
-                                       disabled:text-gray-300 disabled:hover:bg-transparent"
-                            title="Xóa thành viên"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <MemberTable
+                members={filteredMembers}
+                renderStatus={renderStatusBadge}
+                renderRole={(m) => (
+                  <div
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border ${m.roleName === "COMPANY_ADMIN"
+                      ? "bg-yellow-50 text-yellow-700 border-yellow-200"
+                      : "bg-blue-50 text-blue-700 border-blue-200"
+                      }`}
+                  >
+                    {m.roleName === "COMPANY_ADMIN" ? (
+                      <Crown className="w-3.5 h-3.5" />
+                    ) : (
+                      <Shield className="w-3.5 h-3.5" />
+                    )}
+                    <span className="text-sm font-semibold">{m.roleName}</span>
+                  </div>
+                )}
+                formatDateTime={formatDateTime}
+                onViewDetail={handleViewDetails}
+                onEdit={openEditModal}
+                onDelete={openDeleteConfirmation}
+                disableEdit={(m) => m.userId === user?.id}
+                disableDelete={(m) =>
+                  m.userId === user?.id || m.status === "PENDING"
+                }
+              />
+
             </div>
           </div>
         ) : (
@@ -464,82 +371,19 @@ export default function MembersPage() {
         )}
 
         {/* Invite Modal (Giữ nguyên) */}
-        {showInviteModal && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fadeIn">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-slideUp">
-              <div className="relative overflow-hidden bg-gradient-to-br from-blue-500 via-cyan-500 to-blue-600 p-6">
-                <div className="absolute inset-0 bg-grid-white/10"></div>
-                <div className="absolute -right-8 -top-8 w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
-                <div className="relative z-10 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
-                      <UserPlus className="w-6 h-6 text-white" />
-                    </div>
-                    <div>
-                      <h2 className="text-xl font-bold text-white">
-                        Mời thành viên mới
-                      </h2>
-                      <p className="text-white/80 text-sm">
-                        Thêm người vào công ty
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => setShowInviteModal(false)}
-                    className="p-2 hover:bg-white/20 rounded-lg transition-colors"
-                  >
-                    <X className="w-5 h-5 text-white" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Modal Body */}
-              <div className="p-6 space-y-5">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                    <Mail className="w-4 h-4 text-blue-500" />
-                    Email
-                  </label>
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="example@company.com"
-                    className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all duration-300 outline-none hover:border-gray-300"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                    <Crown className="w-4 h-4 text-yellow-500" />
-                    Vai trò
-                  </label>
-                  <select
-                    value={roleId}
-                    onChange={(e) => setRoleId(Number(e.target.value))}
-                    className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all duration-300 outline-none hover:border-gray-300 cursor-pointer"
-                  >
-                    <option value={2}>Quản trị viên (Admin)</option>
-                    <option value={3}>Thành viên (Member)</option>
-                  </select>
-                </div>
-                <div className="flex gap-3 pt-2">
-                  <button
-                    onClick={() => setShowInviteModal(false)}
-                    className="flex-1 px-4 py-3 border-2 border-gray-200 rounded-xl hover:bg-gray-50 font-semibold transition-all duration-300"
-                  >
-                    Hủy
-                  </button>
-                  <button
-                    onClick={handleInvite}
-                    className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-xl hover:from-blue-600 hover:to-cyan-600 font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
-                  >
-                    Gửi lời mời
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+        <InviteMemberModal
+  isOpen={showInviteModal}
+  onClose={() => setShowInviteModal(false)}
+  onInvite={() => handleInvite()}
+  isLoading={loading}
+  email={email}
+  setEmail={setEmail}
+  roleId={roleId}
+  setRoleId={setRoleId}
+  title="Mời thành viên mới"
+  description="Thêm người vào công ty"
+  contextType="company"
+/>
 
         {/* ✅ MỚI: Modal Chỉnh sửa Trạng thái */}
         {showEditModal && selectedMember && (
@@ -615,12 +459,23 @@ export default function MembersPage() {
             </div>
           </div>
         )}
-        <MemberDetailModal
+        <MemberDetailModalBase
           isOpen={showDetailModal}
           onClose={() => setShowDetailModal(false)}
           member={detailMember}
           loading={loadingDetail}
+          title="Chi tiết thành viên công ty"
+          showStatus={true}
+          fields={[
+            { label: "ID thành viên", key: "memberId" },
+            { label: "User ID", key: "userId" },
+            { label: "Vai trò", key: "roleName" },
+            { label: "Chức danh", key: "jobTitle" },
+            { label: "Ngày tham gia", key: "joinedAt" },
+            { label: "Email", key: "email" },
+          ]}
         />
+
 
         {/* ✅ MỚI: Modal Xác nhận Xóa */}
         <ConfirmationModal
