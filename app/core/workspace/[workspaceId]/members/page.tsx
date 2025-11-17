@@ -32,6 +32,9 @@ import {
 // ✅ Lấy user từ Context
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/components/ui/ToastProvider";
+import MemberDetailModalBase from "@/components/ui/MemberDetailModalBase";
+import MemberTable from "@/components/ui/MemberTable";
+import InviteMemberModal from "@/components/ui/InviteMemberModal"; 
 
 export default function MembersPage() {
   const { showToast } = useToast();
@@ -55,6 +58,8 @@ export default function MembersPage() {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedMember, setSelectedMember] = useState<any | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
+
+
 
   // 🧩 1. Lấy danh sách thành viên workspace
   useEffect(() => {
@@ -191,21 +196,21 @@ export default function MembersPage() {
     }
   };
 
-  // 🧩 6. HELPER: Định dạng thời gian (Giờ:Phút Ngày/Tháng/Năm)
-  const formatDateTime = (dateString: string) => {
-    if (!dateString) return "—";
+  const formatDateTime = (date?: string | null): string => {
+    if (!date) return "—";
     try {
-      return new Date(dateString).toLocaleString("vi-VN", {
+      return new Date(date).toLocaleString("vi-VN", {
         day: "2-digit",
         month: "2-digit",
         year: "numeric",
         hour: "2-digit",
         minute: "2-digit",
       });
-    } catch (e) {
+    } catch {
       return "—";
     }
   };
+
 
   // 🔍 Lọc danh sách
   const filteredMembers = members.filter(
@@ -287,118 +292,31 @@ export default function MembersPage() {
         ) : filteredMembers.length > 0 ? (
           <div className="bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden animate-fadeInUp">
             <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-bold text-gray-600 uppercase">
-                      STT
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-bold text-gray-600 uppercase">
-                      Thành viên
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-bold text-gray-600 uppercase">
-                      Email
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-bold text-gray-600 uppercase">
-                      Vai trò
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-bold text-gray-600 uppercase">
-                      Trạng thái
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-bold text-gray-600 uppercase">
-                      Ngày tham gia
-                    </th>
-                    <th className="px-6 py-3 text-center text-xs font-bold text-gray-600 uppercase">
-                      Thao tác
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {filteredMembers.map((m, index) => (
-                    <tr
-                      key={m.memberId}
-                      className="hover:bg-blue-50 transition-all"
-                    >
-                      <td className="px-6 py-4 text-sm font-medium text-gray-700">
-                        {index + 1}
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <img
-                            src={
-                              m.avatarUrl ||
-                              `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                                m.fullName
-                              )}&background=random`
-                            }
-                            className="w-10 h-10 rounded-lg border border-gray-200 object-cover"
-                            alt={m.fullName}
-                          />
-                          <div>
-                            <div className="font-semibold text-gray-900">
-                              {m.fullName}
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">{m.email}</td>
-                      <td className="px-6 py-4">
-                        <div
-                          className={`inline-flex items-center gap-1 px-3 py-1 rounded-full border ${
-                            m.roleCode === "WORKSPACE_ADMIN"
-                              ? "bg-yellow-50 text-yellow-700 border-yellow-200"
-                              : "bg-blue-50 text-blue-700 border-blue-200"
-                          }`}
-                        >
-                          {m.roleCode === "WORKSPACE_ADMIN" ? (
-                            <Crown className="w-3.5 h-3.5" />
-                          ) : (
-                            <Shield className="w-3.5 h-3.5" />
-                          )}
-                          <span className="text-sm font-medium">
-                            {m.roleName || "—"}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        {renderStatusBadge(m.status)}
-                      </td>
-                      <td className="px-6 py-4 text-gray-500 text-sm">
-                        {formatDateTime(m.joinedAt)}
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <div className="flex justify-center gap-1">
-                          <button
-                            onClick={() => handleViewDetail(m.memberId)}
-                            className="group p-2.5 text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
-                            title="Xem chi tiết"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleEditStatus(m)}
-                            disabled={m.userId === user?.id}
-                            className="group p-2.5 text-green-600 hover:bg-green-50 rounded-xl transition-all
-                                      disabled:text-gray-300 disabled:hover:bg-transparent"
-                            title="Sửa vai trò/trạng thái (Tạm để trống)"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleRemove(m)}
-                            disabled={m.userId === user?.id}
-                            className="group p-2.5 text-red-600 hover:bg-red-50 rounded-xl transition-all
-                                       disabled:text-gray-300 disabled:hover:bg-transparent"
-                            title="Xóa khỏi workspace (Tạm để trống)"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <MemberTable
+                members={filteredMembers}
+                renderStatus={renderStatusBadge}
+                renderRole={(m) => (
+                  <div
+                    className={`inline-flex items-center gap-1 px-3 py-1 rounded-full border ${m.roleCode === "WORKSPACE_ADMIN"
+                        ? "bg-yellow-50 text-yellow-700 border-yellow-200"
+                        : "bg-blue-50 text-blue-700 border-blue-200"
+                      }`}
+                  >
+                    {m.roleCode === "WORKSPACE_ADMIN" ? (
+                      <Crown className="w-3.5 h-3.5" />
+                    ) : (
+                      <Shield className="w-3.5 h-3.5" />
+                    )}
+                    <span className="text-sm font-medium">{m.roleName || "—"}</span>
+                  </div>
+                )}
+                formatDateTime={formatDateTime}
+                onViewDetail={(m) => handleViewDetail(m.memberId)}
+                onEdit={handleEditStatus}
+                onDelete={handleRemove}
+                disableEdit={(m) => m.userId === user?.id}
+                disableDelete={(m) => m.userId === user?.id}
+              />
             </div>
           </div>
         ) : (
@@ -412,157 +330,41 @@ export default function MembersPage() {
       </div>
 
       {/* 🔹 Modal Mời (Thêm từ CÔNG TY) */}
-      {showInviteModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fadeIn">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-slideUp">
-            <div className="relative bg-gradient-to-br from-blue-500 to-cyan-500 p-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
-                    <UserPlus className="w-6 h-6 text-white" />
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-bold text-white">
-                      Mời vào Workspace
-                    </h2>
-                    <p className="text-white/80 text-sm">
-                      Thêm thành viên (từ công ty)
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setShowInviteModal(false)}
-                  className="p-2 hover:bg-white/20 rounded-lg transition-colors"
-                >
-                  <X className="w-5 h-5 text-white" />
-                </button>
-              </div>
-            </div>
-            <div className="p-6 space-y-5">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Email
-                </label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="example@company.com"
-                  className="w-full border-2 border-gray-200 rounded-xl px-4 py-3"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Vai trò
-                </label>
-                {/* ✅ SỬA LỖI: Cập nhật <select> để dùng roleCode (string) */}
-                <select
-                  value={roleCode}
-                  onChange={(e) => setRoleCode(e.target.value)}
-                  className="w-full border-2 border-gray-200 rounded-xl px-4 py-3"
-                >
-                  <option value="WORKSPACE_ADMIN">Quản trị (Admin)</option>
-                  <option value="WORKSPACE_MEMBER">Thành viên (Member)</option>
-                </select>
-              </div>
-              <div className="flex gap-3 pt-2">
-                <button
-                  onClick={() => setShowInviteModal(false)}
-                  className="flex-1 px-4 py-3 border-2 rounded-xl font-semibold"
-                >
-                  Hủy
-                </button>
-                <button
-                  onClick={handleInvite}
-                  className="flex-1 px-4 py-3 bg-blue-500 text-white rounded-xl font-semibold"
-                >
-                  Gửi lời mời
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <InviteMemberModal
+  isOpen={showInviteModal}
+  onClose={() => setShowInviteModal(false)}
+  onInvite={handleInvite}
+  isLoading={loading}
+  email={email}
+  setEmail={setEmail}
+  roleId={roleCode === "WORKSPACE_ADMIN" ? 1 : 2}
+  setRoleId={(v) => setRoleCode(v === 1 ? "WORKSPACE_ADMIN" : "WORKSPACE_MEMBER")}
+  title="Mời thành viên Workspace"
+  description="Thêm thành viên vào phòng ban"
+  contextType="workspace"
+/>
 
       {/* 🔹 Modal xem chi tiết */}
-      {showDetailModal && (
-        <div
-          className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn"
-          onClick={() => setShowDetailModal(false)}
-        >
-          <div
-            className="bg-white w-full max-w-md rounded-2xl shadow-2xl p-6 relative animate-slideUp"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              onClick={() => setShowDetailModal(false)}
-              className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 transition"
-            >
-              <X className="w-5 h-5" />
-            </button>
+      <MemberDetailModalBase
+        isOpen={showDetailModal}
+        onClose={() => {
+          setShowDetailModal(false);
+          setSelectedMember(null);
+        }}
+        member={selectedMember}
+        loading={loadingDetail}
+        title="Chi tiết thành viên Workspace"
+        showStatus={true}
+        fields={[
+          { label: "ID thành viên", key: "memberId" },
+          { label: "User ID", key: "userId" },
+          { label: "Vai trò", key: "roleName" },
+          { label: "Chức danh", key: "jobTitle" },
+          { label: "Ngày tham gia", key: "joinedAt" },
+          { label: "Email", key: "email" },
+        ]}
+      />
 
-            {loadingDetail ? (
-              <div className="py-10 text-center">
-                <Loader2 className="w-8 h-8 text-blue-500 animate-spin mx-auto mb-3" />
-                <p className="text-gray-500">
-                  Đang tải thông tin thành viên...
-                </p>
-              </div>
-            ) : selectedMember ? (
-              <>
-                <div className="flex flex-col items-center text-center mb-5">
-                  <img
-                    src={
-                      selectedMember.avatarUrl ||
-                      `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                        selectedMember.fullName
-                      )}&background=random`
-                    }
-                    alt={selectedMember.fullName}
-                    className="w-20 h-20 rounded-full border-4 border-blue-100 shadow-md mb-3"
-                  />
-                  <h2 className="text-xl font-semibold text-gray-800">
-                    {selectedMember.fullName}
-                  </h2>
-                  <p className="text-sm text-gray-500">
-                    {selectedMember.roleName}
-                  </p>
-                </div>
-
-                <div className="space-y-3 text-gray-700">
-                  <div className="flex items-center gap-3">
-                    <Mail className="w-5 h-5 text-blue-500" />
-                    <span>{selectedMember.email}</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Shield className="w-5 h-5 text-yellow-500" />
-                    <span>Vai trò: {selectedMember.roleName || "—"}</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Calendar className="w-5 h-5 text-green-500" />
-                    <span>
-                      Tham gia:{" "}
-                      {selectedMember.joinedAt
-                        ? new Date(selectedMember.joinedAt).toLocaleDateString(
-                            "vi-VN"
-                          )
-                        : "—"}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <User className="w-5 h-5 text-purple-500" />
-                    <span>ID: {selectedMember.memberId}</span>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <div className="py-10 text-center text-red-500">
-                Không thể tải chi tiết.
-              </div>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
