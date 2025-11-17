@@ -49,15 +49,15 @@ export default function WorkspaceOverviewPage() {
         const data = await getWorkspaceDetail(companyId, workspaceId);
 
         // ⚙️ Giả lập số liệu thống kê (nếu cần)
-        setWorkspace({
-          workspaceName: data.workspaceName,
-          description: data.description || "Chưa có mô tả",
-          memberCount: data.memberCount || Math.floor(Math.random() * 15) + 5,
-          projectCount: data.projectCount || Math.floor(Math.random() * 10) + 1,
-          taskCount: data.taskCount || Math.floor(Math.random() * 150) + 20,
-          completionRate:
-            data.completionRate || Math.floor(Math.random() * 100),
-        });
+        // setWorkspace({
+        //   workspaceName: data.workspaceName,
+        //   description: data.description || "Chưa có mô tả",
+        //   memberCount: data.memberCount || Math.floor(Math.random() * 15) + 5,
+        //   projectCount: data.projectCount || Math.floor(Math.random() * 10) + 1,
+        //   taskCount: data.taskCount || Math.floor(Math.random() * 150) + 20,
+        //   completionRate:
+        //     data.completionRate || Math.floor(Math.random() * 100),
+        // });
       } catch (err: any) {
         showToast(err.message || "Không thể tải thông tin phòng ban!", "error");
       } finally {

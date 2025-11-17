@@ -38,7 +38,7 @@ export default function ProjectCard({
   workspaceId,
   viewMode = "grid",
 }: any) {
-  const projectLink = `/core/workspace/${workspaceId}/project/${p.id}/board`;
+  const projectLink = `/core/workspace/${workspaceId}/project/${p.id}`;
 
   const formatDate = (dateString: string) => {
     if (!dateString) return "--";
