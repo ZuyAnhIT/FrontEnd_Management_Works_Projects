@@ -48,7 +48,7 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
           />
         </div>
 
-        {/* Nội dung */}
+        {/* Content */}
         <main className="flex-1 overflow-y-auto p-4">
           {children}
         </main>
@@ -58,13 +58,15 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
       <CreateTaskModal
         isOpen={showTaskModal}
         onClose={() => setShowTaskModal(false)}
-        onCreate={(task) => {
-          console.log("[API] Task:", task)
+        projectId={Number(projectId)}
+        workspaceId={1}    // ⚠ sau này bạn thay bằng real workspaceId
+        onCreated={() => {
+          console.log("[API] Task created")
           setShowTaskModal(false)
         }}
       />
 
-      {/* Sprint Modal (API version) */}
+      {/* Sprint Modal */}
       <CreateSprintModal
         isOpen={showSprintModal}
         onClose={() => setShowSprintModal(false)}
