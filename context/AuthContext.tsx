@@ -45,6 +45,8 @@ type AppRole =
   | "COMPANY_MEMBER"
   | "WORKSPACE_ADMIN"
   | "WORKSPACE_MEMBER"
+  |  "PROJECT_ADMIN"
+  | "PROJECT_MEMBER"
   | "USER"
   | "GUEST_PROJECT"
   | null;
@@ -77,6 +79,8 @@ const ROLE_DASHBOARDS: Record<string, string> = {
   COMPANY_MEMBER: "/admin",
   WORKSPACE_ADMIN: "/core",
   WORKSPACE_MEMBER: "/core",
+  PROJECT_ADMIN: "/core/workspace/${workspaceId}/project/${projectId}",
+  PROJECT_MEMBER: "/core/workspace/${workspaceId}/project/${projectId}",
   USER: "/create-company",
   GUEST_PROJECT: "/projects",
 };
@@ -101,12 +105,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       mainRole = "COMPANY_ADMIN";
     } else if (user.workspaces?.some((w) => w.roleCode === "WORKSPACE_ADMIN")) {
       mainRole = "WORKSPACE_ADMIN";
+    } else if (user.projects?.some((p) => p.roleCode === "PROJECT_ADMIN")) {
+      mainRole = "PROJECT_ADMIN";
     } else if (user.company?.roleCode === "COMPANY_MEMBER") {
       mainRole = "COMPANY_MEMBER";
-    } else if (
-      user.workspaces?.some((w) => w.roleCode === "WORKSPACE_MEMBER")
-    ) {
+    } else if (user.workspaces?.some((w) => w.roleCode === "WORKSPACE_MEMBER")) {
       mainRole = "WORKSPACE_MEMBER";
+    }else if (user.projects?.some((p) => p.roleCode === "PROJECT_MEMBER")) {
+      mainRole = "PROJECT_MEMBER";
     }
 
     console.log("🎯 Vai trò được xác định:", mainRole);
@@ -396,6 +402,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       COMPANY_MEMBER: ["workspace.view", "project.view"],
       WORKSPACE_ADMIN: ["workspace.*", "project.*"],
       WORKSPACE_MEMBER: ["project.view"],
+      PROJECT_ADMIN: [ "project.*"],
+      PROJECT_MEMBER: [""],
       USER: [],
       GUEST_PROJECT: ["project.view"],
     };
