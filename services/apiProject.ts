@@ -1,7 +1,9 @@
 "use client";
 
+
 import apiClient from "@/lib/apiClient";
 import { getCurrentUser } from "@/services/apiUser";
+
 
 // ===================================================
 // 🔹 Interface kiểu dữ liệu project
@@ -28,6 +30,7 @@ export interface Project {
   updatedAt: string;
 }
 
+
 // ===================================================
 // 1️⃣ GET – Lấy danh sách dự án trong workspace
 // ===================================================
@@ -35,9 +38,11 @@ export const getProjects = async (workspaceId: number): Promise<Project[]> => {
   const token = localStorage.getItem("accessToken");
   if (!token) throw new Error("Người dùng chưa đăng nhập.");
 
+
   const user = await getCurrentUser();
   const companyId = user.company?.companyId || user.workspaces?.[0].companyId;
   if (!companyId) throw new Error("Không tìm thấy ID công ty.");
+
 
   try {
     const res = await apiClient.get(
@@ -45,9 +50,11 @@ export const getProjects = async (workspaceId: number): Promise<Project[]> => {
       { headers: { Authorization: `Bearer ${token}` } }
     );
 
+
     const data = res.data;
     if (!data.success)
       throw new Error(data.message || "Không thể tải danh sách dự án.");
+
 
     return data.data as Project[];
   } catch (err: any) {
@@ -58,6 +65,7 @@ export const getProjects = async (workspaceId: number): Promise<Project[]> => {
     );
   }
 };
+
 
 // ===================================================
 // 2️⃣ POST – Tạo dự án mới trong workspace
@@ -81,9 +89,11 @@ export const createProject = async (
   const token = localStorage.getItem("accessToken");
   if (!token) throw new Error("Người dùng chưa đăng nhập.");
 
+
   const user = await getCurrentUser();
   const companyId = user.company?.companyId;
   if (!companyId) throw new Error("Không tìm thấy ID công ty.");
+
 
   try {
     const res = await apiClient.post(
@@ -92,9 +102,11 @@ export const createProject = async (
       { headers: { Authorization: `Bearer ${token}` } }
     );
 
+
     const data = res.data;
     if (!data.success)
       throw new Error(data.message || "Không thể tạo dự án mới.");
+
 
     return data.data as Project;
   } catch (err: any) {
@@ -105,6 +117,7 @@ export const createProject = async (
   }
 };
 
+
 // ===================================================
 // 3️⃣ GET – Lấy danh sách dự án trong “Thùng rác”
 // ===================================================
@@ -114,9 +127,11 @@ export const getTrashedProjects = async (
   const token = localStorage.getItem("accessToken");
   if (!token) throw new Error("Người dùng chưa đăng nhập.");
 
+
   const user = await getCurrentUser();
   const companyId = user.company?.companyId;
   if (!companyId) throw new Error("Không tìm thấy ID công ty.");
+
 
   try {
     const res = await apiClient.get(
@@ -124,9 +139,11 @@ export const getTrashedProjects = async (
       { headers: { Authorization: `Bearer ${token}` } }
     );
 
+
     const data = res.data;
     if (!data.success)
       throw new Error(data.message || "Không thể tải danh sách dự án đã xóa.");
+
 
     return data.data as Project[];
   } catch (err: any) {
@@ -138,6 +155,7 @@ export const getTrashedProjects = async (
   }
 };
 
+
 // ===================================================
 // 4️⃣ DELETE – Xóa dự án
 // ===================================================
@@ -148,9 +166,11 @@ export const deleteProject = async (
   const token = localStorage.getItem("accessToken");
   if (!token) throw new Error("Người dùng chưa đăng nhập.");
 
+
   const user = await getCurrentUser();
   const companyId = user.company?.companyId;
   if (!companyId) throw new Error("Không tìm thấy ID công ty.");
+
 
   try {
     const res = await apiClient.delete(
@@ -158,8 +178,10 @@ export const deleteProject = async (
       { headers: { Authorization: `Bearer ${token}` } }
     );
 
+
     const data = res.data;
     if (!data.success) throw new Error(data.message || "Không thể xóa dự án.");
+
 
     return {
       success: true,
@@ -180,9 +202,11 @@ export const getProjectDetail = async (
   const token = localStorage.getItem("accessToken");
   if (!token) throw new Error("Người dùng chưa đăng nhập.");
 
+
   const user = await getCurrentUser();
   const companyId = user.company?.companyId;
   if (!companyId) throw new Error("Không tìm thấy ID công ty.");
+
 
   try {
     const res = await apiClient.get(
@@ -190,9 +214,11 @@ export const getProjectDetail = async (
       { headers: { Authorization: `Bearer ${token}` } }
     );
 
+
     const data = res.data;
     if (!data.success)
       throw new Error(data.message || "Không thể lấy chi tiết dự án.");
+
 
     return data.data as Project;
   } catch (err: any) {
@@ -203,6 +229,8 @@ export const getProjectDetail = async (
     );
   }
 };
+
+
 
 
 //Cập nhật dự án
@@ -227,9 +255,11 @@ export const updateProject = async (
   const token = localStorage.getItem("accessToken");
   if (!token) throw new Error("Người dùng chưa đăng nhập.");
 
+
   const user = await getCurrentUser();
   const companyId = user.company?.companyId;
   if (!companyId) throw new Error("Không tìm thấy ID công ty.");
+
 
   try {
     const res = await apiClient.put(
@@ -238,9 +268,11 @@ export const updateProject = async (
       { headers: { Authorization: `Bearer ${token}` } }
     );
 
+
     const data = res.data;
     if (!data.success)
       throw new Error(data.message || "Không thể cập nhật dự án.");
+
 
     return data.data as Project;
   } catch (err: any) {
@@ -252,6 +284,7 @@ export const updateProject = async (
   }
 };
 
+
 //Cập nhật trạng thái dự án
 export const updateProjectStatus = async (
   workspaceId: number,
@@ -261,9 +294,11 @@ export const updateProjectStatus = async (
   const token = localStorage.getItem("accessToken");
   if (!token) throw new Error("Người dùng chưa đăng nhập.");
 
+
   const user = await getCurrentUser();
   const companyId = user.company?.companyId;
   if (!companyId) throw new Error("Không tìm thấy ID công ty.");
+
 
   try {
     const res = await apiClient.put(
@@ -272,9 +307,11 @@ export const updateProjectStatus = async (
       { headers: { Authorization: `Bearer ${token}` } }
     );
 
+
     const data = res.data;
     if (!data.success)
       throw new Error(data.message || "Không thể thay đổi trạng thái dự án.");
+
 
     return data.data as Project;
   } catch (err: any) {
@@ -296,9 +333,11 @@ export const updateProjectMemberRole = async (
   const token = localStorage.getItem("accessToken");
   if (!token) throw new Error("Người dùng chưa đăng nhập.");
 
+
   const user = await getCurrentUser();
   const companyId = user.company?.companyId;
   if (!companyId) throw new Error("Không tìm thấy ID công ty.");
+
 
   try {
     const res = await apiClient.put(
@@ -307,8 +346,10 @@ export const updateProjectMemberRole = async (
       { headers: { Authorization: `Bearer ${token}` } }
     );
 
+
     if (!res.data.success)
       throw new Error(res.data.message || "Không thể cập nhật vai trò thành viên.");
+
 
     return { success: true, message: res.data.message };
   } catch (err: any) {
@@ -319,6 +360,8 @@ export const updateProjectMemberRole = async (
     );
   }
 };
+
+
 
 
 //Lấy danh sách thành viên trong dự án
@@ -334,6 +377,7 @@ export interface ProjectMember {
   status: string;
 }
 
+
 export const getProjectMembers = async (
   workspaceId: number,
   projectId: number
@@ -341,9 +385,11 @@ export const getProjectMembers = async (
   const token = localStorage.getItem("accessToken");
   if (!token) throw new Error("Người dùng chưa đăng nhập.");
 
+
   const user = await getCurrentUser();
   const companyId = user.company?.companyId;
   if (!companyId) throw new Error("Không tìm thấy ID công ty.");
+
 
   try {
     const res = await apiClient.get(
@@ -352,8 +398,11 @@ export const getProjectMembers = async (
 );
 
 
+
+
     if (!res.data.success)
       throw new Error(res.data.message || "Không thể tải danh sách thành viên.");
+
 
     return res.data.data as ProjectMember[];
   } catch (err: any) {
@@ -365,13 +414,14 @@ export const getProjectMembers = async (
   }
 };
 
+
  //Lấy backlog của dự án
  export interface BacklogTask {
   id: number;
   taskCode: string;
   title: string;
   taskType: string;
-  status: string;
+  statusName: string;
   priority: string;
   sprintId: number;
   assigneeId: number;
@@ -385,6 +435,7 @@ export const getProjectMembers = async (
   sortOrder: number;
 }
 
+
 export const getProjectBacklog = async (
   workspaceId: number,
   projectId: number
@@ -392,9 +443,11 @@ export const getProjectBacklog = async (
   const token = localStorage.getItem("accessToken");
   if (!token) throw new Error("Người dùng chưa đăng nhập.");
 
+
   const user = await getCurrentUser();
   const companyId = user.company?.companyId;
   if (!companyId) throw new Error("Không tìm thấy ID công ty.");
+
 
   try {
     const res = await apiClient.get(
@@ -402,9 +455,11 @@ export const getProjectBacklog = async (
       { headers: { Authorization: `Bearer ${token}` } }
     );
 
+
     const data = res.data;
     if (!data.success)
       throw new Error(data.message || "Không thể tải backlog.");
+
 
     return data.data as BacklogTask[];
   } catch (err: any) {
@@ -416,6 +471,7 @@ export const getProjectBacklog = async (
   }
 };
 
+
 //Tạo task trong project
 export const createProjectTask = async (
   workspaceId: number,
@@ -426,7 +482,7 @@ export const createProjectTask = async (
     sprintId?: number;
     epicId?: number;
     assigneeId?: number;
-    status: string;
+    statusName: string;
     taskType: string;
     priority: string;
     storyPoints?: number;
@@ -438,9 +494,11 @@ export const createProjectTask = async (
   const token = localStorage.getItem("accessToken");
   if (!token) throw new Error("Người dùng chưa đăng nhập.");
 
+
   const user = await getCurrentUser();
   const companyId = user.company?.companyId;
   if (!companyId) throw new Error("Không tìm thấy ID công ty.");
+
 
   try {
     const res = await apiClient.post(
@@ -449,9 +507,11 @@ export const createProjectTask = async (
       { headers: { Authorization: `Bearer ${token}` } }
     );
 
+
     const data = res.data;
     if (!data.success)
       throw new Error(data.message || "Không thể tạo task.");
+
 
     return data.data;
   } catch (err: any) {
@@ -461,3 +521,6 @@ export const createProjectTask = async (
     );
   }
 };
+
+
+

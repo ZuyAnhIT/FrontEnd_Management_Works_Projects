@@ -1,5 +1,6 @@
 "use client";
 
+
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import {
@@ -14,9 +15,12 @@ import {
   Plus,
 } from "lucide-react";
 
+
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { CreateSprintModal } from "./create-sprint-modal";
+import { CreateTaskModal } from "./create-task-modal";
+
 
 import { useToast } from "@/components/ui/ToastProvider";
 import {
@@ -28,15 +32,21 @@ import {
   Sprint,
 } from "@/services/apiSprint";
 
+
 export function Sprints() {
+
+
   const { showToast } = useToast();
   const { projectId } = useParams() as { projectId: string };
-
+  const params = useParams();
+  const workspaceId = Number(params.workspaceId);
   const [sprints, setSprints] = useState<Sprint[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [detailLoading, setDetailLoading] = useState<number | null>(null);
+  const [createTaskSprintId, setCreateTaskSprintId] = useState<number | null>(null);
+
 
   //
   // ------------------------------------------
@@ -55,9 +65,11 @@ export function Sprints() {
     }
   };
 
+
   useEffect(() => {
     if (projectId) loadSprints();
   }, [projectId]);
+
 
   //
   // ------------------------------------------
@@ -67,6 +79,7 @@ export function Sprints() {
   const toggleExpand = async (id: number) => {
     const isOpen = expanded.has(id);
 
+
     if (isOpen) {
       const s = new Set(expanded);
       s.delete(id);
@@ -74,14 +87,17 @@ export function Sprints() {
       return;
     }
 
+
     try {
       setDetailLoading(id);
       const detail = await getSprintDetail(Number(projectId), id);
+
 
       // thay tasks
       setSprints((prev) =>
         prev.map((s) => (s.id === id ? { ...s, tasks: detail.tasks } : s))
       );
+
 
       // mở card
       const s = new Set(expanded);
@@ -93,6 +109,22 @@ export function Sprints() {
       setDetailLoading(null);
     }
   };
+  ///
+  const reloadSprintDetail = async (sprintId: number) => {
+    try {
+      const detail = await getSprintDetail(Number(projectId), sprintId);
+
+
+      setSprints(prev =>
+        prev.map(s =>
+          s.id === sprintId ? { ...s, tasks: detail.tasks } : s
+        )
+      );
+    } catch (err) {
+      console.error("Reload sprint detail failed:", err);
+    }
+  };
+
 
   //
   // ------------------------------------------
@@ -109,6 +141,7 @@ export function Sprints() {
     }
   };
 
+
   const handleComplete = async (id: number) => {
     try {
       await completeSprint(Number(projectId), id);
@@ -118,6 +151,9 @@ export function Sprints() {
       showToast(err.message || "Không thể complete sprint", "error");
     }
   };
+
+
+
 
   const handleCancel = async (id: number) => {
     try {
@@ -129,6 +165,7 @@ export function Sprints() {
     }
   };
 
+
   //
   // ------------------------------------------
   // Stats
@@ -136,6 +173,7 @@ export function Sprints() {
   //
   const active = sprints.filter((s) => s.status === "IN_PROGRESS");
   const completed = sprints.filter((s) => s.status === "COMPLETED");
+
 
   //
   // ------------------------------------------
@@ -149,6 +187,7 @@ export function Sprints() {
       </div>
     );
 
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-white via-purple-50/30 to-white">
       <div className="p-6 max-w-[1600px] mx-auto space-y-6">
@@ -156,17 +195,20 @@ export function Sprints() {
         <div className="relative overflow-hidden bg-gradient-to-br from-purple-500 via-pink-500 to-purple-600 rounded-3xl p-8 shadow-2xl animate-fadeIn">
           <div className="absolute inset-0 bg-grid-white/10"></div>
 
+
           <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div className="flex items-center gap-4">
               <div className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center shadow-lg">
                 <GitBranch className="w-8 h-8 text-white" />
               </div>
 
+
               <div>
                 <div className="flex items-center gap-2 mb-1">
                   <h1 className="text-3xl font-bold text-white">Sprints</h1>
                   <Sparkles className="w-5 h-5 text-yellow-300 animate-pulse" />
                 </div>
+
 
                 <div className="flex items-center gap-4 text-white/80">
                   <span className="text-sm">{sprints.length} total sprints</span>
@@ -178,6 +220,7 @@ export function Sprints() {
               </div>
             </div>
 
+
             {/* OPEN MODAL */}
             <Button
               onClick={() => setShowCreateModal(true)}
@@ -188,6 +231,7 @@ export function Sprints() {
             </Button>
           </div>
         </div>
+
 
         {/* STATS */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-fadeInUp">
@@ -207,6 +251,7 @@ export function Sprints() {
             </CardContent>
           </Card>
 
+
           <Card className="border-0 shadow-lg bg-gradient-to-br from-green-50 to-emerald-50">
             <CardContent className="p-6">
               <div className="flex items-center gap-4">
@@ -223,6 +268,7 @@ export function Sprints() {
             </CardContent>
           </Card>
 
+
           <Card className="border-0 shadow-lg bg-gradient-to-br from-blue-50 to-cyan-50">
             <CardContent className="p-6">
               <div className="flex items-center gap-4">
@@ -237,21 +283,26 @@ export function Sprints() {
           </Card>
         </div>
 
+
         {/* LIST */}
         <div className="space-y-6 animate-fadeInUp delay-100">
           {sprints.map((s, i) => {
             const isExpanded = expanded.has(s.id);
 
-            const completedTasks = s.tasks.filter(
-              (t) => t.status === "COMPLETED" || t.status === "DONE"
+
+            const completedTasks = (s.tasks || []).filter(
+              (t) => t.statusName === "COMPLETED" || t.statusName === "DONE"
             ).length;
 
-            const totalTasks = s.tasks.length;
+
+            const totalTasks = (s.tasks || []).length;
+
 
             const percent =
               totalTasks > 0
                 ? Math.round((completedTasks / totalTasks) * 100)
                 : 0;
+
 
             //
             // ---------------- Sprint Colors ----------------
@@ -260,15 +311,17 @@ export function Sprints() {
               s.status === "IN_PROGRESS"
                 ? "from-purple-500 to-pink-500"
                 : s.status === "COMPLETED"
-                ? "from-green-500 to-emerald-500"
-                : s.status === "CANCELLED"
-                ? "from-gray-500 to-gray-600"
-                : "from-blue-500 to-cyan-500";
+                  ? "from-green-500 to-emerald-500"
+                  : s.status === "CANCELLED"
+                    ? "from-gray-500 to-gray-600"
+                    : "from-blue-500 to-cyan-500";
+
 
             //
             // ---------------- Sprint Actions ----------------
             //
             const isPlanned = s.status === "NOT_STARTED";
+
 
             return (
               <Card
@@ -285,15 +338,18 @@ export function Sprints() {
                         <div className="flex items-center gap-3 mb-2">
                           <h2 className="text-2xl font-bold text-white">{s.name}</h2>
 
+
                           <span className="text-xs px-3 py-1.5 rounded-full font-semibold shadow-md bg-white/20 backdrop-blur-sm text-white">
                             {s.status}
                           </span>
                         </div>
 
+
                         <div className="flex items-center gap-2 mb-3">
                           <Target className="w-4 h-4 text-white/80" />
                           <p className="text-white/90 text-sm">{s.goal}</p>
                         </div>
+
 
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                           <div>
@@ -303,6 +359,7 @@ export function Sprints() {
                             </p>
                           </div>
 
+
                           <div>
                             <p className="text-white/70 text-xs mb-1">End Date</p>
                             <p className="text-white font-semibold">
@@ -310,10 +367,12 @@ export function Sprints() {
                             </p>
                           </div>
 
+
                           <div>
                             <p className="text-white/70 text-xs mb-1">Tasks</p>
                             <p className="text-white font-semibold">{totalTasks}</p>
                           </div>
+
 
                           <div>
                             <p className="text-white/70 text-xs mb-1">Progress</p>
@@ -321,6 +380,7 @@ export function Sprints() {
                           </div>
                         </div>
                       </div>
+
 
                       {/* ACTIONS */}
                       <div className="flex flex-col gap-2">
@@ -333,6 +393,7 @@ export function Sprints() {
                           </Button>
                         )}
 
+
                         {s.status === "IN_PROGRESS" && (
                           <>
                             <Button
@@ -342,7 +403,8 @@ export function Sprints() {
                               Complete
                             </Button>
 
-                              <Button
+
+                            <Button
                               onClick={() => handleCancel(s.id)}
                               className="bg-white/20 text-white hover:bg-white/30"
                             >
@@ -351,6 +413,7 @@ export function Sprints() {
                           </>
                         )}
                       </div>
+
 
                       {/* EXPAND */}
                       <button
@@ -367,6 +430,7 @@ export function Sprints() {
                       </button>
                     </div>
 
+
                     {/* PROGRESS BAR */}
                     <div className="mt-4 bg-white/20 backdrop-blur-sm rounded-full h-2 overflow-hidden">
                       <div
@@ -376,23 +440,41 @@ export function Sprints() {
                     </div>
                   </div>
 
+
                   {/* TASK LIST */}
                   {isExpanded && (
                     <div className="p-6 bg-gradient-to-b from-purple-50 to-pink-50">
-                      <div className="flex items-center gap-2 mb-4">
-                        <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
-                          <span className="text-white text-xs font-bold">
-                            {totalTasks}
+                      {/* HEADER: Sửa lại để có nút Create Task bên phải */}
+                      <div className="flex items-center justify-between mb-4">
+
+
+                        {/* Bên trái: Title và số lượng */}
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
+                            <span className="text-white text-xs font-bold">
+                              {totalTasks}
+                            </span>
+                          </div>
+                          <h3 className="font-bold text-gray-900 text-lg">Sprint Tasks</h3>
+                          <span className="text-sm text-gray-500">
+                            ({completedTasks} completed)
                           </span>
                         </div>
-                        <h3 className="font-bold text-gray-900 text-lg">Sprint Tasks</h3>
-                        <span className="text-sm text-gray-500">
-                          ({completedTasks} completed)
-                        </span>
+
+
+                        <Button
+                          // SỬA Ở ĐÂY: Lưu ID của sprint hiện tại vào state
+                          onClick={() => setCreateTaskSprintId(s.id)}
+                          className="hidden md:flex gap-2 bg-gradient-to-r from-blue-500 to-cyan-500 text-white hover:shadow-lg transition-all"
+                        >
+                          <Plus className="w-4 h-4" />
+                          <span>New Task</span>
+                        </Button>
                       </div>
 
+
                       <div className="space-y-3">
-                        {s.tasks.map((t, idx) => (
+                        {(s.tasks || []).map((t, idx) => (
                           <div
                             key={t.id}
                             className="p-4 bg-white rounded-xl border-2 border-gray-100 hover:border-purple-300 hover:shadow-md transition-all duration-300 animate-fadeInUp"
@@ -404,42 +486,44 @@ export function Sprints() {
                                 <div className="flex flex-wrap items-center gap-2 mb-2">
                                   <h4 className="font-bold text-gray-900">{t.title}</h4>
 
+
                                   {/* PRIORITY */}
                                   <span
-                                    className={`text-xs px-2 py-1 rounded-full font-semibold ${
-                                      t.priority === "CRITICAL"
-                                        ? "bg-gradient-to-r from-red-500 to-red-600 text-white"
-                                        : t.priority === "HIGH"
+                                    className={`text-xs px-2 py-1 rounded-full font-semibold ${t.priority === "CRITICAL"
+                                      ? "bg-gradient-to-r from-red-500 to-red-600 text-white"
+                                      : t.priority === "HIGH"
                                         ? "bg-gradient-to-r from-orange-500 to-orange-600 text-white"
                                         : t.priority === "MEDIUM"
-                                        ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white"
-                                        : "bg-gradient-to-r from-gray-400 to-gray-500 text-white"
-                                    }`}
+                                          ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white"
+                                          : "bg-gradient-to-r from-gray-400 to-gray-500 text-white"
+                                      }`}
                                   >
                                     {t.priority}
                                   </span>
 
+
                                   {/* STATUS */}
                                   <span
-                                    className={`text-xs px-2 py-1 rounded-full font-semibold ${
-                                      t.status === "DONE" || t.status === "COMPLETED"
-                                        ? "bg-gradient-to-r from-green-500 to-emerald-500 text-white"
-                                        : t.status === "IN_PROGRESS"
+                                    className={`text-xs px-2 py-1 rounded-full font-semibold ${t.statusName === "DONE" || t.statusName === "COMPLETED"
+                                      ? "bg-gradient-to-r from-green-500 to-emerald-500 text-white"
+                                      : t.statusName === "IN_PROGRESS"
                                         ? "bg-gradient-to-r from-amber-500 to-orange-500 text-white"
-                                        : t.status === "REVIEW"
-                                        ? "bg-gradient-to-r from-blue-500 to-cyan-500 text-white"
-                                        : "bg-gradient-to-r from-gray-500 to-gray-600 text-white"
-                                    }`}
+                                        : t.statusName === "REVIEW"
+                                          ? "bg-gradient-to-r from-blue-500 to-cyan-500 text-white"
+                                          : "bg-gradient-to-r from-gray-500 to-gray-600 text-white"
+                                      }`}
                                   >
-                                    {t.status}
+                                    {t.statusName}
                                   </span>
                                 </div>
                               </div>
+
 
                               {/* AVATAR */}
                               <div className="flex-shrink-0 group">
                                 <div className="relative">
                                   <div className="absolute -inset-1 bg-gradient-to-r from-purple-500 to-pink-500 rounded-2xl blur opacity-30 group-hover:opacity-60 transition-opacity duration-300"></div>
+
 
                                   <div className="relative w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
                                     <span className="text-2xl">
@@ -467,6 +551,7 @@ export function Sprints() {
           })}
         </div>
 
+
         {/* EMPTY */}
         {sprints.length === 0 && (
           <div className="flex flex-col items-center justify-center py-20 animate-fadeIn">
@@ -474,12 +559,14 @@ export function Sprints() {
               <GitBranch className="w-12 h-12 text-white" />
             </div>
 
+
             <h3 className="text-2xl font-bold text-gray-900 mb-2">
               No sprints yet
             </h3>
             <p className="text-gray-500 mb-6">
               Create your first sprint to organize work
             </p>
+
 
             <Button
               onClick={() => setShowCreateModal(true)}
@@ -490,6 +577,7 @@ export function Sprints() {
             </Button>
           </div>
         )}
+
 
         {/* MODAL */}
         <CreateSprintModal
@@ -502,7 +590,40 @@ export function Sprints() {
             showToast("Sprint created successfully!", "success");
           }}
         />
+        {createTaskSprintId !== null && (
+          <CreateTaskModal
+            isOpen={true}
+            onClose={() => setCreateTaskSprintId(null)}
+
+
+            projectId={Number(projectId)}
+            workspaceId={workspaceId}
+
+
+            sprintId={createTaskSprintId}
+
+
+            onCreated={async () => {
+              const sid = createTaskSprintId;
+
+
+              setCreateTaskSprintId(null);
+
+
+              await loadSprints();                // reload danh sách sprint
+              if (sid) await reloadSprintDetail(sid);  // reload task sprint đang mở
+
+
+              showToast("Task created successfully!", "success");
+            }}
+
+
+          />
+        )}
+
+
       </div>
+
 
       {/* ANIMATIONS */}
       <style jsx>{`
@@ -543,3 +664,6 @@ export function Sprints() {
     </div>
   );
 }
+
+
+

@@ -1,31 +1,48 @@
 "use client"
 
+
 import React, { createContext, useContext, useState, useCallback, ReactNode } from "react"
 import { CheckCircle, XCircle, AlertTriangle, Info } from "lucide-react"
 import clsx from "clsx"
 
+
 type ToastType = "success" | "error" | "warning" | "info"
 
+
 interface Toast {
-  id: number
+  id: string
   message: string
   type: ToastType
 }
+
 
 interface ToastContextType {
   showToast: (message: string, type?: ToastType, duration?: number) => void
 }
 
+
 const ToastContext = createContext<ToastContextType | undefined>(undefined)
+
 
 export const ToastProvider = ({ children }: { children: ReactNode }) => {
   const [toasts, setToasts] = useState<Toast[]>([])
 
-  const showToast = useCallback((message: string, type: ToastType = "info", duration = 3000) => {
-    const id = Date.now()
-    setToasts((prev) => [...prev, { id, message, type }])
-    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), duration)
-  }, [])
+
+  const showToast = useCallback(
+    (message: string, type: ToastType = "info", duration = 3000) => {
+      const id = crypto.randomUUID() // 🔥 Fix: unique key 100%
+
+
+      setToasts((prev) => [...prev, { id, message, type }])
+
+
+      setTimeout(() => {
+        setToasts((prev) => prev.filter((t) => t.id !== id))
+      }, duration)
+    },
+    []
+  )
+
 
   const iconForType = (type: ToastType) => {
     switch (type) {
@@ -40,11 +57,13 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
     }
   }
 
+
   return (
     <ToastContext.Provider value={{ showToast }}>
       {children}
 
-      {/* 🔔 Toast Container */}
+
+      {/* Toast Container */}
       <div className="fixed top-6 right-6 flex flex-col gap-3 z-[9999] items-end">
         {toasts.map((toast) => (
           <div
@@ -70,8 +89,12 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
   )
 }
 
+
 export const useToast = () => {
   const ctx = useContext(ToastContext)
   if (!ctx) throw new Error("useToast must be used within a ToastProvider")
   return ctx
 }
+
+
+
