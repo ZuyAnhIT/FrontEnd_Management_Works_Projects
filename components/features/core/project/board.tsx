@@ -28,7 +28,6 @@ interface Column {
   borderColor: string
   hoverBorder: string
   textColor: string
-  icon: string
   lightColor: string
 }
 
@@ -84,34 +83,30 @@ const colorPalettes = [
   },
 ]
 
-const iconList = ['📋', '⚡', '👀', '✅', '🚀', '💎', '🎯', '🔥', '⭐', '💡', '🎨', '📊', '🏆', '🎭', '🌟', '💪', '🎪', '🎬', '📱', '💻']
-
-const getRandomIcon = () => iconList[Math.floor(Math.random() * iconList.length)]
 const getRandomColorPalette = () => colorPalettes[Math.floor(Math.random() * colorPalettes.length)]
 
 const defaultColumns: Column[] = [
   { 
     id: 'todo',
     label: 'To Do', 
-    icon: '📋',
+    
     ...colorPalettes[0]
   },
   { 
     id: 'in-progress',
     label: 'In Progress', 
-    icon: '⚡',
+    
     ...colorPalettes[1]
   },
   { 
     id: 'review',
     label: 'Review', 
-    icon: '👀',
+    
     ...colorPalettes[2]
   },
   { 
     id: 'done',
     label: 'Done', 
-    icon: '✅',
     ...colorPalettes[3]
   },
 ]
@@ -146,9 +141,11 @@ const mockTasks: Task[] = [
 ]
 
 interface BoardProps {
-  project?: any;
+  project?: any
 }
+
 export default function Board({ project }: BoardProps) {
+
   const [tasks, setTasks] = useState<Task[]>(mockTasks)
   const [columns, setColumns] = useState<Column[]>(defaultColumns)
   const [draggedTask, setDraggedTask] = useState<Task | null>(null)
@@ -342,7 +339,6 @@ export default function Board({ project }: BoardProps) {
       const newColumn: Column = {
         id: `col-${Date.now()}`,
         label: newColumnName.trim(),
-        icon: getRandomIcon(),
         ...palette
       }
       setColumns([...columns, newColumn])
@@ -393,12 +389,7 @@ export default function Board({ project }: BoardProps) {
     setEditColumnName('')
   }
 
-  // Change column icon
-  const handleChangeIcon = (columnId: string) => {
-    setColumns(columns.map(c => 
-      c.id === columnId ? { ...c, icon: getRandomIcon() } : c
-    ))
-  }
+  
 
   // Calculate stats
   const totalTasks = tasks.length
@@ -500,13 +491,7 @@ export default function Board({ project }: BoardProps) {
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2 flex-1 min-w-0">
                       <GripVertical className="w-5 h-5 text-white/70 flex-shrink-0" />
-                      <button
-                        onClick={() => handleChangeIcon(column.id)}
-                        className="text-3xl drop-shadow-lg hover:scale-110 transition-transform flex-shrink-0"
-                        title="Click to change icon"
-                      >
-                        {column.icon}
-                      </button>
+                      
                       {editingColumn === column.id ? (
                         <input
                           type="text"
@@ -650,7 +635,8 @@ export default function Board({ project }: BoardProps) {
                     {columnTasks.length === 0 && newTaskColumn !== column.id ? (
                       <div className="flex flex-col items-center justify-center py-16 text-center">
                         <div className={`w-20 h-20 mb-4 rounded-2xl flex items-center justify-center ${column.lightColor} shadow-lg`}>
-                          <span className="text-4xl">{column.icon}</span>
+                          <div className="w-10 h-10 rounded-lg bg-gray-200" />
+
                         </div>
                         <p className="text-sm text-gray-600 font-semibold mb-1">
                           No tasks here
@@ -833,7 +819,8 @@ export default function Board({ project }: BoardProps) {
                       <div className="absolute inset-0 flex items-center justify-center">
                         <div className={`${column.lightColor} px-6 py-3 rounded-2xl shadow-2xl backdrop-blur-sm border-2 ${column.borderColor}`}>
                           <p className={`text-sm font-bold ${column.textColor} flex items-center gap-2`}>
-                            <span className="text-2xl">{column.icon}</span>
+                            <div className="w-10 h-10 rounded-lg bg-gray-200" />
+
                             Drop task here
                           </p>
                         </div>
