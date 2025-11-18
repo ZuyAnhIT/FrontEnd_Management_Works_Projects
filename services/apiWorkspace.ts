@@ -375,7 +375,41 @@ export const updateWorkspaceMemberStatus = async (
     );
   }
 };
+// ===================================================
+// 🔹 3️⃣ Xóa thành viên khỏi Workspace (Dùng memberId)
+// ===================================================
+export const removeWorkspaceMember = async (
+  companyId: number,
+  workspaceId: number,
+  memberId: number // ✅ Đã đổi từ userId sang memberId
+) => {
+  if (!companyId || !workspaceId || !memberId)
+    throw new Error("Thiếu thông tin ID.");
 
+  const token = localStorage.getItem("accessToken");
+  if (!token) throw new Error("Người dùng chưa đăng nhập.");
+
+  try {
+    // ✅ API path đã đổi: .../members/{memberId}
+    const res = await apiClient.delete(
+      `/companies/${companyId}/workspaces/${workspaceId}/members/${memberId}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+
+    const data = res.data;
+    if (!data.success)
+      throw new Error(data.message || "Không thể xóa thành viên.");
+
+    return data;
+  } catch (err: any) {
+    console.error("Lỗi xóa thành viên workspace:", err);
+    throw new Error(
+      err.response?.data?.message ??
+        err.message ??
+        "Lỗi hệ thống, không thể xóa thành viên."
+    );
+  }
+};
 // ===================================================
 // 🔹 3️⃣ Lấy danh sách thành viên trong Workspace
 // ===================================================

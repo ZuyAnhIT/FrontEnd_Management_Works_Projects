@@ -20,6 +20,7 @@ import {
   CheckCircle,
   Clock,
   XCircle,
+  Save,
 } from "lucide-react";
 
 // ⛔️ Sửa đường dẫn nếu bạn chưa di chuyển file
@@ -27,6 +28,8 @@ import {
   getWorkspaceMembers,
   inviteMemberToWorkspace,
   getWorkspaceMemberDetail,
+  updateWorkspaceMemberStatus,
+  removeWorkspaceMember
 } from "@/services/apiWorkspace";
 
 // ✅ Lấy user từ Context
@@ -35,7 +38,7 @@ import { useToast } from "@/components/ui/ToastProvider";
 import MemberDetailModalBase from "@/components/ui/MemberDetailModalBase";
 import MemberTable from "@/components/ui/MemberTable";
 import InviteMemberModal from "@/components/ui/InviteMemberModal"; 
-
+import ConfirmationModal from "@/components/ui/ConfirmationModal";
 export default function MembersPage() {
   const { showToast } = useToast();
   const params = useParams();
@@ -54,11 +57,23 @@ export default function MembersPage() {
   const [email, setEmail] = useState("");
   const [roleCode, setRoleCode] = useState("WORKSPACE_MEMBER"); // Mặc định là Member
 
-  // ✅ Modal xem chi tiết
-  const [showDetailModal, setShowDetailModal] = useState(false);
-  const [selectedMember, setSelectedMember] = useState<any | null>(null);
-  const [loadingDetail, setLoadingDetail] = useState(false);
+// ...
+  // ✅ 2. SỬA LỖI & BỔ SUNG STATE
+  // State cho Modal Sửa (Giống Company)
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedMember, setSelectedMember] = useState<any | null>(null); // State này cho modal SỬA
+  const [newStatus, setNewStatus] = useState("ACTIVE");
+  const [isUpdating, setIsUpdating] = useState(false);
 
+  // Modal xem chi tiết
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [detailMember, setDetailMember] = useState<any | null>(null); // Đổi tên state này (từ selectedMember -> detailMember)
+  const [loadingDetail, setLoadingDetail] = useState(false);
+// ...
+  // ✅ STATE MỚI CHO MODAL XÓA (Copy từ Company)
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [memberToDelete, setMemberToDelete] = useState<any | null>(null);
 
 
   // 🧩 1. Lấy danh sách thành viên workspace
@@ -97,12 +112,13 @@ export default function MembersPage() {
     try {
       setLoadingDetail(true);
       setShowDetailModal(true); // Mở modal trước
-      const detail = await getWorkspaceMemberDetail(
-        companyId,
-        workspaceId,
-        memberId
-      );
-      setSelectedMember(detail);
+     const detail = await getWorkspaceMemberDetail(
+       companyId,
+       workspaceId,
+       memberId
+     );
+     setDetailMember(detail); // ✅ 3. Sửa tên state (từ setSelectedMember -> setDetailMember)
+// ...
     } catch (err: any) {
       showToast(err.message || "Không thể tải chi tiết thành viên.", "error");
       setShowDetailModal(false); // Đóng modal nếu lỗi
@@ -148,24 +164,84 @@ export default function MembersPage() {
   };
 
   // 🧩 4. HÀNH ĐỘNG MỚI (Tạm để trống)
-  const handleEditStatus = (member: any) => {
-    showToast(
-      `(Demo) Chức năng Sửa cho ${member.fullName} đang phát triển.`,
-      "info"
-    );
+  // ...
+  // ✅ 4. THAY THẾ HÀM "DEMO"
+  
+  // Hàm Mở Modal Sửa (Giống Company)
+  const openEditModal = (member: any) => {
+    setSelectedMember(member); // Lưu thành viên đang được chọn để sửa
+    setNewStatus(member.status); // Lấy status hiện tại của họ
+    setShowEditModal(true); // Mở modal
   };
 
-  const handleRemove = (member: any) => {
-    if (member.userId === user?.id) {
+  // Hàm Submit Cập nhật Trạng thái (Logic chính)
+  const handleUpdateStatus = async () => {
+    if (!companyId || !workspaceId || !selectedMember) return;
+
+    setIsUpdating(true);
+    try {
+      // Gọi service của Workspace với memberId (KHÔNG PHẢI userId)
+      await updateWorkspaceMemberStatus(
+        companyId,
+        workspaceId,
+        selectedMember.memberId, 
+        { newStatus }
+      );
+
+      // Refresh danh sách từ API (Copy logic từ useEffect)
+      const data = await getWorkspaceMembers(companyId, workspaceId);
+      const dataWithStatus = data.map((m: any, i: number) => ({
+        ...m,
+        // Giữ lại logic giả lập status nếu API của bạn chưa trả về
+        status: m.status || (i % 2 === 0 ? "ACTIVE" : "PENDING"), 
+      }));
+      setMembers(dataWithStatus);
+
+      showToast("Cập nhật trạng thái thành công!", "success");
+      setShowEditModal(false);
+      setSelectedMember(null);
+    } catch (err: any) {
+      showToast(err.message || "Cập nhật thất bại!", "error");
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  // 🧩 5. HÀM MỞ MODAL XÓA (Thay thế cho handleRemove cũ)
+  const openDeleteConfirmation = (member: any) => {
+    if (member.memberId === member?.id) {
       showToast("Bạn không thể tự xóa chính mình.", "error");
       return;
     }
-    showToast(
-      `(Demo) Chức năng Xóa cho ${member.fullName} đang phát triển.`,
-      "info"
-    );
-    // (Logic gọi API xóa khỏi workspace sẽ ở đây)
+    setMemberToDelete(member); // Lưu người cần xóa
+    setIsDeleteModalOpen(true); // Mở modal
   };
+
+  // 🧩 6. HÀM THỰC HIỆN XÓA (Được gọi bởi Modal)
+  const handleConfirmRemove = async () => {
+    if (!companyId || !workspaceId || !memberToDelete) return;
+
+    setIsDeleting(true);
+    try {
+      // Gọi API xóa
+      await removeWorkspaceMember(companyId, workspaceId, memberToDelete.memberId);
+      
+      showToast("Đã xóa thành viên khỏi workspace!", "success");
+      
+      // Cập nhật UI: Lọc bỏ người vừa xóa
+      setMembers((prev) =>
+        prev.filter((m) => m.memberId !== memberToDelete.memberId)
+      );
+      
+      setIsDeleteModalOpen(false); // Đóng modal
+    } catch (err: any) {
+      showToast(err.message || "Không thể xóa thành viên!", "error");
+    } finally {
+      setIsDeleting(false);
+      setMemberToDelete(null);
+    }
+  };
+// ...
 
   // 🧩 5. HELPER: Render Trạng thái (đọc status)
   const renderStatusBadge = (status: string) => {
@@ -177,18 +253,18 @@ export default function MembersPage() {
             <span className="text-sm font-semibold">Hoạt động</span>
           </div>
         );
-      case "PENDING":
+      case "SUSPENDED":
         return (
           <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border bg-yellow-50 text-yellow-700 border-yellow-200">
             <Clock className="w-3.5 h-3.5" />
-            <span className="text-sm font-semibold">Đang chờ</span>
+            <span className="text-sm font-semibold">Tạm khóa</span>
           </div>
         );
-      case "INACTIVE":
+      case "REMOVED":
         return (
           <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border bg-gray-100 text-gray-600 border-gray-200">
             <XCircle className="w-3.5 h-3.5" />
-            <span className="text-sm font-semibold">Tạm khóa</span>
+            <span className="text-sm font-semibold">Đã rời</span>
           </div>
         );
       default:
@@ -312,8 +388,8 @@ export default function MembersPage() {
                 )}
                 formatDateTime={formatDateTime}
                 onViewDetail={(m) => handleViewDetail(m.memberId)}
-                onEdit={handleEditStatus}
-                onDelete={handleRemove}
+                onEdit={openEditModal} // ✅ 5. Sửa hàm onEdit
+                onDelete={openDeleteConfirmation} // ✅ 7. SỬA HÀM onDelete
                 disableEdit={(m) => m.userId === user?.id}
                 disableDelete={(m) => m.userId === user?.id}
               />
@@ -343,15 +419,88 @@ export default function MembersPage() {
   description="Thêm thành viên vào phòng ban"
   contextType="workspace"
 />
+{/* ✅ 6. THÊM MODAL CHỈNH SỬA (GIỐNG HỆT COMPANY) */}
+      {showEditModal && selectedMember && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fadeIn">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-slideUp">
+            {/* Modal Header */}
+            <div className="relative bg-gradient-to-br from-green-500 to-emerald-500 p-6">
+              <div className="relative z-10 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
+                    <Edit className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-white">
+                      Cập nhật trạng thái
+                    </h2>
+                    <p className="text-white/80 text-sm">
+                      {selectedMember.fullName}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowEditModal(false)}
+                  className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5 text-white" />
+                </button>
+              </div>
+            </div>
 
+            {/* Modal Body */}
+            <div className="p-6 space-y-5">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4 text-green-500" />
+                  Trạng thái mới
+                </label>
+                <select
+                  value={newStatus}
+                  onChange={(e) => setNewStatus(e.target.value)}
+                  className="w-full border-2 border-gray-200 rounded-xl px-4 py-3"
+                >
+                  <option value="ACTIVE">Hoạt động (ACTIVE)</option>
+                  <option value="SUSPENDED">Tạm khóa (SUSPENDED)</option>
+                  {/* API của bạn chỉ cho phép 2 trạng thái này */}
+                </select>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => setShowEditModal(false)}
+                  className="flex-1 px-4 py-3 border-2 border-gray-200 rounded-xl hover:bg-gray-50 font-semibold transition-all duration-300"
+                >
+                  Hủy
+                </button>
+                <button
+                  onClick={handleUpdateStatus} // GỌI HÀM MỚI
+                  disabled={isUpdating}
+                  className="flex-1 flex items-center justify-center px-4 py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-xl hover:from-green-600 hover:to-emerald-600 font-semibold shadow-lg hover:shadow-xl transition-all duration-300
+                                disabled:opacity-70 disabled:cursor-not-allowed"
+                >
+                  {isUpdating ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <Save className="w-4 h-4" />
+                      Lưu thay đổi
+                    </div>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       {/* 🔹 Modal xem chi tiết */}
       <MemberDetailModalBase
         isOpen={showDetailModal}
         onClose={() => {
           setShowDetailModal(false);
-          setSelectedMember(null);
+          setDetailMember(null);
         }}
-        member={selectedMember}
+        member={detailMember}
         loading={loadingDetail}
         title="Chi tiết thành viên Workspace"
         showStatus={true}
@@ -364,7 +513,15 @@ export default function MembersPage() {
           { label: "Email", key: "email" },
         ]}
       />
-
+        {/* ✅ MỚI: Modal Xác nhận Xóa (Đặt ở cuối cùng) */}
+      <ConfirmationModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onConfirm={handleConfirmRemove}
+        isLoading={isDeleting}
+        title="Xác nhận xóa thành viên"
+        description={`Bạn có chắc chắn muốn xóa thành viên "${memberToDelete?.fullName}" (${memberToDelete?.email}) khỏi không gian làm việc này? Hành động này không thể hoàn tác.`}
+      />
     </div>
   );
 }
