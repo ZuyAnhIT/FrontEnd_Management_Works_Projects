@@ -1,9 +1,8 @@
+// services/apiDashboard.ts
 "use client";
 
 
 import apiClient from "@/lib/apiClient";
-import { getCurrentUser } from "@/services/apiUser";
-
 
 // ===================================================
 // 🔹 Interface: Workspace trong Dashboard
@@ -12,6 +11,8 @@ export interface DashboardWorkspace {
   workspaceId: number;
   workspaceName: string;
   workspaceCode: string;
+  memberCount: number; // Thêm trường này nếu cần thống kê
+  projectCount: number; // Thêm trường này nếu cần thống kê
   workspaceDescription: string;
   workspaceCoverImage: string;
   workspaceColor: string;
@@ -79,140 +80,53 @@ export interface DashboardCompany {
 
 // ===================================================
 // 1️⃣ GET – Lấy danh sách Workspace tôi tham gia
-//     /api/dashboard/workspaces
 // ===================================================
-export const getDashboardWorkspaces = async (): Promise<
-  DashboardWorkspace[]
-> => {
-  const token = localStorage.getItem("accessToken");
-  if (!token) throw new Error("Người dùng chưa đăng nhập.");
-
-
+export const getDashboardWorkspaces = async (): Promise<DashboardWorkspace[]> => {
   try {
-    const res = await apiClient.get(`/dashboard/workspaces`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-
-
-    const data = res.data;
-
-
-    if (!data.success)
-      throw new Error(data.message || "Không thể tải danh sách workspace.");
-
-
-    return data.data as DashboardWorkspace[];
+    const res = await apiClient.get('/dashboard/workspaces');
+    return res.data.data as DashboardWorkspace[];
   } catch (err: any) {
-    console.error("❌ Lỗi tải danh sách dashboard workspace:", err);
-    throw new Error(
-      err.response?.data?.message ||
-        "Lỗi hệ thống, không thể tải danh sách workspace."
-    );
+    console.error("❌ Lỗi tải danh sách workspace:", err.response?.data || err);
+    throw new Error(err.response?.data?.message || "Không thể tải danh sách Workspace của bạn.");
   }
 };
-
 
 // ===================================================
 // 2️⃣ GET – Lấy danh sách Task của tôi
-//     /api/dashboard/my-tasks
 // ===================================================
 export const getDashboardMyTasks = async (): Promise<DashboardMyTask[]> => {
-  const token = localStorage.getItem("accessToken");
-  if (!token) throw new Error("Người dùng chưa đăng nhập.");
-
-
   try {
-    const res = await apiClient.get(`/dashboard/my-tasks`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-
-
-    const data = res.data;
-
-
-    if (!data.success)
-      throw new Error(data.message || "Không thể tải danh sách công việc.");
-
-
-    return data.data as DashboardMyTask[];
+    const res = await apiClient.get('/dashboard/my-tasks');
+    return res.data.data as DashboardMyTask[];
   } catch (err: any) {
-    console.error("❌ Lỗi tải công việc của tôi:", err);
-    throw new Error(
-      err.response?.data?.message ||
-        "Lỗi hệ thống, không thể tải công việc của bạn."
-    );
+    console.error("❌ Lỗi tải công việc của tôi:", err.response?.data || err);
+    throw new Error(err.response?.data?.message || "Không thể tải công việc của bạn.");
   }
 };
-
 
 // ===================================================
 // 3️⃣ GET – Lấy danh sách Project của tôi
-//     /api/dashboard/my-projects
 // ===================================================
-export const getDashboardMyProjects = async (): Promise<
-  DashboardMyProject[]
-> => {
-  const token = localStorage.getItem("accessToken");
-  if (!token) throw new Error("Người dùng chưa đăng nhập.");
-
-
+export const getDashboardMyProjects = async (): Promise<any[]> => { // Dùng any[] cho đơn giản
   try {
-    const res = await apiClient.get(`/dashboard/my-projects`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-
-
-    const data = res.data;
-
-
-    if (!data.success)
-      throw new Error(data.message || "Không thể tải danh sách dự án.");
-
-
-    return data.data as DashboardMyProject[];
+    const res = await apiClient.get('/dashboard/my-projects');
+    return res.data.data;
   } catch (err: any) {
-    console.error("❌ Lỗi tải dự án của tôi:", err);
-    throw new Error(
-      err.response?.data?.message ||
-        "Lỗi hệ thống, không thể tải dự án của bạn."
-    );
+    console.error("❌ Lỗi tải dự án của tôi:", err.response?.data || err);
+    throw new Error(err.response?.data?.message || "Lỗi hệ thống, không thể tải dự án của bạn.");
   }
 };
-
 
 // ===================================================
 // 4️⃣ GET – Lấy danh sách Company của tôi
-//     /api/dashboard/companies
 // ===================================================
-export const getDashboardCompanies = async (): Promise<
-  DashboardCompany[]
-> => {
-  const token = localStorage.getItem("accessToken");
-  if (!token) throw new Error("Người dùng chưa đăng nhập.");
-
-
+export const getDashboardCompanies = async (): Promise<DashboardCompany[]> => {
   try {
-    const res = await apiClient.get(`/dashboard/companies`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-
-
-    const data = res.data;
-
-
-    if (!data.success)
-      throw new Error(data.message || "Không thể tải danh sách công ty.");
-
-
-    return data.data as DashboardCompany[];
+    const res = await apiClient.get('/dashboard/companies');
+    return res.data.data as DashboardCompany[];
   } catch (err: any) {
-    console.error("❌ Lỗi tải danh sách công ty:", err);
-    throw new Error(
-      err.response?.data?.message ||
-        "Lỗi hệ thống, không thể tải danh sách công ty."
-    );
+    console.error("❌ Lỗi tải danh sách công ty:", err.response?.data || err);
+    throw new Error(err.response?.data?.message || "Lỗi hệ thống, không thể tải danh sách công ty.");
   }
 };
-
-
 
