@@ -21,6 +21,7 @@ import {
   Clock,
   XCircle,
   Save,
+  ShieldAlert,
 } from "lucide-react";
 
 // ⛔️ Sửa đường dẫn nếu bạn chưa di chuyển file
@@ -29,6 +30,7 @@ import {
   inviteMemberToWorkspace,
   getWorkspaceMemberDetail,
   updateWorkspaceMemberStatus,
+  updateWorkspaceMemberRole,
   removeWorkspaceMember
 } from "@/services/apiWorkspace";
 
@@ -39,6 +41,7 @@ import MemberDetailModalBase from "@/components/ui/MemberDetailModalBase";
 import MemberTable from "@/components/ui/MemberTable";
 import InviteMemberModal from "@/components/ui/InviteMemberModal"; 
 import ConfirmationModal from "@/components/ui/ConfirmationModal";
+
 export default function MembersPage() {
   const { showToast } = useToast();
   const params = useParams();
@@ -51,6 +54,7 @@ export default function MembersPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [members, setMembers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
   const [showInviteModal, setShowInviteModal] = useState(false);
 
   // ✅ SỬA LỖI: Đổi state sang roleCode (string)
@@ -60,9 +64,11 @@ export default function MembersPage() {
 // ...
   // ✅ 2. SỬA LỖI & BỔ SUNG STATE
   // State cho Modal Sửa (Giống Company)
+// ✅ CẬP NHẬT STATE CHO MODAL SỬA
   const [showEditModal, setShowEditModal] = useState(false);
-  const [selectedMember, setSelectedMember] = useState<any | null>(null); // State này cho modal SỬA
-  const [newStatus, setNewStatus] = useState("ACTIVE");
+  const [selectedMember, setSelectedMember] = useState<any | null>(null);
+  const [newStatus, setNewStatus] = useState("");
+  const [newRole, setNewRole] = useState(""); // <--- STATE MỚI CHO ROLE
   const [isUpdating, setIsUpdating] = useState(false);
 
   // Modal xem chi tiết
@@ -75,7 +81,7 @@ export default function MembersPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [memberToDelete, setMemberToDelete] = useState<any | null>(null);
 
-
+    
   // 🧩 1. Lấy danh sách thành viên workspace
   useEffect(() => {
     if (isAuthLoading) return; // Chờ auth xong
@@ -94,6 +100,7 @@ export default function MembersPage() {
         const dataWithStatus = data.map((m: any, i: number) => ({
           ...m,
           status: m.status || (i % 2 === 0 ? "ACTIVE" : "PENDING"),
+          roleCode: m.roleCode || (m.roleName === 'Workspace Administrator' ? 'WORKSPACE_ADMIN' : 'WORKSPACE_MEMBER')
         }));
         setMembers(dataWithStatus);
       } catch (err: any) {
@@ -167,37 +174,65 @@ export default function MembersPage() {
   // ...
   // ✅ 4. THAY THẾ HÀM "DEMO"
   
-  // Hàm Mở Modal Sửa (Giống Company)
+  // Hàm Mở Modal Sửa
   const openEditModal = (member: any) => {
-    setSelectedMember(member); // Lưu thành viên đang được chọn để sửa
-    setNewStatus(member.status); // Lấy status hiện tại của họ
-    setShowEditModal(true); // Mở modal
+    setSelectedMember(member);
+    // ✅ Thay đổi: Reset về rỗng mỗi khi mở modal
+    setNewStatus(""); 
+    setNewRole(""); 
+    setShowEditModal(true);
   };
 
-  // Hàm Submit Cập nhật Trạng thái (Logic chính)
-  const handleUpdateStatus = async () => {
+  // Hàm Submit Cập nhật (Xử lý cả Status và Role)
+  const handleUpdateMember = async () => {
     if (!companyId || !workspaceId || !selectedMember) return;
+
+    // Nếu cả 2 đều rỗng (chưa chọn gì) -> đóng modal luôn
+    if (newStatus === "" && newRole === "") {
+      setShowEditModal(false);
+      return;
+    }
 
     setIsUpdating(true);
     try {
-      // Gọi service của Workspace với memberId (KHÔNG PHẢI userId)
-      await updateWorkspaceMemberStatus(
-        companyId,
-        workspaceId,
-        selectedMember.memberId, 
-        { newStatus }
-      );
+      const promises = [];
 
-      // Refresh danh sách từ API (Copy logic từ useEffect)
+      // 1. Nếu user chọn Status (khác rỗng) -> Gọi API Status
+      if (newStatus !== "") {
+        promises.push(
+          updateWorkspaceMemberStatus(
+            companyId,
+            workspaceId,
+            selectedMember.memberId,
+            { newStatus }
+          )
+        );
+      }
+
+      // 2. Nếu user chọn Role (khác rỗng) -> Gọi API Role
+      if (newRole !== "") {
+        promises.push(
+          updateWorkspaceMemberRole(
+            companyId,
+            workspaceId,
+            selectedMember.memberId,
+            newRole
+          )
+        );
+      }
+      // Chạy song song các request
+      await Promise.all(promises);
+
+      // Refresh danh sách
       const data = await getWorkspaceMembers(companyId, workspaceId);
-      const dataWithStatus = data.map((m: any, i: number) => ({
-        ...m,
-        // Giữ lại logic giả lập status nếu API của bạn chưa trả về
-        status: m.status || (i % 2 === 0 ? "ACTIVE" : "PENDING"), 
-      }));
-      setMembers(dataWithStatus);
+       const mappedData = data.map((m: any) => ({
+            ...m,
+            status: m.status || "ACTIVE", 
+            roleCode: m.roleCode || (m.roleName === 'Workspace Administrator' ? 'WORKSPACE_ADMIN' : 'WORKSPACE_MEMBER') 
+        }));
+      setMembers(mappedData);
 
-      showToast("Cập nhật trạng thái thành công!", "success");
+      showToast("Cập nhật thông tin thành công!", "success");
       setShowEditModal(false);
       setSelectedMember(null);
     } catch (err: any) {
@@ -261,12 +296,12 @@ export default function MembersPage() {
           </div>
         );
       case "REMOVED":
-        return (
-          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border bg-gray-100 text-gray-600 border-gray-200">
-            <XCircle className="w-3.5 h-3.5" />
-            <span className="text-sm font-semibold">Đã rời</span>
-          </div>
-        );
+      return (
+        <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border bg-red-50 text-red-700 border-red-200">
+          <XCircle className="w-3.5 h-3.5" />
+          <span className="text-sm font-semibold">Đã rời</span>
+        </div>
+      );
       default:
         return null;
     }
@@ -357,136 +392,123 @@ export default function MembersPage() {
           </button>
         </div>
 
-        {/* Members Table */}
+        {/* ✅ TABLE: Cập nhật icon Crown/Shield */}
         {loading ? (
-          <div className="bg-white rounded-2xl shadow-xl border border-gray-200 p-12 text-center">
-            <Loader2 className="w-8 h-8 text-blue-500 animate-spin mx-auto mb-4" />
-            <p className="text-gray-600 font-medium">
-              Đang tải danh sách thành viên...
-            </p>
-          </div>
+          <div className="bg-white rounded-2xl shadow-xl border border-gray-200 p-12 text-center"><Loader2 className="w-8 h-8 text-blue-500 animate-spin mx-auto" /></div>
         ) : filteredMembers.length > 0 ? (
           <div className="bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden animate-fadeInUp">
             <div className="overflow-x-auto">
               <MemberTable
                 members={filteredMembers}
                 renderStatus={renderStatusBadge}
-                renderRole={(m) => (
-                  <div
-                    className={`inline-flex items-center gap-1 px-3 py-1 rounded-full border ${m.roleCode === "WORKSPACE_ADMIN"
-                        ? "bg-yellow-50 text-yellow-700 border-yellow-200"
-                        : "bg-blue-50 text-blue-700 border-blue-200"
-                      }`}
-                  >
-                    {m.roleCode === "WORKSPACE_ADMIN" ? (
-                      <Crown className="w-3.5 h-3.5" />
-                    ) : (
-                      <Shield className="w-3.5 h-3.5" />
-                    )}
-                    <span className="text-sm font-medium">{m.roleName || "—"}</span>
-                  </div>
-                )}
+                // ✅ Cập nhật logic hiển thị Icon và Style
+                renderRole={(m) => {
+  const isAdmin = m.roleCode === "WORKSPACE_ADMIN";
+  const status = m.status;
+
+  let badgeStyle = "";
+  let iconColor = "";
+  let IconComponent = isAdmin ? Crown : Shield;
+
+  // 🎯 ƯU TIÊN THEO STATUS
+  if (status === "SUSPENDED") {
+    // Xám rõ hơn: còn trong hệ thống nhưng đang bị khóa
+    badgeStyle = "bg-gray-100 text-gray-600 border-gray-200";
+    iconColor = "text-gray-500";
+  } 
+  else if (status === "REMOVED") {
+    // Xám nhạt hơn: đã rời, de-emphasized
+    badgeStyle = "bg-gray-50 text-gray-400 border-gray-150";
+    iconColor = "text-gray-300";
+  } 
+  else {
+    // 🟢 ACTIVE → theo role
+    if (isAdmin) {
+      badgeStyle = "bg-yellow-50 text-yellow-700 border-yellow-200";
+      iconColor = "text-yellow-600";
+    } else {
+      badgeStyle = "bg-blue-50 text-blue-700 border-blue-200";
+      iconColor = "text-blue-600";
+    }
+  }
+
+  return (
+    <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border ${badgeStyle}`}>
+      <IconComponent className={`w-3.5 h-3.5 ${iconColor}`} />
+      <span className="text-sm font-semibold">{m.roleName || "—"}</span>
+    </div>
+  );
+}}
+
+
+
                 formatDateTime={formatDateTime}
                 onViewDetail={(m) => handleViewDetail(m.memberId)}
-                onEdit={openEditModal} // ✅ 5. Sửa hàm onEdit
-                onDelete={openDeleteConfirmation} // ✅ 7. SỬA HÀM onDelete
+                onEdit={openEditModal}
+                onDelete={openDeleteConfirmation}
                 disableEdit={(m) => m.userId === user?.id}
                 disableDelete={(m) => m.userId === user?.id}
               />
             </div>
           </div>
         ) : (
-          <div className="bg-white rounded-2xl shadow-xl border-2 border-dashed border-gray-200 p-16 text-center">
-            <Users className="w-10 h-10 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              Không có thành viên nào
-            </h3>
-          </div>
+          <div className="text-center p-16 bg-white rounded-2xl border-2 border-dashed"><Users className="w-10 h-10 text-gray-400 mx-auto mb-4" /><h3>Không tìm thấy thành viên</h3></div>
         )}
       </div>
 
-      {/* 🔹 Modal Mời (Thêm từ CÔNG TY) */}
-      <InviteMemberModal
-  isOpen={showInviteModal}
-  onClose={() => setShowInviteModal(false)}
-  onInvite={handleInvite}
-  isLoading={loading}
-  email={email}
-  setEmail={setEmail}
-  roleId={roleCode === "WORKSPACE_ADMIN" ? 1 : 2}
-  setRoleId={(v) => setRoleCode(v === 1 ? "WORKSPACE_ADMIN" : "WORKSPACE_MEMBER")}
-  title="Mời thành viên Workspace"
-  description="Thêm thành viên vào phòng ban"
-  contextType="workspace"
-/>
-{/* ✅ 6. THÊM MODAL CHỈNH SỬA (GIỐNG HỆT COMPANY) */}
+      <InviteMemberModal 
+        isOpen={showInviteModal} onClose={() => setShowInviteModal(false)} onInvite={handleInvite} isLoading={loading} 
+        email={email} setEmail={setEmail} roleId={roleCode === "WORKSPACE_ADMIN" ? 1 : 2} setRoleId={(v) => setRoleCode(v === 1 ? "WORKSPACE_ADMIN" : "WORKSPACE_MEMBER")} 
+        title="Mời thành viên" description="Thêm vào workspace" contextType="workspace" 
+      />
+{/* ✅ MODAL SỬA (UPDATE LOGIC SELECT) */}
       {showEditModal && selectedMember && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fadeIn">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-slideUp">
-            {/* Modal Header */}
             <div className="relative bg-gradient-to-br from-green-500 to-emerald-500 p-6">
-              <div className="relative z-10 flex items-center justify-between">
+              <div className="flex items-center justify-between relative z-10">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
-                    <Edit className="w-6 h-6 text-white" />
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-bold text-white">
-                      Cập nhật trạng thái
-                    </h2>
-                    <p className="text-white/80 text-sm">
-                      {selectedMember.fullName}
-                    </p>
-                  </div>
+                   <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center"><Edit className="w-6 h-6 text-white" /></div>
+                   <div><h2 className="text-xl font-bold text-white">Cập nhật thành viên</h2><p className="text-white/80 text-sm">{selectedMember.fullName}</p></div>
                 </div>
-                <button
-                  onClick={() => setShowEditModal(false)}
-                  className="p-2 hover:bg-white/20 rounded-lg transition-colors"
-                >
-                  <X className="w-5 h-5 text-white" />
-                </button>
+                <button onClick={() => setShowEditModal(false)} className="p-2 hover:bg-white/20 rounded-lg"><X className="w-5 h-5 text-white" /></button>
               </div>
             </div>
 
             {/* Modal Body */}
             <div className="p-6 space-y-5">
+              {/* Select Role */}
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4 text-green-500" />
-                  Trạng thái mới
-                </label>
-                <select
-                  value={newStatus}
-                  onChange={(e) => setNewStatus(e.target.value)}
-                  className="w-full border-2 border-gray-200 rounded-xl px-4 py-3"
-                >
-                  <option value="ACTIVE">Hoạt động (ACTIVE)</option>
-                  <option value="SUSPENDED">Tạm khóa (SUSPENDED)</option>
-                  {/* API của bạn chỉ cho phép 2 trạng thái này */}
+                <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2"><ShieldAlert className="w-4 h-4 text-blue-500" /> Vai trò (Role)</label>
+                <div className="relative">
+                  <select value={newRole} onChange={(e) => setNewRole(e.target.value)} className="w-full appearance-none border-2 border-gray-200 rounded-xl px-4 py-3 pl-11 focus:outline-none focus:border-blue-500 bg-white">
+                    {/* ✅ Giá trị rỗng hiển thị mặc định */}
+                    <option value="">-- Vui lòng chọn (Giữ nguyên) --</option>
+                    <option value="WORKSPACE_MEMBER">Thành viên (Member)</option>
+                    <option value="WORKSPACE_ADMIN">Quản trị viên (Admin)</option>
+                  </select>
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                     {/* Chỉ hiện icon Crown nếu chọn Admin, còn lại (hoặc rỗng) hiện Shield */}
+                     {newRole === 'WORKSPACE_ADMIN' ? <Crown className="w-5 h-5 text-yellow-500" /> : <Shield className="w-5 h-5 text-gray-400" />}
+                  </div>
+                </div>
+              </div>
+
+              {/* Select Status */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2"><CheckCircle className="w-4 h-4 text-green-500" /> Trạng thái (Status)</label>
+                <select value={newStatus} onChange={(e) => setNewStatus(e.target.value)} className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:border-green-500">
+                   {/* ✅ Giá trị rỗng hiển thị mặc định */}
+                   <option value="">-- Vui lòng chọn (Giữ nguyên) --</option>
+                   <option value="ACTIVE">Hoạt động (ACTIVE)</option>
+                   <option value="SUSPENDED">Tạm khóa (SUSPENDED)</option>
                 </select>
               </div>
 
-              <div className="flex gap-3 pt-2">
-                <button
-                  onClick={() => setShowEditModal(false)}
-                  className="flex-1 px-4 py-3 border-2 border-gray-200 rounded-xl hover:bg-gray-50 font-semibold transition-all duration-300"
-                >
-                  Hủy
-                </button>
-                <button
-                  onClick={handleUpdateStatus} // GỌI HÀM MỚI
-                  disabled={isUpdating}
-                  className="flex-1 flex items-center justify-center px-4 py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-xl hover:from-green-600 hover:to-emerald-600 font-semibold shadow-lg hover:shadow-xl transition-all duration-300
-                                disabled:opacity-70 disabled:cursor-not-allowed"
-                >
-                  {isUpdating ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <Save className="w-4 h-4" />
-                      Lưu thay đổi
-                    </div>
-                  )}
+              <div className="flex gap-3 pt-4 border-t border-gray-100 mt-4">
+                <button onClick={() => setShowEditModal(false)} className="flex-1 px-4 py-3 border-2 border-gray-200 rounded-xl hover:bg-gray-50 font-semibold">Hủy</button>
+                <button onClick={handleUpdateMember} disabled={isUpdating} className="flex-1 flex items-center justify-center px-4 py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl disabled:opacity-70">
+                   {isUpdating ? <Loader2 className="w-5 h-5 animate-spin" /> : <div className="flex items-center gap-2"><Save className="w-4 h-4" /> Lưu thay đổi</div>}
                 </button>
               </div>
             </div>
