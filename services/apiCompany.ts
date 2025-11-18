@@ -267,3 +267,39 @@ export const updateCompanyMemberStatus = async (
   // Giả sử API trả về { success: true, message: "...", data: updatedMember }
   return res.data.data;
 };
+
+// ===================================================
+// 🔹 Cập nhật Vai trò (Role) thành viên trong Công ty
+// ===================================================
+export const updateCompanyMemberRole = async (
+  companyId: number,
+  memberId: number,
+  roleCode: string // "COMPANY_ADMIN" hoặc "COMPANY_MEMBER"
+) => {
+  if (!companyId || !memberId)
+    throw new Error("Thiếu thông tin ID công ty hoặc thành viên.");
+
+  const token = localStorage.getItem("accessToken");
+  if (!token) throw new Error("Người dùng chưa đăng nhập.");
+
+  try {
+    const res = await apiClient.put(
+      `/companies/${companyId}/members/${memberId}/role`,
+      { roleCode }, // Payload khớp với RoleUpdateRequest của Backend
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+
+    const data = res.data;
+    if (!data.success)
+      throw new Error(data.message || "Không thể cập nhật vai trò thành viên.");
+
+    return data;
+  } catch (err: any) {
+    console.error("Lỗi cập nhật vai trò thành viên công ty:", err);
+    throw new Error(
+      err.response?.data?.message ??
+        err.message ??
+        "Lỗi hệ thống, không thể cập nhật vai trò."
+    );
+  }
+};
