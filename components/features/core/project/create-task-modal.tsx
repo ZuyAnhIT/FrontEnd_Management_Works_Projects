@@ -1,5 +1,6 @@
 "use client";
 
+
 import { useState } from "react";
 import {
   X,
@@ -17,36 +18,46 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/components/ui/ToastProvider";
 
+
 // API thật
 import { createProjectTask } from "@/services/apiProject";
+
 
 interface CreateTaskModalProps {
   isOpen: boolean;
   onClose: () => void;
   projectId: number;
   workspaceId: number;
+  sprintId?: number | null;
   onCreated?: () => void;
+
+
 }
+
 
 export function CreateTaskModal({
   isOpen,
   onClose,
   projectId,
   workspaceId,
+  sprintId,
   onCreated,
 }: CreateTaskModalProps) {
   const { showToast } = useToast();
+
 
   const [formData, setFormData] = useState({
     title: "",
     description: "",
     priority: "LOW",
-    status: "TODO",
+    statusName: "TODO",
     subtasks: [] as { title: string }[],
   });
 
+
   const [newSubtask, setNewSubtask] = useState("");
   const [loading, setLoading] = useState(false);
+
 
   const handleAddSubtask = () => {
     if (!newSubtask.trim()) return;
@@ -57,6 +68,7 @@ export function CreateTaskModal({
     setNewSubtask("");
   };
 
+
   const handleRemoveSubtask = (i: number) => {
     setFormData((prev) => ({
       ...prev,
@@ -64,69 +76,89 @@ export function CreateTaskModal({
     }));
   };
 
+
   // 🚀 CREATE TASK - REAL API
   const handleCreate = async () => {
     if (!formData.title.trim()) {
       showToast("Task title is required!");
 
+
       return;
     }
 
+
     try {
       setLoading(true);
+
 
       const payload = {
         title: formData.title,
         description: formData.description,
 
-        status: formData.status,
+
+        statusName: formData.statusName,
         taskType: "STORY",
         priority: formData.priority,
+
 
         storyPoints: 0,
         estimatedHours: 0,
 
+
         assigneeId: undefined, // FIX NULL ERROR
         attachments: [],
         links: [],
+        sprintId: sprintId ?? undefined,
       };
 
+
       await createProjectTask(workspaceId, projectId, payload);
+
 
       showToast(`Task "${formData.title}" created successfully!`);
 
 
+
+
       onCreated?.();
+
 
       // Reset state
       setFormData({
         title: "",
         description: "",
         priority: "LOW",
-        status: "TODO",
+        statusName: "TODO",
         subtasks: [],
       });
+
 
       onClose();
     } catch (err: any) {
       console.error("❌ API ERROR:", err?.response?.data || err);
 
+
       showToast(err?.response?.data?.message || "Cannot create task");
+
 
     } finally {
       setLoading(false);
     }
   };
 
+
   if (!isOpen) return null;
+
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fadeIn">
       <Card className="w-full max-w-2xl max-h-[90vh] overflow-hidden shadow-2xl border-0 animate-scaleIn flex flex-col">
 
+
         {/* HEADER */}
         <CardHeader className="relative overflow-hidden bg-gradient-to-br from-blue-500 via-cyan-500 to-blue-600 p-8">
           <div className="absolute inset-0 bg-grid-white/10"></div>
+
 
           <div className="relative z-10 flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -142,6 +174,7 @@ export function CreateTaskModal({
               </div>
             </div>
 
+
             <button
               onClick={onClose}
               className="p-2 hover:bg-white/20 rounded-xl transition-all duration-300 hover:scale-110 hover:rotate-90 backdrop-blur-sm"
@@ -151,8 +184,10 @@ export function CreateTaskModal({
           </div>
         </CardHeader>
 
+
         {/* BODY */}
         <CardContent className="p-8 space-y-6 bg-gradient-to-b from-blue-50/30 to-white overflow-y-auto flex-1">
+
 
           {/* TITLE */}
           <div>
@@ -160,6 +195,7 @@ export function CreateTaskModal({
               <Sparkles className="w-4 h-4 text-white bg-gradient-to-br from-purple-500 to-pink-500 p-1 rounded" />
               Task Title*
             </label>
+
 
             <Input
               value={formData.title}
@@ -169,12 +205,14 @@ export function CreateTaskModal({
             />
           </div>
 
+
           {/* DESCRIPTION */}
           <div>
             <label className="text-sm font-semibold flex items-center gap-2 mb-3 text-gray-700">
               <FileText className="w-4 h-4 text-white bg-gradient-to-br from-blue-500 to-cyan-500 p-1 rounded" />
               Description
             </label>
+
 
             <Textarea
               value={formData.description}
@@ -185,6 +223,7 @@ export function CreateTaskModal({
             />
           </div>
 
+
           {/* PRIORITY + STATUS */}
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -192,6 +231,7 @@ export function CreateTaskModal({
                 <Flag className="w-4 h-4 text-white bg-gradient-to-br from-orange-500 to-red-500 p-1 rounded" />
                 Priority
               </label>
+
 
               <select
                 value={formData.priority}
@@ -207,26 +247,29 @@ export function CreateTaskModal({
               </select>
             </div>
 
+
             <div>
               <label className="text-sm font-semibold mb-3 flex items-center gap-2 text-gray-700">
                 <Activity className="w-4 h-4 text-white bg-gradient-to-br from-green-500 to-emerald-500 p-1 rounded" />
                 Status
               </label>
 
+
               <select
-                value={formData.status}
+                value={formData.statusName}
                 onChange={(e) =>
-                  setFormData({ ...formData, status: e.target.value })
+                  setFormData({ ...formData, statusName: e.target.value })
                 }
                 className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl"
               >
-                <option value="TODO">📋 To Do</option>
-                <option value="IN_PROGRESS">⚡ In Progress</option>
-                <option value="REVIEW">👀 Review</option>
-                <option value="DONE">✅ Done</option>
+                <option value="TODO"> To Do</option>
+                <option value="IN_PROGRESS"> In Progress</option>
+                <option value="REVIEW"> Review</option>
+                <option value="DONE"> Done</option>
               </select>
             </div>
           </div>
+
 
           {/* SUBTASKS */}
           <div>
@@ -234,6 +277,7 @@ export function CreateTaskModal({
               <CheckSquare className="w-4 h-4 text-white bg-gradient-to-r from-teal-500 to-cyan-500 p-1 rounded" />
               Subtasks
             </label>
+
 
             {formData.subtasks.map((st, index) => (
               <div
@@ -250,6 +294,7 @@ export function CreateTaskModal({
               </div>
             ))}
 
+
             <div className="flex gap-2 mt-3">
               <Input
                 value={newSubtask}
@@ -263,11 +308,13 @@ export function CreateTaskModal({
             </div>
           </div>
 
+
           {/* ACTIONS */}
           <div className="flex justify-end gap-3 pt-6 border-t">
             <Button variant="outline" onClick={onClose}>
               Cancel
             </Button>
+
 
             <Button
               onClick={handleCreate}
@@ -282,3 +329,6 @@ export function CreateTaskModal({
     </div>
   );
 }
+
+
+
