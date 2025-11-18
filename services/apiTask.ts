@@ -11,7 +11,7 @@ import apiClient from "@/lib/apiClient";
 
 // 🔹 Gán task vào sprint
 export const assignTaskToSprint = async (taskId: number, sprintId: number) => {
-  const res = await apiClient.put(`/api/tasks/${taskId}/sprint`, {
+  const res = await apiClient.put(`/tasks/${taskId}/sprint`, {
     sprintId,
   });
   return res.data; // { success, message, data }
@@ -25,14 +25,14 @@ export const assignTaskToSprint = async (taskId: number, sprintId: number) => {
 
 // 🔹 Lấy danh sách comment theo task
 export const getTaskComments = async (taskId: number) => {
-  const res = await apiClient.get(`/api/tasks/${taskId}/comments`);
+  const res = await apiClient.get(`/tasks/${taskId}/comments`);
   return res.data; // { success, message, data: [...] }
 };
 
 
 // 🔹 Thêm comment cho task
 export const addTaskComment = async (taskId: number, content: string) => {
-  const res = await apiClient.post(`/api/tasks/${taskId}/comments`, {
+  const res = await apiClient.post(`/tasks/${taskId}/comments`, {
     content,
   });
   return res.data; // { success, message, data }
@@ -46,7 +46,7 @@ export const addTaskComment = async (taskId: number, content: string) => {
 
 // 🔹 Lấy danh sách file đính kèm theo task
 export const getTaskAttachments = async (taskId: number) => {
-  const res = await apiClient.get(`/api/tasks/${taskId}/attachments`);
+  const res = await apiClient.get(`/tasks/${taskId}/attachments`);
   return res.data; // { success, message, data: [...] }
 };
 
@@ -58,7 +58,7 @@ export const uploadTaskAttachment = async (taskId: number, file: File) => {
 
 
   const res = await apiClient.post(
-    `/api/tasks/${taskId}/attachments`,
+    `/tasks/${taskId}/attachments`,
     formData,
     {
       headers: { "Content-Type": "multipart/form-data" },
