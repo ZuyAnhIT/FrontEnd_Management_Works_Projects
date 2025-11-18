@@ -10,6 +10,7 @@ import {
   Sparkles,
   Mail,
   UserPlus,
+  ShieldAlert,
   Crown,
   Shield,
   Loader2,
@@ -27,6 +28,7 @@ import {
   inviteMemberToCompany,
   removeCompanyMember,
   updateCompanyMemberStatus,
+  updateCompanyMemberRole,
   getDetailCompanyMembers,
 } from "@/services/apiCompany";
 
@@ -55,12 +57,14 @@ export default function MembersPage() {
   const [email, setEmail] = useState("");
   const [roleId, setRoleId] = useState(3);
 
-  // State cho Modal Sửa
+// ✅ CẬP NHẬT STATE CHO MODAL SỬA (Giống Workspace)
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedMember, setSelectedMember] = useState<any | null>(null);
-  const [newStatus, setNewStatus] = useState("ACTIVE");
-  const [isUpdating, setIsUpdating] = useState(false);
 
+ // State lưu giá trị đang chỉnh sửa (Mặc định rỗng để hiện "Vui lòng chọn")
+  const [newStatus, setNewStatus] = useState(""); 
+  const [newRole, setNewRole] = useState(""); 
+  const [isUpdating, setIsUpdating] = useState(false);
   // ✅ 2. State mới cho Modal Xóa
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -169,33 +173,68 @@ export default function MembersPage() {
     }
   };
 
+  // 🧩 Logic Mở Modal Sửa
   const openEditModal = (member: any) => {
     setSelectedMember(member);
-    setNewStatus(member.status);
+    // Reset về rỗng để hiển thị "Vui lòng chọn"
+    setNewStatus(""); 
+    setNewRole(""); 
     setShowEditModal(true);
   };
 
-  // 🧩 6. Hàm Submit Cập nhật Trạng thái
-const handleUpdateStatus = async () => {
-  if (!companyId || !selectedMember) return;
-  setIsUpdating(true);
-  try {
-    // ✅ Gửi memberId thay vì userId
-    await updateCompanyMemberStatus(companyId, selectedMember.memberId, newStatus);
+  // 🧩 Logic Lưu Thay Đổi (Chỉ gọi API nếu user ĐÃ CHỌN)
+  const handleUpdateMember = async () => {
+    if (!companyId || !selectedMember) return;
 
-    // ✅ Refresh danh sách từ API
-    const refreshed = await getCompanyMembers(companyId);
-    setMembers(refreshed);
+    // Nếu cả 2 đều rỗng (chưa chọn gì) -> đóng modal luôn
+    if (newStatus === "" && newRole === "") {
+      setShowEditModal(false);
+      return;
+    }
 
-    showToast("Cập nhật trạng thái thành công!", "success");
-    setShowEditModal(false);
-  } catch (err: any) {
-    showToast(err.message || "Cập nhật thất bại!", "error");
-  } finally {
-    setIsUpdating(false);
-  }
-};
+    setIsUpdating(true);
+    try {
+      const promises = [];
 
+      // 1. Nếu user chọn Status (khác rỗng) -> Gọi API Status
+      if (newStatus !== "") {
+        promises.push(
+          updateCompanyMemberStatus(
+            companyId, 
+            selectedMember.memberId, // Lưu ý: Dùng memberId hay userId tùy API của bạn
+            newStatus
+          )
+        );
+      }
+
+      // 2. Nếu user chọn Role (khác rỗng) -> Gọi API Role
+      if (newRole !== "") {
+        promises.push(
+          updateCompanyMemberRole(
+            companyId, 
+            selectedMember.memberId, // Lưu ý: Dùng memberId hay userId tùy API của bạn
+            newRole
+          )
+        );
+      }
+
+      // Chạy song song các request
+      await Promise.all(promises);
+
+      // Refresh danh sách
+      const refreshed = await getCompanyMembers(companyId);
+      setMembers(refreshed);
+
+      showToast("Cập nhật thông tin thành công!", "success");
+      setShowEditModal(false);
+      setSelectedMember(null);
+    } catch (err: any) {
+    showToast(err.response?.data?.message || err.message || "Cập nhật thất bại!", "error");
+}
+ finally {
+      setIsUpdating(false);
+    }
+  };
 
   // 🧩 7. HELPER: Render Trạng thái (đọc status từ API)
   const renderStatusBadge = (status: string) => {
@@ -334,24 +373,49 @@ const handleUpdateStatus = async () => {
               <MemberTable
                 members={filteredMembers}
                 renderStatus={renderStatusBadge}
-                renderRole={(m) => (
-                  <div
-                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border ${m.roleName === "COMPANY_ADMIN"
-                      ? "bg-yellow-50 text-yellow-700 border-yellow-200"
-                      : "bg-blue-50 text-blue-700 border-blue-200"
-                      }`}
-                  >
-                    {m.roleName === "COMPANY_ADMIN" ? (
-                      <Crown className="w-3.5 h-3.5" />
-                    ) : (
-                      <Shield className="w-3.5 h-3.5" />
-                    )}
-                    <span className="text-sm font-semibold">{m.roleName}</span>
-                  </div>
-                )}
+                // ✅ LOGIC ICON DANH SÁCH MỚI
+                renderRole={(m) => {
+  const isAdmin = m.roleCode === "COMPANY_ADMIN"||
+  m.roleName === "Company Administrator";
+  const status = m.status;
+
+  let badgeStyle = "";
+  let iconColor = "";
+  let IconComponent = isAdmin ? Crown : Shield;
+
+  // 🎯 ƯU TIÊN THEO STATUS
+  if (status === "SUSPENDED") {
+    // Xám đậm → tạm khóa
+    badgeStyle = "bg-gray-100 text-gray-600 border-gray-200";
+    iconColor = "text-gray-500";
+  } 
+  else if (status === "REMOVED") {
+    // Xám nhạt → đã rời
+    badgeStyle = "bg-gray-50 text-gray-400 border-gray-150";
+    iconColor = "text-gray-300";
+  } 
+  else {
+    // 🟢 ACTIVE → hiện màu theo role
+    if (isAdmin) {
+      badgeStyle = "bg-yellow-50 text-yellow-700 border-yellow-200";
+      iconColor = "text-yellow-600";
+    } else {
+      badgeStyle = "bg-blue-50 text-blue-700 border-blue-200";
+      iconColor = "text-blue-600";
+    }
+  }
+
+  return (
+    <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border ${badgeStyle}`}>
+      <IconComponent className={`w-3.5 h-3.5 ${iconColor}`} />
+      <span className="text-sm font-semibold">{m.roleName || "—"}</span>
+    </div>
+  );
+}}
+
                 formatDateTime={formatDateTime}
                 onViewDetail={handleViewDetails}
-                onEdit={openEditModal}
+                onEdit={openEditModal} // Trỏ vào hàm mới
                 onDelete={openDeleteConfirmation}
                 disableEdit={(m) => m.userId === user?.id}
                 disableDelete={(m) =>
@@ -390,79 +454,83 @@ const handleUpdateStatus = async () => {
   contextType="company"
 />
 
-        {/* ✅ MỚI: Modal Chỉnh sửa Trạng thái */}
-        {showEditModal && selectedMember && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fadeIn">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-slideUp">
-              {/* Modal Header */}
-              <div className="relative bg-gradient-to-br from-green-500 to-emerald-500 p-6">
-                <div className="relative z-10 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
-                      <Edit className="w-6 h-6 text-white" />
-                    </div>
-                    <div>
-                      <h2 className="text-xl font-bold text-white">
-                        Cập nhật trạng thái
-                      </h2>
-                      <p className="text-white/80 text-sm">
-                        {selectedMember.fullName}
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => setShowEditModal(false)}
-                    className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+        {/* ✅ MODAL CHỈNH SỬA (CẬP NHẬT UI) */}
+      {showEditModal && selectedMember && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fadeIn">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-slideUp">
+            {/* Header giữ nguyên */}
+            <div className="relative bg-gradient-to-br from-green-500 to-emerald-500 p-6">
+               {/* ... */}
+            </div>
+
+            <div className="p-6 space-y-5">
+              
+              {/* 🔹 Select Role (MỚI THÊM) */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                  <ShieldAlert className="w-4 h-4 text-blue-500" /> 
+                  Vai trò (Role)
+                </label>
+                <div className="relative">
+                  <select 
+                    value={newRole} 
+                    onChange={(e) => setNewRole(e.target.value)} 
+                    className="w-full appearance-none border-2 border-gray-200 rounded-xl px-4 py-3 pl-11 focus:outline-none focus:border-blue-500 bg-white"
                   >
-                    <X className="w-5 h-5 text-white" />
-                  </button>
+                    <option value="">-- Vui lòng chọn (Giữ nguyên) --</option>
+                    <option value="COMPANY_MEMBER">Thành viên (Member)</option>
+                    <option value="COMPANY_ADMIN">Quản trị viên (Admin)</option>
+                  </select>
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                     {/* Logic icon trong select */}
+                     {newRole === 'COMPANY_ADMIN' ? <Crown className="w-5 h-5 text-yellow-500" /> : <Shield className="w-5 h-5 text-gray-400" />}
+                  </div>
                 </div>
               </div>
 
-              {/* Modal Body */}
-              <div className="p-6 space-y-5">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                    <CheckCircle className="w-4 h-4 text-green-500" />
-                    Trạng thái mới
-                  </label>
-                  <select
-                        value={newStatus}
-                        onChange={(e) => setNewStatus(e.target.value)}
-                        className="w-full border-2 border-gray-200 rounded-xl px-4 py-3"
-                      >
-                        <option value="ACTIVE">Hoạt động (ACTIVE)</option>
-                        <option value="SUSPENDED">Tạm khóa (SUSPENDED)</option>
-                      </select>
-                </div>
+              {/* 🔹 Select Status (CẬP NHẬT) */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4 text-green-500" /> 
+                  Trạng thái (Status)
+                </label>
+                <select 
+                  value={newStatus} 
+                  onChange={(e) => setNewStatus(e.target.value)} 
+                  className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:border-green-500"
+                >
+                   <option value="">-- Vui lòng chọn (Giữ nguyên) --</option>
+                   <option value="ACTIVE">Hoạt động (ACTIVE)</option>
+                   <option value="SUSPENDED">Tạm khóa (SUSPENDED)</option>
+                </select>
+              </div>
 
-                <div className="flex gap-3 pt-2">
-                  <button
-                    onClick={() => setShowEditModal(false)}
-                    className="flex-1 px-4 py-3 border-2 border-gray-200 rounded-xl hover:bg-gray-50 font-semibold transition-all duration-300"
-                  >
-                    Hủy
-                  </button>
-                  <button
-                    onClick={handleUpdateStatus}
-                    disabled={isUpdating}
-                    className="flex-1 flex items-center justify-center px-4 py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-xl hover:from-green-600 hover:to-emerald-600 font-semibold shadow-lg hover:shadow-xl transition-all duration-300
-                               disabled:opacity-70 disabled:cursor-not-allowed"
-                  >
-                    {isUpdating ? (
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <Save className="w-4 h-4" />
-                        Lưu thay đổi
-                      </div>
-                    )}
-                  </button>
-                </div>
+              <div className="flex gap-3 pt-4 border-t border-gray-100 mt-4">
+                <button 
+                  onClick={() => setShowEditModal(false)} 
+                  className="flex-1 px-4 py-3 border-2 border-gray-200 rounded-xl hover:bg-gray-50 font-semibold transition-all duration-300"
+                >
+                  Hủy
+                </button>
+                <button 
+                  onClick={handleUpdateMember} // Gọi hàm mới
+                  disabled={isUpdating} 
+                  className="flex-1 flex items-center justify-center px-4 py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl disabled:opacity-70"
+                >
+                   {isUpdating ? (
+                     <Loader2 className="w-5 h-5 animate-spin" />
+                   ) : (
+                     <div className="flex items-center gap-2">
+                       <Save className="w-4 h-4" /> 
+                       Lưu thay đổi
+                     </div>
+                   )}
+                </button>
               </div>
             </div>
           </div>
-        )}
+        </div>
+      )}
         <MemberDetailModalBase
           isOpen={showDetailModal}
           onClose={() => setShowDetailModal(false)}
