@@ -186,7 +186,7 @@ export const getProjectDetail = async (
 
   try {
     const res = await apiClient.get(
-      `/api/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}`,
+      `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}`,
       { headers: { Authorization: `Bearer ${token}` } }
     );
 
@@ -233,7 +233,7 @@ export const updateProject = async (
 
   try {
     const res = await apiClient.put(
-      `/api/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}`,
+      `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}`,
       payload,
       { headers: { Authorization: `Bearer ${token}` } }
     );
@@ -267,7 +267,7 @@ export const updateProjectStatus = async (
 
   try {
     const res = await apiClient.put(
-      `/api/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/status`,
+      `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/status`,
       { newStatus },
       { headers: { Authorization: `Bearer ${token}` } }
     );
@@ -302,7 +302,7 @@ export const updateProjectMemberRole = async (
 
   try {
     const res = await apiClient.put(
-      `/api/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/members/${memberId}/role`,
+      `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/members/${memberId}/role`,
       { roleCode },
       { headers: { Authorization: `Bearer ${token}` } }
     );
@@ -347,9 +347,10 @@ export const getProjectMembers = async (
 
   try {
     const res = await apiClient.get(
-      `/api/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/members`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
+  `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/members`,
+  { headers: { Authorization: `Bearer ${token}` } }
+);
+
 
     if (!res.data.success)
       throw new Error(res.data.message || "Không thể tải danh sách thành viên.");
@@ -397,7 +398,7 @@ export const getProjectBacklog = async (
 
   try {
     const res = await apiClient.get(
-      `/api/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/backlog`,
+      `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/backlog`,
       { headers: { Authorization: `Bearer ${token}` } }
     );
 
@@ -443,7 +444,7 @@ export const createProjectTask = async (
 
   try {
     const res = await apiClient.post(
-      `/api/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/tasks`,
+      `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/tasks`,
       payload,
       { headers: { Authorization: `Bearer ${token}` } }
     );

@@ -44,6 +44,9 @@ export default function ProjectMembersPage() {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedMember, setSelectedMember] = useState<any | null>(null);
 
+  const [showRoleModal, setShowRoleModal] = useState(false);
+  const [roleMember, setRoleMember] = useState<any | null>(null);
+
   // ===========================
   // FORMAT DATE
   // ===========================
@@ -61,27 +64,22 @@ export default function ProjectMembersPage() {
       return "—";
     }
   };
-
+  
   // ===========================
   // LOAD MEMBERS
   // ===========================
-  useEffect(() => {
-    if (isAuthLoading) return;
-    if (!companyId || !workspaceId || !projectId) {
-      setLoading(false);
-      return;
-    }
-
-    const loadMembers = async () => {
+  const loadMembers = async () => {
       try {
         setLoading(true);
 
         const data = await getProjectMembers(workspaceId, projectId); // ✔ FIXED
 
-        const mapped = data.map((m: any, i: number) => ({
-          ...m,
-          status: m.status || (i % 2 === 0 ? "ACTIVE" : "PENDING"),
-        }));
+      const mapped = data.map((m: any, i: number) => ({
+        ...m,
+        roleCode: m.roleCode || (m.roleName === "Project Admin" ? "PROJECT_ADMIN" : "PROJECT_MEMBER"), // ✅ thêm logic
+        status: m.status || (i % 2 === 0 ? "ACTIVE" : "PENDING"),
+      }));
+
 
         setMembers(mapped);
       } catch (err: any) {
@@ -91,8 +89,27 @@ export default function ProjectMembersPage() {
       }
     };
 
+  useEffect(() => {
+    if (isAuthLoading) return;
+    if (!companyId || !workspaceId || !projectId) {
+      setLoading(false);
+      return;
+    }
     loadMembers();
   }, [companyId, workspaceId, projectId, isAuthLoading]);
+
+
+  // ===========================
+  // OPEN ROLE MODAL
+  // ===========================
+  const openRoleModal = (member: any) => {
+  setRoleMember({
+    ...member,
+    roleCode: member.roleCode || "PROJECT_MEMBER", // ✅ fallback
+  });
+  setShowRoleModal(true);
+};
+
 
   // ===========================
   // VIEW DETAIL
@@ -102,34 +119,6 @@ export default function ProjectMembersPage() {
     setShowDetailModal(true);
   };
 
-  // ===========================
-  // CHANGE ROLE
-  // ===========================
-  const handleChangeRole = async (member: any) => {
-    try {
-      const newRole =
-        member.roleCode === "PROJECT_ADMIN"
-          ? "PROJECT_MEMBER"
-          : "PROJECT_ADMIN";
-
-      await updateProjectMemberRole(
-        workspaceId,
-        projectId,
-        member.memberId,
-        newRole // ✔ FIXED
-      );
-
-      showToast("Cập nhật vai trò thành công!", "success");
-
-      setMembers((prev) =>
-        prev.map((m) =>
-          m.memberId === member.memberId ? { ...m, roleCode: newRole } : m
-        )
-      );
-    } catch (err: any) {
-      showToast(err.message || "Lỗi cập nhật vai trò", "error");
-    }
-  };
 
   // ===========================
   // STATUS BADGE
@@ -236,7 +225,7 @@ export default function ProjectMembersPage() {
               </div>
             )}
             onViewDetail={handleViewDetail}
-            onEdit={handleChangeRole}
+            onEdit={openRoleModal}
             onDelete={undefined}
             disableDelete={() => true}
             formatDateTime={formatDateTime} // ✔ REQUIRED
@@ -259,6 +248,67 @@ export default function ProjectMembersPage() {
           { label: "Ngày tham gia", key: "joinedAt" },
         ]}
       />
+
+{/* ROLE MODAL */}
+      {showRoleModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-lg p-6 w-[400px]">
+            <h2 className="text-xl font-bold mb-4">Đổi vai trò thành viên</h2>
+            <p className="mb-4 text-gray-600">
+              Thành viên: <strong>{roleMember?.fullName}</strong>
+            </p>
+
+            <select
+              className="w-full border rounded-lg p-3 mb-4"
+              value={roleMember?.roleCode || "PROJECT_MEMBER"} // ✅ fallback
+              onChange={(e) =>
+                setRoleMember({ ...roleMember, roleCode: e.target.value })
+              }
+            >
+              <option value="PROJECT_ADMIN">Quản trị dự án</option>
+              <option value="PROJECT_MEMBER">Thành viên dự án</option>
+            </select>
+
+
+            <div className="flex justify-end gap-3">
+              <button
+                className="px-4 py-2 rounded-lg bg-gray-200"
+                onClick={() => setShowRoleModal(false)}
+              >
+                Hủy
+              </button>
+              <button
+                className="px-4 py-2 rounded-lg bg-blue-600 text-white"
+                onClick={async () => {
+                  try {
+                    await updateProjectMemberRole(
+                      workspaceId,
+                      projectId,
+                      roleMember.memberId,
+                      roleMember.roleCode || "PROJECT_MEMBER" // ✅ fallback
+                    );
+                    showToast("Cập nhật vai trò thành công!", "success");
+                    await loadMembers(); // ✅ refresh danh sách
+                    setMembers((prev) =>
+                      prev.map((m) =>
+                        m.memberId === roleMember.memberId
+                          ? { ...m, roleCode: roleMember.roleCode }
+                          : m
+                      )
+                    );
+
+                    setShowRoleModal(false);
+                  } catch (err: any) {
+                    showToast(err.message || "Lỗi cập nhật vai trò", "error");
+                  }
+                }}
+              >
+                Lưu
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
