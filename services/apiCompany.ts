@@ -257,11 +257,11 @@ export const removeCompanyMember = async (
 // ✅ HÀM MỚI: Cập nhật trạng thái thành viên
 export const updateCompanyMemberStatus = async (
   companyId: number,
-  userId: number,
+  memberId: number,
   newStatus: string
 ) => {
   const res = await apiClient.put(
-    `/companies/${companyId}/members/${userId}/status`,
+    `/companies/${companyId}/members/${memberId}/status`,
     { newStatus }
   );
   // Giả sử API trả về { success: true, message: "...", data: updatedMember }
