@@ -95,7 +95,7 @@ export default function WorkspaceSettingsPage() {
     setSaving(true);
     try {
       await updateWorkspace(companyId, workspaceId, {
-        workspaceName: form.workspaceName,
+        name: form.workspaceName,
         description: form.description,
         coverImage: form.coverImage,
         color: form.color,
