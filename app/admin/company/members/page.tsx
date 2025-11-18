@@ -176,28 +176,26 @@ export default function MembersPage() {
   };
 
   // 🧩 6. Hàm Submit Cập nhật Trạng thái
-  const handleUpdateStatus = async () => {
-    if (!companyId || !selectedMember) return;
+const handleUpdateStatus = async () => {
+  if (!companyId || !selectedMember) return;
+  setIsUpdating(true);
+  try {
+    // ✅ Gửi memberId thay vì userId
+    await updateCompanyMemberStatus(companyId, selectedMember.memberId, newStatus);
 
-    setIsUpdating(true);
-    try {
-      const updatedMember = await updateCompanyMemberStatus(
-        companyId,
-        selectedMember.userId,
-        newStatus
-      );
-      // Cập nhật lại danh sách members state
-      setMembers((prev) =>
-        prev.map((m) => (m.userId === updatedMember.userId ? updatedMember : m))
-      );
-      showToast("Cập nhật trạng thái thành công!", "success");
-      setShowEditModal(false);
-    } catch (err: any) {
-      showToast(err.message || "Cập nhật thất bại!", "error");
-    } finally {
-      setIsUpdating(false);
-    }
-  };
+    // ✅ Refresh danh sách từ API
+    const refreshed = await getCompanyMembers(companyId);
+    setMembers(refreshed);
+
+    showToast("Cập nhật trạng thái thành công!", "success");
+    setShowEditModal(false);
+  } catch (err: any) {
+    showToast(err.message || "Cập nhật thất bại!", "error");
+  } finally {
+    setIsUpdating(false);
+  }
+};
+
 
   // 🧩 7. HELPER: Render Trạng thái (đọc status từ API)
   const renderStatusBadge = (status: string) => {
@@ -209,6 +207,13 @@ export default function MembersPage() {
             <span className="text-sm font-semibold">Hoạt động</span>
           </div>
         );
+        case "SUSPENDED":
+        return (
+          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border bg-yellow-50 text-yellow-700 border-yellow-200">
+            <Clock className="w-3.5 h-3.5" />
+            <span className="text-sm font-semibold">Tạm khoá</span>
+          </div>
+        );
       case "PENDING":
         return (
           <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border bg-yellow-50 text-yellow-700 border-yellow-200">
@@ -216,11 +221,11 @@ export default function MembersPage() {
             <span className="text-sm font-semibold">Đang chờ</span>
           </div>
         );
-      case "INACTIVE":
+      case "REMOVED":
         return (
           <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border bg-gray-100 text-gray-600 border-gray-200">
             <XCircle className="w-3.5 h-3.5" />
-            <span className="text-sm font-semibold">Tạm khóa</span>
+            <span className="text-sm font-semibold">Đã rời</span>
           </div>
         );
       default:
@@ -422,14 +427,13 @@ export default function MembersPage() {
                     Trạng thái mới
                   </label>
                   <select
-                    value={newStatus}
-                    onChange={(e) => setNewStatus(e.target.value)}
-                    className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:border-green-500 focus:ring-2 focus:ring-green-100 transition-all duration-300 outline-none hover:border-gray-300 cursor-pointer"
-                  >
-                    <option value="ACTIVE">Hoạt động (ACTIVE)</option>
-                    <option value="INACTIVE">Tạm khóa (INACTIVE)</option>
-                    <option value="PENDING">Đang chờ (PENDING)</option>
-                  </select>
+                        value={newStatus}
+                        onChange={(e) => setNewStatus(e.target.value)}
+                        className="w-full border-2 border-gray-200 rounded-xl px-4 py-3"
+                      >
+                        <option value="ACTIVE">Hoạt động (ACTIVE)</option>
+                        <option value="SUSPENDED">Tạm khóa (SUSPENDED)</option>
+                      </select>
                 </div>
 
                 <div className="flex gap-3 pt-2">
