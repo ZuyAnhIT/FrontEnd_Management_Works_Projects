@@ -1,4 +1,4 @@
-'use client'
+"use client";
 
 import {
   Menu,
@@ -8,72 +8,92 @@ import {
   Plus,
   Filter,
   Share2,
-} from 'lucide-react'
-import { useState } from 'react'
-import { usePathname } from 'next/navigation'
-import { Button } from '@/components/ui/button'
-import { CreateTaskModal } from './create-task-modal'
-import { CreateSprintModal } from './create-sprint-modal'
-import UserMenu from '@/components/ui/UserMenu'
-import { useAuth } from '@/context/AuthContext'
+} from "lucide-react";
+
+import { useState } from "react";
+import { usePathname, useParams } from "next/navigation";
+
+import { Button } from "@/components/ui/button";
+import { CreateTaskModal } from "./create-task-modal";
+import { CreateSprintModal } from "./create-sprint-modal";
+import UserMenu from "@/components/ui/UserMenu";
+import { useAuth } from "@/context/AuthContext";
 
 interface ProjectHeaderProps {
-  projectName?: string
-  onMenuToggle: () => void
-  onTaskCreate?: () => void
-  onSprintCreate?: () => void
+  projectName?: string;
+  onMenuToggle: () => void;
+  onTaskCreate?: () => void;
+  onSprintCreate?: () => void;
 }
 
 export default function ProjectHeader({
-  projectName = 'Project',
+  projectName = "Project",
   onMenuToggle,
   onTaskCreate,
   onSprintCreate,
 }: ProjectHeaderProps) {
-  
-  // 🔥 Lấy user thật từ Auth Provider
-  const { user, logout } = useAuth()
+  // =============================================
+  // 📌 Lấy workspaceId & projectId từ URL
+  // =============================================
+  const params = useParams();
+  const projectId = Number(params.projectId);
+  const workspaceId = Number(params.workspaceId);
 
-  // ⭐ Convert userAuth -> userMenu format
+  // =============================================
+  // 📌 Auth
+  // =============================================
+  const { user, logout } = useAuth();
+
   const safeUser = {
-    name: user?.fullName || 'User',
-    email: user?.email || 'user@example.com',
-  }
+    name: user?.fullName || "User",
+    email: user?.email || "user@example.com",
+  };
 
-  const [searchQuery, setSearchQuery] = useState('')
-  const [showTaskModal, setShowTaskModal] = useState(false)
-  const [showSprintModal, setShowSprintModal] = useState(false)
-  const [userMenuOpen, setUserMenuOpen] = useState(false)
+  // =============================================
+  // 📌 State
+  // =============================================
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showTaskModal, setShowTaskModal] = useState(false);
+  const [showSprintModal, setShowSprintModal] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
 
-  const pathname = usePathname()
+  const pathname = usePathname();
+
+  // =============================================
+  // 📌 Dynamic Title
+  // =============================================
+  const getPageTitle = () => {
+    if (pathname?.includes("/board")) return "Board";
+    if (pathname?.includes("/backlog")) return "Backlog";
+    if (pathname?.includes("/sprints")) return "Sprints";
+    if (pathname?.includes("/timeline")) return "Timeline";
+    if (pathname?.includes("/summary")) return "Summary";
+    return "Dashboard";
+  };
 
   const getCreateButtonLabel = () =>
-    pathname?.includes('/sprints') ? 'New Sprint' : 'New Task'
+    pathname.includes("/sprints") ? "New Sprint" : "New Task";
 
   const handleCreateClick = () => {
-    pathname?.includes('/sprints')
+    pathname.includes("/sprints")
       ? setShowSprintModal(true)
-      : setShowTaskModal(true)
-  }
+      : setShowTaskModal(true);
+  };
 
-  const getPageTitle = () => {
-    if (pathname?.includes('/board')) return 'Board'
-    if (pathname?.includes('/backlog')) return 'Backlog'
-    if (pathname?.includes('/sprints')) return 'Sprints'
-    if (pathname?.includes('/timeline')) return 'Timeline'
-    if (pathname?.includes('/summary')) return 'Summary'
-    return 'Dashboard'
-  }
-
+  // =============================================
+  // 📌 Logout
+  // =============================================
   const handleLogout = async () => {
-    await logout()
-  }
+    await logout();
+  };
 
+  // =============================================
+  // 📌 UI
+  // =============================================
   return (
     <>
       <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-gray-200/80 shadow-sm">
         <div className="px-4 lg:px-6 py-3 flex items-center justify-between">
-          
           {/* LEFT */}
           <div className="flex items-center gap-4">
             <button
@@ -98,14 +118,14 @@ export default function ProjectHeader({
                 placeholder="Search tasks..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all outline-none"
+                className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm 
+                focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all outline-none"
               />
             </div>
           </div>
 
           {/* RIGHT */}
           <div className="flex items-center gap-2 lg:gap-3">
-
             <button className="p-2.5 hover:bg-gray-100 rounded-xl transition-all hidden md:inline-flex">
               <Filter className="w-5 h-5 text-gray-600" />
             </button>
@@ -136,10 +156,11 @@ export default function ProjectHeader({
             <div className="relative">
               <button
                 onClick={(e) => {
-                  e.stopPropagation()
-                  setUserMenuOpen(!userMenuOpen)
+                  e.stopPropagation();
+                  setUserMenuOpen(!userMenuOpen);
                 }}
-                className="relative w-10 h-10 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center text-white font-bold hover:scale-110 transition-all shadow-lg"
+                className="relative w-10 h-10 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl 
+                flex items-center justify-center text-white font-bold hover:scale-110 transition-all shadow-lg"
               >
                 {safeUser.name.charAt(0).toUpperCase()}
                 <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-400 border-2 border-white rounded-full"></span>
@@ -157,28 +178,32 @@ export default function ProjectHeader({
         </div>
       </header>
 
-      {/* TASK MODAL */}
+      {/* =============================================
+          🔥 TASK MODAL — truyền params đúng
+      ============================================= */}
       <CreateTaskModal
         isOpen={showTaskModal}
         onClose={() => setShowTaskModal(false)}
-        projectId={1}        // ⚠️ Bạn có thể thay bằng useParams()
-        workspaceId={1}      // ⚠️ Bạn có thể thay bằng useParams()
+        projectId={projectId}
+        workspaceId={workspaceId}
         onCreated={() => {
-          onTaskCreate?.()
-          setShowTaskModal(false)
+          onTaskCreate?.();
+          setShowTaskModal(false);
         }}
       />
 
-      {/* SPRINT MODAL */}
+      {/* =============================================
+          🔥 SPRINT MODAL
+      ============================================= */}
       <CreateSprintModal
         isOpen={showSprintModal}
         onClose={() => setShowSprintModal(false)}
-        projectId={1}
+        projectId={projectId}
         onCreated={() => {
-          onSprintCreate?.()
-          setShowSprintModal(false)
+          onSprintCreate?.();
+          setShowSprintModal(false);
         }}
       />
     </>
-  )
+  );
 }
