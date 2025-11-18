@@ -279,6 +279,7 @@ export interface WorkspaceMember {
   email: string;
   avatarUrl: string;
   roleName: string;
+  roleCode: string;
   joinedAt: string;
   status: string;
 }
@@ -475,6 +476,42 @@ export const getWorkspaceMemberDetail = async (
     throw new Error(
       err.response?.data?.message ||
         "Lỗi hệ thống, không thể lấy chi tiết thành viên workspace."
+    );
+  }
+};
+// ===================================================
+// 🔹 5️⃣ Cập nhật Vai trò (Role) thành viên trong Workspace
+// ===================================================
+export const updateWorkspaceMemberRole = async (
+  companyId: number,
+  workspaceId: number,
+  memberId: number,
+  roleCode: string // "WORKSPACE_ADMIN" hoặc "WORKSPACE_MEMBER"
+) => {
+  if (!companyId || !workspaceId || !memberId)
+    throw new Error("Thiếu thông tin ID.");
+
+  const token = localStorage.getItem("accessToken");
+  if (!token) throw new Error("Người dùng chưa đăng nhập.");
+
+  try {
+    const res = await apiClient.put(
+      `/companies/${companyId}/workspaces/${workspaceId}/members/${memberId}/role`,
+      { roleCode }, // Payload
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+
+    const data = res.data;
+    if (!data.success)
+      throw new Error(data.message || "Không thể cập nhật vai trò thành viên.");
+
+    return data;
+  } catch (err: any) {
+    console.error("Lỗi cập nhật vai trò thành viên:", err);
+    throw new Error(
+      err.response?.data?.message ??
+        err.message ??
+        "Lỗi hệ thống, không thể cập nhật vai trò."
     );
   }
 };
