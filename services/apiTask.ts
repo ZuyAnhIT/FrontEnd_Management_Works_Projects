@@ -68,3 +68,18 @@ export const uploadTaskAttachment = async (taskId: number, file: File) => {
 
   return res.data; // { success, message, data }
 };
+
+
+  // 🔹 Chuyển task sang status khác
+    // PUT /api/tasks/{taskId}/move
+    export const moveTaskToStatus = async (
+      taskId: number,
+      newStatusId: number
+    ) => {
+      const res = await apiClient.put(`/tasks/${taskId}/move`, {
+        newStatusId,
+      });
+
+
+      return res.data; // { success, message, data: {} }
+    };
