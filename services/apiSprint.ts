@@ -1,5 +1,6 @@
 "use client";
 
+
 import apiClient from "@/lib/apiClient";
 import { getCurrentUser } from "@/services/apiUser";
 //
@@ -8,13 +9,15 @@ import { getCurrentUser } from "@/services/apiUser";
 // ===================================================
 //
 
+
 export interface SprintTask {
   id: number;
   title: string;
-  status: string;
+  statusName: string;
   priority: string;
   assigneeAvatarUrl?: string | null;
 }
+
 
 export interface Sprint {
   id: number;
@@ -27,6 +30,7 @@ export interface Sprint {
   tasks: SprintTask[];
 }
 
+
 // -----------------------------------------------
 // 🔹 Sprint Detail Task
 // -----------------------------------------------
@@ -35,24 +39,30 @@ export interface SprintDetailTask {
   taskCode: string;
   title: string;
   taskType: string;
-  status: string;
+  statusName: string;
   priority: string;
 
+
   sprintId: number;
+
 
   assigneeId: number | null;
   assigneeName: string | null;
   assigneeAvatarUrl: string | null;
 
+
   epicId: number | null;
   epicName: string | null;
   epicColor: string | null;
 
+
   storyPoints: number | null;
   dueDate: string | null;
 
+
   sortOrder: number;
 }
+
 
 // -----------------------------------------------
 // 🔹 Sprint Detail Response
@@ -68,6 +78,7 @@ export interface SprintDetail {
   tasks: SprintDetailTask[];
 }
 
+
 //
 // ===================================================
 // 1️⃣ GET – Lấy danh sách Sprint
@@ -81,16 +92,20 @@ export const getSprints = async (
   const token = localStorage.getItem("accessToken");
   if (!token) throw new Error("Người dùng chưa đăng nhập.");
 
+
   try {
     const res = await apiClient.get(`/projects/${projectId}/sprints`, {
       params: status ? { status } : {},
       headers: { Authorization: `Bearer ${token}` },
     });
 
+
     const data = res.data;
+
 
     if (!data.success)
       throw new Error(data.message || "Không thể tải danh sách Sprint.");
+
 
     return data.data as Sprint[];
   } catch (err: any) {
@@ -101,6 +116,7 @@ export const getSprints = async (
     );
   }
 };
+
 
 //
 // ===================================================
@@ -121,6 +137,7 @@ export const createSprint = async (
   const token = localStorage.getItem("accessToken");
   if (!token) throw new Error("Người dùng chưa đăng nhập.");
 
+
   try {
     const res = await apiClient.post(
       `/projects/${projectId}/sprints`,
@@ -130,10 +147,13 @@ export const createSprint = async (
       }
     );
 
+
     const data = res.data;
+
 
     if (!data.success)
       throw new Error(data.message || "Không thể tạo Sprint.");
+
 
     return data.data as Sprint;
   } catch (err: any) {
@@ -144,6 +164,7 @@ export const createSprint = async (
     );
   }
 };
+
 
 //
 // ===================================================
@@ -158,6 +179,7 @@ export const startSprint = async (
   const token = localStorage.getItem("accessToken");
   if (!token) throw new Error("Người dùng chưa đăng nhập.");
 
+
   try {
     const res = await apiClient.post(
       `/projects/${projectId}/sprints/${sprintId}/start`,
@@ -167,10 +189,13 @@ export const startSprint = async (
       }
     );
 
+
     const data = res.data;
+
 
     if (!data.success)
       throw new Error(data.message || "Không thể bắt đầu Sprint.");
+
 
     return data.data as Sprint;
   } catch (err: any) {
@@ -181,6 +206,7 @@ export const startSprint = async (
     );
   }
 };
+
 
 //
 // ===================================================
@@ -195,6 +221,7 @@ export const completeSprint = async (
   const token = localStorage.getItem("accessToken");
   if (!token) throw new Error("Người dùng chưa đăng nhập.");
 
+
   try {
     const res = await apiClient.post(
       `/projects/${projectId}/sprints/${sprintId}/complete`,
@@ -204,10 +231,13 @@ export const completeSprint = async (
       }
     );
 
+
     const data = res.data;
+
 
     if (!data.success)
       throw new Error(data.message || "Không thể hoàn thành Sprint.");
+
 
     return data.data as Sprint;
   } catch (err: any) {
@@ -218,6 +248,7 @@ export const completeSprint = async (
     );
   }
 };
+
 
 //
 // ===================================================
@@ -232,6 +263,7 @@ export const cancelSprint = async (
   const token = localStorage.getItem("accessToken");
   if (!token) throw new Error("Người dùng chưa đăng nhập.");
 
+
   try {
     const res = await apiClient.post(
       `/projects/${projectId}/sprints/${sprintId}/cancel`,
@@ -241,10 +273,13 @@ export const cancelSprint = async (
       }
     );
 
+
     const data = res.data;
+
 
     if (!data.success)
       throw new Error(data.message || "Không thể hủy Sprint.");
+
 
     return data.data as Sprint;
   } catch (err: any) {
@@ -255,6 +290,7 @@ export const cancelSprint = async (
     );
   }
 };
+
 
 //
 // ===================================================
@@ -269,6 +305,7 @@ export const getSprintDetail = async (
   const token = localStorage.getItem("accessToken");
   if (!token) throw new Error("Người dùng chưa đăng nhập.");
 
+
   try {
     const res = await apiClient.get(
       `/projects/${projectId}/sprints/${sprintId}`,
@@ -277,10 +314,13 @@ export const getSprintDetail = async (
       }
     );
 
+
     const data = res.data;
+
 
     if (!data.success)
       throw new Error(data.message || "Không thể tải chi tiết Sprint.");
+
 
     return data.data as SprintDetail;
   } catch (err: any) {
@@ -291,3 +331,6 @@ export const getSprintDetail = async (
     );
   }
 };
+
+
+
