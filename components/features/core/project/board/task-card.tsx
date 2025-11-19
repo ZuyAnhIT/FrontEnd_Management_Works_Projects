@@ -1,6 +1,8 @@
-import { ChevronDown, ChevronRight, Trash2 } from 'lucide-react'
+import { ChevronDown, ChevronRight } from 'lucide-react'
 import { useState } from 'react'
 import { SubtaskList } from './subtask-list'
+import { TaskContextMenu } from './task-context-menu'
+import { AssigneeDropdown } from './assignee-dropdown'
 
 interface Subtask {
   id: string
@@ -27,6 +29,7 @@ interface TaskCardProps {
   onToggleSubtask: (taskId: string, subtaskId: string) => void
   onDeleteSubtask: (taskId: string, subtaskId: string) => void
   onAddSubtask: (taskId: string, title: string) => void
+  onChangeAssignee: (taskId: string, assigneeId?: string) => void
   animationDelay: number
 }
 
@@ -39,81 +42,90 @@ export function TaskCard({
   onToggleSubtask,
   onDeleteSubtask,
   onAddSubtask,
+  onChangeAssignee,
   animationDelay,
 }: TaskCardProps) {
   const [isExpanded, setIsExpanded] = useState(false)
   const completedSubtasks = task.subtasks?.filter((st) => st.completed).length || 0
   const totalSubtasks = task.subtasks?.length || 0
 
+  const priorityColor = {
+    high: 'bg-red-50 border-l-red-500 text-red-700',
+    medium: 'bg-amber-50 border-l-amber-500 text-amber-700',
+    low: 'bg-green-50 border-l-green-500 text-green-700',
+  }[task.priority || 'low']
+
+  const handleTaskContextMenuAction = (action: string) => {
+    switch (action) {
+      case 'copy-link':
+        navigator.clipboard.writeText(`task-${task.id}`)
+        break
+      case 'copy-key':
+        navigator.clipboard.writeText(task.id)
+        break
+      default:
+        break
+    }
+  }
+
   return (
     <div
       className={`
-        group/task bg-white rounded-xl p-4 shadow-md hover:shadow-xl transition-all duration-300 
-        border-l-4 cursor-move animate-fadeInUp relative
-        ${
-          task.priority === 'high'
-            ? 'border-l-red-500'
-            : task.priority === 'medium'
-              ? 'border-l-yellow-500'
-              : 'border-l-green-500'
-        }
-        ${isDragged ? 'opacity-40 scale-95' : 'hover:scale-102'}
+        group/task bg-white rounded border-l-4 p-3 shadow-sm hover:shadow-md transition-all duration-150
+        cursor-move
+        ${priorityColor}
+        ${isDragged ? 'opacity-50 scale-95' : 'hover:shadow-md'}
       `}
       style={{ animationDelay: `${animationDelay}ms` }}
       draggable
       onDragStart={() => onDragStart(task)}
       onDragEnd={onDragEnd}
     >
-      <button
-        onClick={() => onDelete(task.id)}
-        className="absolute top-2 right-2 w-6 h-6 bg-red-100 hover:bg-red-200 rounded-lg flex items-center justify-center opacity-0 group-hover/task:opacity-100 transition-opacity"
-        title="Delete task"
-      >
-        <Trash2 className="w-3 h-3 text-red-600" />
-      </button>
-
-      <div className="flex items-start gap-2 mb-2">
-        {totalSubtasks > 0 && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation()
-              setIsExpanded(!isExpanded)
-            }}
-            className="mt-1 text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            {isExpanded ? (
-              <ChevronDown className="w-4 h-4" />
-            ) : (
-              <ChevronRight className="w-4 h-4" />
-            )}
-          </button>
-        )}
-        <div className="flex-1 pr-8">
-          <h3 className="font-semibold text-gray-900">{task.title}</h3>
-          {task.description && (
-            <p className="text-sm text-gray-600 mt-1">{task.description}</p>
+      <div className="flex items-start justify-between gap-2 mb-2">
+        <div className="flex items-start gap-2 flex-1 min-w-0">
+          {totalSubtasks > 0 && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                setIsExpanded(!isExpanded)
+              }}
+              className="mt-0.5 text-slate-400 hover:text-slate-600 transition-colors flex-shrink-0"
+            >
+              {isExpanded ? (
+                <ChevronDown className="w-4 h-4" />
+              ) : (
+                <ChevronRight className="w-4 h-4" />
+              )}
+            </button>
           )}
+          <div className="flex-1 min-w-0">
+            <h3 className="font-semibold text-slate-900 text-sm break-words">{task.title}</h3>
+            {task.description && (
+              <p className="text-xs text-slate-600 mt-1">{task.description}</p>
+            )}
+          </div>
         </div>
+
+        <TaskContextMenu
+          taskId={task.id}
+          taskTitle={task.title}
+          onChangeStatus={() => {}}
+          onCopyLink={() => handleTaskContextMenuAction('copy-link')}
+          onCopyKey={() => handleTaskContextMenuAction('copy-key')}
+          onAddFlag={() => {}}
+          onAddLabel={() => {}}
+          onLinkWorkItem={() => {}}
+          onChangeParent={() => {}}
+          onArchive={() => {}}
+          onDelete={onDelete}
+        />
       </div>
 
-      <div className="flex items-center justify-between text-xs mb-2">
-        <span
-          className={`px-2 py-1 rounded-full font-medium ${
-            task.priority === 'high'
-              ? 'bg-red-100 text-red-700'
-              : task.priority === 'medium'
-                ? 'bg-yellow-100 text-yellow-700'
-                : 'bg-green-100 text-green-700'
-          }`}
-        >
-          {task.priority}
-        </span>
-        {totalSubtasks > 0 && (
-          <span className="text-gray-500 text-xs">
-            {completedSubtasks}/{totalSubtasks} subtasks
-          </span>
-        )}
-      </div>
+      {totalSubtasks > 0 && (
+        <div className="text-xs text-slate-600 mb-2 px-6">
+          {completedSubtasks}/{totalSubtasks} subtasks
+        </div>
+      )}
 
       {isExpanded && (
         <SubtaskList
@@ -125,26 +137,13 @@ export function TaskCard({
         />
       )}
 
-      <style jsx>{`
-        .animate-fadeInUp {
-          animation: fadeInUp 0.5s ease-out;
-        }
-
-        @keyframes fadeInUp {
-          from {
-            opacity: 0;
-            transform: translateY(20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-
-        .hover\:scale-102:hover {
-          transform: scale(1.02);
-        }
-      `}</style>
+      <div className="mt-2 pt-2 border-t border-slate-200">
+        <AssigneeDropdown
+          taskId={task.id}
+          currentAssignee={task.assignee}
+          onAssigneeChange={onChangeAssignee}
+        />
+      </div>
     </div>
   )
 }

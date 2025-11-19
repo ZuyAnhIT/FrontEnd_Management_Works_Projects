@@ -4,7 +4,6 @@ import { useState } from 'react'
 import { BoardHeader } from '@/components/features/core/project/board/board-header'
 import { BoardColumn } from '@/components/features/core/project/board/board-column'
 import { AddColumnSection } from '@/components/features/core/project/board/add-column-section'
-import { ProgressBar } from '@/components/features/core/project/board/progress-bar'
 import { ConfirmModal } from '@/components/features/core/project/board/confirm-modal'
 
 interface Subtask {
@@ -26,12 +25,6 @@ interface Task {
 interface Column {
   id: string
   label: string
-  color: string
-  bgColor: string
-  borderColor: string
-  hoverBorder: string
-  textColor: string
-  lightColor: string
 }
 
 interface Modal {
@@ -43,97 +36,11 @@ interface Modal {
   onConfirm?: () => void
 }
 
-const colorPalettes = [
-  {
-    color: 'from-slate-500 to-slate-600',
-    bgColor: 'from-slate-50 to-slate-100',
-    borderColor: 'border-slate-300',
-    hoverBorder: 'hover:border-slate-400',
-    textColor: 'text-slate-700',
-    lightColor: 'bg-slate-100',
-  },
-  {
-    color: 'from-amber-500 to-orange-500',
-    bgColor: 'from-amber-50 to-orange-50',
-    borderColor: 'border-amber-300',
-    hoverBorder: 'hover:border-amber-400',
-    textColor: 'text-amber-700',
-    lightColor: 'bg-amber-100',
-  },
-  {
-    color: 'from-blue-500 to-cyan-500',
-    bgColor: 'from-blue-50 to-cyan-50',
-    borderColor: 'border-blue-300',
-    hoverBorder: 'hover:border-blue-400',
-    textColor: 'text-blue-700',
-    lightColor: 'bg-blue-100',
-  },
-  {
-    color: 'from-green-500 to-emerald-500',
-    bgColor: 'from-green-50 to-emerald-50',
-    borderColor: 'border-green-300',
-    hoverBorder: 'hover:border-green-400',
-    textColor: 'text-green-700',
-    lightColor: 'bg-green-100',
-  },
-  {
-    color: 'from-purple-500 to-indigo-500',
-    bgColor: 'from-purple-50 to-indigo-50',
-    borderColor: 'border-purple-300',
-    hoverBorder: 'hover:border-purple-400',
-    textColor: 'text-purple-700',
-    lightColor: 'bg-purple-100',
-  },
-  {
-    color: 'from-pink-500 to-rose-500',
-    bgColor: 'from-pink-50 to-rose-50',
-    borderColor: 'border-pink-300',
-    hoverBorder: 'hover:border-pink-400',
-    textColor: 'text-pink-700',
-    lightColor: 'bg-pink-100',
-  },
-  {
-    color: 'from-teal-500 to-cyan-500',
-    bgColor: 'from-teal-50 to-cyan-50',
-    borderColor: 'border-teal-300',
-    hoverBorder: 'hover:border-teal-400',
-    textColor: 'text-teal-700',
-    lightColor: 'bg-teal-100',
-  },
-  {
-    color: 'from-red-500 to-orange-500',
-    bgColor: 'from-red-50 to-orange-50',
-    borderColor: 'border-red-300',
-    hoverBorder: 'hover:border-red-400',
-    textColor: 'text-red-700',
-    lightColor: 'bg-red-100',
-  },
-]
-
-const getRandomColorPalette = () =>
-  colorPalettes[Math.floor(Math.random() * colorPalettes.length)]
-
 const defaultColumns: Column[] = [
-  {
-    id: 'todo',
-    label: 'To Do',
-    ...colorPalettes[0],
-  },
-  {
-    id: 'in-progress',
-    label: 'In Progress',
-    ...colorPalettes[1],
-  },
-  {
-    id: 'review',
-    label: 'Review',
-    ...colorPalettes[2],
-  },
-  {
-    id: 'done',
-    label: 'Done',
-    ...colorPalettes[3],
-  },
+  { id: 'todo', label: 'To Do' },
+  { id: 'in-progress', label: 'In Progress' },
+  { id: 'review', label: 'Review' },
+  { id: 'done', label: 'Done' },
 ]
 
 const mockTasks: Task[] = [
@@ -360,11 +267,9 @@ export default function Board({ project }: BoardProps) {
   // Add new column
   const handleAddColumn = () => {
     if (newColumnName.trim()) {
-      const palette = getRandomColorPalette()
       const newColumn: Column = {
         id: `col-${Date.now()}`,
         label: newColumnName.trim(),
-        ...palette,
       }
       setColumns([...columns, newColumn])
       setNewColumnName('')
@@ -420,6 +325,32 @@ export default function Board({ project }: BoardProps) {
     setEditColumnName('')
   }
 
+  // Change assignee
+  const handleChangeAssignee = (taskId: string, assigneeId?: string) => {
+    setTasks(
+      tasks.map((t) =>
+        t.id === taskId ? { ...t, assignee: assigneeId } : t
+      )
+    )
+  }
+
+  // Move column
+  const handleMoveColumn = (columnId: string, direction: 'left' | 'right') => {
+    const currentIndex = columns.findIndex((c) => c.id === columnId)
+    if (currentIndex === -1) return
+
+    const targetIndex = direction === 'left' ? currentIndex - 1 : currentIndex + 1
+
+    if (targetIndex >= 0 && targetIndex < columns.length) {
+      const newColumns = [...columns]
+      ;[newColumns[currentIndex], newColumns[targetIndex]] = [
+        newColumns[targetIndex],
+        newColumns[currentIndex],
+      ]
+      setColumns(newColumns)
+    }
+  }
+
   // Calculate stats
   const totalTasks = tasks.length
   const completedTasks = tasks.filter((t) => {
@@ -440,18 +371,20 @@ export default function Board({ project }: BoardProps) {
     totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-white via-purple-50/40 to-pink-50/30">
+    <div className="min-h-screen bg-slate-50">
       <div className="p-6 max-w-[2000px] mx-auto space-y-6">
         {/* Header */}
-        <BoardHeader
-          totalTasks={totalTasks}
-          completionRate={completionRate}
-          inProgressTasks={inProgressTasks}
-          columnsCount={columns.length}
-        />
+        <div className="mb-8">
+          <BoardHeader
+            totalTasks={totalTasks}
+            completionRate={completionRate}
+            inProgressTasks={inProgressTasks}
+            columnsCount={columns.length}
+          />
+        </div>
 
         {/* Board Columns */}
-        <div className="flex gap-4 overflow-x-auto pb-4 animate-fadeInUp delay-100">
+        <div className="flex gap-6 overflow-x-auto pb-4">
           {columns.map((column, index) => (
             <BoardColumn
               key={column.id}
@@ -484,10 +417,11 @@ export default function Board({ project }: BoardProps) {
               onSaveColumnName={handleSaveColumnName}
               newTaskColumn={newTaskColumn}
               onToggleNewTask={setNewTaskColumn}
+              onChangeAssignee={handleChangeAssignee}
+              onMoveColumn={handleMoveColumn}
             />
           ))}
 
-          {/* Add Column Button */}
           <AddColumnSection
             isAdding={isAddingColumn}
             onToggleAdding={() => setIsAddingColumn(!isAddingColumn)}
@@ -496,17 +430,8 @@ export default function Board({ project }: BoardProps) {
             onSubmit={handleAddColumn}
           />
         </div>
-
-        {/* Progress Bar */}
-        <ProgressBar
-          completedTasks={completedTasks}
-          totalTasks={totalTasks}
-          inProgressTasks={inProgressTasks}
-          completionRate={completionRate}
-        />
       </div>
 
-      {/* Modal */}
       <ConfirmModal
         isOpen={modal.type === 'confirm'}
         title={modal.title}
@@ -514,27 +439,6 @@ export default function Board({ project }: BoardProps) {
         onConfirm={() => modal.onConfirm?.()}
         onCancel={() => setModal({ type: null, title: '', message: '' })}
       />
-
-      <style jsx>{`
-        .animate-fadeInUp {
-          animation: fadeInUp 0.5s ease-out;
-        }
-
-        @keyframes fadeInUp {
-          from {
-            opacity: 0;
-            transform: translateY(20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-
-        .delay-100 {
-          animation-delay: 100ms;
-        }
-      `}</style>
     </div>
   )
 }
