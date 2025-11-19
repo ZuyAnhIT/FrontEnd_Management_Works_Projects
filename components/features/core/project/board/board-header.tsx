@@ -1,5 +1,4 @@
 import { Button } from '@/components/ui/button'
-import { Filter, LayoutGrid, Sparkles, TrendingUp, Zap } from 'lucide-react'
 
 interface BoardHeaderProps {
   totalTasks: number
@@ -8,6 +7,37 @@ interface BoardHeaderProps {
   columnsCount: number
 }
 
+// Icon components as SVG
+const LayoutGridIcon = () => (
+  <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zM14 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />
+  </svg>
+)
+
+const SparklesIcon = () => (
+  <svg className="w-6 h-6 text-yellow-300 animate-pulse" fill="currentColor" viewBox="0 0 24 24">
+    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8zm3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5zm-7 0c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5 7.67 11 8.5 11z" />
+  </svg>
+)
+
+const TrendingUpIcon = () => (
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+  </svg>
+)
+
+const ZapIcon = () => (
+  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+  </svg>
+)
+
+const FilterIcon = () => (
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+  </svg>
+)
+
 export function BoardHeader({
   totalTasks,
   completionRate,
@@ -15,63 +45,38 @@ export function BoardHeader({
   columnsCount,
 }: BoardHeaderProps) {
   return (
-    <div className="relative overflow-hidden bg-gradient-to-br from-purple-500 via-pink-500 to-purple-600 rounded-3xl p-8 shadow-2xl animate-fadeIn">
-      <div className="absolute inset-0 bg-grid-white/10"></div>
-      <div className="absolute -right-8 -bottom-8 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
-      <div className="absolute -left-8 -top-8 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
-
-      <div className="relative z-10">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-          <div className="flex items-center gap-4">
-            <div className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center shadow-xl">
-              <LayoutGrid className="w-8 h-8 text-white" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <h1 className="text-3xl font-bold text-white">Task Board</h1>
-                <Sparkles className="w-6 h-6 text-yellow-300 animate-pulse" />
-              </div>
-              <div className="flex flex-wrap items-center gap-4 text-white/90">
-                <span className="text-sm font-medium flex items-center gap-1">
-                  <div className="w-2 h-2 bg-white rounded-full"></div>
-                  {totalTasks} total tasks
-                </span>
-                <span className="text-sm font-medium flex items-center gap-1">
-                  <TrendingUp className="w-4 h-4" />
-                  {completionRate}% complete
-                </span>
-                <span className="text-sm font-medium flex items-center gap-1">
-                  <Zap className="w-4 h-4" />
-                  {inProgressTasks} active
-                </span>
-                <span className="text-sm font-medium flex items-center gap-1">
-                  <LayoutGrid className="w-4 h-4" />
-                  {columnsCount} columns
-                </span>
-              </div>
-            </div>
+    <div className="border-b border-slate-200 pb-6">
+      <h1 className="text-2xl font-bold text-slate-900 mb-4">Task Board</h1>
+      
+      <div className="flex flex-wrap gap-8">
+        <div className="flex items-center gap-3">
+          <div className="flex flex-col">
+            <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">Total Tasks</span>
+            <span className="text-xl font-bold text-slate-900">{totalTasks}</span>
           </div>
+        </div>
+        
+        <div className="flex items-center gap-3">
+          <div className="flex flex-col">
+            <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">In Progress</span>
+            <span className="text-xl font-bold text-slate-900">{inProgressTasks}</span>
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-3">
+          <div className="flex flex-col">
+            <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">Completion</span>
+            <span className="text-xl font-bold text-blue-600">{completionRate}%</span>
+          </div>
+        </div>
 
-          <div className="flex items-center gap-3">
-            <Button
-              variant="outline"
-              className="bg-white/10 backdrop-blur-sm border-white/20 text-white hover:bg-pink-200/20 shadow-lg px-4 py-2 h-auto font-medium"
-            >
-              <Filter className="w-4 h-4 mr-2" />
-              Filter
-            </Button>
+        <div className="flex items-center gap-3">
+          <div className="flex flex-col">
+            <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">Columns</span>
+            <span className="text-xl font-bold text-slate-900">{columnsCount}</span>
           </div>
         </div>
       </div>
-
-      <style jsx>{`
-        .bg-grid-white\/10 {
-          background-image: linear-gradient(white 1px, transparent 1px),
-            linear-gradient(90deg, white 1px, transparent 1px);
-          background-size: 20px 20px;
-          opacity: 0.1;
-        }
-      `}</style>
     </div>
   )
 }
