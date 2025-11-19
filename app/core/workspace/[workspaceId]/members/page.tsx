@@ -263,10 +263,18 @@ export default function MembersPage() {
       
       showToast("Đã xóa thành viên khỏi workspace!", "success");
       
-      // Cập nhật UI: Lọc bỏ người vừa xóa
-      setMembers((prev) =>
-        prev.filter((m) => m.memberId !== memberToDelete.memberId)
-      );
+      // 🔥 DÙNG REFRESH API — giống Company
+    const data = await getWorkspaceMembers(companyId, workspaceId);
+    const mapped = data.map((m: any) => ({
+      ...m,
+      status: m.status || "ACTIVE",
+      roleCode:
+        m.roleCode ||
+        (m.roleName === "Workspace Administrator"
+          ? "WORKSPACE_ADMIN"
+          : "WORKSPACE_MEMBER"),
+    }));
+    setMembers(mapped);
       
       setIsDeleteModalOpen(false); // Đóng modal
     } catch (err: any) {

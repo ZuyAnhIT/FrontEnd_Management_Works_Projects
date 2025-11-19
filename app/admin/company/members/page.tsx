@@ -134,9 +134,8 @@ export default function MembersPage() {
     try {
       await removeCompanyMember(companyId, memberToDelete.userId);
       showToast("Đã xóa thành viên!", "success");
-      setMembers((prev) =>
-        prev.filter((m) => m.userId !== memberToDelete.userId)
-      );
+      const refreshed = await getCompanyMembers(companyId);
+    setMembers(refreshed);
       setIsDeleteModalOpen(false); // Đóng modal
     } catch (err: any) {
       showToast(err.message || "Không thể xóa thành viên!", "error");
