@@ -1,73 +1,74 @@
 "use client";
-import { Loader2, Sparkles } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import React from "react";
 
-interface LoadingButtonProps {
+interface LoadingButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   text: string;
-  isLoading: boolean;
+  isLoading?: boolean;
   loadingText?: string;
   icon?: React.ReactNode;
-  type?: "button" | "submit";
-  className?: string;
-  onClick?: () => void;
-  variant?: "primary" | "secondary" | "success" | "danger";
+  variant?: "primary" | "secondary" | "outline" | "danger" | "success" | "ghost";
   size?: "sm" | "md" | "lg";
 }
 
 export default function LoadingButton({
   text,
-  loadingText,
+  loadingText = "Đang xử lý...",
   icon,
-  isLoading,
+  isLoading = false,
   type = "submit",
   className = "",
   onClick,
   variant = "primary",
   size = "md",
+  disabled,
+  ...props
 }: LoadingButtonProps) {
+  
+  // 1. Hệ màu phẳng (Flat Colors) chuẩn Jira/Modern UI
   const variants = {
-    primary: "from-blue-500 via-cyan-500 to-blue-600 hover:from-blue-600 hover:via-cyan-600 hover:to-blue-700",
-    secondary: "from-gray-500 via-gray-600 to-gray-700 hover:from-gray-600 hover:via-gray-700 hover:to-gray-800",
-    success: "from-green-500 via-emerald-500 to-green-600 hover:from-green-600 hover:via-emerald-600 hover:to-green-700",
-    danger: "from-red-500 via-pink-500 to-red-600 hover:from-red-600 hover:via-pink-600 hover:to-red-700",
+    primary: "bg-blue-600 hover:bg-blue-700 text-white shadow-sm border border-transparent",
+    secondary: "bg-slate-100 hover:bg-slate-200 text-slate-700 border border-transparent",
+    outline: "bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 shadow-sm",
+    danger: "bg-red-600 hover:bg-red-700 text-white shadow-sm border border-transparent",
+    success: "bg-green-600 hover:bg-green-700 text-white shadow-sm border border-transparent",
+    ghost: "bg-transparent hover:bg-slate-100 text-slate-600 border-transparent",
   };
 
+  // 2. Kích thước chuẩn
   const sizes = {
-    sm: "py-2 text-sm",
-    md: "py-2.5 text-base",
-    lg: "py-3 text-lg",
+    sm: "h-8 px-3 text-xs",
+    md: "h-10 px-4 text-sm", // Chuẩn thường dùng
+    lg: "h-12 px-6 text-base",
   };
 
   return (
     <button
       type={type}
       onClick={onClick}
-      disabled={isLoading}
+      disabled={isLoading || disabled}
       className={`
-        relative w-full rounded-xl font-semibold text-white 
-        bg-gradient-to-r ${variants[variant]}
-        transition-all duration-300 
-        flex items-center justify-center gap-2 
-        shadow-lg hover:shadow-xl
-        disabled:opacity-60 disabled:cursor-not-allowed
-        disabled:hover:shadow-lg
-        group overflow-hidden
+        relative flex items-center justify-center gap-2 
+        font-medium rounded-md transition-all duration-200
+        focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500/50
+        active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100
+        ${variants[variant]}
         ${sizes[size]}
         ${className}
       `}
+      {...props}
     >
-      <div className="relative z-10 flex items-center justify-center gap-2">
-        {isLoading ? (
-          <>
-            <Loader2 className="w-5 h-5 animate-spin" />
-            <span>{loadingText || "Đang xử lý..."}</span>
-          </>
-        ) : (
-          <>
-            {icon}
-            <span>{text}</span>
-          </>
-        )}
-      </div>
+      {isLoading ? (
+        <>
+          <Loader2 className="w-4 h-4 animate-spin" />
+          <span>{loadingText}</span>
+        </>
+      ) : (
+        <>
+          {icon && <span className="shrink-0">{icon}</span>}
+          <span>{text}</span>
+        </>
+      )}
     </button>
   );
 }

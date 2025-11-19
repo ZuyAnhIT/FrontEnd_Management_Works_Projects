@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Mail, Eye, Edit, Trash2 } from "lucide-react";
+import { Mail, Eye, Edit, Trash2, MoreHorizontal } from "lucide-react";
 
 interface MemberTableProps {
   members: any[];
@@ -30,111 +30,123 @@ export default function MemberTable({
 }: MemberTableProps) {
 
   return (
-    <div className="bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden animate-fadeInUp">
+    // Container: Nền trắng, viền xám, shadow nhẹ, bo góc vừa phải
+    <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden animate-in fade-in duration-300">
       <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
+        <table className="w-full text-sm text-left">
+          
+          {/* HEADER: Minimalist Style */}
+          <thead className="bg-slate-50/80 border-b border-slate-200">
             <tr>
-              <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">STT</th>
-              <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Thành viên</th>
-              <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Email</th>
-              <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Vai trò</th>
-              <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Trạng thái</th>
-              <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Ngày tham gia</th>
-              <th className="px-6 py-4 text-center text-xs font-bold text-gray-600 uppercase tracking-wider">Thao tác</th>
+              <th className="px-4 py-3 font-semibold text-slate-500 uppercase text-[11px] tracking-wider w-12">#</th>
+              <th className="px-4 py-3 font-semibold text-slate-500 uppercase text-[11px] tracking-wider">Member</th>
+              <th className="px-4 py-3 font-semibold text-slate-500 uppercase text-[11px] tracking-wider">Contact</th>
+              <th className="px-4 py-3 font-semibold text-slate-500 uppercase text-[11px] tracking-wider">Role</th>
+              <th className="px-4 py-3 font-semibold text-slate-500 uppercase text-[11px] tracking-wider">Status</th>
+              <th className="px-4 py-3 font-semibold text-slate-500 uppercase text-[11px] tracking-wider">Joined Date</th>
+              <th className="px-4 py-3 text-right font-semibold text-slate-500 uppercase text-[11px] tracking-wider w-24">Actions</th>
             </tr>
           </thead>
 
-          <tbody className="divide-y divide-gray-200">
+          <tbody className="divide-y divide-slate-100">
             {members.map((m, index) => (
               <tr
                 key={m.memberId || m.userId || `row-${index}`}
-                className="hover:bg-gradient-to-r hover:from-blue-50/50 hover:to-cyan-50/50 transition-all"
+                className="group hover:bg-slate-50/50 transition-colors"
               >
                 {/* STT */}
-                <td className="px-6 py-4 text-sm font-medium text-gray-700">{index + 1}</td>
+                <td className="px-4 py-3 text-slate-400 font-mono text-xs">{index + 1}</td>
 
-                {/* Avatar + Tên */}
-                <td className="px-6 py-4">
+                {/* Avatar + Name */}
+                <td className="px-4 py-3">
                   <div className="flex items-center gap-3">
-                    <img
-                      src={
-                        m.avatarUrl ||
-                        `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                          m.fullName || "A"
-                        )}&background=random`
-                      }
-                      alt={m.fullName}
-                      className="w-12 h-12 rounded-xl border-2 border-gray-200 object-cover shadow-sm"
-                    />
-                    <div>
-                      <div className="font-semibold text-gray-900">{m.fullName}</div>
-                      <div className="text-xs text-gray-500">
-                        {m.userId ? `ID: ${m.userId}` : "(Chưa xác nhận)"}
+                    <div className="relative w-9 h-9 rounded-full overflow-hidden border border-slate-200 shrink-0">
+                        <img
+                        src={
+                            m.avatarUrl ||
+                            `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                            m.fullName || "U"
+                            )}&background=random&color=fff`
+                        }
+                        alt={m.fullName}
+                        className="w-full h-full object-cover"
+                        />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="font-medium text-slate-900 truncate">{m.fullName}</div>
+                      <div className="text-xs text-slate-400 truncate font-mono">
+                        {m.userId ? `ID: ${m.userId}` : "Pending"}
                       </div>
                     </div>
                   </div>
                 </td>
 
                 {/* Email */}
-                <td className="px-6 py-4">
-                  <div className="flex items-center gap-2 text-gray-700">
-                    <Mail className="w-4 h-4 text-gray-400" />
-                    {m.email || "—"}
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-2 text-slate-600">
+                    <Mail className="w-3.5 h-3.5 text-slate-400" />
+                    <span className="truncate max-w-[150px]">{m.email || "—"}</span>
                   </div>
                 </td>
 
-                {/* Vai trò */}
-                <td className="px-6 py-4">{renderRole(m)}</td>
+                {/* Role */}
+                <td className="px-4 py-3">{renderRole(m)}</td>
 
-                {/* Trạng thái */}
-                <td className="px-6 py-4">{renderStatus(m.status)}</td>
+                {/* Status */}
+                <td className="px-4 py-3">{renderStatus(m.status)}</td>
 
-                {/* Ngày tham gia */}
-                <td className="px-6 py-4 text-gray-500 text-sm">
+                {/* Joined Date */}
+                <td className="px-4 py-3 text-slate-500 text-xs font-medium">
                   {formatDateTime(m.joinedAt)}
                 </td>
 
-                {/* Thao tác */}
-                <td className="px-6 py-4 text-center">
-                  <div className="flex justify-center gap-1">
-
-                    {/* Xem chi tiết */}
+                {/* Actions (Right Aligned) */}
+                <td className="px-4 py-3 text-right">
+                  <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    
+                    {/* View */}
                     <button
                       onClick={() => onViewDetail(m)}
-                      className="group p-2.5 text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
+                      className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+                      title="View Details"
                     >
                       <Eye className="w-4 h-4" />
                     </button>
 
-                    {/* Sửa */}
+                    {/* Edit */}
                     {onEdit && (
                       <button
                         onClick={() => onEdit(m)}
                         disabled={disableEdit(m)}
-                        className="group p-2.5 text-green-600 hover:bg-green-50 rounded-xl transition-all disabled:text-gray-300 disabled:hover:bg-transparent"
+                        className="p-1.5 text-slate-500 hover:text-amber-600 hover:bg-amber-50 rounded-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                        title="Edit Member"
                       >
                         <Edit className="w-4 h-4" />
                       </button>
                     )}
 
-                    {/* Xóa */}
+                    {/* Delete */}
                     {onDelete && (
                       <button
                         onClick={() => onDelete(m)}
                         disabled={disableDelete(m)}
-                        className="group p-2.5 text-red-600 hover:bg-red-50 rounded-xl transition-all disabled:text-gray-300 disabled:hover:bg-transparent"
+                        className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                        title="Remove Member"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
                     )}
 
                   </div>
+                  
+                  {/* Mobile/Fallback Icon when not hovering */}
+                  <div className="group-hover:hidden flex justify-end">
+                     <MoreHorizontal className="w-4 h-4 text-slate-300" />
+                  </div>
                 </td>
               </tr>
             ))}
           </tbody>
-
         </table>
       </div>
     </div>

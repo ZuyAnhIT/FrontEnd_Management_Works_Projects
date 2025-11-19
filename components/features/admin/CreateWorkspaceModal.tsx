@@ -1,17 +1,22 @@
 "use client";
+
 import { useState } from "react";
 import {
-  PlusCircle,
   X,
   Loader2,
-  Sparkles,
+  Sparkles, // Thay PlusCircle bằng Sparkles hoặc icon khác phù hợp hơn nếu muốn
   Image as ImageIcon,
   FileText,
   Building,
   Palette,
+  Layout,
 } from "lucide-react";
 import { createWorkspace } from "@/services/apiWorkspace";
 import { useToast } from "@/components/ui/ToastProvider";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 
 export default function CreateWorkspaceModal({
   isOpen,
@@ -69,242 +74,155 @@ export default function CreateWorkspaceModal({
   ];
 
   return (
+    // 1. Backdrop tối giản
     <div
-      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn"
+      className="fixed inset-0 z-50 bg-black/40 backdrop-blur-[2px] flex items-center justify-center p-4 animate-in fade-in duration-200"
       onClick={onClose}
     >
-      <div
+      {/* 2. Modal Card */}
+      <Card 
         onClick={(e) => e.stopPropagation()}
-        className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden animate-slideUp"
+        className="w-full max-w-2xl max-h-[90vh] bg-white border border-slate-200 shadow-2xl rounded-xl flex flex-col animate-in zoom-in-95 duration-200 overflow-hidden"
       >
-        {/* Enhanced Header */}
-        <div className="relative bg-gradient-to-r from-blue-500 via-cyan-500 to-teal-500 p-8 overflow-hidden">
-          {/* Animated background effect */}
-          <div className="absolute inset-0 opacity-20">
-            <div className="absolute top-0 left-0 w-64 h-64 bg-white rounded-full mix-blend-overlay filter blur-3xl animate-blob"></div>
-            <div className="absolute top-0 right-0 w-64 h-64 bg-white rounded-full mix-blend-overlay filter blur-3xl animate-blob animation-delay-2000"></div>
-          </div>
-
-          <div className="relative flex items-center justify-between text-white">
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center shadow-2xl ring-4 ring-white/30">
-                <PlusCircle className="w-8 h-8 text-white" />
+        {/* Header */}
+        <CardHeader className="bg-white border-b border-slate-100 px-6 py-5 flex flex-row items-center justify-between sticky top-0 z-10 shrink-0">
+           <div className="flex items-center gap-4">
+              <div className="w-10 h-10 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center shadow-sm">
+                <Layout className="w-5 h-5 text-blue-600" />
               </div>
               <div>
-                <h2 className="text-2xl font-bold flex items-center gap-2 mb-1">
-                  Tạo Workspace mới
-                  <Sparkles className="w-5 h-5 text-yellow-300" />
-                </h2>
-                <p className="text-white/80 text-sm">
-                  Tạo không gian làm việc cho phòng ban
-                </p>
+                 <CardTitle className="text-xl text-slate-900 font-bold">Create Workspace</CardTitle>
+                 <p className="text-slate-500 text-xs font-medium mt-0.5">Set up a new space for your team</p>
               </div>
-            </div>
-            <button
-              onClick={onClose}
-              className="p-2 hover:bg-white/20 rounded-xl transition-all duration-300 hover:rotate-90"
-            >
-              <X className="w-6 h-6 text-white" />
-            </button>
-          </div>
+           </div>
+
+           <button
+            onClick={onClose}
+            className="p-2 rounded-md hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </CardHeader>
+
+        {/* Body: Form */}
+        <div className="flex-1 overflow-y-auto p-6 bg-white">
+           <form onSubmit={handleCreate} className="space-y-6">
+              
+              {/* Name */}
+              <div className="space-y-1.5">
+                 <label className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+                    <Building className="w-4 h-4 text-slate-500" />
+                    Workspace Name <span className="text-red-500">*</span>
+                 </label>
+                 <Input
+                    value={form.workspaceName}
+                    onChange={(e) => setForm({ ...form, workspaceName: e.target.value })}
+                    placeholder="e.g. Marketing Team"
+                    className="h-10 border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-600 transition-all shadow-sm"
+                    autoFocus
+                 />
+              </div>
+
+              {/* Description */}
+              <div className="space-y-1.5">
+                 <label className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-slate-500" />
+                    Description
+                 </label>
+                 <Textarea
+                    value={form.description}
+                    onChange={(e) => setForm({ ...form, description: e.target.value })}
+                    rows={3}
+                    placeholder="What is this workspace for?"
+                    className="resize-none border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-600 transition-all shadow-sm"
+                 />
+              </div>
+
+              {/* Color Picker */}
+              <div className="space-y-2">
+                 <label className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+                    <Palette className="w-4 h-4 text-slate-500" />
+                    Theme Color
+                 </label>
+                 <div className="flex flex-wrap gap-3">
+                    {colorOptions.map((color) => (
+                       <button
+                          key={color.value}
+                          type="button"
+                          onClick={() => setForm({ ...form, color: color.value })}
+                          className={`
+                             w-8 h-8 rounded-full transition-all duration-200 flex items-center justify-center
+                             ${form.color === color.value ? "ring-2 ring-offset-2 ring-slate-400 scale-110" : "hover:scale-105"}
+                          `}
+                          style={{ backgroundColor: color.value }}
+                          title={color.name}
+                       >
+                          {form.color === color.value && <div className="w-2 h-2 bg-white rounded-full" />}
+                       </button>
+                    ))}
+                 </div>
+              </div>
+
+              {/* Cover Image */}
+              <div className="space-y-1.5">
+                 <label className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+                    <ImageIcon className="w-4 h-4 text-slate-500" />
+                    Cover Image (URL)
+                 </label>
+                 <Input
+                    value={form.coverImage}
+                    onChange={(e) => setForm({ ...form, coverImage: e.target.value })}
+                    placeholder="https://example.com/image.jpg"
+                    className="h-10 border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-600 transition-all shadow-sm"
+                 />
+                 {form.coverImage ? (
+                    <div className="mt-2 rounded-lg overflow-hidden border border-slate-200 shadow-sm w-full h-32 bg-slate-50 flex items-center justify-center">
+                       <img
+                          src={form.coverImage}
+                          alt="Preview"
+                          className="w-full h-full object-cover"
+                          onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                       />
+                    </div>
+                 ) : (
+                    <div className="mt-2 h-24 w-full rounded-lg border-2 border-dashed border-slate-200 bg-slate-50 flex items-center justify-center" style={{backgroundColor: `${form.color}10`}}>
+                       <span className="text-xs text-slate-400">No cover image selected</span>
+                    </div>
+                 )}
+              </div>
+
+              {/* Hidden Submit */}
+              <button type="submit" className="hidden" />
+           </form>
         </div>
 
-        {/* Enhanced Form */}
-        <form
-          onSubmit={handleCreate}
-          className="p-8 max-h-[70vh] overflow-y-auto"
-        >
-          <div className="space-y-6">
-            {/* Workspace Name - Full Width */}
-            <div className="group">
-              <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-2">
-                <Building className="w-4 h-4 text-blue-500" />
-                Tên Workspace <span className="text-red-500">*</span>
-              </label>
-              <input
-                value={form.workspaceName}
-                onChange={(e) => setForm({ ...form, workspaceName: e.target.value })}
-                placeholder="VD: Phòng Marketing"
-                className="w-full border-2 border-gray-200 rounded-xl px-4 py-3.5 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all font-medium"
-                required
-              />
-            </div>
+        {/* Footer Actions */}
+        <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-100 bg-slate-50/50 shrink-0">
+           <Button
+              variant="outline"
+              onClick={onClose}
+              className="h-10 px-5 text-sm font-semibold text-slate-700 border-slate-300 hover:bg-white hover:text-slate-900 transition-colors"
+           >
+              Cancel
+           </Button>
 
-            {/* Description */}
-            <div className="group">
-              <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-2">
-                <FileText className="w-4 h-4 text-gray-500" />
-                Mô tả workspace
-              </label>
-              <textarea
-                value={form.description}
-                onChange={(e) =>
-                  setForm({ ...form, description: e.target.value })
-                }
-                rows={4}
-                placeholder="Mô tả về workspace này..."
-                className="w-full border-2 border-gray-200 rounded-xl px-4 py-3.5 focus:border-gray-400 focus:ring-4 focus:ring-gray-400/10 outline-none resize-none transition-all"
-              />
-            </div>
+           <Button
+              onClick={handleCreate}
+              disabled={loading}
+              className="h-10 px-6 text-sm font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-lg transition-all active:scale-95"
+           >
+              {loading ? (
+                 <span className="flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Creating...
+                 </span>
+              ) : (
+                 "Create Workspace"
+              )}
+           </Button>
+        </div>
 
-            {/* Color Picker */}
-            <div className="group">
-              <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-2">
-                <Palette className="w-4 h-4 text-purple-500" />
-                Màu chủ đạo
-              </label>
-              <div className="grid grid-cols-4 md:grid-cols-8 gap-3">
-                {colorOptions.map((color) => (
-                  <button
-                    key={color.value}
-                    type="button"
-                    onClick={() => setForm({ ...form, color: color.value })}
-                    className={`relative w-full aspect-square rounded-xl transition-all duration-300 hover:scale-110 ${
-                      form.color === color.value
-                        ? "ring-4 ring-offset-2 ring-blue-500 scale-110"
-                        : "hover:ring-2 hover:ring-gray-300"
-                    }`}
-                    style={{ backgroundColor: color.value }}
-                    title={color.name}
-                  >
-                    {form.color === color.value && (
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="w-6 h-6 bg-white rounded-full flex items-center justify-center">
-                          <Sparkles className="w-4 h-4 text-gray-800" />
-                        </div>
-                      </div>
-                    )}
-                  </button>
-                ))}
-              </div>
-              <div className="mt-3 flex items-center gap-2">
-                <input
-                  type="color"
-                  value={form.color}
-                  onChange={(e) => setForm({ ...form, color: e.target.value })}
-                  className="w-12 h-12 rounded-lg border-2 border-gray-200 cursor-pointer"
-                />
-                <span className="text-sm text-gray-600 font-mono">{form.color}</span>
-              </div>
-            </div>
-
-            {/* Cover Image */}
-            <div className="group">
-              <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-2">
-                <ImageIcon className="w-4 h-4 text-pink-500" />
-                Ảnh bìa (URL)
-              </label>
-              <div className="relative">
-                <input
-                  value={form.coverImage}
-                  onChange={(e) =>
-                    setForm({ ...form, coverImage: e.target.value })
-                  }
-                  placeholder="https://images.unsplash.com/..."
-                  className="w-full border-2 border-gray-200 rounded-xl px-4 py-3.5 focus:border-pink-500 focus:ring-4 focus:ring-pink-500/10 outline-none transition-all"
-                />
-                {form.coverImage && (
-                  <div className="mt-3 relative rounded-xl overflow-hidden border-2 border-gray-200">
-                    <img
-                      src={form.coverImage}
-                      alt="Preview"
-                      className="w-full h-40 object-cover"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = "none";
-                      }}
-                    />
-                  </div>
-                )}
-                {!form.coverImage && (
-                  <div className="mt-3 relative rounded-xl overflow-hidden border-2 border-dashed border-gray-300">
-                    <div
-                      className="w-full h-40 flex items-center justify-center"
-                      style={{ backgroundColor: form.color }}
-                    >
-                      <Building className="w-12 h-12 text-white/50" />
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex gap-4 pt-4 border-t border-gray-200">
-              <button
-                type="button"
-                onClick={onClose}
-                className="flex-1 border-2 border-gray-300 rounded-xl py-3.5 hover:bg-gray-50 hover:border-gray-400 font-bold text-gray-700 transition-all"
-              >
-                Hủy
-              </button>
-              <button
-                type="submit"
-                disabled={loading}
-                className="flex-1 bg-gradient-to-r from-blue-500 via-cyan-500 to-teal-500 text-white rounded-xl py-3.5 hover:from-blue-600 hover:via-cyan-600 hover:to-teal-600 font-bold disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    Đang tạo...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-5 h-5" />
-                    Tạo Workspace
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </form>
-      </div>
-
-      <style jsx>{`
-        @keyframes fadeIn {
-          from {
-            opacity: 0;
-          }
-          to {
-            opacity: 1;
-          }
-        }
-        .animate-fadeIn {
-          animation: fadeIn 0.3s ease-out;
-        }
-
-        @keyframes slideUp {
-          from {
-            opacity: 0;
-            transform: translateY(30px) scale(0.95);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0) scale(1);
-          }
-        }
-        .animate-slideUp {
-          animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-        }
-
-        @keyframes blob {
-          0%,
-          100% {
-            transform: translate(0, 0) scale(1);
-          }
-          33% {
-            transform: translate(30px, -50px) scale(1.1);
-          }
-          66% {
-            transform: translate(-20px, 20px) scale(0.9);
-          }
-        }
-        .animate-blob {
-          animation: blob 7s infinite;
-        }
-        .animation-delay-2000 {
-          animation-delay: 2s;
-        }
-      `}</style>
+      </Card>
     </div>
   );
 }

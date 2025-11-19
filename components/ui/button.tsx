@@ -5,22 +5,34 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium transition-colors disabled:opacity-50 disabled:pointer-events-none",
+  // Base styles: Focus ring màu xanh, disable mờ đi
+  "inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90",
-        destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
-        outline: "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
-        secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-        ghost: "hover:bg-accent hover:text-accent-foreground",
-        link: "text-primary underline-offset-4 hover:underline",
+        // Primary: Xanh dương đậm (Jira Primary)
+        default: "bg-blue-600 text-white hover:bg-blue-700 shadow-sm border border-transparent",
+        
+        // Destructive: Đỏ (Xóa/Nguy hiểm)
+        destructive: "bg-red-600 text-white hover:bg-red-700 shadow-sm border border-transparent",
+        
+        // Outline: Nền trắng, viền xám (Secondary actions)
+        outline: "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900 shadow-sm",
+        
+        // Secondary: Nền xám nhạt (Ít dùng hơn Outline)
+        secondary: "bg-slate-100 text-slate-900 hover:bg-slate-200 border border-transparent",
+        
+        // Ghost: Không nền (Icon buttons, Menu items)
+        ghost: "hover:bg-slate-100 hover:text-slate-900 text-slate-600",
+        
+        // Link: Text xanh, gạch chân khi hover
+        link: "text-blue-600 underline-offset-4 hover:underline",
       },
       size: {
-        default: "h-10 px-4 py-2",
-        sm: "h-9 px-3",
-        lg: "h-11 px-8",
-        icon: "h-10 w-10",
+        default: "h-9 px-4 py-2", // Jira thường dùng h-9 (36px) gọn hơn h-10
+        sm: "h-8 rounded-md px-3 text-xs",
+        lg: "h-10 rounded-md px-8",
+        icon: "h-9 w-9",
       },
     },
     defaultVariants: {

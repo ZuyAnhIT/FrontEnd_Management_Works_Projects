@@ -3,20 +3,21 @@ import {
   Building,
   Trash2,
   ArrowRight,
-  Sparkles,
   Calendar,
   Users,
   Zap,
+  Layout
 } from "lucide-react";
+import Link from "next/link"; // Dùng Link thay vì button navigate nếu có thể
 
-const statusColors: Record<string, string> = {
-  ACTIVE: "bg-emerald-500 text-white",
-  INACTIVE: "bg-gray-400 text-white",
+const statusStyles: Record<string, string> = {
+  ACTIVE: "bg-green-50 text-green-700 border-green-200",
+  INACTIVE: "bg-slate-100 text-slate-600 border-slate-200",
 };
 
 const statusLabels: Record<string, string> = {
-  ACTIVE: "Hoạt động",
-  INACTIVE: "Không hoạt động",
+  ACTIVE: "Active",
+  INACTIVE: "Inactive",
 };
 
 export default function WorkspaceCard({
@@ -25,190 +26,160 @@ export default function WorkspaceCard({
   onNavigate,
   viewMode = "grid",
 }: any) {
+  
   const formatDate = (dateString: string) => {
     if (!dateString) return "--";
     try {
-      return new Date(dateString).toLocaleDateString("vi-VN");
+      return new Date(dateString).toLocaleDateString("en-US");
     } catch (e) {
       return "--";
     }
   };
 
-  // List view
+  // --------------------------
+  // 1. LIST VIEW (Horizontal)
+  // --------------------------
   if (viewMode === "list") {
     return (
-      <div className="group bg-white/90 backdrop-blur-xl rounded-2xl border border-gray-200 overflow-hidden hover:shadow-2xl transition-all duration-300 hover:border-blue-300">
-        <div className="flex items-center gap-6 p-6">
-          {/* Thumbnail */}
-          <div className="relative w-24 h-24 rounded-xl overflow-hidden flex-shrink-0 shadow-lg">
-            {workspace.coverImage ? (
+      <div className="group flex items-center gap-4 p-4 bg-white border border-slate-200 rounded-lg hover:border-blue-400 hover:shadow-md transition-all duration-200">
+        
+        {/* Thumbnail */}
+        <div className="w-16 h-16 shrink-0 rounded-lg overflow-hidden bg-slate-100 border border-slate-200 flex items-center justify-center relative">
+           {workspace.coverImage ? (
               <img
                 src={workspace.coverImage}
                 alt="cover"
-                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                className="w-full h-full object-cover"
               />
-            ) : (
-              <div
+           ) : (
+              <div 
                 className="w-full h-full flex items-center justify-center"
-                style={{ backgroundColor: workspace.color || "#3B82F6" }}
+                style={{ backgroundColor: `${workspace.color}20` }} // Giảm opacity màu nền
               >
-                <Building className="w-8 h-8 text-white/80" />
+                 <Building className="w-6 h-6" style={{ color: workspace.color || "#3B82F6" }} />
               </div>
-            )}
-          </div>
+           )}
+        </div>
 
-          {/* Content */}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-start justify-between mb-2">
-              <div>
-                <h3 className="font-bold text-xl text-gray-900 group-hover:text-blue-600 transition-colors truncate">
-                  {workspace.workspaceName}
-                </h3>
-                <p className="text-sm text-gray-500">ID: {workspace.workspaceId}</p>
-              </div>
-              <span className={`px-3 py-1 text-xs rounded-full font-bold shadow-md ${statusColors[workspace.status] || "bg-gray-400 text-white"}`}>
-                {statusLabels[workspace.status] || "UNKNOWN"}
+        {/* Content */}
+        <div className="flex-1 min-w-0 grid grid-cols-12 gap-4 items-center">
+           <div className="col-span-4">
+              <h3 className="font-bold text-slate-900 text-sm truncate group-hover:text-blue-600 transition-colors cursor-pointer" onClick={() => onNavigate(workspace.workspaceId)}>
+                 {workspace.workspaceName}
+              </h3>
+              <p className="text-xs text-slate-500 font-mono mt-0.5">ID: {workspace.workspaceId}</p>
+           </div>
+
+           <div className="col-span-2">
+              <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wide ${statusStyles[workspace.status] || "bg-slate-100 text-slate-600 border-slate-200"}`}>
+                 {statusLabels[workspace.status] || workspace.status}
               </span>
-            </div>
-            <p className="text-sm text-gray-600 mb-3 line-clamp-1">{workspace.description || "Không có mô tả"}</p>
-            
-            <div className="flex items-center gap-6 text-sm text-gray-600">
-              <div className="flex items-center gap-1.5">
-                <Calendar className="w-4 h-4 text-blue-500" />
-                {formatDate(workspace.createdAt)}
-              </div>
-              <div className="flex items-center gap-1.5">
-                <Users className="w-4 h-4 text-purple-500" />
-                Company #{workspace.companyId}
-              </div>
-            </div>
-          </div>
+           </div>
 
-          {/* Actions */}
-          <div className="flex items-center gap-3 flex-shrink-0">
-            <button
-              onClick={() => onNavigate(workspace.workspaceId)}
-              className="group/btn flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-xl hover:from-blue-600 hover:to-cyan-600 transition-all font-semibold shadow-lg hover:shadow-xl hover:scale-105"
-            >
-              Quản lý
-              <ArrowRight className="w-4 h-4 group-hover/btn:translate-x-1 transition-transform" />
-            </button>
-            <button
-              onClick={() => onDelete(workspace.workspaceId)}
-              className="p-2.5 text-red-600 border-2 border-red-200 rounded-xl hover:bg-red-50 hover:border-red-300 transition-all"
-            >
-              <Trash2 className="w-5 h-5" />
-            </button>
-          </div>
+           <div className="col-span-3 text-xs text-slate-500 flex items-center gap-1">
+              <Calendar className="w-3.5 h-3.5" />
+              {formatDate(workspace.createdAt)}
+           </div>
+
+           {/* Actions */}
+           <div className="col-span-3 flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+               <button
+                 onClick={() => onNavigate(workspace.workspaceId)}
+                 className="p-2 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+                 title="Go to workspace"
+               >
+                 <ArrowRight className="w-4 h-4" />
+               </button>
+               <button
+                 onClick={() => onDelete(workspace.workspaceId)}
+                 className="p-2 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                 title="Delete workspace"
+               >
+                 <Trash2 className="w-4 h-4" />
+               </button>
+           </div>
         </div>
       </div>
     );
   }
 
-  // Grid view (enhanced)
+  // --------------------------
+  // 2. GRID VIEW (Vertical Card)
+  // --------------------------
   return (
-    <div className="group relative bg-white/90 backdrop-blur-xl rounded-2xl border border-gray-200 overflow-hidden hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 hover:border-blue-300 flex flex-col">
-      {/* Hover glow effect */}
-      <div className="absolute inset-0 bg-gradient-to-br from-blue-500/0 via-cyan-500/0 to-teal-500/0 group-hover:from-blue-500/5 group-hover:via-cyan-500/5 group-hover:to-teal-500/5 transition-all duration-500 pointer-events-none"></div>
-
-      {/* Cover Image */}
-      <div className="relative h-48 overflow-hidden">
+    <div className="group flex flex-col bg-white border border-slate-200 rounded-xl overflow-hidden hover:shadow-lg hover:border-blue-300 transition-all duration-300 h-full">
+      
+      {/* Cover Section */}
+      <div className="h-28 w-full bg-slate-100 relative overflow-hidden border-b border-slate-100">
         {workspace.coverImage ? (
           <img
             src={workspace.coverImage}
             alt="cover"
-            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
           />
         ) : (
-          <div
-            className="w-full h-full flex items-center justify-center relative overflow-hidden"
-            style={{ backgroundColor: workspace.color || "#3B82F6" }}
-          >
-            <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent"></div>
-            <Building className="w-16 h-16 text-white/80 relative z-10 group-hover:scale-110 transition-all duration-300" />
+          <div className="w-full h-full flex items-center justify-center bg-slate-50">
+             <Layout className="w-10 h-10 text-slate-300" />
           </div>
         )}
-        
-        {/* Status badge */}
+
+        {/* Status Badge */}
         <div className="absolute top-3 right-3">
-          <span className={`px-3 py-1.5 text-xs rounded-full font-bold shadow-lg backdrop-blur-sm ${statusColors[workspace.status] || "bg-gray-400 text-white"}`}>
-            {statusLabels[workspace.status] || "UNKNOWN"}
-          </span>
-        </div>
-
-        {/* Company ID badge */}
-        <div className="absolute top-3 left-3">
-          <div className="px-3 py-1.5 bg-white/20 backdrop-blur-sm text-white text-xs rounded-full font-bold shadow-lg">
-            ID: {workspace.workspaceId}
-          </div>
+           <span className={`px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wide shadow-sm ${statusStyles[workspace.status] || "bg-white text-slate-600 border-slate-200"}`}>
+              {statusLabels[workspace.status] || workspace.status}
+           </span>
         </div>
       </div>
 
-      {/* Content */}
-      <div className="p-6 flex-1 flex flex-col relative">
-        {/* Header */}
-        <div className="flex items-start gap-3 mb-4">
-          <div 
-            className="w-12 h-12 rounded-xl flex items-center justify-center shadow-lg flex-shrink-0 transition-all duration-300"
-            style={{ backgroundColor: workspace.color || "#3B82F6" }}
-          >
-            <Building className="w-7 h-7 text-white" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h3 className="font-bold text-lg text-gray-900 group-hover:text-blue-600 transition-colors line-clamp-1 mb-1">
-              {workspace.workspaceName}
-            </h3>
-            <p className="text-sm text-gray-500 font-mono">#{workspace.workspaceId}</p>
-          </div>
+      {/* Body Content */}
+      <div className="p-5 flex flex-col flex-1">
+        
+        {/* Icon & Title */}
+        <div className="flex items-start gap-3 mb-3">
+           <div 
+              className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 shadow-sm border border-slate-100"
+              style={{ backgroundColor: `${workspace.color}15` }} // Màu nền rất nhạt
+           >
+              <Building className="w-5 h-5" style={{ color: workspace.color || "#3B82F6" }} />
+           </div>
+           <div className="min-w-0">
+              <h3 className="font-bold text-slate-900 text-base line-clamp-1 group-hover:text-blue-600 transition-colors cursor-pointer" onClick={() => onNavigate(workspace.workspaceId)}>
+                 {workspace.workspaceName}
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5 line-clamp-1">{workspace.description || "No description"}</p>
+           </div>
         </div>
 
-        {/* Description */}
-        <p className="text-sm text-gray-600 mb-4 line-clamp-2 min-h-[40px] flex-1">
-          {workspace.description || "Không có mô tả"}
-        </p>
-
-        {/* Metadata */}
-        <div className="space-y-3 mb-4">
-          <div className="flex items-center justify-between text-xs text-gray-600">
-            <div className="flex items-center gap-1.5 bg-blue-50 px-3 py-1.5 rounded-lg">
-              <Users className="w-3.5 h-3.5 text-blue-500" />
-              <span className="font-medium">Company #{workspace.companyId}</span>
-            </div>
-            <div className="flex items-center gap-1.5 bg-purple-50 px-3 py-1.5 rounded-lg">
-              <Sparkles className="w-3.5 h-3.5 text-purple-500" />
-              <span className="font-bold">{workspace.status}</span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 text-xs text-gray-600 bg-amber-50 px-3 py-2 rounded-lg">
-            <Calendar className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
-            <span className="font-medium">
-              Tạo: {formatDate(workspace.createdAt)}
-            </span>
-          </div>
+        {/* Meta Grid */}
+        <div className="mt-auto pt-4 border-t border-slate-100 grid grid-cols-2 gap-2 text-xs text-slate-500">
+           <div className="flex items-center gap-1.5">
+              <Users className="w-3.5 h-3.5 text-slate-400" />
+              <span>Company #{workspace.companyId}</span>
+           </div>
+           <div className="flex items-center gap-1.5 justify-end">
+              <Calendar className="w-3.5 h-3.5 text-slate-400" />
+              <span>{formatDate(workspace.createdAt)}</span>
+           </div>
         </div>
 
-        {/* Actions */}
-        <div className="mt-auto space-y-2 pt-4 border-t border-gray-100">
-          <button
-            onClick={() => onNavigate(workspace.workspaceId)}
-            className="group/btn relative flex items-center justify-center gap-2 w-full px-4 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-xl hover:from-blue-600 hover:to-cyan-600 transition-all font-bold shadow-lg hover:shadow-xl hover:scale-105 overflow-hidden"
-          >
-            <div className="absolute inset-0 bg-white/0 group-hover/btn:bg-white/10 transition-all"></div>
-            <Zap className="w-4 h-4 relative z-10" />
-            <span className="relative z-10">Vào workspace</span>
-            <ArrowRight className="w-4 h-4 relative z-10 group-hover/btn:translate-x-1 transition-transform" />
-          </button>
-
-          <button
-            onClick={() => onDelete(workspace.workspaceId)}
-            className="w-full flex items-center justify-center gap-2 text-red-600 border-2 border-red-200 py-2.5 rounded-xl hover:bg-red-50 hover:border-red-300 transition-all font-semibold"
-          >
-            <Trash2 className="w-4 h-4" />
-            Xóa workspace
-          </button>
-        </div>
       </div>
+
+      {/* Footer Actions (Hover show) */}
+      <div className="px-5 pb-4 pt-0 mt-auto opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex gap-2">
+        <button
+           onClick={() => onNavigate(workspace.workspaceId)}
+           className="flex-1 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold py-2 rounded text-center transition-colors flex items-center justify-center gap-2"
+        >
+           <Zap className="w-3 h-3" /> Open
+        </button>
+        <button 
+           onClick={() => onDelete(workspace.workspaceId)}
+           className="px-3 py-2 border border-slate-200 hover:bg-red-50 hover:border-red-200 hover:text-red-600 rounded text-slate-500 transition-colors"
+        >
+           <Trash2 className="w-4 h-4" />
+        </button>
+      </div>
+
     </div>
   );
 }

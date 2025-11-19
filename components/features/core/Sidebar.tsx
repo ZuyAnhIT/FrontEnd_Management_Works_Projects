@@ -6,337 +6,286 @@ import {
   FolderKanban,
   ClipboardCheck,
   Settings,
+  Briefcase,
   ChevronLeft,
   ChevronRight,
-  X,
-  Layers,
-  Sparkles,
-  Crown,
+  ChevronDown,
+  ChevronUp,
+  PlusCircle,
   Building2,
-  Briefcase,
+  X,
+  Layers
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { usePathname, useRouter, useParams } from "next/navigation";
+import { getCompanyWorkspaces } from "@/services/apiWorkspace";
+import { getCurrentUser } from "@/services/apiUser";
+import { useToast } from "@/components/ui/ToastProvider";
+import Link from "next/link";
 
 interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
-  user: any; // 👈 Nhận user từ CoreLayout
-  workspaces: any[];
-  loadingWs: boolean;
+  activeMenu: string;
+  setActiveMenu: (id: string) => void;
 }
 
-export default function CoreSidebar({
+export default function MemberSidebar({
   isOpen,
   onClose,
-  user,
-  workspaces,
-  loadingWs,
+  activeMenu,
+  setActiveMenu,
 }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
+  const [companyId, setCompanyId] = useState<number | null>(null);
+  const [workspaces, setWorkspaces] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showProjects, setShowProjects] = useState(true); // Mặc định mở projects để dễ thấy
+
   const router = useRouter();
   const pathname = usePathname();
   const params = useParams();
   const workspaceId = params.workspaceId;
+  const { showToast } = useToast();
 
-  const isWorkspaceView = pathname?.startsWith("/core/workspace/");
+  const isWorkspaceView = pathname?.startsWith("/member/workspace/");
 
-  // 🔹 Menu tổng quan (chưa chọn workspace)
-  const coreMenu = [
-    { id: "home", icon: Home, label: "Trang chủ", path: "/core" },
-    {
-      id: "tasks",
-      icon: UserCheck,
-      label: "Việc của tôi",
-      path: "/core/tasks",
-    },
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const user = await getCurrentUser();
+        setCompanyId(user.company?.companyId || null);
+      } catch (err: any) {
+        // Silent fail
+      }
+    };
+    fetchUser();
+  }, []);
+
+  useEffect(() => {
+    if (!companyId) return;
+    const fetchWorkspaces = async () => {
+      try {
+        setLoading(true);
+        const data = await getCompanyWorkspaces(companyId);
+        setWorkspaces(data || []);
+      } catch (err: any) {
+        // Silent fail
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchWorkspaces();
+  }, [companyId]);
+
+  // Menu Configs
+  const memberMenu = [
+    { id: "home", icon: Home, label: "Overview", path: "/member" },
+    { id: "company", icon: Building2, label: "Company", path: "/core/company" },
+    { id: "tasks", icon: UserCheck, label: "My Work", path: "/core/tasks" },
   ];
 
-  // 🔹 Menu khi đã vào workspace
   const workspaceMenu = [
-    {
-      id: "overview",
-      icon: Home,
-      label: "Tổng quan",
-      path: `/core/workspace/${workspaceId}`,
+    { id: "overview", icon: Home, label: "Summary", path: `/core/workspace/${workspaceId}` },
+    { 
+      id: "projects", 
+      icon: FolderKanban, 
+      label: "Projects",
+      children: [
+         { name: "Project Alpha", path: `/core/workspace/${workspaceId}/project-a` }, // Mock
+         { name: "Project Beta", path: `/core/workspace/${workspaceId}/project-b` },
+      ]
     },
-    {
-      id: "project",
-      icon: FolderKanban,
-      label: "Dự án",
-      path: `/core/workspace/${workspaceId}/project`,
-    },
-    {
-      id: "members",
-      icon: ClipboardCheck,
-      label: "Thành viên",
-      path: `/core/workspace/${workspaceId}/members`,
-    },
-    {
-      id: "settings",
-      icon: Settings,
-      label: "Cài đặt",
-      path: `/core/workspace/${workspaceId}/settings`,
-    },
+    { id: "members", icon: ClipboardCheck, label: "People", path: `/core/workspace/${workspaceId}/members` },
+    { id: "settings", icon: Settings, label: "Settings", path: `/core/workspace/${workspaceId}/settings` },
   ];
 
   return (
     <>
-      {/* Overlay cho mobile */}
+      {/* Mobile Overlay */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden animate-fadeIn"
+          className="fixed inset-0 bg-black/40 backdrop-blur-[2px] z-40 lg:hidden animate-in fade-in duration-200"
           onClick={onClose}
         />
       )}
 
       <aside
         className={`fixed lg:static inset-y-0 left-0 z-50 
-        ${collapsed ? "w-20" : "w-72"} 
-        bg-gradient-to-b from-white via-green-50/30 to-white
-        border-r border-gray-200/80 shadow-xl lg:shadow-none
-        transform transition-all duration-300 ease-in-out 
-        ${isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"} 
-        flex flex-col`}
+        ${collapsed ? "w-[64px]" : "w-64"} 
+        bg-[#F4F5F7] border-r border-slate-200
+        transition-all duration-300 ease-in-out flex flex-col
+        ${isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
       >
-        {/* ===== Header ===== */}
-        <div className="relative overflow-hidden bg-gradient-to-br from-green-500 via-emerald-500 to-cyan-500 p-4 shadow-lg">
-          <div className="absolute inset-0 bg-grid-white/10"></div>
-
-          <div className="relative z-10 flex items-center justify-between">
-            <div
-              className={`flex items-center gap-3 ${
-                collapsed ? "justify-center w-full" : ""
-              }`}
-            >
-              <div className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center shadow-lg">
-                {isWorkspaceView ? (
-                  <Briefcase className="w-5 h-5 text-white" />
-                ) : (
-                  <Building2 className="w-5 h-5 text-white" />
-                )}
-              </div>
-              {!collapsed && (
-                <div>
-                  <div className="flex items-center gap-1.5 mb-0.5">
-                    <Sparkles className="w-3.5 h-3.5 text-yellow-300" />
-                    <span className="font-bold text-white text-sm">
-                      {isWorkspaceView ? "Workspace" : user.company?.companyName || "WorkNet"}
-                    </span>
-                  </div>
-                  <span className="text-white/80 text-xs">
-                    {isWorkspaceView ? "Phòng ban" : "Công ty"}
-                  </span>
-                </div>
-              )}
+        {/* ===== HEADER ===== */}
+        <div className="h-16 flex items-center justify-between px-4 border-b border-slate-200/50 bg-[#F4F5F7]">
+          <div className={`flex items-center gap-3 overflow-hidden transition-all ${collapsed ? 'justify-center w-full' : ''}`}>
+            
+            {/* Logo Icon (Jira Style) */}
+            <div className="w-8 h-8 rounded-md bg-blue-600 flex items-center justify-center shrink-0 shadow-sm">
+               {isWorkspaceView ? <Briefcase className="w-4 h-4 text-white" /> : <Building2 className="w-4 h-4 text-white" />}
             </div>
 
             {!collapsed && (
-              <button
-                onClick={() => setCollapsed(!collapsed)}
-                className="p-2 rounded-lg bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all"
-              >
-                <ChevronLeft className="w-4 h-4 text-white" />
-              </button>
+              <div className="min-w-0 flex-1 animate-in fade-in duration-200">
+                <span className="block text-slate-900 font-bold text-sm truncate">
+                    {isWorkspaceView ? "Workspace" : "WorkNet"}
+                </span>
+                <span className="block text-slate-500 text-[10px] font-semibold uppercase tracking-wide">
+                    {isWorkspaceView ? "Department" : "Enterprise"}
+                </span>
+              </div>
             )}
           </div>
 
-          {collapsed && (
-            <button
-              onClick={() => setCollapsed(false)}
-              className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-lg bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all"
-            >
-              <ChevronRight className="w-3.5 h-3.5 text-white" />
-            </button>
-          )}
-
+          {/* Mobile Close */}
           <button
             onClick={onClose}
-            className="lg:hidden absolute top-4 right-4 p-2 rounded-lg bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all"
+            className="lg:hidden p-1.5 rounded-md hover:bg-slate-200 text-slate-500 transition-colors"
           >
-            <X className="w-4 h-4 text-white" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* ===== Menu ===== */}
-        <nav className="flex-1 overflow-y-auto p-4 space-y-6 custom-scrollbar">
-          {!isWorkspaceView && (
-            <>
-              {/* Menu chính */}
-              <div className="space-y-1">
-                {!collapsed && (
-                  <div className="px-3 py-2 text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
-                    <Sparkles className="w-3 h-3" />
-                    Menu chính
-                  </div>
-                )}
-                {coreMenu.map((item, index) => {
-                  const isActive = pathname === item.path;
-                  return (
-                    <button
-                      key={item.id}
-                      onClick={() => {
-                        router.push(item.path);
-                        if (window.innerWidth < 1024) onClose();
-                      }}
-                      className={`group w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 ${
-                        isActive
-                          ? "bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-lg scale-[1.02]"
-                          : "text-gray-700 hover:bg-white hover:shadow-md"
-                      } ${collapsed ? "justify-center" : ""}`}
-                      style={{ animationDelay: `${index * 50}ms` }}
-                    >
-                      <item.icon className="w-5 h-5" />
-                      {!collapsed && <span>{item.label}</span>}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Danh sách workspace */}
-              {!collapsed && (
-                <div className="space-y-2">
-                  <div className="px-3 py-2 text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
-                    <Layers className="w-3 h-3" />
-                    Phòng ban
-                  </div>
-
-                  {loadingWs ? (
-                    <div className="flex items-center gap-2 px-3 py-2 text-gray-400 text-sm">
-                      <div className="w-4 h-4 border-2 border-green-500 border-t-transparent rounded-full animate-spin"></div>
-                      Đang tải...
-                    </div>
-                  ) : workspaces.length > 0 ? (
-                    <div className="space-y-1 max-h-64 overflow-y-auto custom-scrollbar">
-                      {workspaces.map((ws) => {
-                        const isActive =
-                          pathname === `/core/workspace/${ws.workspaceId}`;
-                        const isAdmin = ws.roleCode?.includes("ADMIN");
-                        return (
-                          <button
-                            key={ws.workspaceId}
-                            onClick={() => {
-                              router.push(`/core/workspace/${ws.workspaceId}`);
-                              if (window.innerWidth < 1024) onClose();
-                            }}
-                            className={`group w-full flex items-center gap-2 px-3 py-2.5 rounded-lg transition-all duration-200 ${
-                              isActive
-                                ? "bg-green-50 text-green-600 border border-green-200 shadow-sm"
-                                : "hover:bg-gray-50 text-gray-700 border border-transparent"
-                            }`}
-                          >
-                            <FolderKanban className="w-4 h-4 flex-shrink-0" />
-                            <span
-                              className={`flex-1 text-left text-sm truncate ${
-                                isActive ? "font-semibold" : ""
-                              }`}
+        {/* ===== SCROLLABLE CONTENT ===== */}
+        <nav className="flex-1 overflow-y-auto py-6 px-3 space-y-6 custom-scrollbar">
+          
+          {/* SECTION 1: MAIN MENU */}
+          <div className="space-y-1">
+             {!isWorkspaceView ? (
+                /* --- CORE MEMBER MENU --- */
+                memberMenu.map((item) => {
+                   const isActive = pathname === item.path;
+                   return (
+                      <Link key={item.id} href={item.path} className="block">
+                        <button
+                            className={`group relative w-full flex items-center rounded-md transition-all duration-200 ${collapsed ? 'justify-center px-0 py-3' : 'px-3 py-2 gap-3'} ${isActive ? 'bg-blue-100 text-blue-700' : 'text-slate-600 hover:bg-slate-200/60 hover:text-slate-900'}`}
+                            onClick={() => { if(window.innerWidth < 1024) onClose() }}
+                            title={collapsed ? item.label : undefined}
+                        >
+                            {isActive && <div className="absolute left-0 top-1 bottom-1 w-1 bg-blue-600 rounded-r-full"></div>}
+                            <item.icon className={`${collapsed ? 'w-5 h-5' : 'w-4 h-4'} ${isActive ? 'text-blue-700' : 'text-slate-500 group-hover:text-slate-700'} transition-colors`} />
+                            {!collapsed && <span className="text-sm font-medium">{item.label}</span>}
+                        </button>
+                      </Link>
+                   )
+                })
+             ) : (
+                /* --- WORKSPACE MENU --- */
+                workspaceMenu.map((item) => {
+                    const isActive = pathname === item.path;
+                    const hasChildren = !!item.children;
+                    
+                    return (
+                        <div key={item.id}>
+                            <button
+                                onClick={() => {
+                                    if (hasChildren) setShowProjects(!showProjects);
+                                    else if (item.path) {
+                                        router.push(item.path);
+                                        if (window.innerWidth < 1024) onClose();
+                                    }
+                                }}
+                                className={`group relative w-full flex items-center rounded-md transition-all duration-200 ${collapsed ? 'justify-center px-0 py-3' : 'px-3 py-2 gap-3'} ${isActive ? 'bg-blue-100 text-blue-700' : 'text-slate-600 hover:bg-slate-200/60 hover:text-slate-900'}`}
+                                title={collapsed ? item.label : undefined}
                             >
-                              {ws.workspaceName}
-                            </span>
-                            {isAdmin && (
-                              <span className="text-xs bg-gradient-to-r from-yellow-400 to-orange-400 text-white px-2 py-0.5 rounded-full font-semibold shadow-sm flex items-center">
-                                <Crown className="w-3 h-3 mr-1" /> Admin
-                              </span>
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="px-3 py-2 text-gray-400 text-sm">
-                      Chưa có phòng ban nào
-                    </div>
-                  )}
-                </div>
-              )}
-            </>
-          )}
+                                {isActive && <div className="absolute left-0 top-1 bottom-1 w-1 bg-blue-600 rounded-r-full"></div>}
+                                <item.icon className={`${collapsed ? 'w-5 h-5' : 'w-4 h-4'} ${isActive ? 'text-blue-700' : 'text-slate-500 group-hover:text-slate-700'} transition-colors`} />
+                                {!collapsed && (
+                                    <>
+                                        <span className="flex-1 text-left text-sm font-medium">{item.label}</span>
+                                        {hasChildren && (
+                                            showProjects ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />
+                                        )}
+                                    </>
+                                )}
+                            </button>
 
-          {/* Menu khi đã vào Workspace */}
-          {isWorkspaceView && (
-            <div className="space-y-1">
-              {!collapsed && (
-                <div className="px-3 py-2 text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
-                  <Sparkles className="w-3 h-3" />
-                  Workspace Menu
-                </div>
-              )}
-              {workspaceMenu.map((item, index) => {
-                const isActive = pathname === item.path;
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => {
-                      router.push(item.path);
-                      if (window.innerWidth < 1024) onClose();
-                    }}
-                    className={`group w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 ${
-                      isActive
-                        ? "bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-lg scale-[1.02]"
-                        : "text-gray-700 hover:bg-white hover:shadow-md"
-                    } ${collapsed ? "justify-center" : ""}`}
-                    style={{ animationDelay: `${index * 50}ms` }}
-                  >
-                    <item.icon className="w-5 h-5" />
-                    {!collapsed && <span>{item.label}</span>}
-                  </button>
-                );
-              })}
-            </div>
+                            {/* Submenu Projects */}
+                            {!collapsed && hasChildren && showProjects && (
+                                <div className="mt-1 space-y-1 ml-4 border-l-2 border-slate-200 pl-2 animate-in slide-in-from-top-2 duration-200">
+                                    {item.children?.map((sub) => (
+                                        <button
+                                            key={sub.path}
+                                            onClick={() => router.push(sub.path)}
+                                            className={`block w-full text-left text-sm px-3 py-1.5 rounded-md transition-colors ${pathname === sub.path ? 'text-blue-700 font-medium bg-blue-50' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'}`}
+                                        >
+                                            {sub.name}
+                                        </button>
+                                    ))}
+                                    <button 
+                                        onClick={() => router.push(`/member/workspace/${workspaceId}/create-project`)}
+                                        className="flex items-center gap-2 w-full text-left text-xs px-3 py-2 text-slate-500 hover:text-blue-600 transition-colors mt-1"
+                                    >
+                                        <PlusCircle className="w-3 h-3" /> Create project
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    )
+                })
+             )}
+          </div>
+
+          {/* SECTION 2: DEPARTMENTS LIST (Only in Core View) */}
+          {!isWorkspaceView && !collapsed && (
+              <div className="pt-4 border-t border-slate-200 mx-1">
+                  <div className="px-2 mb-2 text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between">
+                      <span>Workspaces</span>
+                      {workspaces.length > 0 && <span className="bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded text-[10px]">{workspaces.length}</span>}
+                  </div>
+                  
+                  <div className="space-y-1 max-h-60 overflow-y-auto custom-scrollbar pr-1">
+                      {loading ? (
+                          <div className="px-3 py-2 text-xs text-slate-400 italic">Loading...</div>
+                      ) : workspaces.length > 0 ? (
+                          workspaces.map((ws) => (
+                              <button
+                                  key={ws.workspaceId}
+                                  onClick={() => router.push(`/member/workspace/${ws.workspaceId}`)}
+                                  className="w-full flex items-center gap-2 px-3 py-2 rounded-md text-slate-600 hover:bg-slate-200/60 hover:text-slate-900 transition-colors text-sm group"
+                              >
+                                  <div className="w-2 h-2 rounded-full bg-slate-400 group-hover:bg-blue-500 transition-colors"></div>
+                                  <span className="truncate flex-1 text-left">{ws.workspaceName}</span>
+                              </button>
+                          ))
+                      ) : (
+                          <div className="px-3 py-2 text-xs text-slate-400 italic">No workspaces found</div>
+                      )}
+                  </div>
+              </div>
           )}
         </nav>
 
-        {/* ===== Footer ===== */}
-        <div className="p-4 border-t border-gray-200/50">
-          {!collapsed ? (
-            <div className="relative overflow-hidden bg-gradient-to-br from-green-400 via-emerald-400 to-cyan-500 rounded-xl p-4 shadow-lg">
-              <div className="relative z-10 flex items-center gap-3">
-                <div className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
-                  {isWorkspaceView ? (
-                    <Crown className="w-5 h-5 text-white" />
-                  ) : (
-                    <Sparkles className="w-5 h-5 text-white" />
-                  )}
-                </div>
-                <div>
-                  <div className="text-white text-xs font-medium mb-0.5">
-                    {isWorkspaceView ? "Quyền hạn" : "Trạng thái"}
-                  </div>
-                  <div className="text-white font-bold text-sm flex items-center gap-1">
-                    {isWorkspaceView ? "Workspace Admin" : "Người dùng VIP"}
-                    <Sparkles className="w-3 h-3 animate-pulse" />
-                  </div>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="flex justify-center">
-              <div className="w-12 h-12 bg-gradient-to-br from-green-400 to-emerald-500 rounded-xl flex items-center justify-center shadow-lg">
-                {isWorkspaceView ? (
-                  <Crown className="w-6 h-6 text-white" />
-                ) : (
-                  <Sparkles className="w-6 h-6 text-white" />
-                )}
-              </div>
-            </div>
-          )}
+        {/* ===== FOOTER: COLLAPSE TOGGLE ===== */}
+        <div className="p-4 border-t border-slate-200 bg-[#F4F5F7]">
+           <button
+             onClick={() => setCollapsed(!collapsed)}
+             className={`
+                hidden lg:flex w-full items-center rounded-md text-slate-500 hover:bg-slate-200/60 hover:text-slate-900 transition-colors
+                ${collapsed ? 'justify-center py-2' : 'justify-start gap-3 px-2 py-2'}
+             `}
+             title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+           >
+             {collapsed ? (
+                <ChevronRight className="w-5 h-5" />
+             ) : (
+                <>
+                   <div className="flex items-center justify-center w-6 h-6 rounded bg-slate-200 text-slate-500 group-hover:text-slate-700">
+                      <ChevronLeft className="w-4 h-4" />
+                   </div>
+                   <span className="text-xs font-medium">Collapse sidebar</span>
+                </>
+             )}
+           </button>
         </div>
       </aside>
 
       <style jsx>{`
-        .custom-scrollbar::-webkit-scrollbar {
-          width: 4px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: #cbd5e1;
-          border-radius: 10px;
-        }
-        .bg-grid-white\\/10 {
-          background-image: linear-gradient(white 1px, transparent 1px),
-            linear-gradient(90deg, white 1px, transparent 1px);
-          background-size: 20px 20px;
-          opacity: 0.1;
-        }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
       `}</style>
     </>
   );

@@ -2,8 +2,8 @@
 
 import { Project } from '@/lib/mock-data'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
-import { Sparkles, TrendingUp, CheckCircle, Clock, Target, Zap, LayoutGrid } from 'lucide-react'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts'
+import { Sparkles, TrendingUp, CheckCircle, Clock, Target, Zap, LayoutGrid, Layers, AlertCircle } from 'lucide-react'
 
 interface DashboardProps {
   project: Project
@@ -11,341 +11,303 @@ interface DashboardProps {
 
 export function Dashboard({ project }: DashboardProps) {
   const activeSprint = project.sprints.find((s) => s.status === 'active')
-  const allTasks = project.allTasks
+  const allTasks = project.allTasks || [] // Fallback empty array
+
+  // Thống kê theo trạng thái
   const tasksByStatus = {
-    todo: allTasks.filter((t) => t.status === 'todo').length,
-    'in-progress': allTasks.filter((t) => t.status === 'in-progress').length,
-    review: allTasks.filter((t) => t.status === 'review').length,
-    done: allTasks.filter((t) => t.status === 'done').length,
+    todo: allTasks.filter((t) => ['todo', 'to do'].includes(t.status.toLowerCase())).length,
+    'in-progress': allTasks.filter((t) => ['in-progress', 'in progress', 'doing'].includes(t.status.toLowerCase())).length,
+    review: allTasks.filter((t) => t.status.toLowerCase() === 'review').length,
+    done: allTasks.filter((t) => ['done', 'completed'].includes(t.status.toLowerCase())).length,
   }
 
   const statusData = [
-    { name: 'To Do', value: tasksByStatus.todo, fill: '#6b7280' },
-    { name: 'In Progress', value: tasksByStatus['in-progress'], fill: '#f59e0b' },
-    { name: 'Review', value: tasksByStatus.review, fill: '#3b82f6' },
-    { name: 'Done', value: tasksByStatus.done, fill: '#10b981' },
-  ]
+    { name: 'To Do', value: tasksByStatus.todo, fill: '#94a3b8' }, // Slate-400
+    { name: 'In Progress', value: tasksByStatus['in-progress'], fill: '#3b82f6' }, // Blue-500
+    { name: 'Review', value: tasksByStatus.review, fill: '#f59e0b' }, // Amber-500
+    { name: 'Done', value: tasksByStatus.done, fill: '#10b981' }, // Emerald-500
+  ].filter(item => item.value > 0); // Chỉ hiện trạng thái có dữ liệu
 
+  // Thống kê theo độ ưu tiên
   const tasksByPriority = {
-    low: allTasks.filter((t) => t.priority === 'low').length,
-    medium: allTasks.filter((t) => t.priority === 'medium').length,
-    high: allTasks.filter((t) => t.priority === 'high').length,
-    critical: allTasks.filter((t) => t.priority === 'critical').length,
+    low: allTasks.filter((t) => t.priority.toLowerCase() === 'low').length,
+    medium: allTasks.filter((t) => t.priority.toLowerCase() === 'medium').length,
+    high: allTasks.filter((t) => t.priority.toLowerCase() === 'high').length,
+    critical: allTasks.filter((t) => t.priority.toLowerCase() === 'critical').length,
   }
 
   const priorityData = [
-    { name: 'Low', value: tasksByPriority.low, fill: '#6b7280' },
+    { name: 'Low', value: tasksByPriority.low, fill: '#94a3b8' },
     { name: 'Medium', value: tasksByPriority.medium, fill: '#3b82f6' },
-    { name: 'High', value: tasksByPriority.high, fill: '#f59e0b' },
+    { name: 'High', value: tasksByPriority.high, fill: '#f97316' },
     { name: 'Critical', value: tasksByPriority.critical, fill: '#ef4444' },
   ]
 
   const completionRate = allTasks.length > 0 ? Math.round((tasksByStatus.done / allTasks.length) * 100) : 0
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-white via-purple-50/30 to-white">
-      <div className="p-6 max-w-[1600px] mx-auto space-y-6">
-        {/* Header */}
-        <div className="relative overflow-hidden bg-gradient-to-br from-purple-500 via-pink-500 to-purple-600 rounded-3xl p-8 shadow-2xl animate-fadeIn">
-          <div className="absolute inset-0 bg-grid-white/10"></div>
-          <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
+    <div className="min-h-screen bg-slate-50/50 text-slate-900 font-sans pb-10">
+      <div className="p-8 max-w-[1600px] mx-auto space-y-8">
+        
+        {/* =====================================================
+            HEADER: Clean & Minimalist
+        ===================================================== */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+           <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center shadow-sm">
+                <LayoutGrid className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+                  {project.name}
+                </h1>
+                <p className="text-slate-500 text-sm mt-0.5">{project.description || "Project Overview & Statistics"}</p>
+              </div>
+           </div>
+           
+           {/* Quick info tag */}
+           <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 rounded-md border border-slate-200">
+              <Clock className="w-4 h-4 text-slate-500" />
+              <span className="text-xs font-medium text-slate-600">Last updated: Just now</span>
+           </div>
+        </div>
+
+        {/* =====================================================
+            QUICK STATS: Flat Cards
+        ===================================================== */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           
-          <div className="relative z-10">
-            <div className="flex items-center gap-4 mb-2">
-              <div className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center shadow-lg">
-                <LayoutGrid className="w-8 h-8 text-white" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h1 className="text-3xl font-bold text-white">{project.name}</h1>
-                  <Sparkles className="w-6 h-6 text-yellow-300 animate-pulse" />
-                </div>
-                <p className="text-white/80 mt-1">{project.description}</p>
-              </div>
+          {/* Total Tasks */}
+          <Card className="border border-slate-200 shadow-sm hover:shadow-md transition-all">
+            <CardContent className="p-6 flex items-center justify-between">
+               <div>
+                  <p className="text-sm font-medium text-slate-500 mb-1">Total Tasks</p>
+                  <h3 className="text-3xl font-bold text-slate-900">{allTasks.length}</h3>
+               </div>
+               <div className="w-12 h-12 bg-blue-50 rounded-full flex items-center justify-center border border-blue-100">
+                  <Layers className="w-6 h-6 text-blue-600" />
+               </div>
+            </CardContent>
+            <div className="px-6 pb-4">
+               <div className="text-xs text-slate-500 flex items-center gap-1">
+                  <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                  Across all sprints
+               </div>
             </div>
-          </div>
-        </div>
-
-        {/* Quick Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 animate-fadeInUp">
-          <Card className="relative overflow-hidden border-0 shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105">
-            <div className="absolute inset-0 bg-gradient-to-br from-blue-500 to-cyan-500 opacity-10"></div>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-semibold text-gray-600">Total Tasks</CardTitle>
-                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center shadow-lg">
-                  <Target className="w-5 h-5 text-white" />
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold bg-gradient-to-r from-blue-500 to-cyan-500 bg-clip-text text-transparent">
-                {allTasks.length}
-              </div>
-              <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
-                <Sparkles className="w-3 h-3" />
-                {activeSprint?.name || 'No active sprint'}
-              </p>
-            </CardContent>
           </Card>
 
-          <Card className="relative overflow-hidden border-0 shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105">
-            <div className="absolute inset-0 bg-gradient-to-br from-amber-500 to-orange-500 opacity-10"></div>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-semibold text-gray-600">In Progress</CardTitle>
-                <div className="w-10 h-10 bg-gradient-to-br from-amber-500 to-orange-500 rounded-xl flex items-center justify-center shadow-lg">
-                  <Zap className="w-5 h-5 text-white" />
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold bg-gradient-to-r from-amber-500 to-orange-500 bg-clip-text text-transparent">
-                {tasksByStatus['in-progress']}
-              </div>
-              <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
-                <TrendingUp className="w-3 h-3" />
-                {Math.round((tasksByStatus['in-progress'] / allTasks.length) * 100)}% of total
-              </p>
+          {/* In Progress */}
+          <Card className="border border-slate-200 shadow-sm hover:shadow-md transition-all">
+            <CardContent className="p-6 flex items-center justify-between">
+               <div>
+                  <p className="text-sm font-medium text-slate-500 mb-1">In Progress</p>
+                  <h3 className="text-3xl font-bold text-slate-900">{tasksByStatus['in-progress']}</h3>
+               </div>
+               <div className="w-12 h-12 bg-amber-50 rounded-full flex items-center justify-center border border-amber-100">
+                  <Zap className="w-6 h-6 text-amber-500" />
+               </div>
             </CardContent>
+             <div className="px-6 pb-4">
+               <div className="text-xs text-slate-500 flex items-center gap-1">
+                  <TrendingUp className="w-3 h-3 text-amber-500" />
+                  Active work items
+               </div>
+            </div>
           </Card>
 
-          <Card className="relative overflow-hidden border-0 shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105">
-            <div className="absolute inset-0 bg-gradient-to-br from-green-500 to-emerald-500 opacity-10"></div>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-semibold text-gray-600">Completed</CardTitle>
-                <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-500 rounded-xl flex items-center justify-center shadow-lg">
-                  <CheckCircle className="w-5 h-5 text-white" />
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold bg-gradient-to-r from-green-500 to-emerald-500 bg-clip-text text-transparent">
-                {tasksByStatus.done}
-              </div>
-              <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
-                <Sparkles className="w-3 h-3" />
-                {completionRate}% complete
-              </p>
+          {/* Completed */}
+          <Card className="border border-slate-200 shadow-sm hover:shadow-md transition-all">
+            <CardContent className="p-6 flex items-center justify-between">
+               <div>
+                  <p className="text-sm font-medium text-slate-500 mb-1">Done</p>
+                  <h3 className="text-3xl font-bold text-slate-900">{tasksByStatus.done}</h3>
+               </div>
+               <div className="w-12 h-12 bg-green-50 rounded-full flex items-center justify-center border border-green-100">
+                  <CheckCircle className="w-6 h-6 text-green-600" />
+               </div>
             </CardContent>
+            <div className="px-6 pb-4">
+               <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                  <div className="bg-green-500 h-full rounded-full" style={{ width: `${completionRate}%` }}></div>
+               </div>
+               <p className="text-xs text-slate-500 mt-2">{completionRate}% completion rate</p>
+            </div>
           </Card>
 
-          <Card className="relative overflow-hidden border-0 shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105">
-            <div className="absolute inset-0 bg-gradient-to-br from-purple-500 to-pink-500 opacity-10"></div>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-semibold text-gray-600">Active Sprint</CardTitle>
-                <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center shadow-lg">
-                  <Clock className="w-5 h-5 text-white" />
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold bg-gradient-to-r from-purple-500 to-pink-500 bg-clip-text text-transparent">
-                {activeSprint?.tasks.length || 0}
-              </div>
-              <p className="text-xs text-gray-500 mt-1 truncate">
-                {activeSprint?.name || 'No active sprint'}
-              </p>
+          {/* Active Sprint */}
+          <Card className="border border-slate-200 shadow-sm hover:shadow-md transition-all bg-slate-50/50">
+            <CardContent className="p-6 flex items-center justify-between">
+               <div className="overflow-hidden">
+                  <p className="text-sm font-medium text-slate-500 mb-1">Active Sprint</p>
+                  <h3 className="text-xl font-bold text-slate-900 truncate" title={activeSprint?.name}>
+                     {activeSprint?.name || 'No Active Sprint'}
+                  </h3>
+               </div>
+               <div className="w-12 h-12 bg-purple-50 rounded-full flex items-center justify-center border border-purple-100 shrink-0">
+                  <Target className="w-6 h-6 text-purple-600" />
+               </div>
             </CardContent>
+            <div className="px-6 pb-4">
+               {activeSprint ? (
+                   <p className="text-xs text-slate-500 flex items-center gap-1">
+                       <Clock className="w-3 h-3" />
+                       Ends in {Math.max(0, Math.ceil((new Date(activeSprint.endDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)))} days
+                   </p>
+               ) : (
+                   <p className="text-xs text-slate-400 italic">Start a sprint to see details</p>
+               )}
+            </div>
           </Card>
         </div>
 
-        {/* Progress Bar */}
-        <Card className="border-0 shadow-xl overflow-hidden animate-fadeInUp delay-100">
-          <div className="relative overflow-hidden bg-gradient-to-r from-green-500 via-emerald-500 to-green-600 p-6">
-            <div className="absolute inset-0 bg-grid-white/10"></div>
-            <div className="relative z-10 flex items-center justify-between mb-4">
-              <div>
-                <h3 className="font-bold text-white text-lg flex items-center gap-2">
-                  <TrendingUp className="w-5 h-5" />
-                  Overall Progress
-                </h3>
-                <p className="text-sm text-white/80 mt-1">
-                  {tasksByStatus.done} of {allTasks.length} tasks completed
-                </p>
-              </div>
-              <div className="text-4xl font-bold text-white">
-                {completionRate}%
-              </div>
-            </div>
-            <div className="relative h-4 bg-white/20 rounded-full overflow-hidden backdrop-blur-sm">
-              <div 
-                className="h-full bg-white rounded-full transition-all duration-1000 ease-out shadow-lg"
-                style={{ width: `${completionRate}%` }}
-              ></div>
-            </div>
-          </div>
-        </Card>
-
-        {/* Charts */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-fadeInUp delay-200">
-          <Card className="border-0 shadow-xl">
-            <CardHeader className="bg-gradient-to-r from-blue-50 to-cyan-50">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center shadow-md">
-                  <Target className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <CardTitle>Task Status Distribution</CardTitle>
-                  <p className="text-sm text-gray-500">Overview of tasks by status</p>
-                </div>
-              </div>
+        {/* =====================================================
+            CHARTS SECTION
+        ===================================================== */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          
+          {/* Status Distribution (Pie Chart) */}
+          <Card className="border border-slate-200 shadow-sm">
+            <CardHeader className="border-b border-slate-100 pb-4">
+               <CardTitle className="text-base font-bold text-slate-800 flex items-center gap-2">
+                  <Layers className="w-4 h-4 text-slate-500" />
+                  Task Status
+               </CardTitle>
             </CardHeader>
-            <CardContent className="pt-6">
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie 
-                    data={statusData} 
-                    cx="50%" 
-                    cy="50%" 
-                    labelLine={false} 
-                    label={({ name, value }) => `${name}: ${value}`} 
-                    outerRadius={100} 
-                    fill="#8884d8" 
-                    dataKey="value"
-                  >
-                    {statusData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.fill} />
+            <CardContent className="pt-6 min-h-[300px]">
+               <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={statusData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={90}
+                      paddingAngle={2}
+                      dataKey="value"
+                      stroke="none"
+                    >
+                      {statusData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.fill} />
+                      ))}
+                    </Pie>
+                    <Tooltip 
+                        contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                        itemStyle={{ fontSize: '12px', fontWeight: 600 }}
+                    />
+                    <Legend 
+                        verticalAlign="bottom" 
+                        height={36} 
+                        iconType="circle"
+                        formatter={(value) => <span className="text-xs text-slate-600 font-medium ml-1">{value}</span>}
+                    />
+                  </PieChart>
+               </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          {/* Priority Distribution (Bar Chart) */}
+          <Card className="border border-slate-200 shadow-sm">
+            <CardHeader className="border-b border-slate-100 pb-4">
+               <CardTitle className="text-base font-bold text-slate-800 flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-slate-500" />
+                  Task Priority
+               </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-6 min-h-[300px]">
+               <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={priorityData} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                    <XAxis 
+                        dataKey="name" 
+                        axisLine={false} 
+                        tickLine={false} 
+                        tick={{ fontSize: 12, fill: '#64748b' }} 
+                        dy={10}
+                    />
+                    <YAxis 
+                        axisLine={false} 
+                        tickLine={false} 
+                        tick={{ fontSize: 12, fill: '#64748b' }} 
+                    />
+                    <Tooltip 
+                        cursor={{ fill: '#f8fafc' }}
+                        contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                    />
+                    <Bar dataKey="value" radius={[6, 6, 0, 0]} barSize={40}>
+                      {priorityData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.fill} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+               </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* =====================================================
+            ACTIVE SPRINT TASKS (List)
+        ===================================================== */}
+        {activeSprint && activeSprint.tasks.length > 0 && (
+           <Card className="border border-slate-200 shadow-sm">
+              <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-4">
+                 <div className="flex items-center justify-between">
+                    <CardTitle className="text-base font-bold text-slate-800">
+                       Work in Progress (Active Sprint)
+                    </CardTitle>
+                    <span className="text-xs font-medium px-2.5 py-1 bg-blue-100 text-blue-700 rounded-full">
+                       {activeSprint.tasks.length} issues
+                    </span>
+                 </div>
+              </CardHeader>
+              <CardContent className="p-0">
+                 <div className="divide-y divide-slate-100">
+                    {activeSprint.tasks.slice(0, 5).map((task) => (
+                       <div key={task.id} className="p-4 hover:bg-slate-50 transition-colors flex items-center justify-between gap-4">
+                          <div className="flex items-center gap-3 min-w-0">
+                             {/* Status Icon */}
+                             {task.status === 'done' ? (
+                                <div className="w-5 h-5 rounded bg-green-100 flex items-center justify-center shrink-0">
+                                   <CheckCircle className="w-3.5 h-3.5 text-green-600" />
+                                </div>
+                             ) : task.status === 'in-progress' ? (
+                                <div className="w-5 h-5 rounded bg-blue-100 flex items-center justify-center shrink-0">
+                                   <Clock className="w-3.5 h-3.5 text-blue-600" />
+                                </div>
+                             ) : (
+                                <div className="w-5 h-5 rounded bg-slate-100 flex items-center justify-center shrink-0">
+                                   <div className="w-2.5 h-2.5 rounded-sm border border-slate-400"></div>
+                                </div>
+                             )}
+                             
+                             <div className="min-w-0">
+                                <p className="text-sm font-medium text-slate-900 truncate">{task.title}</p>
+                                <p className="text-xs text-slate-500 uppercase font-bold tracking-wider">{task.id}</p>
+                             </div>
+                          </div>
+
+                          {/* Priority Badge */}
+                          <span className={`
+                             px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide border shrink-0
+                             ${task.priority === 'critical' ? 'bg-red-50 text-red-700 border-red-200' : 
+                               task.priority === 'high' ? 'bg-orange-50 text-orange-700 border-orange-200' :
+                               task.priority === 'medium' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                               'bg-slate-100 text-slate-600 border-slate-200'}
+                          `}>
+                             {task.priority}
+                          </span>
+                       </div>
                     ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow-xl">
-            <CardHeader className="bg-gradient-to-r from-purple-50 to-pink-50">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center shadow-md">
-                  <Zap className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <CardTitle>Tasks by Priority</CardTitle>
-                  <p className="text-sm text-gray-500">Distribution of task priorities</p>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="pt-6">
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={priorityData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                  <XAxis dataKey="name" />
-                  <YAxis />
-                  <Tooltip />
-                  <Bar dataKey="value" fill="url(#colorGradient)" radius={[8, 8, 0, 0]} />
-                  <defs>
-                    <linearGradient id="colorGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#a855f7" />
-                      <stop offset="100%" stopColor="#ec4899" />
-                    </linearGradient>
-                  </defs>
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Active Sprint Tasks */}
-        {activeSprint && (
-          <Card className="border-0 shadow-xl animate-fadeInUp delay-300">
-            <CardHeader className="bg-gradient-to-r from-orange-50 to-red-50">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-red-500 rounded-xl flex items-center justify-center shadow-md">
-                  <Target className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <CardTitle>{activeSprint.name}</CardTitle>
-                  <p className="text-sm text-gray-500">{activeSprint.goal}</p>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="pt-6">
-              <div className="space-y-3">
-                {activeSprint.tasks.slice(0, 5).map((task, index) => (
-                  <div 
-                    key={task.id} 
-                    className="flex items-center justify-between p-4 border-2 border-gray-200 rounded-2xl hover:shadow-lg hover:border-gray-300 transition-all duration-300 bg-white animate-fadeInUp"
-                    style={{ animationDelay: `${index * 50}ms` }}
-                  >
-                    <div className="flex-1">
-                      <p className="font-semibold text-gray-900">{task.title}</p>
-                      <div className="flex gap-2 mt-2">
-                        <span className={`text-xs px-3 py-1 rounded-full font-medium ${
-                          task.priority === 'critical' ? 'bg-gradient-to-r from-red-500 to-red-600 text-white' :
-                          task.priority === 'high' ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white' :
-                          task.priority === 'medium' ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white' :
-                          'bg-gradient-to-r from-gray-400 to-gray-500 text-white'
-                        }`}>
-                          {task.priority}
-                        </span>
-                        <span className={`text-xs px-3 py-1 rounded-full font-medium ${
-                          task.status === 'done' ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white' :
-                          task.status === 'review' ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white' :
-                          task.status === 'in-progress' ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white' :
-                          'bg-gradient-to-r from-gray-400 to-gray-500 text-white'
-                        }`}>
-                          {task.status}
-                        </span>
-                      </div>
+                 </div>
+                 {activeSprint.tasks.length > 5 && (
+                    <div className="p-3 bg-slate-50 text-center border-t border-slate-100">
+                       <button className="text-xs font-medium text-blue-600 hover:underline">View all tasks</button>
                     </div>
-                    {task.assignee && (
-                      <div className="text-3xl ml-4">{task.assignee.avatar}</div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+                 )}
+              </CardContent>
+           </Card>
         )}
-      </div>
 
-      <style jsx>{`
-        .bg-grid-white\/10 {
-          background-image: linear-gradient(white 1px, transparent 1px),
-            linear-gradient(90deg, white 1px, transparent 1px);
-          background-size: 20px 20px;
-          opacity: 0.1;
-        }
-        
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        
-        @keyframes fadeInUp {
-          from {
-            opacity: 0;
-            transform: translateY(20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        
-        .animate-fadeIn {
-          animation: fadeIn 0.5s ease-out;
-        }
-        
-        .animate-fadeInUp {
-          animation: fadeInUp 0.5s ease-out;
-        }
-        
-        .delay-100 {
-          animation-delay: 100ms;
-        }
-        
-        .delay-200 {
-          animation-delay: 200ms;
-        }
-        
-        .delay-300 {
-          animation-delay: 300ms;
-        }
-      `}</style>
+      </div>
     </div>
   )
 }

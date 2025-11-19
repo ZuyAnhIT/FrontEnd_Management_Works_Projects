@@ -7,7 +7,6 @@ import {
   GitBranch,
   Calendar,
   BarChart3,
-  ChevronRight,
 } from 'lucide-react'
 import { usePathname, useParams } from 'next/navigation'
 import Link from 'next/link'
@@ -64,42 +63,47 @@ export default function ProjectNavTabs({
   ]
 
   return (
-    <div className="bg-white border-b border-gray-200">
-      <div className="flex items-center h-14 px-4 gap-2">
+    <div className="bg-white border-b border-slate-200 sticky top-14 z-30">
+      <div className="flex items-center h-12 px-4 lg:px-6 gap-4">
         
         {/* Menu button for mobile */}
         <button
           onClick={onMenuToggle}
-          className="lg:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors"
+          className="lg:hidden p-2 rounded-md hover:bg-slate-100 text-slate-500 transition-colors"
         >
-          <MenuIcon className="w-5 h-5 text-gray-700" />
+          <MenuIcon className="w-5 h-5" />
         </button>
 
-        {/* Navigation Tabs */}
+        {/* Navigation Tabs Container */}
         <div className="flex-1 overflow-x-auto scrollbar-hide">
-          <div className="flex gap-0.5">
+          <div className="flex gap-6 h-full">
             {navTabs.map((tab) => {
-              const isActive =
-                pathname === tab.path ||
-                (tab.id === 'dashboard' &&
-                  pathname.endsWith(`/project/${projectId}`))
+              // Logic check active path chính xác hơn
+              const isActive = 
+                pathname === tab.path || 
+                (tab.id === 'dashboard' && pathname?.endsWith(`/project/${projectId}`));
 
               return (
-                <Link key={tab.id} href={tab.path}>
+                <Link key={tab.id} href={tab.path} className="relative flex items-center h-full group">
                   <button
-                    className={`flex items-center gap-2 px-4 py-2.5 whitespace-nowrap transition-all duration-200 font-medium border-b-2 ${
-                      isActive
-                        ? 'text-blue-600 border-blue-600 bg-blue-50/50'
-                        : 'text-gray-600 border-transparent hover:text-gray-800'
-                    }`}
+                    className={`
+                      flex items-center gap-2 py-3 text-sm font-medium transition-colors whitespace-nowrap
+                      ${isActive 
+                        ? 'text-blue-600' // Active: Chữ xanh
+                        : 'text-slate-600 hover:text-slate-900' // Inactive: Chữ xám
+                      }
+                    `}
                   >
-                    <tab.icon className="w-4 h-4" />
+                    {/* Icon ẩn trên mobile nhỏ để tiết kiệm chỗ, hiện trên tablet trở lên */}
+                    <tab.icon className={`w-4 h-4 ${isActive ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-600'}`} />
+                    
                     <span>{tab.label}</span>
-
-                    {isActive && (
-                      <ChevronRight className="w-3 h-3 animate-pulse" />
-                    )}
                   </button>
+
+                  {/* Active Indicator Bar (Gạch chân xanh) */}
+                  {isActive && (
+                    <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-blue-600 rounded-t-full animate-in fade-in zoom-in-x duration-200"></div>
+                  )}
                 </Link>
               )
             })}

@@ -1,17 +1,13 @@
 "use client";
 import { useEffect, useState } from "react";
 import {
-  FolderKanban,
   Loader2,
-  Sparkles,
-  PlusCircle,
-  Building,
-  Trash2,
+  Plus,
   Search,
-  Grid3x3,
-  List,
+  Grid,
+  List as ListIcon,
   Filter,
-  TrendingUp,
+  Building2,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -21,6 +17,7 @@ import {
 } from "@/services/apiWorkspace";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/components/ui/ToastProvider";
+import { Button } from "@/components/ui/button"; // Giả sử có component Button chuẩn
 
 import CreateWorkspaceModal from "@/components/features/admin/CreateWorkspaceModal";
 import WorkspaceCard from "@/components/features/admin/WorkspaceCard";
@@ -64,24 +61,24 @@ export default function CompanyWorkspacesPage() {
 
   const handleDelete = async (workspaceId: number) => {
     if (!companyId) return;
-    if (!window.confirm("Bạn có chắc muốn xóa workspace này không?")) return;
+    // Thay confirm native bằng modal confirm (nếu có) sẽ tốt hơn
+    if (!window.confirm("Are you sure you want to delete this workspace?")) return;
 
     try {
       await deleteWorkspace(companyId, workspaceId);
-      showToast("Đã xóa workspace thành công!", "success");
+      showToast("Workspace deleted successfully!", "success");
       setWorkspaces((prev) => prev.filter((w) => w.workspaceId !== workspaceId));
     } catch (err: any) {
-      showToast(err.message || "Xóa thất bại!", "error");
+      showToast(err.message || "Failed to delete workspace!", "error");
     }
   };
 
   const handleCreateSuccess = (newWs: any) => {
     setWorkspaces((prev) => [newWs, ...prev]);
     setShowCreateModal(false);
-    showToast("Đã tạo workspace mới!", "success");
+    showToast("Workspace created successfully!", "success");
   };
 
-  // Filter logic
   const filteredList = workspaces
     .filter((w) =>
       w.workspaceName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -93,159 +90,136 @@ export default function CompanyWorkspacesPage() {
 
   if (isAuthLoading || loading)
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-cyan-50 to-teal-50">
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="text-center">
-          <Loader2 className="w-16 h-16 text-blue-500 animate-spin mx-auto mb-4" />
-          <p className="text-gray-600 font-medium animate-pulse">Đang tải workspace...</p>
+          <Loader2 className="w-8 h-8 text-blue-600 animate-spin mx-auto mb-2" />
+          <p className="text-sm text-slate-500 font-medium">Loading workspaces...</p>
         </div>
       </div>
     );
 
   if (!companyId)
     return (
-      <div className="min-h-screen flex items-center justify-center text-red-500">
-        Lỗi: Không tìm thấy thông tin công ty.
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 text-red-500">
+        Error: Company information not found.
       </div>
     );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-cyan-50/40">
-      {/* Floating particles effect */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none opacity-30">
-        <div className="absolute top-20 left-10 w-72 h-72 bg-blue-300 rounded-full mix-blend-multiply filter blur-3xl animate-blob"></div>
-        <div className="absolute top-40 right-10 w-72 h-72 bg-cyan-300 rounded-full mix-blend-multiply filter blur-3xl animate-blob animation-delay-2000"></div>
-        <div className="absolute bottom-20 left-1/2 w-72 h-72 bg-teal-300 rounded-full mix-blend-multiply filter blur-3xl animate-blob animation-delay-4000"></div>
-      </div>
-
-      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Enhanced Header */}
-        <div className="relative bg-white/80 backdrop-blur-xl rounded-3xl p-8 mb-8 shadow-2xl border border-white/50 overflow-hidden group">
-          <div className="absolute inset-0 bg-gradient-to-br from-blue-500/90 via-cyan-500/90 to-teal-500/90 opacity-100 group-hover:opacity-95 transition-opacity"></div>
-          
-          <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-1000">
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent skew-x-12 translate-x-[-100%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
-          </div>
-
-          <div className="relative flex flex-col md:flex-row items-center justify-between gap-6">
-            <div className="flex items-center gap-5">
-              <div className="relative w-16 h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center shadow-2xl ring-4 ring-white/30 group-hover:scale-110 transition-transform duration-300">
-                <Building className="w-9 h-9 text-white" />
-                <div className="absolute -top-1 -right-1 w-5 h-5 bg-yellow-400 rounded-full flex items-center justify-center shadow-lg animate-pulse">
-                  <Sparkles className="w-3 h-3 text-yellow-900" />
-                </div>
-              </div>
-              <div className="text-white">
-                <h1 className="text-4xl font-bold mb-1 tracking-tight">Workspace Công ty</h1>
-                <p className="text-white/90 text-sm font-medium flex items-center gap-2">
-                  <TrendingUp className="w-4 h-4" />
-                  Quản lý toàn bộ phòng ban và không gian làm việc
-                </p>
-              </div>
-            </div>
-            <button
+    // Nền xám nhạt (Jira standard)
+    <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
+      
+      <div className="max-w-[1600px] mx-auto px-6 py-8 space-y-6">
+        
+        {/* =====================================================
+            HEADER: Title & Create Button
+        ===================================================== */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+           <div>
+              <h1 className="text-2xl font-bold text-slate-900">Workspaces</h1>
+              <p className="text-sm text-slate-500 mt-1">Manage all departments and working environments</p>
+           </div>
+           
+           <Button 
               onClick={() => setShowCreateModal(true)}
-              className="group/btn relative flex items-center gap-3 bg-white text-blue-600 px-6 py-3.5 rounded-xl font-bold shadow-2xl overflow-hidden transition-all duration-300 hover:scale-105 hover:shadow-blue-500/20 w-full md:w-auto"
-            >
-              <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-cyan-500/10 opacity-0 group-hover/btn:opacity-100 transition-opacity"></div>
-              <PlusCircle className="w-5 h-5 relative z-10 group-hover/btn:rotate-90 transition-transform duration-300" />
-              <span className="relative z-10">Tạo phòng ban mới</span>
-            </button>
-          </div>
+              className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm font-bold h-10 px-5 rounded-[3px]"
+           >
+              <Plus className="w-4 h-4 mr-2" /> Create Workspace
+           </Button>
         </div>
 
-        {/* Enhanced Filters Section */}
-        <div className="bg-white/90 backdrop-blur-xl rounded-2xl p-6 mb-6 shadow-xl border border-gray-100">
-          <div className="flex flex-col lg:flex-row gap-4">
-            {/* Search */}
-            <div className="flex-1 relative">
-              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+        {/* =====================================================
+            TOOLBAR: Search & Filters
+        ===================================================== */}
+        <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm flex flex-col md:flex-row gap-4 items-center justify-between">
+           
+           {/* Search */}
+           <div className="relative w-full md:w-96 group">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Tìm kiếm theo tên workspace hoặc mô tả..."
-                className="w-full pl-12 pr-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:bg-white outline-none transition-all"
+                placeholder="Search workspaces..."
+                className="w-full pl-9 pr-4 h-10 bg-white border border-slate-200 rounded-md text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
               />
-            </div>
+           </div>
 
-            {/* Status Filter */}
-            <div className="flex items-center gap-2 bg-gray-50 rounded-xl px-4 py-2 border-2 border-gray-200">
-              <Filter className="w-4 h-4 text-gray-600" />
-              <select
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-                className="bg-transparent outline-none font-medium text-gray-700"
-              >
-                <option value="all">Tất cả trạng thái</option>
-                <option value="ACTIVE">Hoạt động</option>
-                <option value="INACTIVE">Không hoạt động</option>
-              </select>
-            </div>
+           {/* Right Filters */}
+           <div className="flex items-center gap-3 w-full md:w-auto">
+              
+              {/* Status Filter */}
+              <div className="relative">
+                 <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500">
+                    <Filter className="w-4 h-4" />
+                 </div>
+                 <select
+                    value={filterStatus}
+                    onChange={(e) => setFilterStatus(e.target.value)}
+                    className="h-10 pl-9 pr-8 bg-white border border-slate-200 rounded-md text-sm font-medium text-slate-700 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 appearance-none cursor-pointer hover:bg-slate-50 transition-colors"
+                 >
+                    <option value="all">All Status</option>
+                    <option value="ACTIVE">Active</option>
+                    <option value="INACTIVE">Inactive</option>
+                 </select>
+              </div>
 
-            {/* View Mode Toggle */}
-            <div className="flex gap-2 bg-gray-50 rounded-xl p-1 border-2 border-gray-200">
-              <button
-                onClick={() => setViewMode("grid")}
-                className={`p-2 rounded-lg transition-all ${
-                  viewMode === "grid"
-                    ? "bg-white text-blue-600 shadow-md"
-                    : "text-gray-500 hover:text-gray-700"
-                }`}
-              >
-                <Grid3x3 className="w-5 h-5" />
-              </button>
-              <button
-                onClick={() => setViewMode("list")}
-                className={`p-2 rounded-lg transition-all ${
-                  viewMode === "list"
-                    ? "bg-white text-blue-600 shadow-md"
-                    : "text-gray-500 hover:text-gray-700"
-                }`}
-              >
-                <List className="w-5 h-5" />
-              </button>
-            </div>
-          </div>
+              {/* View Toggle */}
+              <div className="flex bg-slate-100 p-1 rounded-md border border-slate-200">
+                 <button
+                    onClick={() => setViewMode("grid")}
+                    className={`p-1.5 rounded-sm transition-all ${viewMode === 'grid' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
+                    title="Grid View"
+                 >
+                    <Grid className="w-4 h-4" />
+                 </button>
+                 <button
+                    onClick={() => setViewMode("list")}
+                    className={`p-1.5 rounded-sm transition-all ${viewMode === 'list' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
+                    title="List View"
+                 >
+                    <ListIcon className="w-4 h-4" />
+                 </button>
+              </div>
+           </div>
         </div>
 
-        {/* Workspaces List */}
+        {/* =====================================================
+            CONTENT: Workspaces List
+        ===================================================== */}
         {filteredList.length === 0 ? (
-          <div className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-xl border-2 border-dashed border-gray-300 p-20 text-center animate-fadeInUp">
-            <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl flex items-center justify-center">
-              <Building className="w-10 h-10 text-gray-400" />
+          /* Empty State */
+          <div className="flex flex-col items-center justify-center py-20 border-2 border-dashed border-slate-200 rounded-xl bg-white">
+            <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4 border border-slate-100">
+              <Building2 className="w-8 h-8 text-slate-300" />
             </div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-2">
-              {searchQuery || filterStatus !== "all"
-                ? "Không tìm thấy workspace phù hợp"
-                : "Chưa có workspace nào"}
+            <h3 className="text-lg font-bold text-slate-900 mb-1">
+              {searchQuery || filterStatus !== "all" ? "No workspaces found" : "No workspaces yet"}
             </h3>
-            <p className="text-gray-500 mb-6">
-              {searchQuery || filterStatus !== "all"
-                ? "Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm"
-                : "Bắt đầu bằng cách tạo phòng ban đầu tiên"}
+            <p className="text-sm text-slate-500 mb-6 max-w-xs text-center">
+              {searchQuery || filterStatus !== "all" 
+                ? "Try adjusting your filters or search query." 
+                : "Get started by creating your first workspace to organize your team."}
             </p>
             {!searchQuery && filterStatus === "all" && (
-              <button
-                onClick={() => setShowCreateModal(true)}
-                className="inline-flex items-center gap-2 bg-gradient-to-r from-blue-500 to-cyan-500 text-white px-6 py-3 rounded-xl font-bold shadow-lg hover:shadow-xl hover:scale-105 transition-all"
-              >
-                <PlusCircle className="w-5 h-5" />
-                Tạo phòng ban đầu tiên
-              </button>
+               <Button 
+                  onClick={() => setShowCreateModal(true)}
+                  variant="outline"
+                  className="border-slate-300 text-slate-700"
+               >
+                  <Plus className="w-4 h-4 mr-2" /> Create Workspace
+               </Button>
             )}
           </div>
         ) : (
-          <div className={`animate-fadeInUp ${
+          /* Grid/List Content */
+          <div className={`animate-in fade-in duration-500 ${
             viewMode === "grid"
-              ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-              : "space-y-4"
+              ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6" // Tăng số cột cho màn hình lớn
+              : "flex flex-col space-y-3"
           }`}>
             {filteredList.map((ws, idx) => (
-              <div
-                key={ws.workspaceId}
-                style={{ animationDelay: `${idx * 50}ms` }}
-                className="animate-fadeInUp"
-              >
+              <div key={ws.workspaceId}>
                 <WorkspaceCard
                   workspace={ws}
                   onDelete={handleDelete}
@@ -260,47 +234,10 @@ export default function CompanyWorkspacesPage() {
         <CreateWorkspaceModal
           isOpen={showCreateModal}
           onClose={() => setShowCreateModal(false)}
-          companyId={companyId!}
+          companyId={companyId}
           onSuccess={handleCreateSuccess}
         />
       </div>
-
-      <style jsx>{`
-        @keyframes fadeInUp {
-          from {
-            opacity: 0;
-            transform: translateY(20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        .animate-fadeInUp {
-          animation: fadeInUp 0.6s ease-out forwards;
-        }
-
-        @keyframes blob {
-          0%, 100% {
-            transform: translate(0, 0) scale(1);
-          }
-          33% {
-            transform: translate(30px, -50px) scale(1.1);
-          }
-          66% {
-            transform: translate(-20px, 20px) scale(0.9);
-          }
-        }
-        .animate-blob {
-          animation: blob 7s infinite;
-        }
-        .animation-delay-2000 {
-          animation-delay: 2s;
-        }
-        .animation-delay-4000 {
-          animation-delay: 4s;
-        }
-      `}</style>
     </div>
   );
 }
