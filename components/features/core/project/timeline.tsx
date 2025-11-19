@@ -3,14 +3,14 @@
 import { Project } from '@/lib/mock-data'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Plus, Calendar, Sparkles, Clock, TrendingUp } from 'lucide-react'
+import { Plus, Calendar, Clock, AlertTriangle, ChevronRight } from 'lucide-react'
 
 interface TimelineProps {
   project: Project
 }
 
 export function Timeline({ project }: TimelineProps) {
-  const sortedTasks = [...project.allTasks].sort(
+  const sortedTasks = [...(project.allTasks || [])].sort(
     (a, b) => new Date(a.dueDate || '2099-01-01').getTime() - new Date(b.dueDate || '2099-01-01').getTime()
   )
 
@@ -36,94 +36,88 @@ export function Timeline({ project }: TimelineProps) {
   })
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-white via-purple-50/30 to-white">
-      <div className="p-6 max-w-[1600px] mx-auto space-y-6">
-        {/* Header */}
-        <div className="relative overflow-hidden bg-gradient-to-br from-purple-500 via-pink-500 to-purple-600 rounded-3xl p-8 shadow-2xl animate-fadeIn">
-          <div className="absolute inset-0 bg-grid-white/10"></div>
-          <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
-          
-          <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <div className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center shadow-lg">
-                <Calendar className="w-8 h-8 text-white" />
+    <div className="min-h-screen bg-slate-50/50 text-slate-900 font-sans pb-10">
+      <div className="p-8 max-w-[2400px] mx-auto space-y-8">
+        
+        {/* =====================================================
+            HEADER: Clean & Minimalist
+        ===================================================== */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+           <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-purple-600 rounded-lg flex items-center justify-center shadow-sm">
+                <Calendar className="w-6 h-6 text-white" />
               </div>
               <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <h1 className="text-3xl font-bold text-white">Timeline</h1>
-                  <Sparkles className="w-5 h-5 text-yellow-300 animate-pulse" />
-                </div>
-                <div className="flex items-center gap-4 text-white/80">
-                  <span className="text-sm">{sortedTasks.length} tasks scheduled</span>
-                  <span className="text-sm flex items-center gap-1">
-                    <Clock className="w-4 h-4" />
-                    {upcomingTasks.length} due this week
-                  </span>
+                <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+                  Timeline
+                </h1>
+                <div className="flex items-center gap-3 text-sm text-slate-500 mt-0.5">
+                    <span>{sortedTasks.length} tasks scheduled</span>
+                    <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
+                    <span className="flex items-center gap-1">
+                        <Clock className="w-3.5 h-3.5" />
+                        {upcomingTasks.length} due this week
+                    </span>
                 </div>
               </div>
-            </div>
-            
-            <Button className="group bg-white text-purple-600 hover:bg-gray-50 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 px-6 py-3 h-auto font-semibold">
-              <Plus className="w-5 h-5 mr-2 group-hover:rotate-90 transition-transform duration-300" />
-              Add Task
-            </Button>
-          </div>
+           </div>
+           
+           <Button className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm h-10 px-5 font-medium rounded-[3px]">
+              <Plus className="w-4 h-4 mr-2" /> Add Task
+           </Button>
         </div>
 
-        {/* Upcoming Tasks Alert */}
+        {/* =====================================================
+            UPCOMING ALERT: Flat Design
+        ===================================================== */}
         {upcomingTasks.length > 0 && (
-          <Card className="border-0 shadow-lg bg-gradient-to-r from-amber-50 to-orange-50 border-l-4 border-l-amber-500 animate-fadeInUp">
-            <CardContent className="p-6">
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 bg-gradient-to-br from-amber-500 to-orange-500 rounded-2xl flex items-center justify-center shadow-lg flex-shrink-0">
-                  <TrendingUp className="w-6 h-6 text-white" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="font-bold text-amber-900 text-lg mb-1">Upcoming Deadlines</h3>
-                  <p className="text-amber-700 text-sm">
-                    {upcomingTasks.length} task{upcomingTasks.length > 1 ? 's' : ''} due in the next 7 days
+          <div className="bg-orange-50 border border-orange-200 border-l-4 border-l-orange-500 rounded-r-lg p-5 flex flex-col sm:flex-row gap-4 items-start sm:items-center animate-in fade-in slide-in-from-top-2">
+              <div className="p-2 bg-orange-100 rounded-full shrink-0 text-orange-600">
+                  <AlertTriangle className="w-5 h-5" />
+              </div>
+              <div className="flex-1">
+                  <h3 className="font-bold text-orange-900 text-sm mb-1">Upcoming Deadlines</h3>
+                  <p className="text-orange-700 text-sm">
+                    You have {upcomingTasks.length} task{upcomingTasks.length > 1 ? 's' : ''} due in the next 7 days.
                   </p>
                   <div className="flex flex-wrap gap-2 mt-3">
                     {upcomingTasks.slice(0, 3).map((task) => (
-                      <span key={task.id} className="text-xs bg-white px-3 py-1.5 rounded-full text-amber-700 font-medium shadow-sm">
+                      <span key={task.id} className="text-xs bg-white border border-orange-200 px-2 py-1 rounded-md text-orange-800 font-medium flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
                         {task.title}
                       </span>
                     ))}
                     {upcomingTasks.length > 3 && (
-                      <span className="text-xs bg-white px-3 py-1.5 rounded-full text-amber-700 font-medium shadow-sm">
+                      <span className="text-xs text-orange-700 font-medium pt-1 pl-1">
                         +{upcomingTasks.length - 3} more
                       </span>
                     )}
                   </div>
-                </div>
               </div>
-            </CardContent>
-          </Card>
+          </div>
         )}
 
-        {/* Timeline by Month */}
-        <div className="space-y-8 animate-fadeInUp delay-100">
-          {Object.entries(groupedByMonth).map(([month, tasks], monthIndex) => (
-            <div key={month} className="space-y-4 animate-fadeInUp" style={{ animationDelay: `${monthIndex * 100}ms` }}>
+        {/* =====================================================
+            TIMELINE: Minimalist Vertical Line
+        ===================================================== */}
+        <div className="space-y-10 pl-2">
+          {Object.entries(groupedByMonth).map(([month, tasks]) => (
+            <div key={month} className="relative">
+              
               {/* Month Header */}
-              <div className="sticky top-4 z-10 bg-gradient-to-r from-purple-100 to-pink-100 rounded-2xl px-6 py-4 shadow-lg backdrop-blur-sm border border-purple-200">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center shadow-md">
-                    <Calendar className="w-5 h-5 text-white" />
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-bold text-purple-900">{month}</h2>
-                    <p className="text-sm text-purple-600">{tasks.length} task{tasks.length > 1 ? 's' : ''}</p>
-                  </div>
-                </div>
+              <div className="sticky top-20 z-10 mb-6 flex items-center gap-4">
+                 <div className="w-3 h-3 bg-purple-600 rounded-full ring-4 ring-purple-50 shadow-sm"></div>
+                 <h2 className="text-lg font-bold text-slate-800 bg-slate-50 px-2 py-1 rounded-md inline-block border border-slate-200/50">
+                    {month}
+                 </h2>
               </div>
 
-              {/* Tasks for this month */}
-              <div className="space-y-4 ml-0 relative">
-                {/* Timeline Line */}
-                <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-gradient-to-b from-purple-300 via-pink-300 to-purple-300"></div>
+              {/* Timeline Line */}
+              <div className="absolute left-1.5 top-3 bottom-0 w-[2px] bg-slate-200 -z-10"></div>
 
-                {tasks.map((task, taskIndex) => {
+              {/* Tasks List */}
+              <div className="space-y-4 pl-8">
+                {tasks.map((task) => {
                   const daysUntilDue = task.dueDate 
                     ? Math.ceil((new Date(task.dueDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
                     : null
@@ -133,97 +127,79 @@ export function Timeline({ project }: TimelineProps) {
                   return (
                     <Card 
                       key={task.id} 
-                      className={`ml-16 border-0 shadow-lg hover:shadow-2xl transition-all duration-300 hover:scale-[1.02] animate-fadeInUp ${
-                        isOverdue ? 'ring-2 ring-red-500' : isUpcoming ? 'ring-2 ring-amber-500' : ''
-                      }`}
-                      style={{ animationDelay: `${taskIndex * 50}ms` }}
+                      className={`
+                        border-l-[3px] shadow-sm hover:shadow-md transition-all duration-200 bg-white group cursor-pointer
+                        ${isOverdue ? 'border-l-red-500' : isUpcoming ? 'border-l-orange-500' : 'border-l-slate-300'}
+                        border-t border-r border-b border-slate-200
+                      `}
                     >
-                      <CardContent className="p-6">
-                        <div className="flex items-start gap-4">
-                          {/* Date Badge */}
-                          <div className="flex-shrink-0">
-                            <div className={`relative w-20 rounded-2xl p-3 text-center shadow-lg ${
-                              isOverdue 
-                                ? 'bg-gradient-to-br from-red-500 to-red-600' 
-                                : isUpcoming
-                                ? 'bg-gradient-to-br from-amber-500 to-orange-500'
-                                : 'bg-gradient-to-br from-purple-500 to-pink-500'
-                            }`}>
-                              {task.dueDate ? (
+                      <CardContent className="p-4 flex items-center gap-6">
+                        
+                        {/* Date Box */}
+                        <div className={`
+                            flex flex-col items-center justify-center w-16 h-16 rounded-lg border shrink-0
+                            ${isOverdue ? 'bg-red-50 border-red-100 text-red-700' : 
+                              isUpcoming ? 'bg-orange-50 border-orange-100 text-orange-700' : 
+                              'bg-slate-50 border-slate-200 text-slate-600'}
+                        `}>
+                             {task.dueDate ? (
                                 <>
-                                  <div className="text-white text-xs font-bold uppercase">
-                                    {new Date(task.dueDate).toLocaleDateString('en-US', { month: 'short' })}
-                                  </div>
-                                  <div className="text-white text-2xl font-bold">
-                                    {new Date(task.dueDate).getDate()}
-                                  </div>
-                                  {daysUntilDue !== null && (
-                                    <div className="text-white text-xs mt-1 font-medium">
-                                      {isOverdue ? `${Math.abs(daysUntilDue)}d ago` : `${daysUntilDue}d left`}
-                                    </div>
-                                  )}
+                                   <span className="text-[10px] font-bold uppercase leading-none">{new Date(task.dueDate).toLocaleDateString('en-US', { month: 'short' })}</span>
+                                   <span className="text-xl font-bold leading-tight">{new Date(task.dueDate).getDate()}</span>
                                 </>
-                              ) : (
-                                <div className="text-white text-xs font-bold">No Date</div>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Task Content */}
-                          <div className="flex-1">
-                            <div className="flex flex-wrap items-center gap-3 mb-3">
-                              <h3 className="font-bold text-gray-900 text-lg">{task.title}</h3>
-                              
-                              <span className={`text-xs px-3 py-1.5 rounded-full font-semibold shadow-md ${
-                                task.priority === 'critical' ? 'bg-gradient-to-r from-red-500 to-red-600 text-white' :
-                                task.priority === 'high' ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white' :
-                                task.priority === 'medium' ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white' :
-                                'bg-gradient-to-r from-gray-400 to-gray-500 text-white'
-                              }`}>
-                                {task.priority}
-                              </span>
-                              
-                              <span className={`text-xs px-3 py-1.5 rounded-full font-semibold shadow-md ${
-                                task.status === 'done' ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white' :
-                                task.status === 'review' ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white' :
-                                task.status === 'in-progress' ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white' :
-                                'bg-gradient-to-r from-gray-400 to-gray-500 text-white'
-                              }`}>
-                                {task.status}
-                              </span>
-                            </div>
-
-                            <p className="text-sm text-gray-600 leading-relaxed mb-3">
-                              {task.description}
-                            </p>
-
-                            {/* Subtasks Preview */}
-                            {task.subtasks.length > 0 && (
-                              <div className="flex items-center gap-2 text-sm text-gray-500">
-                                <div className="flex items-center gap-1">
-                                  <div className="w-4 h-4 bg-purple-100 rounded flex items-center justify-center">
-                                    <span className="text-xs text-purple-600">✓</span>
-                                  </div>
-                                  <span className="font-medium">
-                                    {task.subtasks.filter(st => st.completed).length}/{task.subtasks.length} subtasks
-                                  </span>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Assignee Avatar */}
-                          {task.assignee && (
-                            <div className="flex-shrink-0 group">
-                              <div className="relative">
-                                <div className="absolute -inset-1 bg-gradient-to-r from-purple-500 to-pink-500 rounded-2xl blur opacity-30 group-hover:opacity-60 transition-opacity duration-300"></div>
-                                <div className="relative w-14 h-14 bg-white rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
-                                  <span className="text-3xl">{task.assignee.avatar}</span>
-                                </div>
-                              </div>
-                            </div>
-                          )}
+                             ) : (
+                                <span className="text-[10px] font-bold">No Date</span>
+                             )}
                         </div>
+
+                        {/* Task Info */}
+                        <div className="flex-1 min-w-0">
+                           <div className="flex items-center justify-between mb-1">
+                              <h3 className="font-bold text-slate-900 text-base truncate group-hover:text-blue-600 transition-colors">{task.title}</h3>
+                              {daysUntilDue !== null && (
+                                 <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                                    isOverdue ? 'bg-red-100 text-red-700' : 
+                                    isUpcoming ? 'bg-orange-100 text-orange-700' : 
+                                    'bg-slate-100 text-slate-500'
+                                 }`}>
+                                    {isOverdue ? `${Math.abs(daysUntilDue)}d overdue` : `${daysUntilDue}d left`}
+                                 </span>
+                              )}
+                           </div>
+
+                           <p className="text-sm text-slate-500 truncate mb-2">{task.description || "No description provided"}</p>
+
+                           {/* Meta Badges */}
+                           <div className="flex items-center gap-2">
+                              <span className={`text-[10px] px-2 py-0.5 rounded border font-semibold uppercase tracking-wide
+                                 ${task.priority === 'critical' ? 'bg-red-50 text-red-700 border-red-200' :
+                                   task.priority === 'high' ? 'bg-orange-50 text-orange-700 border-orange-200' :
+                                   task.priority === 'medium' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                                   'bg-slate-50 text-slate-600 border-slate-200'}
+                              `}>
+                                 {task.priority}
+                              </span>
+
+                              <span className={`text-[10px] px-2 py-0.5 rounded border font-semibold uppercase tracking-wide
+                                 ${task.status === 'done' ? 'bg-green-50 text-green-700 border-green-200' :
+                                   task.status === 'in-progress' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                                   'bg-slate-50 text-slate-600 border-slate-200'}
+                              `}>
+                                 {task.status}
+                              </span>
+                           </div>
+                        </div>
+
+                        {/* Assignee & Chevron */}
+                        <div className="hidden sm:flex items-center gap-4 pl-4 border-l border-slate-100">
+                           {task.assignee && (
+                              <div className="w-8 h-8 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-sm" title={task.assignee.name}>
+                                 {task.assignee.avatar}
+                              </div>
+                           )}
+                           <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-slate-500 transition-colors" />
+                        </div>
+
                       </CardContent>
                     </Card>
                   )
@@ -235,56 +211,19 @@ export function Timeline({ project }: TimelineProps) {
 
         {/* Empty State */}
         {sortedTasks.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-20 animate-fadeIn">
-            <div className="w-24 h-24 bg-gradient-to-br from-purple-500 to-pink-500 rounded-3xl flex items-center justify-center shadow-2xl mb-6">
-              <Calendar className="w-12 h-12 text-white" />
+          <div className="flex flex-col items-center justify-center py-24 border-2 border-dashed border-slate-200 rounded-xl bg-white">
+            <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
+              <Calendar className="w-8 h-8 text-slate-300" />
             </div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-2">No scheduled tasks</h3>
-            <p className="text-gray-500 mb-6">Add due dates to your tasks to see them here</p>
-            <Button className="group bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 px-6 py-3 h-auto font-semibold">
-              <Plus className="w-5 h-5 mr-2 group-hover:rotate-90 transition-transform duration-300" />
-              Add Your First Task
+            <h3 className="text-lg font-bold text-slate-900">No scheduled tasks</h3>
+            <p className="text-slate-500 text-sm mb-6">Add due dates to your tasks to see them on the timeline</p>
+            <Button variant="outline" className="border-slate-300 text-slate-700">
+              <Plus className="w-4 h-4 mr-2" /> Create Task
             </Button>
           </div>
         )}
-      </div>
 
-      <style jsx>{`
-        .bg-grid-white\/10 {
-          background-image: linear-gradient(white 1px, transparent 1px),
-            linear-gradient(90deg, white 1px, transparent 1px);
-          background-size: 20px 20px;
-          opacity: 0.1;
-        }
-        
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        
-        @keyframes fadeInUp {
-          from {
-            opacity: 0;
-            transform: translateY(20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        
-        .animate-fadeIn {
-          animation: fadeIn 0.5s ease-out;
-        }
-        
-        .animate-fadeInUp {
-          animation: fadeInUp 0.5s ease-out;
-        }
-        
-        .delay-100 {
-          animation-delay: 100ms;
-        }
-      `}</style>
+      </div>
     </div>
   )
 }

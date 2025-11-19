@@ -1,12 +1,13 @@
 "use client";
 import { useState } from "react";
-// ⛔️ SỬA LỖI: Import từ 'services/'
 import { changeUserPassword } from "@/services/apiUser";
 import { useToast } from "@/components/ui/ToastProvider";
-import { LockKeyhole, Eye, EyeOff, Loader2 } from "lucide-react";
-import LoadingButton from "@/components/ui/LoadingButton"; // Dùng LoadingButton thống nhất
+import { Lock, Eye, EyeOff, KeyRound } from "lucide-react";
+import LoadingButton from "@/components/ui/LoadingButton";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input"; // Giả sử có Input
 
-// Tách PasswordInput ra component con
+// Tách PasswordInput ra component con (Minimalist Style)
 function PasswordInput({
   label,
   value,
@@ -20,23 +21,22 @@ function PasswordInput({
 }) {
   const [show, setShow] = useState(false);
   return (
-    <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">
-        {label}
+    <div className="space-y-1.5">
+      <label className="text-sm font-semibold text-slate-900">
+        {label} <span className="text-red-500">*</span>
       </label>
       <div className="relative">
-        <LockKeyhole className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-        <input
+        <Input
           type={show ? "text" : "password"}
           value={value}
           onChange={onChange}
-          className="w-full border-2 border-gray-200 rounded-xl px-10 py-3 pr-10 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+          className="pr-10 h-10 border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-600 transition-all shadow-sm"
           placeholder={placeholder}
         />
         <button
           type="button"
           onClick={() => setShow(!show)}
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
         >
           {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
         </button>
@@ -62,84 +62,94 @@ export default function AccountPage() {
     e.preventDefault();
 
     if (!form.oldPassword || !form.newPassword || !form.confirmNewPassword) {
-      showToast("Vui lòng nhập đầy đủ thông tin!", "warning");
+      showToast("Please fill in all fields.", "warning");
       return;
     }
     if (form.newPassword.length < 6) {
-      showToast("Mật khẩu mới phải có ít nhất 6 ký tự.", "warning");
+      showToast("New password must be at least 6 characters.", "warning");
       return;
     }
     if (form.newPassword !== form.confirmNewPassword) {
-      showToast("Mật khẩu xác nhận không khớp!", "error");
+      showToast("Passwords do not match.", "error");
       return;
     }
 
     try {
       setIsLoading(true);
-      // ⛔️ SỬA LỖI: Import từ 'services/'
       await changeUserPassword(form);
-      showToast("✅ Đổi mật khẩu thành công!", "success");
+      showToast("Password changed successfully!", "success");
       setForm({ oldPassword: "", newPassword: "", confirmNewPassword: "" });
     } catch (err: any) {
-      showToast(err.message || "❌ Không thể đổi mật khẩu!", "error");
+      showToast(err.message || "Failed to change password.", "error");
     } finally {
       setIsLoading(false);
     }
   };
 
-  // 🎨 CHỈ RETURN CARD (Nội dung)
   return (
-    <div className="bg-white rounded-xl shadow-xl border border-gray-200 p-6 sm:p-8 animate-fadeInUp">
-      {/* Header */}
-      <div className="flex items-center gap-4 mb-6 pb-6 border-b border-gray-100">
-        <div className="w-12 h-12 flex items-center justify-center bg-blue-100 rounded-lg">
-          <LockKeyhole className="w-6 h-6 text-blue-600" />
-        </div>
-        <div>
-          <h1 className="text-xl font-semibold text-gray-900">Đổi mật khẩu</h1>
-          <p className="text-sm text-gray-500">
-            Cập nhật mật khẩu mới để bảo mật tài khoản của bạn.
-          </p>
-        </div>
-      </div>
+    <div className="max-w-2xl mx-auto animate-in fade-in duration-300">
+      
+      {/* Card Container */}
+      <Card className="border border-slate-200 shadow-sm bg-white rounded-xl overflow-hidden">
+        
+        {/* Header */}
+        <CardHeader className="border-b border-slate-100 px-8 py-6 bg-white">
+           <div className="flex items-center gap-4">
+              <div className="w-10 h-10 bg-amber-50 border border-amber-100 rounded-lg flex items-center justify-center shadow-sm">
+                 <KeyRound className="w-5 h-5 text-amber-600" />
+              </div>
+              <div>
+                 <CardTitle className="text-lg font-bold text-slate-900">Change Password</CardTitle>
+                 <p className="text-sm text-slate-500 mt-0.5">
+                    Update your password to keep your account secure.
+                 </p>
+              </div>
+           </div>
+        </CardHeader>
 
-      {/* Form */}
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Mật khẩu hiện tại */}
-        <PasswordInput
-          label="Mật khẩu hiện tại"
-          value={form.oldPassword}
-          onChange={(e) => handleChange("oldPassword", e.target.value)}
-          placeholder="Nhập mật khẩu hiện tại"
-        />
+        {/* Body */}
+        <CardContent className="p-8">
+           <form onSubmit={handleSubmit} className="space-y-6">
+              
+              <PasswordInput
+                label="Current Password"
+                value={form.oldPassword}
+                onChange={(e) => handleChange("oldPassword", e.target.value)}
+                placeholder="Enter current password"
+              />
 
-        {/* Mật khẩu mới */}
-        <PasswordInput
-          label="Mật khẩu mới"
-          value={form.newPassword}
-          onChange={(e) => handleChange("newPassword", e.target.value)}
-          placeholder="Nhập mật khẩu mới (ít nhất 6 ký tự)"
-        />
+              <div className="h-px bg-slate-100 my-2"></div>
 
-        {/* Xác nhận mật khẩu */}
-        <PasswordInput
-          label="Xác nhận mật khẩu mới"
-          value={form.confirmNewPassword}
-          onChange={(e) => handleChange("confirmNewPassword", e.target.value)}
-          placeholder="Nhập lại mật khẩu mới"
-        />
+              <div className="grid gap-6 md:grid-cols-2">
+                 <PasswordInput
+                    label="New Password"
+                    value={form.newPassword}
+                    onChange={(e) => handleChange("newPassword", e.target.value)}
+                    placeholder="Enter new password"
+                 />
 
-        {/* Nút submit */}
-        <div className="pt-4 border-t border-gray-100">
-          <LoadingButton
-            type="submit"
-            isLoading={isLoading}
-            text="Lưu thay đổi"
-            loadingText="Đang xử lý..."
-            className="w-full md:w-auto px-6 py-3" // Thêm padding
-          />
-        </div>
-      </form>
+                 <PasswordInput
+                    label="Confirm Password"
+                    value={form.confirmNewPassword}
+                    onChange={(e) => handleChange("confirmNewPassword", e.target.value)}
+                    placeholder="Re-enter new password"
+                 />
+              </div>
+
+              {/* Footer Actions */}
+              <div className="pt-6 flex justify-end">
+                 <LoadingButton
+                    type="submit"
+                    isLoading={isLoading}
+                    text="Change Password"
+                    loadingText="Updating..."
+                    className="bg-blue-600 hover:bg-blue-700 font-bold px-6 shadow-sm"
+                 />
+              </div>
+
+           </form>
+        </CardContent>
+      </Card>
     </div>
   );
 }

@@ -2,43 +2,40 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-// ✅ Lấy user từ Context
 import { useAuth } from "@/context/AuthContext";
-// ⛔️ SỬA LỖI: Import từ 'services/'
 import { getWorkspaceDetail } from "@/services/apiWorkspace";
 import {
   Settings,
   FolderKanban,
   Users,
   Clock,
-  Sparkles,
   Target,
   Loader2,
-  TrendingUp, // ✅ Thêm icon
-  Calendar, // ✅ Thêm icon
-  BarChart3, // ✅ Thêm icon
+  TrendingUp,
+  BarChart3,
+  Briefcase,
+  Layout,
+  ChevronRight
 } from "lucide-react";
 import { useToast } from "@/components/ui/ToastProvider";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"; // Giả sử có
 
 export default function WorkspaceOverviewPage() {
   const { showToast } = useToast();
   const params = useParams();
   const workspaceId = Number(params.workspaceId);
 
-  // ✅ Lấy user từ Context
   const { user, isLoading: isAuthLoading } = useAuth();
-  const companyId = user?.company?.companyId || null; // Lấy companyId
+  const companyId = user?.company?.companyId || null;
 
   const [loading, setLoading] = useState(true);
-  const [workspace, setWorkspace] = useState<any>(null); // Khởi tạo là null
+  const [workspace, setWorkspace] = useState<any>(null);
 
-  // 🧩 Lấy thông tin chi tiết workspace
   useEffect(() => {
-    // Chờ Auth và companyId sẵn sàng
     if (isAuthLoading) return;
     if (!companyId || !workspaceId) {
       if (!isAuthLoading)
-        showToast("Không thể tải thông tin phòng ban!", "error");
+        showToast("Workspace not found", "error");
       setLoading(false);
       return;
     }
@@ -47,289 +44,215 @@ export default function WorkspaceOverviewPage() {
       try {
         setLoading(true);
         const data = await getWorkspaceDetail(companyId, workspaceId);
-
-        // ⚙️ Giả lập số liệu thống kê (nếu cần)
-        // setWorkspace({
-        //   workspaceName: data.workspaceName,
-        //   description: data.description || "Chưa có mô tả",
-        //   memberCount: data.memberCount || Math.floor(Math.random() * 15) + 5,
-        //   projectCount: data.projectCount || Math.floor(Math.random() * 10) + 1,
-        //   taskCount: data.taskCount || Math.floor(Math.random() * 150) + 20,
-        //   completionRate:
-        //     data.completionRate || Math.floor(Math.random() * 100),
-        // });
+        setWorkspace(data); // data thực tế từ API
       } catch (err: any) {
-        showToast(err.message || "Không thể tải thông tin phòng ban!", "error");
+        showToast(err.message || "Failed to load workspace info", "error");
       } finally {
         setLoading(false);
       }
     };
     fetchWorkspace();
-  }, [companyId, workspaceId, isAuthLoading, showToast]); // Thêm isAuthLoading
+  }, [companyId, workspaceId, isAuthLoading, showToast]);
 
   if (isAuthLoading || loading)
     return (
-      <div className="min-h-[80vh] flex items-center justify-center bg-gradient-to-b from-white via-blue-50/40 to-white">
-        <div className="text-center space-y-4">
-          <Loader2 className="w-12 h-12 mx-auto text-green-500 animate-spin" />
-          <p className="text-gray-600 font-medium">
-            Đang tải dữ liệu workspace...
-          </p>
-        </div>
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
       </div>
     );
 
   if (!workspace)
     return (
-      <div className="p-8 text-center text-red-500">
-        Không thể tải dữ liệu phòng ban.
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 text-red-500">
+        Workspace data unavailable.
       </div>
     );
 
-  // 🎨 Giao diện đầy đủ của bạn
   return (
-    <div className="min-h-screen bg-gradient-to-b from-white via-blue-50/40 to-white">
-      {/* 🎨 Background decoration */}
-      <div className="absolute inset-0 -z-10 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 right-1/4 w-96 h-96 bg-green-200 rounded-full mix-blend-multiply blur-3xl opacity-20 animate-pulse"></div>
-        <div className="absolute top-40 left-1/4 w-96 h-96 bg-emerald-200 rounded-full mix-blend-multiply blur-3xl opacity-20 animate-pulse delay-1000"></div>
-      </div>
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-8">
-        {/* 🔹 Hero Header */}
-        <div className="relative overflow-hidden bg-gradient-to-br from-green-500 via-emerald-500 to-cyan-500 rounded-3xl p-8 shadow-2xl animate-fadeIn">
-          <div className="absolute inset-0 bg-grid-white/10"></div>
-
-          <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-            {/* Left side */}
-            <div className="flex items-center gap-4 flex-1">
-              <div className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center shadow-lg">
-                <FolderKanban className="w-8 h-8 text-white" />
+    <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
+      <div className="max-w-[1600px] mx-auto px-6 py-8 space-y-8">
+        
+        {/* 1. HEADER SECTION */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+           <div className="flex items-start gap-5">
+              {/* Workspace Icon */}
+              <div className="w-16 h-16 rounded-xl bg-blue-600 flex items-center justify-center shadow-sm shrink-0">
+                 <FolderKanban className="w-8 h-8 text-white" />
               </div>
-
+              
+              {/* Title & Meta */}
               <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <Sparkles className="w-5 h-5 text-yellow-300 animate-pulse" />
-                  <span className="text-white/80 text-sm font-medium">
-                    Workspace
-                  </span>
-                </div>
-                <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
-                  {workspace.workspaceName}
-                </h1>
-                <p className="text-white/80 text-sm">
-                  /{workspace.workspaceName.toLowerCase().replace(/\s/g, "-")}
-                </p>
+                 <h1 className="text-3xl font-bold text-slate-900 leading-tight">
+                    {workspace.workspaceName}
+                 </h1>
+                 <p className="text-sm text-slate-500 mt-1 font-mono">
+                    /{workspace.workspaceName.toLowerCase().replace(/\s/g, "-")}
+                 </p>
+                 <p className="text-sm text-slate-500 mt-2 max-w-2xl line-clamp-2">
+                    {workspace.description || "No description provided for this workspace."}
+                 </p>
               </div>
-            </div>
+           </div>
 
-            {/* Right side - Action buttons */}
-            <div className="flex gap-3 flex-wrap">
+           {/* Actions */}
+           <div className="flex gap-3">
               <button
-                onClick={() =>
-                  showToast("Chức năng này đang được phát triển", "info")
-                }
-                className="flex items-center gap-2 px-5 py-3 bg-white/20 backdrop-blur-sm rounded-xl hover:bg-white/30 text-white font-medium transition-all shadow-lg hover:shadow-xl"
+                 onClick={() => showToast("Settings feature coming soon", "info")}
+                 className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-md text-slate-700 font-medium hover:bg-slate-50 hover:text-slate-900 transition-colors shadow-sm"
               >
-                <Settings className="w-5 h-5" />
-                <span className="hidden sm:inline">Cài đặt</span>
+                 <Settings className="w-4 h-4" />
+                 Settings
               </button>
-            </div>
-          </div>
-
-          {/* Decorative circles */}
-          <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
-          <div className="absolute -left-8 top-1/2 w-24 h-24 bg-white/10 rounded-full blur-2xl"></div>
+           </div>
         </div>
 
-        {/* 📊 Stats Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 animate-fadeInUp">
-          {/* Dự án */}
-          <div className="group relative overflow-hidden bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
-            <div className="absolute inset-0 bg-gradient-to-br from-blue-50 to-cyan-50 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+        {/* 2. STATS OVERVIEW */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+           
+           {/* Projects Card */}
+           <Card className="border border-slate-200 shadow-sm hover:shadow-md transition-all">
+              <CardContent className="p-6">
+                 <div className="flex justify-between items-start mb-4">
+                    <div>
+                       <p className="text-sm font-medium text-slate-500">Active Projects</p>
+                       <h3 className="text-3xl font-bold text-slate-900 mt-1">
+                          {workspace.projectCount || 0}
+                       </h3>
+                    </div>
+                    <div className="p-2 bg-blue-50 rounded-lg text-blue-600">
+                       <Briefcase className="w-5 h-5" />
+                    </div>
+                 </div>
+                 <div className="flex items-center gap-1 text-xs font-medium text-green-600">
+                    <TrendingUp className="w-3 h-3" />
+                    <span>+2 new this week</span>
+                 </div>
+              </CardContent>
+           </Card>
 
-            <div className="relative z-10">
-              <div className="flex items-center justify-between mb-4">
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center shadow-md">
-                  <FolderKanban className="w-6 h-6 text-white" />
-                </div>
-                <span className="text-xs font-semibold px-3 py-1 bg-blue-50 text-blue-600 rounded-full">
-                  Projects
-                </span>
-              </div>
+           {/* Members Card */}
+           <Card className="border border-slate-200 shadow-sm hover:shadow-md transition-all">
+              <CardContent className="p-6">
+                 <div className="flex justify-between items-start mb-4">
+                    <div>
+                       <p className="text-sm font-medium text-slate-500">Team Members</p>
+                       <h3 className="text-3xl font-bold text-slate-900 mt-1">
+                          {workspace.memberCount || 0}
+                       </h3>
+                    </div>
+                    <div className="p-2 bg-green-50 rounded-lg text-green-600">
+                       <Users className="w-5 h-5" />
+                    </div>
+                 </div>
+                 <div className="flex items-center gap-1 text-xs font-medium text-green-600">
+                    <TrendingUp className="w-3 h-3" />
+                    <span>Growing team</span>
+                 </div>
+              </CardContent>
+           </Card>
 
-              <h3 className="text-3xl font-bold text-gray-900 mb-1">
-                {workspace.projectCount}
-              </h3>
-              <p className="text-sm text-gray-600 font-medium">
-                Dự án đang hoạt động
-              </p>
+           {/* Tasks Card */}
+           <Card className="border border-slate-200 shadow-sm hover:shadow-md transition-all">
+              <CardContent className="p-6">
+                 <div className="flex justify-between items-start mb-4">
+                    <div>
+                       <p className="text-sm font-medium text-slate-500">Total Tasks</p>
+                       <h3 className="text-3xl font-bold text-slate-900 mt-1">
+                          {workspace.taskCount || 0}
+                       </h3>
+                    </div>
+                    <div className="p-2 bg-purple-50 rounded-lg text-purple-600">
+                       <Layout className="w-5 h-5" />
+                    </div>
+                 </div>
+                 <div className="flex items-center gap-1 text-xs font-medium text-slate-400">
+                    <Clock className="w-3 h-3" />
+                    <span>Updated just now</span>
+                 </div>
+              </CardContent>
+           </Card>
 
-              <div className="mt-3 flex items-center gap-1 text-xs text-blue-600">
-                <TrendingUp className="w-3 h-3" />
-                <span>+2 tuần này</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Thành viên */}
-          <div className="group relative overflow-hidden bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
-            <div className="absolute inset-0 bg-gradient-to-br from-green-50 to-emerald-50 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-
-            <div className="relative z-10">
-              <div className="flex items-center justify-between mb-4">
-                <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-500 rounded-xl flex items-center justify-center shadow-md">
-                  <Users className="w-6 h-6 text-white" />
-                </div>
-                <span className="text-xs font-semibold px-3 py-1 bg-green-50 text-green-600 rounded-full">
-                  Members
-                </span>
-              </div>
-
-              <h3 className="text-3xl font-bold text-gray-900 mb-1">
-                {workspace.memberCount}
-              </h3>
-              <p className="text-sm text-gray-600 font-medium">
-                Thành viên trong team
-              </p>
-
-              <div className="mt-3 flex items-center gap-1 text-xs text-green-600">
-                <TrendingUp className="w-3 h-3" />
-                <span>+3 thành viên mới</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Công việc */}
-          <div className="group relative overflow-hidden bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
-            <div className="absolute inset-0 bg-gradient-to-br from-purple-50 to-pink-50 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-
-            <div className="relative z-10">
-              <div className="flex items-center justify-between mb-4">
-                <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center shadow-md">
-                  <Clock className="w-6 h-6 text-white" />
-                </div>
-                <span className="text-xs font-semibold px-3 py-1 bg-purple-50 text-purple-600 rounded-full">
-                  Tasks
-                </span>
-              </div>
-
-              <h3 className="text-3xl font-bold text-gray-900 mb-1">
-                {workspace.taskCount}
-              </h3>
-              <p className="text-sm text-gray-600 font-medium">
-                Công việc tổng cộng
-              </p>
-
-              <div className="mt-3 flex items-center gap-1 text-xs text-purple-600">
-                <Calendar className="w-3 h-3" />
-                <span>12 deadline tuần này</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Hoàn thành */}
-          <div className="group relative overflow-hidden bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
-            <div className="absolute inset-0 bg-gradient-to-br from-orange-50 to-yellow-50 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-
-            <div className="relative z-10">
-              <div className="flex items-center justify-between mb-4">
-                <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-yellow-500 rounded-xl flex items-center justify-center shadow-md">
-                  <Target className="w-6 h-6 text-white" />
-                </div>
-                <span className="text-xs font-semibold px-3 py-1 bg-orange-50 text-orange-600 rounded-full">
-                  Progress
-                </span>
-              </div>
-
-              <h3 className="text-3xl font-bold bg-gradient-to-r from-orange-500 to-yellow-500 bg-clip-text text-transparent mb-1">
-                {workspace.completionRate}%
-              </h3>
-              <p className="text-sm text-gray-600 font-medium">
-                Tỷ lệ hoàn thành
-              </p>
-
-              {/* Progress bar */}
-              <div className="mt-3 h-2 bg-gray-100 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-orange-500 to-yellow-500 rounded-full transition-all duration-1000"
-                  style={{ width: `${workspace.completionRate}%` }}
-                ></div>
-              </div>
-            </div>
-          </div>
+           {/* Completion Rate Card */}
+           <Card className="border border-slate-200 shadow-sm hover:shadow-md transition-all">
+              <CardContent className="p-6">
+                 <div className="flex justify-between items-start mb-4">
+                    <div>
+                       <p className="text-sm font-medium text-slate-500">Completion Rate</p>
+                       <h3 className="text-3xl font-bold text-slate-900 mt-1">
+                          {workspace.completionRate || 0}%
+                       </h3>
+                    </div>
+                    <div className="p-2 bg-orange-50 rounded-lg text-orange-600">
+                       <Target className="w-5 h-5" />
+                    </div>
+                 </div>
+                 <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden mt-2">
+                    <div 
+                       className="h-full bg-orange-500 rounded-full" 
+                       style={{ width: `${workspace.completionRate || 0}%` }}
+                    ></div>
+                 </div>
+              </CardContent>
+           </Card>
         </div>
 
-        {/* 📝 Description Card */}
-        {workspace.description && workspace.description !== "Chưa có mô tả" && (
-          <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 animate-fadeInUp delay-100">
-            <div className="flex items-center gap-2 mb-3">
-              <BarChart3 className="w-5 h-5 text-gray-600" />
-              <h2 className="text-lg font-semibold text-gray-900">
-                Mô tả workspace
-              </h2>
-            </div>
-            <p className="text-gray-600 leading-relaxed">
-              {workspace.description}
-            </p>
-          </div>
-        )}
-
-        {/* 💡 Quick Actions (Optional) */}
-        <div className="grid md:grid-cols-3 gap-4 animate-fadeInUp delay-200">
-          <button
-            onClick={() => showToast("Chức năng đang phát triển", "info")}
-            className="p-4 bg-white rounded-xl border border-gray-200 hover:border-blue-300 hover:shadow-lg transition-all text-left group"
-          >
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center group-hover:bg-blue-100 transition-colors">
-                <Users className="w-5 h-5 text-blue-600" />
+        {/* 3. QUICK ACTIONS GRID */}
+        <div>
+           <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-4">Quick Actions</h3>
+           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              
+              {/* Manage Members */}
+              <div 
+                 onClick={() => showToast("Coming soon", "info")}
+                 className="group p-5 bg-white border border-slate-200 rounded-xl hover:border-blue-300 hover:shadow-md transition-all cursor-pointer flex items-start gap-4"
+              >
+                 <div className="p-3 bg-blue-50 text-blue-600 rounded-lg group-hover:bg-blue-100 transition-colors">
+                    <Users className="w-6 h-6" />
+                 </div>
+                 <div className="flex-1">
+                    <h4 className="font-bold text-slate-900 group-hover:text-blue-700 transition-colors flex items-center justify-between">
+                       Manage Members <ChevronRight className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </h4>
+                    <p className="text-sm text-slate-500 mt-1">Add, remove or update member roles.</p>
+                 </div>
               </div>
-              <h4 className="font-semibold text-gray-900">
-                Quản lý thành viên
-              </h4>
-            </div>
-            <p className="text-sm text-gray-500">
-              Thêm, xóa hoặc chỉnh sửa quyền thành viên
-            </p>
-          </button>
 
-          <button
-            onClick={() => showToast("Chức năng đang phát triển", "info")}
-            className="p-4 bg-white rounded-xl border border-gray-200 hover:border-green-300 hover:shadow-lg transition-all text-left group"
-          >
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center group-hover:bg-green-100 transition-colors">
-                <BarChart3 className="w-5 h-5 text-green-600" />
+              {/* Reports */}
+              <div 
+                 onClick={() => showToast("Coming soon", "info")}
+                 className="group p-5 bg-white border border-slate-200 rounded-xl hover:border-green-300 hover:shadow-md transition-all cursor-pointer flex items-start gap-4"
+              >
+                 <div className="p-3 bg-green-50 text-green-600 rounded-lg group-hover:bg-green-100 transition-colors">
+                    <BarChart3 className="w-6 h-6" />
+                 </div>
+                 <div className="flex-1">
+                    <h4 className="font-bold text-slate-900 group-hover:text-green-700 transition-colors flex items-center justify-between">
+                       Reports & Analytics <ChevronRight className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </h4>
+                    <p className="text-sm text-slate-500 mt-1">View detailed progress and performance stats.</p>
+                 </div>
               </div>
-              <h4 className="font-semibold text-gray-900">
-                Báo cáo & Thống kê
-              </h4>
-            </div>
-            <p className="text-sm text-gray-500">
-              Xem hiệu suất và tiến độ chi tiết
-            </p>
-          </button>
 
-          <button
-            onClick={() => showToast("Chức năng đang phát triển", "info")}
-            className="p-4 bg-white rounded-xl border border-gray-200 hover:border-purple-300 hover:shadow-lg transition-all text-left group"
-          >
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 bg-purple-50 rounded-lg flex items-center justify-center group-hover:bg-purple-100 transition-colors">
-                <Settings className="w-5 h-5 text-purple-600" />
+              {/* Configuration */}
+              <div 
+                 onClick={() => showToast("Coming soon", "info")}
+                 className="group p-5 bg-white border border-slate-200 rounded-xl hover:border-purple-300 hover:shadow-md transition-all cursor-pointer flex items-start gap-4"
+              >
+                 <div className="p-3 bg-purple-50 text-purple-600 rounded-lg group-hover:bg-purple-100 transition-colors">
+                    <Settings className="w-6 h-6" />
+                 </div>
+                 <div className="flex-1">
+                    <h4 className="font-bold text-slate-900 group-hover:text-purple-700 transition-colors flex items-center justify-between">
+                       Workspace Settings <ChevronRight className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </h4>
+                    <p className="text-sm text-slate-500 mt-1">Configure workflows, permissions and more.</p>
+                 </div>
               </div>
-              <h4 className="font-semibold text-gray-900">
-                Cấu hình Workspace
-              </h4>
-            </div>
-            <p className="text-sm text-gray-500">
-              Tùy chỉnh quy trình và quyền hạn
-            </p>
-          </button>
+
+           </div>
         </div>
+
       </div>
-
     </div>
   );
 }

@@ -1,10 +1,13 @@
 "use client";
+
 import { useEffect, useState } from "react";
-// ⛔️ SỬA LỖI: Import từ 'services/'
 import { updateUserProfile } from "@/services/apiUser";
 import { useToast } from "@/components/ui/ToastProvider";
-import { User, Calendar, Phone, ImageIcon, Save, Loader2 } from "lucide-react";
+import { User, Calendar, Phone, Image as ImageIcon, Loader2, AtSign, Users } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input"; // Giả sử có
+import LoadingButton from "@/components/ui/LoadingButton";
 
 type GenderType = "MALE" | "FEMALE" | "OTHER";
 
@@ -19,7 +22,7 @@ interface ProfileForm {
 
 export default function ProfilePage() {
   const { showToast } = useToast();
-  const { user, isLoading: isAuthLoading } = useAuth(); // Lấy từ Context
+  const { user, isLoading: isAuthLoading, refreshUser } = useAuth(); // Thêm refreshUser để cập nhật context sau khi save
 
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<ProfileForm>({
@@ -31,14 +34,13 @@ export default function ProfilePage() {
     email: "",
   });
 
-  // Set form khi user từ Context đã sẵn sàng
   useEffect(() => {
     if (user) {
       setForm({
         fullName: user.fullName || "",
         avatarUrl: user.avatarUrl || "",
         phoneNumber: user.phoneNumber || "",
-        dateOfBirth: user.dateOfBirth ? user.dateOfBirth.split("T")[0] : "",
+        dateOfBirth: user.dateOfBirth ? new Date(user.dateOfBirth).toISOString().split("T")[0] : "",
         gender: (user.gender as GenderType) || "MALE",
         email: user.email || "",
       });
@@ -51,8 +53,8 @@ export default function ProfilePage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.fullName) {
-      showToast("Vui lòng nhập họ và tên!", "warning");
+    if (!form.fullName.trim()) {
+      showToast("Full name is required.", "warning");
       return;
     }
 
@@ -65,9 +67,10 @@ export default function ProfilePage() {
         dateOfBirth: form.dateOfBirth,
         gender: form.gender,
       });
-      showToast("✅ Cập nhật thông tin thành công!", "success");
+      await refreshUser(); // Cập nhật lại thông tin user trong context
+      showToast("Profile updated successfully!", "success");
     } catch (err: any) {
-      showToast(err.message || "❌ Không thể cập nhật thông tin!", "error");
+      showToast(err.message || "Failed to update profile.", "error");
     } finally {
       setSaving(false);
     }
@@ -75,158 +78,162 @@ export default function ProfilePage() {
 
   if (isAuthLoading)
     return (
-      <div className="bg-white rounded-xl shadow-xl border border-gray-200 p-6 flex justify-center items-center h-96">
-        <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
+      <div className="flex justify-center items-center h-64">
+        <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
       </div>
     );
 
-  // 🎨 CHỈ RETURN CARD (Nội dung)
-  // Bỏ div bọc 'p-6 max-w-3xl'
   return (
-    <div className="bg-white rounded-xl shadow-xl border border-gray-200 p-6 sm:p-8 animate-fadeInUp">
-      {/* 🧍 Header thông tin */}
-      <div className="flex items-center gap-4 mb-6 pb-6 border-b border-gray-100">
-        <div className="w-12 h-12 bg-blue-100 flex items-center justify-center rounded-lg">
-          <User className="w-6 h-6 text-blue-600" />
-        </div>
-        <div>
-          <h1 className="text-xl font-semibold text-gray-900">Hồ sơ cá nhân</h1>
-          <p className="text-sm text-gray-500">
-            Cập nhật thông tin tài khoản của bạn tại đây
-          </p>
-        </div>
-      </div>
+    <div className="max-w-3xl mx-auto py-8 animate-in fade-in duration-500">
+      
+      <Card className="bg-white border border-slate-200 shadow-sm rounded-xl overflow-hidden">
+        
+        {/* Header */}
+        <CardHeader className="border-b border-slate-100 px-8 py-6 bg-white">
+           <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center shadow-sm">
+                 <User className="w-6 h-6 text-blue-600" />
+              </div>
+              <div>
+                 <CardTitle className="text-xl font-bold text-slate-900">Personal Profile</CardTitle>
+                 <p className="text-sm text-slate-500 mt-0.5">Manage your personal information</p>
+              </div>
+           </div>
+        </CardHeader>
 
-      {/* ✍️ Form cập nhật */}
-      <form onSubmit={handleSubmit} className="space-y-5">
-        {/* Email (không chỉnh sửa) */}
-        {form.email && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Email
-            </label>
-            <input
-              type="email"
-              value={form.email}
-              disabled
-              className="mt-1 w-full border-2 border-gray-200 rounded-xl px-4 py-3 bg-gray-100 text-gray-600 cursor-not-allowed"
-            />
-          </div>
-        )}
+        {/* Body */}
+        <CardContent className="p-8">
+          <form onSubmit={handleSubmit} className="space-y-8">
+            
+            {/* Section: Identity */}
+            <div className="space-y-5">
+                <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-2 mb-4">
+                    Identity
+                </h3>
+                
+                {/* Email (Read-only) */}
+                <div className="space-y-1.5">
+                    <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                        <AtSign className="w-4 h-4 text-slate-400" /> Email
+                    </label>
+                    <Input 
+                        value={form.email} 
+                        disabled 
+                        className="bg-slate-50 text-slate-500 border-slate-200 cursor-not-allowed" 
+                    />
+                </div>
 
-        {/* 🎨 Grid cho các trường */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          {/* Họ tên */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Họ và tên
-            </label>
-            <div className="relative">
-              <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input
-                type="text"
-                value={form.fullName}
-                onChange={(e) => handleChange("fullName", e.target.value)}
-                placeholder="Nhập họ và tên"
-                className="pl-10 pr-4 py-3 w-full border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-              />
+                {/* Full Name */}
+                <div className="space-y-1.5">
+                    <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                        <User className="w-4 h-4 text-slate-400" /> Full Name <span className="text-red-500">*</span>
+                    </label>
+                    <Input 
+                        value={form.fullName} 
+                        onChange={(e) => handleChange("fullName", e.target.value)} 
+                        placeholder="e.g. John Doe"
+                        className="focus:ring-blue-100 focus:border-blue-600"
+                    />
+                </div>
             </div>
-          </div>
 
-          {/* Số điện thoại */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Số điện thoại
-            </label>
-            <div className="relative">
-              <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input
-                type="text"
-                value={form.phoneNumber}
-                onChange={(e) => handleChange("phoneNumber", e.target.value)}
-                placeholder="Nhập số điện thoại"
-                className="pl-10 pr-4 py-3 w-full border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-              />
+            {/* Section: Contact & Details */}
+            <div className="space-y-5">
+                <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-2 mb-4">
+                    Details
+                </h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Phone */}
+                    <div className="space-y-1.5">
+                        <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                            <Phone className="w-4 h-4 text-slate-400" /> Phone
+                        </label>
+                        <Input 
+                            value={form.phoneNumber} 
+                            onChange={(e) => handleChange("phoneNumber", e.target.value)} 
+                            placeholder="+1 234 567 890"
+                        />
+                    </div>
+
+                    {/* DOB */}
+                    <div className="space-y-1.5">
+                        <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                            <Calendar className="w-4 h-4 text-slate-400" /> Date of Birth
+                        </label>
+                        <Input 
+                            type="date"
+                            value={form.dateOfBirth} 
+                            onChange={(e) => handleChange("dateOfBirth", e.target.value)} 
+                        />
+                    </div>
+                    
+                    {/* Gender */}
+                    <div className="space-y-1.5">
+                        <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                            <Users className="w-4 h-4 text-slate-400" /> Gender
+                        </label>
+                        <div className="relative">
+                            <select 
+                                value={form.gender} 
+                                onChange={(e) => handleChange("gender", e.target.value as GenderType)}
+                                className="w-full h-10 pl-3 pr-8 border border-slate-300 rounded-md text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-600 appearance-none cursor-pointer"
+                            >
+                                <option value="MALE">Male</option>
+                                <option value="FEMALE">Female</option>
+                                <option value="OTHER">Other</option>
+                            </select>
+                            <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none text-slate-500">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
-          </div>
 
-          {/* Ngày sinh */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Ngày sinh
-            </label>
-            <div className="relative">
-              <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input
-                type="date"
-                value={form.dateOfBirth || ""}
-                onChange={(e) => handleChange("dateOfBirth", e.target.value)}
-                className="pl-10 pr-4 py-3 w-full border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-              />
+            {/* Section: Avatar */}
+            <div className="space-y-5">
+                <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-2 mb-4">
+                    Avatar
+                </h3>
+                <div className="flex items-start gap-6">
+                    <div className="relative w-24 h-24 rounded-full border-2 border-slate-200 overflow-hidden bg-slate-50 shrink-0">
+                        {form.avatarUrl ? (
+                             <img src={form.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                        ) : (
+                             <div className="w-full h-full flex items-center justify-center text-slate-300">
+                                 <User className="w-10 h-10" />
+                             </div>
+                        )}
+                    </div>
+                    <div className="flex-1 space-y-1.5">
+                        <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                             <ImageIcon className="w-4 h-4 text-slate-400" /> Image URL
+                        </label>
+                        <Input 
+                            value={form.avatarUrl} 
+                            onChange={(e) => handleChange("avatarUrl", e.target.value)} 
+                            placeholder="https://example.com/avatar.png"
+                        />
+                        <p className="text-xs text-slate-500">Paste a direct link to an image (JPG, PNG).</p>
+                    </div>
+                </div>
             </div>
-          </div>
 
-          {/* Giới tính */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Giới tính
-            </label>
-            <select
-              value={form.gender}
-              onChange={(e) =>
-                handleChange("gender", e.target.value as GenderType)
-              }
-              className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-            >
-              <option value="MALE">Nam</option>
-              <option value="FEMALE">Nữ</option>
-              <option value="OTHER">Khác</option>
-            </select>
-          </div>
-        </div>
-
-        {/* Ảnh đại diện */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Ảnh đại diện (URL)
-          </label>
-          <div className="relative">
-            <ImageIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              type="text"
-              value={form.avatarUrl}
-              onChange={(e) => handleChange("avatarUrl", e.target.value)}
-              placeholder="Dán URL ảnh đại diện"
-              className="pl-10 pr-4 py-3 w-full border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-            />
-          </div>
-          {form.avatarUrl && (
-            <div className="mt-3">
-              <img
-                src={form.avatarUrl}
-                alt="Avatar Preview"
-                className="w-24 h-24 rounded-full object-cover border-2 border-gray-200 p-1"
-              />
+            {/* Footer Actions */}
+            <div className="pt-6 border-t border-slate-100 flex justify-end">
+                <LoadingButton
+                    type="submit"
+                    isLoading={saving}
+                    text="Save Changes"
+                    loadingText="Saving..."
+                    className="bg-blue-600 hover:bg-blue-700 font-bold px-8 shadow-sm"
+                />
             </div>
-          )}
-        </div>
 
-        {/* Nút lưu */}
-        <div className="pt-4 border-t border-gray-100">
-          <button
-            type="submit"
-            disabled={saving}
-            className={`flex items-center justify-center gap-2 w-full md:w-auto bg-blue-600 text-white px-6 py-3 rounded-xl font-semibold transition ${
-              saving
-                ? "opacity-70 cursor-not-allowed"
-                : "hover:bg-blue-700 active:scale-[0.98] shadow-lg shadow-blue-500/30"
-            }`}
-          >
-            <Save className="w-4 h-4" />
-            {saving ? "Đang lưu..." : "Lưu thay đổi"}
-          </button>
-        </div>
-      </form>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 }
