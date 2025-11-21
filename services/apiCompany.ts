@@ -2,304 +2,337 @@
 import apiClient from "@/lib/apiClient";
 
 // ===================================================
-// 🏢 API COMPANY — Quản lý thông tin & thành viên công ty
+// 🧩 Interfaces — Match Backend Exactly
 // ===================================================
 
-// 🧩 Interface: Thông tin công ty
 export interface Company {
   companyId: number;
   companyName: string;
-  companyCode?: string;
-  description?: string;
-  logo?: string;
-  address?: string;
-  phoneNumber?: string;
-  email?: string;
-  website?: string;
-  createdById?: number;
+  companyCode: string;
+  description: string;
+  logo: string | null;
+  address: string | null;
+  phoneNumber: string | null;
+  email: string | null;
+  website: string | null;
 }
 
-// 🧩 Interface: Thành viên công ty
 export interface CompanyMember {
+  memberId: number;
   userId: number;
   fullName: string;
   email: string;
-  avatarUrl?: string;
-  roleCode?: string;
-  roleName?: string;
-  jobTitle?: string;
-  joinedAt?: string;
+  avatarUrl: string | null;
+  roleName: string | null;
+  jobTitle: string | null;
+  phoneNumber: string | null;
+  status: string;
+  joinedAt: string | null;
+}
+
+export interface PageResponse<T> {
+  content: T[];
+  pageNumber: number;
+  pageSize: number;
+  totalElements: number;
+  totalPages: number;
+  first: boolean;
+  last: boolean;
 }
 
 // ===================================================
-// 🔹 1️⃣ Lấy thông tin công ty theo ID
+// 1️⃣ Get Company by ID
 // ===================================================
-export const getCompanyById = async (companyId: number): Promise<Company> => {
-  const token = localStorage.getItem("accessToken");
-  if (!token) throw new Error("Người dùng chưa đăng nhập.");
-
+export const getCompanyById = async (
+  companyId: number
+): Promise<Company> => {
   try {
-    const res = await apiClient.get(`/companies/${companyId}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-
-    const data = res.data;
-    if (!data.success)
-      throw new Error(data.message || "Không thể lấy thông tin công ty.");
-
-    return data.data as Company;
+    const res = await apiClient.get(`/companies/${companyId}`);
+    if (!res.data.success) {
+      throw new Error(res.data.message || "Failed to fetch company details.");
+    }
+    return res.data.data;
   } catch (err: any) {
-    console.error(" Lỗi lấy thông tin công ty:", err);
+    console.error("Error fetching company info:", err);
     throw new Error(
-      err.response?.data?.message ??
-        err.message ??
-        "Lỗi hệ thống, vui lòng thử lại."
+      err.response?.data?.message || "Unable to fetch company information."
     );
   }
 };
 
 // ===================================================
-// 🔹 2️⃣ Cập nhật thông tin công ty
+// 2️⃣ Update Company
 // ===================================================
 export const updateCompany = async (
   companyId: number,
   payload: Partial<Company>
 ): Promise<Company> => {
-  const token = localStorage.getItem("accessToken");
-  if (!token) throw new Error("Người dùng chưa đăng nhập.");
-
   try {
-    const res = await apiClient.put(`/companies/${companyId}`, payload, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-
-    const data = res.data;
-    if (!data.success)
-      throw new Error(data.message || "Không thể cập nhật thông tin công ty.");
-
-    return data.data as Company;
+    const res = await apiClient.put(`/companies/${companyId}`, payload);
+    if (!res.data.success) {
+      throw new Error(res.data.message || "Failed to update company.");
+    }
+    return res.data.data;
   } catch (err: any) {
-    console.error(" Lỗi cập nhật công ty:", err);
+    console.error("Error updating company:", err);
     throw new Error(
-      err.response?.data?.message ??
-        err.message ??
-        "Lỗi hệ thống, vui lòng thử lại."
+      err.response?.data?.message || "Unable to update company."
     );
   }
 };
 
 // ===================================================
-// 🔹 3️⃣ Tạo công ty mới (PHIÊN BẢN SỬA LỖI)
+// 3️⃣ Create Company
 // ===================================================
 export const createCompany = async (
-  payload: Partial<Company>
-): Promise<Company> => {
-  // ❌ KHÔNG LẤY TOKEN Ở ĐÂY. apiClient (interceptor) sẽ tự làm.
-  // const token = localStorage.getItem("accessToken");
-
+  payload: {
+    companyName: string;
+    description?: string;
+    address?: string;
+    phoneNumber?: string;
+    email?: string;
+    website?: string;
+  }
+): Promise<any> => {
   try {
-    // Chỉ cần gọi post. apiClient sẽ tự gắn Header Authorization
     const res = await apiClient.post(`/companies`, payload);
 
-    const data = res.data;
-    if (!data.success)
-      throw new Error(data.message || "Không thể tạo công ty mới.");
+    if (!res.data.success) {
+      throw new Error(res.data.message || "Failed to create company.");
+    }
 
-    return data.data as Company;
+    return res.data.data;
   } catch (err: any) {
-    console.error(" Lỗi tạo công ty:", err);
+    console.error("Error creating company:", err);
     throw new Error(
-      err.response?.data?.message ??
-        err.message ??
-        "Lỗi hệ thống, vui lòng thử lại."
+      err.response?.data?.message || "Unable to create company."
     );
   }
 };
 
 // ===================================================
-// 🔹 4️⃣ Mời thành viên vào công ty
+// 4️⃣ Invite Member to Company
 // ===================================================
 export const inviteMemberToCompany = async (
   companyId: number,
-  payload: { email: string; roleId: number }
+  payload: { email: string; roleCode: string }
 ) => {
-  const token = localStorage.getItem("accessToken");
-  if (!token) throw new Error("Người dùng chưa đăng nhập.");
-  const roleCode = payload.roleId === 2 ? "COMPANY_ADMIN" : "COMPANY_MEMBER";
-  const body = {
-    email: payload.email,
-    roleCode,
-  };
   try {
     const res = await apiClient.post(
       `/companies/${companyId}/invitations`,
-      body,
-      { headers: { Authorization: `Bearer ${token}` } }
+      payload
     );
-
-    const data = res.data;
-    if (!data.success)
-      throw new Error(data.message || "Không thể gửi lời mời.");
-
-    return data;
+    if (!res.data.success) {
+      throw new Error(res.data.message || "Failed to send invitation.");
+    }
+    return res.data.data;
   } catch (err: any) {
-    console.error(" Lỗi gửi lời mời:", err);
+    console.error("Error sending invitation:", err);
     throw new Error(
-      err.response?.data?.message ??
-        err.message ??
-        "Lỗi hệ thống, không thể gửi lời mời."
+      err.response?.data?.message || "Unable to send invitation."
     );
   }
 };
 
 // ===================================================
-// 🔹 5️⃣ Lấy danh sách thành viên công ty
+// 5️⃣ Get Company Members (Pagination)
 // ===================================================
 export const getCompanyMembers = async (
-  companyId: number
-): Promise<CompanyMember[]> => {
-  if (!companyId || companyId <= 0)
-    throw new Error("Thiếu hoặc sai ID công ty.");
-
-  const token = localStorage.getItem("accessToken");
-  if (!token) throw new Error("Người dùng chưa đăng nhập.");
-
-  try {
-    const res = await apiClient.get(`/companies/${companyId}/members`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-
-    const data = res.data;
-    if (!data.success)
-      throw new Error(data.message || "Không thể lấy danh sách thành viên.");
-
-    return data.data as CompanyMember[];
-  } catch (err: any) {
-    console.error(" Lỗi lấy danh sách thành viên:", err);
-    throw new Error(
-      err.response?.data?.message ??
-        err.message ??
-        "Lỗi hệ thống, không thể tải danh sách thành viên."
-    );
-  }
-};
-// ===================================================
-// 🔹 5️⃣ Lấy danh chi tiết sách thành viên công ty
-// ===================================================
-export const getDetailCompanyMembers = async (
   companyId: number,
-  memberId: number
-): Promise<CompanyMember[]> => {
-  if (!companyId || companyId <= 0)
-    throw new Error("Thiếu hoặc sai ID công ty.");
-  if (!memberId || memberId <= 0)
-    throw new Error("Thiếu hoặc sai ID thành viên.");
-
-  const token = localStorage.getItem("accessToken");
-  if (!token) throw new Error("Người dùng chưa đăng nhập.");
-
+  params: {
+    page?: number;
+    size?: number;
+    sortBy?: string;
+    sortDir?: "asc" | "desc";
+  }
+): Promise<PageResponse<CompanyMember>> => {
   try {
     const res = await apiClient.get(
-      `/companies/${companyId}/members/${memberId}`,
-      {
-        headers: { Authorization: `Bearer ${token}` },
-      }
+      `/companies/${companyId}/members`,
+      { params }
     );
 
-    const data = res.data;
-    if (!data.success)
-      throw new Error(data.message || "Không thể lấy danh sách thành viên.");
+    if (!res.data.success) {
+      throw new Error(res.data.message || "Failed to load members.");
+    }
 
-    return data.data as CompanyMember[];
+    return res.data.data;
   } catch (err: any) {
-    console.error(" Lỗi lấy danh sách thành viên:", err);
+    console.error("Error loading members:", err);
     throw new Error(
-      err.response?.data?.message ??
-        err.message ??
-        "Lỗi hệ thống, không thể tải danh sách thành viên."
+      err.response?.data?.message || "Unable to load company members."
     );
   }
 };
+
 // ===================================================
-// 🔹 6️⃣ Xóa thành viên khỏi công ty
+// 5.1️⃣ Get Company Member Detail
+// ===================================================
+export const getCompanyMemberDetail = async (
+  companyId: number,
+  memberId: number
+): Promise<CompanyMember> => {
+  try {
+    const res = await apiClient.get(
+      `/companies/${companyId}/members/${memberId}`
+    );
+
+    if (!res.data.success) {
+      throw new Error(res.data.message || "Failed to fetch member detail.");
+    }
+
+    return res.data.data;
+  } catch (err: any) {
+    console.error("Error fetching member detail:", err);
+    throw new Error(
+      err.response?.data?.message || "Unable to fetch member detail."
+    );
+  }
+};
+
+// ===================================================
+// 6️⃣ Remove Company Member
 // ===================================================
 export const removeCompanyMember = async (
   companyId: number,
   userId: number
 ) => {
-  if (!companyId || !userId)
-    throw new Error("Thiếu thông tin công ty hoặc người dùng.");
-
-  const token = localStorage.getItem("accessToken");
-  if (!token) throw new Error("Người dùng chưa đăng nhập.");
-
   try {
     const res = await apiClient.delete(
-      `/companies/${companyId}/members/${userId}`,
-      { headers: { Authorization: `Bearer ${token}` } }
+      `/companies/${companyId}/members/${userId}`
     );
 
-    const data = res.data;
-    if (!data.success)
-      throw new Error(data.message || "Không thể xóa thành viên.");
+    if (!res.data.success) {
+      throw new Error(res.data.message || "Failed to remove member.");
+    }
 
-    return data;
+    return res.data.data;
   } catch (err: any) {
-    console.error(" Lỗi xóa thành viên:", err);
+    console.error("Error removing member:", err);
     throw new Error(
-      err.response?.data?.message ??
-        err.message ??
-        "Lỗi hệ thống, không thể xóa thành viên."
+      err.response?.data?.message || "Unable to remove company member."
     );
   }
 };
 
-// ✅ HÀM MỚI: Cập nhật trạng thái thành viên
+// ===================================================
+// 7️⃣ Update Member Status
+// ===================================================
 export const updateCompanyMemberStatus = async (
   companyId: number,
   memberId: number,
   newStatus: string
-) => {
-  const res = await apiClient.put(
-    `/companies/${companyId}/members/${memberId}/status`,
-    { newStatus }
-  );
-  // Giả sử API trả về { success: true, message: "...", data: updatedMember }
-  return res.data.data;
+): Promise<CompanyMember> => {
+  try {
+    const res = await apiClient.put(
+      `/companies/${companyId}/members/${memberId}/status`,
+      { newStatus }
+    );
+
+    if (!res.data.success) {
+      throw new Error(res.data.message || "Failed to update member status.");
+    }
+
+    return res.data.data;
+  } catch (err: any) {
+    console.error("Error updating member status:", err);
+    throw new Error(
+      err.response?.data?.message || "Unable to update member status."
+    );
+  }
 };
 
 // ===================================================
-// 🔹 Cập nhật Vai trò (Role) thành viên trong Công ty
+// 8️⃣ Update Member Role
 // ===================================================
 export const updateCompanyMemberRole = async (
   companyId: number,
   memberId: number,
-  roleCode: string // "COMPANY_ADMIN" hoặc "COMPANY_MEMBER"
+  roleCode: string
 ) => {
-  if (!companyId || !memberId)
-    throw new Error("Thiếu thông tin ID công ty hoặc thành viên.");
-
-  const token = localStorage.getItem("accessToken");
-  if (!token) throw new Error("Người dùng chưa đăng nhập.");
-
   try {
     const res = await apiClient.put(
       `/companies/${companyId}/members/${memberId}/role`,
-      { roleCode }, // Payload khớp với RoleUpdateRequest của Backend
-      { headers: { Authorization: `Bearer ${token}` } }
+      { roleCode }
     );
 
-    const data = res.data;
-    if (!data.success)
-      throw new Error(data.message || "Không thể cập nhật vai trò thành viên.");
+    if (!res.data.success) {
+      throw new Error(res.data.message || "Failed to update member role.");
+    }
 
-    return data;
+    return res.data.data;
   } catch (err: any) {
-    console.error("Lỗi cập nhật vai trò thành viên công ty:", err);
+    console.error("Error updating role:", err);
     throw new Error(
-      err.response?.data?.message ??
-        err.message ??
-        "Lỗi hệ thống, không thể cập nhật vai trò."
+      err.response?.data?.message || "Unable to update member role."
+    );
+  }
+};
+
+// ===================================================
+// 9️⃣ Search Company Members
+// ===================================================
+export const searchCompanyMembers = async (
+  companyId: number,
+  params: {
+    name?: string;
+    email?: string;
+    phone?: string;
+    jobTitle?: string;
+    roleName?: string;
+    status?: string;
+    page?: number;
+    size?: number;
+    sortBy?: string;
+    sortDir?: "asc" | "desc";
+  }
+): Promise<PageResponse<CompanyMember>> => {
+  try {
+    const res = await apiClient.get(
+      `/companies/${companyId}/members/search`,
+      { params }
+    );
+
+    if (!res.data.success) {
+      throw new Error(res.data.message || "Failed to search members.");
+    }
+
+    return res.data.data;
+  } catch (err: any) {
+    console.error("Error searching members:", err);
+    throw new Error(
+      err.response?.data?.message || "Unable to search company members."
+    );
+  }
+};
+
+// ===================================================
+// 🔟 Get Pending Invitations
+// ===================================================
+export const getPendingInvitations = async (
+  companyId: number,
+  params: {
+    page?: number;
+    size?: number;
+    sortBy?: string;
+    sortDir?: "asc" | "desc";
+  }
+) => {
+  try {
+    const res = await apiClient.get(
+      `/companies/${companyId}/invitations/pending`,
+      { params }
+    );
+
+    if (!res.data.success) {
+      throw new Error(res.data.message || "Failed to load pending invitations.");
+    }
+
+    return res.data.data;
+  } catch (err: any) {
+    console.error("Error loading pending invitations:", err);
+    throw new Error(
+      err.response?.data?.message || "Unable to load pending invitations."
     );
   }
 };
