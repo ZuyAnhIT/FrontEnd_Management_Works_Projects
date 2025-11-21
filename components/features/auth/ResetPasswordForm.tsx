@@ -5,7 +5,8 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { KeyRound, CheckCircle2, AlertCircle } from "lucide-react";
 import PasswordField from "./PasswordField";
 import LoadingButton from "@/components/ui/LoadingButton";
-// ⛔️ Sửa đường dẫn nếu cần
+// 1. Import Component đánh giá mật khẩu
+import PasswordStrengthMeter from "@/components/ui/PasswordStrengthMeter";
 import { resetPassword } from "@/services/apiAuth";
 
 export default function ResetPasswordForm() {
@@ -101,14 +102,20 @@ export default function ResetPasswordForm() {
       {/* Form Content */}
       <form className="p-6 space-y-5" onSubmit={handleSubmit}>
         
-        <PasswordField
-          label="New Password"
-          value={newPassword}
-          show={showPassword}
-          toggle={() => setShowPassword(!showPassword)}
-          onChange={(e) => setNewPassword(e.target.value)}
-          placeholder="Enter new password"
-        />
+        {/* Nhóm Mật khẩu mới & Thanh đánh giá */}
+        <div className="space-y-3">
+            <PasswordField
+              label="New Password"
+              value={newPassword}
+              show={showPassword}
+              toggle={() => setShowPassword(!showPassword)}
+              onChange={(e) => setNewPassword(e.target.value)}
+              placeholder="Enter new password"
+            />
+
+            {/* 2. 🔥 Chèn component đánh giá vào đây */}
+            <PasswordStrengthMeter password={newPassword} />
+        </div>
         
         <PasswordField
           label="Confirm Password"

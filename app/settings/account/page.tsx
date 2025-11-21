@@ -5,9 +5,10 @@ import { useToast } from "@/components/ui/ToastProvider";
 import { Lock, Eye, EyeOff, KeyRound } from "lucide-react";
 import LoadingButton from "@/components/ui/LoadingButton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input"; // Giả sử có Input
+import { Input } from "@/components/ui/input"; 
+import PasswordStrengthMeter from "@/components/ui/PasswordStrengthMeter"; // 1. Import
 
-// Tách PasswordInput ra component con (Minimalist Style)
+// Tách PasswordInput ra component con
 function PasswordInput({
   label,
   value,
@@ -89,7 +90,6 @@ export default function AccountPage() {
   return (
     <div className="max-w-2xl mx-auto animate-in fade-in duration-300">
       
-      {/* Card Container */}
       <Card className="border border-slate-200 shadow-sm bg-white rounded-xl overflow-hidden">
         
         {/* Header */}
@@ -120,21 +120,25 @@ export default function AccountPage() {
 
               <div className="h-px bg-slate-100 my-2"></div>
 
-              <div className="grid gap-6 md:grid-cols-2">
+              {/* Mật khẩu mới + Meter */}
+              <div className="space-y-4">
                  <PasswordInput
                     label="New Password"
                     value={form.newPassword}
                     onChange={(e) => handleChange("newPassword", e.target.value)}
                     placeholder="Enter new password"
                  />
-
-                 <PasswordInput
-                    label="Confirm Password"
-                    value={form.confirmNewPassword}
-                    onChange={(e) => handleChange("confirmNewPassword", e.target.value)}
-                    placeholder="Re-enter new password"
-                 />
+                 
+                 {/* 2. 🔥 Thêm Password Strength Meter */}
+                 <PasswordStrengthMeter password={form.newPassword} />
               </div>
+
+              <PasswordInput
+                label="Confirm Password"
+                value={form.confirmNewPassword}
+                onChange={(e) => handleChange("confirmNewPassword", e.target.value)}
+                placeholder="Re-enter new password"
+              />
 
               {/* Footer Actions */}
               <div className="pt-6 flex justify-end">
