@@ -17,20 +17,29 @@ interface User {
   id: number;
   fullName: string;
   email: string;
-  avatarUrl?: string;
-  gender?: string;
-  dateOfBirth?: string;
-  phoneNumber?: string;
+
+  avatarUrl: string | null;
+  gender: "MALE" | "FEMALE" | "OTHER" | null;
+  dateOfBirth: string | null;
+  phoneNumber: string | null;
+  status: string | null;
+
   systemRoles: string[];
+
   company: {
-    companyId: number;
-    roleCode: string;
+    companyId: number | null;
+    companyName: string | null;
+    roleCode: string | null;
   } | null;
+
   workspaces: {
     workspaceId: number;
+    workspaceName: string;
+    companyId: number;
     roleCode: string;
   }[];
-  projects?: {
+
+  projects: {
     projectId: number;
     projectName: string;
     workspaceId: number;
@@ -154,7 +163,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(data);
         setRole(mainRole);
         localStorage.setItem("user", JSON.stringify(data));
-        localStorage.setItem("userRole", mainRole);
+        localStorage.setItem("userRole", mainRole ?? "");
 
         console.log("✅ User and role set:", {
           user: data.email,
