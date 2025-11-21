@@ -12,7 +12,7 @@ import { loginUser, logoutUser } from "@/services/apiAuth";
 import { useRouter, usePathname } from "next/navigation";
 import { useToast } from "@/components/ui/ToastProvider";
 
-// Định nghĩa kiểu User chi tiết
+// Define detailed User type
 interface User {
   id: number;
   fullName: string;
@@ -38,14 +38,14 @@ interface User {
   }[];
 }
 
-// Vai trò tổng hợp
+// Role definition
 type AppRole =
   | "SYSTEM_ADMIN"
   | "COMPANY_ADMIN"
   | "COMPANY_MEMBER"
   | "WORKSPACE_ADMIN"
   | "WORKSPACE_MEMBER"
-  |  "PROJECT_ADMIN"
+  | "PROJECT_ADMIN"
   | "PROJECT_MEMBER"
   | "USER"
   | "GUEST_PROJECT"
@@ -94,7 +94,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const { showToast } = useToast();
 
   // ----------------------------------------------------------------
-  // HÀM HELPER 1: XÁC ĐỊNH VAI TRÒ
+  // HELPER 1: DETERMINE ROLE
   // ----------------------------------------------------------------
   const determineRole = useCallback((user: User): AppRole => {
     let mainRole: AppRole = "USER";
@@ -111,22 +111,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       mainRole = "COMPANY_MEMBER";
     } else if (user.workspaces?.some((w) => w.roleCode === "WORKSPACE_MEMBER")) {
       mainRole = "WORKSPACE_MEMBER";
-    }else if (user.projects?.some((p) => p.roleCode === "PROJECT_MEMBER")) {
+    } else if (user.projects?.some((p) => p.roleCode === "PROJECT_MEMBER")) {
       mainRole = "PROJECT_MEMBER";
     }
 
-    console.log("🎯 Vai trò được xác định:", mainRole);
+    console.log("🎯 Role determined:", mainRole);
     return mainRole;
   }, []);
 
   // ----------------------------------------------------------------
-  // HÀM HELPER 2: LẤY TARGET DASHBOARD THEO ROLE
+  // HELPER 2: GET TARGET DASHBOARD BY ROLE
   // ----------------------------------------------------------------
   const getTargetDashboard = useCallback(
     (userRole: AppRole, userData: User): string => {
       if (!userRole) return "/core";
 
-      // Kiểm tra nếu user cần onboarding
+      // Check if user needs onboarding
       const needsOnboarding =
         userRole === "USER" &&
         !userData.company &&
@@ -142,10 +142,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   // ----------------------------------------------------------------
-  // HÀM HELPER 3: LẤY VÀ SET USER
+  // HELPER 3: FETCH AND SET USER
   // ----------------------------------------------------------------
   const fetchAndSetUser = useCallback(async () => {
-    console.log("🔄 Bắt đầu fetchAndSetUser...");
+    console.log("🔄 Starting fetchAndSetUser...");
     try {
       const data = await getCurrentUser();
       if (data) {
@@ -156,7 +156,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.setItem("user", JSON.stringify(data));
         localStorage.setItem("userRole", mainRole);
 
-        console.log("✅ User và role đã được set:", {
+        console.log("✅ User and role set:", {
           user: data.email,
           role: mainRole,
         });
@@ -165,7 +165,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw new Error("Invalid user data");
       }
     } catch (e) {
-      console.error("❌ Lỗi fetchAndSetUser:", e);
+      console.error("❌ Error fetchAndSetUser:", e);
       setUser(null);
       setRole(null);
       localStorage.clear();
@@ -174,11 +174,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [determineRole]);
 
   // ----------------------------------------------------------------
-  // CHỨC NĂNG 1: TỰ ĐỘNG KIỂM TRA ĐĂNG NHẬP KHI TẢI LẠI TRANG
+  // FEATURE 1: AUTO CHECK LOGIN ON LOAD
   // ----------------------------------------------------------------
   useEffect(() => {
     const checkLogin = async () => {
-      console.log("🔍 Kiểm tra auth khi load trang...");
+      console.log("🔍 Checking auth on page load...");
       const token = localStorage.getItem("accessToken");
 
       if (token) {
@@ -189,18 +189,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           router.push("/");
         }
       } else {
-        console.log("⚠️ Không có token, bỏ qua auth check");
+        console.log("⚠️ No token found, skipping auth check");
       }
 
       setIsLoading(false);
-      console.log("✅ Auth check hoàn tất, isLoading = false");
+      console.log("✅ Auth check completed, isLoading = false");
     };
 
     checkLogin();
   }, [fetchAndSetUser, router]);
 
   // ----------------------------------------------------------------
-  // CHỨC NĂNG 2: LOGIC BẢO VỆ (GUARD) - CHỈ BẢO VỆ, KHÔNG REDIRECT SAU LOGIN
+  // FEATURE 2: GUARD LOGIC - PROTECT ONLY, NO REDIRECT AFTER LOGIN
   // ----------------------------------------------------------------
   useEffect(() => {
     console.log("🛡️ Guard effect triggered:", {
@@ -211,12 +211,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     if (isLoading) {
-      console.log("⏳ isLoading = true, bỏ qua guard");
+      console.log("⏳ isLoading = true, skipping guard");
       return;
     }
 
     const isPublic = PUBLIC_PAGES.some((p) => pathname.startsWith(p));
-    console.log("📍 Trang hiện tại public?", isPublic);
+    console.log("📍 Is current page public?", isPublic);
 
     if (user && role) {
       const isOnboardingPage = pathname.startsWith("/create-company");
@@ -225,140 +225,140 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         !user.company &&
         (!user.workspaces || user.workspaces.length === 0);
 
-      console.log("👤 User đã đăng nhập:", {
+      console.log("👤 User logged in:", {
         role,
         needsOnboarding,
         isOnboardingPage,
         pathname,
       });
 
-      // 1. ÉP BUỘC ONBOARDING (CHỈ KHI ĐANG Ở TRANG KHÁC)
+      // 1. FORCE ONBOARDING (ONLY IF ON ANOTHER PAGE)
       if (
         needsOnboarding &&
         !isOnboardingPage &&
         !pathname.startsWith("/(auth)")
       ) {
         console.log("🚀 Guard: Redirect → /create-company (onboarding)");
-        showToast("Chào mừng! Vui lòng tạo công ty để bắt đầu.", "info");
+        showToast("Welcome! Please create a company to get started.", "info");
         router.push("/create-company");
         return;
       }
 
-      // 2. BẢO VỆ ADMIN (CHỈ CHẶN, KHÔNG REDIRECT)
+      // 2. PROTECT ADMIN (BLOCK ONLY, NO REDIRECT)
       if (
         pathname.startsWith("/admin") &&
         role !== "COMPANY_ADMIN" &&
         role !== "COMPANY_MEMBER"
       ) {
-        console.log("🚫 Guard: Không có quyền truy cập /admin");
-        showToast("Bạn không có quyền truy cập trang Admin", "error");
+        console.log("🚫 Guard: No access to /admin");
+        showToast("You do not have permission to access the Admin page", "error");
         router.push("/core");
       }
     } else if (!isPublic) {
-      // 3. CHƯA ĐĂNG NHẬP
-      console.log("🚀 Guard: Redirect → / (chưa auth)");
-      showToast("Vui lòng đăng nhập để tiếp tục", "warning");
+      // 3. NOT LOGGED IN
+      console.log("🚀 Guard: Redirect → / (not auth)");
+      showToast("Please login to continue", "warning");
       router.push("/");
     }
   }, [isLoading, user, role, pathname, router, showToast]);
 
   // ----------------------------------------------------------------
-  // CHỨC NĂNG 3: HÀM LOGIN (CHO MODAL) - REDIRECT CHỦ ĐỘNG
+  // FEATURE 3: LOGIN FUNCTION (FOR MODAL) - ACTIVE REDIRECT
   // ----------------------------------------------------------------
   const login = async (email: string, password: string) => {
-    console.log("🔑 Bắt đầu login...");
+    console.log("🔑 Starting login...");
     setIsLoading(true);
 
     try {
       const res = await loginUser({ email, password });
 
       if (!res?.data?.accessToken) {
-        throw new Error(res.message || "Đăng nhập thất bại!");
+        throw new Error(res.message || "Login failed!");
       }
 
-      // Lưu tokens
+      // Save tokens
       localStorage.setItem("accessToken", res.data.accessToken);
       localStorage.setItem("refreshToken", res.data.refreshToken);
-      console.log("💾 Đã lưu tokens vào localStorage");
+      console.log("💾 Tokens saved to localStorage");
 
-      // Lấy thông tin user
+      // Fetch user info
       const { user: userData, role: userRole } = await fetchAndSetUser();
-      console.log("✅ Đã lấy user và role:", {
+      console.log("✅ User and role retrieved:", {
         user: userData.email,
         role: userRole,
       });
 
-      // Xác định trang đích
+      // Determine target page
       const targetPage = getTargetDashboard(userRole, userData);
       console.log("🎯 Target page:", targetPage);
 
-      showToast("Đăng nhập thành công!", "success");
+      showToast("Login successful!", "success");
 
-      // ✅ QUAN TRỌNG: Redirect CHỦ ĐỘNG ngay tại đây
-      console.log("🚀 Đang redirect đến:", targetPage);
+      // ✅ IMPORTANT: Active Redirect here
+      console.log("🚀 Redirecting to:", targetPage);
 
-      // Dùng window.location.href thay vì router.push để đảm bảo redirect
+      // Use window.location.href instead of router.push to ensure redirect
       window.location.href = targetPage;
     } catch (error: any) {
-      console.error("❌ Lỗi login:", error);
-      setIsLoading(false); // Chỉ set false khi có lỗi
+      console.error("❌ Login error:", error);
+      setIsLoading(false); // Only set false on error
       showToast(
-        error.response?.data?.message || error.message || "Đăng nhập thất bại!",
+        error.response?.data?.message || error.message || "Login failed!",
         "error"
       );
       throw error;
     }
-    // ⚠️ KHÔNG set isLoading = false ở đây vì đang redirect
+    // ⚠️ DO NOT set isLoading = false here because redirecting
   };
 
   // ----------------------------------------------------------------
-  // CHỨC NĂNG 4: HÀM LOGIN WITH TOKENS (CHO GOOGLE/INVITE) - REDIRECT CHỦ ĐỘNG
+  // FEATURE 4: LOGIN WITH TOKENS (FOR GOOGLE/INVITE) - ACTIVE REDIRECT
   // ----------------------------------------------------------------
   const loginWithTokens = async (accessToken: string, refreshToken: string) => {
-    console.log("🔑 Bắt đầu loginWithTokens...");
+    console.log("🔑 Starting loginWithTokens...");
     setIsLoading(true);
 
     try {
-      // Lưu tokens
+      // Save tokens
       localStorage.setItem("accessToken", accessToken);
       localStorage.setItem("refreshToken", refreshToken);
-      console.log("💾 Đã lưu tokens vào localStorage");
+      console.log("💾 Tokens saved to localStorage");
 
-      // Lấy thông tin user
+      // Fetch user info
       const { user: userData, role: userRole } = await fetchAndSetUser();
-      console.log("✅ Đã lấy user và role:", {
+      console.log("✅ User and role retrieved:", {
         user: userData.email,
         role: userRole,
       });
 
-      // Xác định trang đích
+      // Determine target page
       const targetPage = getTargetDashboard(userRole, userData);
       console.log("🎯 Target page:", targetPage);
 
-      showToast("Đăng nhập thành công!", "success");
+      showToast("Login successful!", "success");
 
-      // ✅ QUAN TRỌNG: Redirect CHỦ ĐỘNG ngay tại đây
-      console.log("🚀 Đang redirect đến:", targetPage);
+      // ✅ IMPORTANT: Active Redirect here
+      console.log("🚀 Redirecting to:", targetPage);
 
-      // Dùng window.location.href thay vì router.push để đảm bảo redirect
+      // Use window.location.href instead of router.push to ensure redirect
       window.location.href = targetPage;
     } catch (error: any) {
-      console.error("❌ Lỗi loginWithTokens:", error);
-      setIsLoading(false); // Chỉ set false khi có lỗi
+      console.error("❌ Error loginWithTokens:", error);
+      setIsLoading(false); // Only set false on error
       showToast(
-        error.response?.data?.message || error.message || "Đăng nhập thất bại!",
+        error.response?.data?.message || error.message || "Login failed!",
         "error"
       );
       throw error;
     }
-    // ⚠️ KHÔNG set isLoading = false ở đây vì đang redirect
+    // ⚠️ DO NOT set isLoading = false here because redirecting
   };
 
   // ----------------------------------------------------------------
-  // CHỨC NĂNG 5: LOGOUT
+  // FEATURE 5: LOGOUT
   // ----------------------------------------------------------------
   const logout = async () => {
-    console.log("🚪 Đăng xuất...");
+    console.log("🚪 Logging out...");
     setIsLoading(true);
 
     try {
@@ -366,32 +366,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(null);
       setRole(null);
       localStorage.clear();
-      showToast("Đăng xuất thành công!", "success");
+      showToast("Logged out successfully!", "success");
       router.push("/");
     } catch (error: any) {
-      console.error("❌ Lỗi logout:", error);
-      showToast("Lỗi khi đăng xuất!", "error");
+      console.error("❌ Logout error:", error);
+      showToast("Error logging out!", "error");
     } finally {
       setIsLoading(false);
     }
   };
 
   // ----------------------------------------------------------------
-  // CHỨC NĂNG 6: REFRESH USER
+  // FEATURE 6: REFRESH USER
   // ----------------------------------------------------------------
   const refreshUser = useCallback(async () => {
-    console.log("🔄 Refresh user...");
+    console.log("🔄 Refreshing user...");
     try {
       await fetchAndSetUser();
-      showToast("Cập nhật thông tin thành công!", "success");
+      showToast("Information updated successfully!", "success");
     } catch (e) {
-      console.error("❌ Lỗi refresh user:", e);
-      showToast("Không thể cập nhật thông tin!", "error");
+      console.error("❌ Error refreshing user:", e);
+      showToast("Could not update information!", "error");
     }
   }, [fetchAndSetUser, showToast]);
 
   // ----------------------------------------------------------------
-  // CHỨC NĂNG 7: CHECK PERMISSION
+  // FEATURE 7: CHECK PERMISSION
   // ----------------------------------------------------------------
   const hasPermission = (permission: string): boolean => {
     if (!user || !role) return false;
@@ -402,7 +402,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       COMPANY_MEMBER: ["workspace.view", "project.view"],
       WORKSPACE_ADMIN: ["workspace.*", "project.*"],
       WORKSPACE_MEMBER: ["project.view"],
-      PROJECT_ADMIN: [ "project.*"],
+      PROJECT_ADMIN: ["project.*"],
       PROJECT_MEMBER: [""],
       USER: [],
       GUEST_PROJECT: ["project.view"],
