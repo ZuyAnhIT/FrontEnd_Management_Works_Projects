@@ -29,17 +29,22 @@ export default function AdminLayout({
       const fetchWorkspaces = async () => {
         try {
           setLoadingWs(true);
-          const data = await getCompanyWorkspaces(companyId);
-          setWorkspaces(data || []);
+
+          const response = await getCompanyWorkspaces(companyId, {
+            page: 0,
+            size: 50,
+            sortBy: "createdAt",
+            sortDir: "desc",
+          });
+
+          setWorkspaces(response.content || []);
         } catch (err: any) {
-          showToast(
-            err.message || "Failed to load workspaces",
-            "error"
-          );
+          showToast(err.message || "Failed to load workspaces", "error");
         } finally {
           setLoadingWs(false);
         }
       };
+
       fetchWorkspaces();
     }
   }, [isAuthenticated, user, showToast]);
@@ -67,28 +72,28 @@ export default function AdminLayout({
   return (
     // 3. Layout Full Screen cố định
     <div className="h-screen w-full bg-slate-50 flex flex-col font-sans text-slate-900 overflow-hidden">
-      
+
       {/* Header cố định */}
       <div className="flex-shrink-0 z-50">
-         <Header onMenuToggle={() => setSidebarOpen(!sidebarOpen)} />
+        <Header onMenuToggle={() => setSidebarOpen(!sidebarOpen)} />
       </div>
 
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar cố định bên trái */}
         <div className="flex-shrink-0 z-40">
-            <Sidebar
+          <Sidebar
             isOpen={sidebarOpen}
             onClose={() => setSidebarOpen(false)}
             activeMenu={activeMenu}
             setActiveMenu={setActiveMenu}
             workspaces={workspaces}
             loadingWs={loadingWs}
-            />
+          />
         </div>
 
         {/* Main Content cuộn độc lập */}
         <main className="flex-1 overflow-y-auto scroll-smooth relative">
-           {children}
+          {children}
         </main>
       </div>
     </div>

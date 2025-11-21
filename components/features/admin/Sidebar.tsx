@@ -53,7 +53,6 @@ export default function AdminSidebar({
     { id: "info", icon: Building, label: "Company Info", path: "/admin/company/companyinfo" },
     { id: "members", icon: Users, label: "Members", path: "/admin/company/members" },
     { id: "workspaces", icon: FolderKanban, label: "Workspaces", path: "/admin/company/workspaces" },
-    { id: "project", icon: FolderKanban, label: "Projects", path: "/admin/company/project" },
     { id: "billing", icon: CreditCard, label: "Billing", path: "/admin/company/billing" },
   ];
 
