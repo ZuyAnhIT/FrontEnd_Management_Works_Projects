@@ -39,7 +39,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/components/ui/ToastProvider";
 import MemberDetailModalBase from "@/components/ui/MemberDetailModalBase";
 import MemberTable from "@/components/ui/MemberTable";
-import InviteMemberModal from "@/components/ui/InviteMemberModal"; 
+import InviteMemberModal from "@/components/ui/InviteMemberModal";
 import ConfirmationModal from "@/components/ui/ConfirmationModal";
 
 export default function MembersPage() {
@@ -94,14 +94,23 @@ export default function MembersPage() {
     const fetchMembers = async () => {
       try {
         setLoading(true);
-        const data = await getWorkspaceMembers(companyId, workspaceId);
+        const data = await getWorkspaceMembers(companyId, workspaceId, {
+          page: 0,
+          size: 100,
+        });
+
         // Giả lập status nếu API không có
-        const dataWithStatus = data.map((m: any, i: number) => ({
+        const mappedData = data.content.map((m: any) => ({
           ...m,
-          status: m.status || (i % 2 === 0 ? "ACTIVE" : "PENDING"),
-          roleCode: m.roleCode || (m.roleName === 'Workspace Administrator' ? 'WORKSPACE_ADMIN' : 'WORKSPACE_MEMBER')
+          status: m.status || "ACTIVE",
+          roleCode:
+            m.roleCode ||
+            (m.roleName === "Workspace Administrator"
+              ? "WORKSPACE_ADMIN"
+              : "WORKSPACE_MEMBER"),
         }));
-        setMembers(dataWithStatus);
+
+        setMembers(mappedData);
       } catch (err: any) {
         showToast(err.message || "Failed to load member list", "error");
       } finally {
@@ -157,13 +166,19 @@ export default function MembersPage() {
       setRoleCode("WORKSPACE_MEMBER"); // Reset về giá trị mặc định
 
       // Tải lại danh sách
-      const data = await getWorkspaceMembers(companyId, workspaceId);
+      const data = await getWorkspaceMembers(companyId, workspaceId, {
+        page: 0,
+        size: 100,
+      });
+
+
       // Giả lập lại status (nếu cần)
-      const dataWithStatus = data.map((m: any, i: number) => ({
+      const dataWithStatus = data.content.map((m: any, i: number) => ({
         ...m,
         status: m.status || (i % 2 === 0 ? "ACTIVE" : "PENDING"),
       }));
       setMembers(dataWithStatus);
+
     } catch (err: any) {
       showToast(err.message || "Invitation failed", "error");
     }
@@ -177,8 +192,8 @@ export default function MembersPage() {
   const openEditModal = (member: any) => {
     setSelectedMember(member);
     // ✅ Thay đổi: Reset về rỗng mỗi khi mở modal
-    setNewStatus(""); 
-    setNewRole(""); 
+    setNewStatus("");
+    setNewRole("");
     setShowEditModal(true);
   };
 
@@ -203,7 +218,7 @@ export default function MembersPage() {
             companyId,
             workspaceId,
             selectedMember.memberId,
-            { newStatus }
+            newStatus
           )
         );
       }
@@ -223,12 +238,19 @@ export default function MembersPage() {
       await Promise.all(promises);
 
       // Refresh danh sách
-      const data = await getWorkspaceMembers(companyId, workspaceId);
-      const mappedData = data.map((m: any) => ({
+      const data = await getWorkspaceMembers(companyId, workspaceId, {
+        page: 0,
+        size: 100,
+      });
+
+      const mappedData = data.content.map((m: any) => ({
         ...m,
-        status: m.status || "ACTIVE", 
-        roleCode: m.roleCode || (m.roleName === 'Workspace Administrator' ? 'WORKSPACE_ADMIN' : 'WORKSPACE_MEMBER') 
+        status: m.status || "ACTIVE",
+        roleCode: m.roleCode || (m.roleName === "Workspace Administrator"
+          ? "WORKSPACE_ADMIN"
+          : "WORKSPACE_MEMBER"),
       }));
+
       setMembers(mappedData);
 
       showToast("Member info updated successfully!", "success");
@@ -259,14 +281,14 @@ export default function MembersPage() {
     try {
       // Gọi API xóa
       await removeWorkspaceMember(companyId, workspaceId, memberToDelete.memberId);
-      
+
       showToast("Member removed from workspace!", "success");
-      
+
       // Cập nhật UI: Lọc bỏ người vừa xóa
       setMembers((prev) =>
         prev.filter((m) => m.memberId !== memberToDelete.memberId)
       );
-      
+
       setIsDeleteModalOpen(false); // Đóng modal
     } catch (err: any) {
       showToast(err.message || "Failed to remove member!", "error");
@@ -413,12 +435,12 @@ export default function MembersPage() {
                     // Xám rõ hơn: còn trong hệ thống nhưng đang bị khóa
                     badgeStyle = "bg-gray-100 text-gray-600 border-gray-200";
                     iconColor = "text-gray-500";
-                  } 
+                  }
                   else if (status === "REMOVED") {
                     // Xám nhạt hơn: đã rời, de-emphasized
                     badgeStyle = "bg-gray-50 text-gray-400 border-gray-150";
                     iconColor = "text-gray-300";
-                  } 
+                  }
                   else {
                     // 🟢 ACTIVE → theo role
                     if (isAdmin) {
@@ -452,12 +474,24 @@ export default function MembersPage() {
         )}
       </div>
 
-      <InviteMemberModal 
-        isOpen={showInviteModal} onClose={() => setShowInviteModal(false)} onInvite={handleInvite} isLoading={loading} 
-        email={email} setEmail={setEmail} roleId={roleCode === "WORKSPACE_ADMIN" ? 1 : 2} setRoleId={(v) => setRoleCode(v === 1 ? "WORKSPACE_ADMIN" : "WORKSPACE_MEMBER")} 
-        title="Invite Member" description="Add to workspace" contextType="workspace" 
+      <InviteMemberModal
+        isOpen={showInviteModal}
+        onClose={() => setShowInviteModal(false)}
+        onInvite={handleInvite}
+        isLoading={loading}
+
+        email={email}
+        setEmail={setEmail}
+
+        roleCode={roleCode}
+        setRoleCode={setRoleCode}
+
+        title="Invite Member"
+        description="Add to workspace"
+        contextType="workspace"
       />
-      
+
+
       {/* ✅ MODAL SỬA (UPDATE LOGIC SELECT) */}
       {showEditModal && selectedMember && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fadeIn">
@@ -465,8 +499,8 @@ export default function MembersPage() {
             <div className="relative bg-gradient-to-br from-green-500 to-emerald-500 p-6">
               <div className="flex items-center justify-between relative z-10">
                 <div className="flex items-center gap-3">
-                   <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center"><Edit className="w-6 h-6 text-white" /></div>
-                   <div><h2 className="text-xl font-bold text-white">Update Member</h2><p className="text-white/80 text-sm">{selectedMember.fullName}</p></div>
+                  <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center"><Edit className="w-6 h-6 text-white" /></div>
+                  <div><h2 className="text-xl font-bold text-white">Update Member</h2><p className="text-white/80 text-sm">{selectedMember.fullName}</p></div>
                 </div>
                 <button onClick={() => setShowEditModal(false)} className="p-2 hover:bg-white/20 rounded-lg"><X className="w-5 h-5 text-white" /></button>
               </div>
@@ -485,8 +519,8 @@ export default function MembersPage() {
                     <option value="WORKSPACE_ADMIN">Admin</option>
                   </select>
                   <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
-                      {/* Chỉ hiện icon Crown nếu chọn Admin, còn lại (hoặc rỗng) hiện Shield */}
-                      {newRole === 'WORKSPACE_ADMIN' ? <Crown className="w-5 h-5 text-yellow-500" /> : <Shield className="w-5 h-5 text-gray-400" />}
+                    {/* Chỉ hiện icon Crown nếu chọn Admin, còn lại (hoặc rỗng) hiện Shield */}
+                    {newRole === 'WORKSPACE_ADMIN' ? <Crown className="w-5 h-5 text-yellow-500" /> : <Shield className="w-5 h-5 text-gray-400" />}
                   </div>
                 </div>
               </div>
@@ -495,17 +529,17 @@ export default function MembersPage() {
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2"><CheckCircle className="w-4 h-4 text-green-500" /> Status</label>
                 <select value={newStatus} onChange={(e) => setNewStatus(e.target.value)} className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:border-green-500">
-                   {/* ✅ Giá trị rỗng hiển thị mặc định */}
-                   <option value="">-- Please Select --</option>
-                   <option value="ACTIVE">Active</option>
-                   <option value="SUSPENDED">Suspended</option>
+                  {/* ✅ Giá trị rỗng hiển thị mặc định */}
+                  <option value="">-- Please Select --</option>
+                  <option value="ACTIVE">Active</option>
+                  <option value="SUSPENDED">Suspended</option>
                 </select>
               </div>
 
               <div className="flex gap-3 pt-4 border-t border-gray-100 mt-4">
                 <button onClick={() => setShowEditModal(false)} className="flex-1 px-4 py-3 border-2 border-gray-200 rounded-xl hover:bg-gray-50 font-semibold">Cancel</button>
                 <button onClick={handleUpdateMember} disabled={isUpdating} className="flex-1 flex items-center justify-center px-4 py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl disabled:opacity-70">
-                   {isUpdating ? <Loader2 className="w-5 h-5 animate-spin" /> : <div className="flex items-center gap-2"><Save className="w-4 h-4" /> Save Changes</div>}
+                  {isUpdating ? <Loader2 className="w-5 h-5 animate-spin" /> : <div className="flex items-center gap-2"><Save className="w-4 h-4" /> Save Changes</div>}
                 </button>
               </div>
             </div>
