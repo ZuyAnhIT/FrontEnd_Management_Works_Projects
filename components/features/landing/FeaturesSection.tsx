@@ -6,18 +6,18 @@ import { motion } from "framer-motion"; // 1. Import motion
 const features = [
   {
     icon: Users,
-    title: "Cộng tác nhóm",
-    desc: "Làm việc cùng nhau hiệu quả và nhanh chóng.",
+    title: "Team Collaboration",
+    desc: "Work together efficiently and quickly.",
   },
   {
     icon: Zap,
-    title: "Tự động hóa thông minh",
-    desc: "Giảm thao tác thủ công, tiết kiệm thời gian.",
+    title: "Smart Automation",
+    desc: "Reduce manual tasks and save time.",
   },
   {
     icon: Shield,
-    title: "Bảo mật hàng đầu",
-    desc: "Dữ liệu của bạn được mã hóa và bảo vệ tuyệt đối.",
+    title: "Top-tier Security",
+    desc: "Your data is encrypted and fully protected.",
   },
 ];
 
@@ -25,7 +25,7 @@ export default function FeaturesSection() {
   return (
     // 2. Bọc section bằng motion.section
     <motion.section
-      id="tinh-nang"
+      id="features"
       className="py-24 px-6 bg-white text-center scroll-mt-24"
       // 3. Định nghĩa hiệu ứng cho section
       initial={{ opacity: 0, y: 50 }} // Trạng thái ban đầu (ẩn, ở dưới)
@@ -34,7 +34,7 @@ export default function FeaturesSection() {
       viewport={{ once: true, amount: 0.3 }} // Chạy 1 lần, khi 30% section lọt vào
     >
       <h2 className="text-3xl font-bold text-gray-900 mb-10">
-        Tính năng nổi bật
+        Key Features
       </h2>
       <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
         {features.map(({ icon: Icon, title, desc }, i) => (
