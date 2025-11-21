@@ -58,7 +58,7 @@ export default function AuthModal({
     };
 
   // ----------------------------------------------------------------
-  // HÀM SUBMIT
+  // HÀM SUBMIT (Đã xóa console.log)
   // ----------------------------------------------------------------
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -68,17 +68,14 @@ export default function AuthModal({
       // 🔹 Đăng nhập
       if (tab === "login") {
         if (!form.email || !form.password) {
-          throw new Error("Vui lòng nhập email và mật khẩu!");
+          throw new Error("Please enter email and password!");
         }
-
-        console.log("📝 Modal: Gọi login từ context...");
 
         // Gọi login từ context
         await login(form.email.trim(), form.password.trim());
 
         // ✅ QUAN TRỌNG: Đóng modal ngay sau khi login thành công
         // (Guard effect sẽ tự động redirect)
-        console.log("✅ Modal: Login thành công, đóng modal");
         onClose();
       }
 
@@ -90,10 +87,10 @@ export default function AuthModal({
           !form.password ||
           !form.confirmPassword
         ) {
-          throw new Error("Vui lòng nhập đầy đủ thông tin!");
+          throw new Error("Please fill in all fields!");
         }
         if (form.password !== form.confirmPassword) {
-          throw new Error("Mật khẩu xác nhận không khớp!");
+          throw new Error("Passwords do not match!");
         }
 
         const res = await registerUser({
@@ -103,15 +100,15 @@ export default function AuthModal({
         });
 
         showToast(
-          res.message || "Vui lòng kiểm tra email để lấy mã OTP!",
-          "info"
+          res.message || "Please check your email for OTP!",
+          "success" // Dùng success thay vì info cho nổi bật
         );
         setTab("verify");
       }
 
       // 🔹 Xác thực email
       else if (tab === "verify") {
-        if (!form.otp) throw new Error("Vui lòng nhập OTP!");
+        if (!form.otp) throw new Error("Please enter OTP!");
 
         const res = await verifyEmail({
           email: form.email.trim(),
@@ -119,15 +116,15 @@ export default function AuthModal({
         });
 
         showToast(
-          res.message || "Xác thực thành công! Vui lòng đăng nhập.",
+          res.message || "Verification successful! Please login.",
           "success"
         );
         setTab("login");
       }
     } catch (error: any) {
-      console.error("❌ Modal: Lỗi submit:", error);
+      // Thay console.error bằng showToast
       showToast(
-        error.response?.data?.message || error.message || "Có lỗi xảy ra!",
+        error.response?.data?.message || error.message || "An error occurred!",
         "error"
       );
     } finally {
@@ -143,17 +140,15 @@ export default function AuthModal({
     refreshToken: string;
   }) => {
     try {
-      console.log("📝 Modal: Gọi loginWithTokens từ context...");
-
       // Gọi loginWithTokens từ context
       await loginWithTokens(data.accessToken, data.refreshToken);
 
       // ✅ Đóng modal ngay sau khi login thành công
-      console.log("✅ Modal: Social login thành công, đóng modal");
       onClose();
+      showToast("Login successful!", "success");
     } catch (error: any) {
-      console.error("❌ Modal: Lỗi social login:", error);
-      showToast(error.message || "Lỗi xử lý đăng nhập Google!", "error");
+      // Thay console.error bằng showToast
+      showToast(error.message || "Social login failed!", "error");
     }
   };
 
@@ -164,21 +159,21 @@ export default function AuthModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-2"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[2px] p-2 animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-sm bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100 transition-all animate-in slide-in-from-bottom-5 duration-300 ease-out"
+        className="relative w-full max-w-sm bg-white rounded-xl shadow-2xl overflow-hidden border border-slate-200 transition-all animate-in zoom-in-95 duration-200"
       >
         <AuthHeader tab={tab} setTab={setTab} onClose={onClose} />
 
-        <div className="p-5">
+        <div className="p-6">
           {(tab === "login" || tab === "register") && (
             <AuthTabs tab={tab} setTab={setTab} />
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-3">
+          <form onSubmit={handleSubmit} className="space-y-4 mt-4">
             {tab === "login" && (
               <AuthFormLogin
                 form={form}
