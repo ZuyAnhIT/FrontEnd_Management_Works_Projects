@@ -16,6 +16,7 @@ import AuthFormLogin from "./AuthFormLogin";
 import InputField from "./InputField";
 import PasswordField from "./PasswordField";
 import LoadingButton from "@/components/ui/LoadingButton";
+import PasswordStrengthMeter from "@/components/ui/PasswordStrengthMeter"; 
 
 // Type for /details API response
 interface InviteDetails {
@@ -24,9 +25,6 @@ interface InviteDetails {
   accountExists: boolean;
 }
 
-// ----------------------------------------
-// Component for CASE 1: New User
-// ----------------------------------------
 function NewUserFlow({
   details,
   token,
@@ -37,6 +35,9 @@ function NewUserFlow({
   const { showToast } = useToast();
   const { loginWithTokens } = useAuth();
   const [loading, setLoading] = useState(false);
+
+  // 👁 Thêm biến showPassword
+  const [showPassword, setShowPassword] = useState(false);
 
   const [form, setForm] = useState({
     fullName: "",
@@ -63,7 +64,6 @@ function NewUserFlow({
         invitationToken: token,
       });
       showToast("Registration & company join successful!", "success");
-      // Auto login and redirect
       await loginWithTokens(data.accessToken, data.refreshToken);
     } catch (err: any) {
       showToast(err.message, "error");
@@ -81,14 +81,16 @@ function NewUserFlow({
           Create an account to accept the invitation.
         </p>
       </div>
+
       <form className="p-6 space-y-4" onSubmit={handleSubmit}>
         <InputField
           label="Email (Invited)"
           icon={<Mail className="w-4 h-4 text-gray-400" />}
           type="email"
           value={details.email}
-          disabled // Lock email
+          disabled
         />
+
         <InputField
           label="Full Name"
           icon={<User className="w-4 h-4 text-gray-400" />}
@@ -97,22 +99,34 @@ function NewUserFlow({
           placeholder="Enter your full name"
           required
         />
+
+        {/* PASSWORD */}
         <PasswordField
           label="Password"
           value={form.password}
           onChange={handleChange("password")}
+          show={showPassword}
+          toggle={() => setShowPassword((prev) => !prev)}
           placeholder="Create a password (min 6 chars)"
         />
+
+        {/* ⬅️ THÊM METER CHECK ĐỘ MẠNH Ở ĐÂY */}
+        <PasswordStrengthMeter password={form.password} />
+
+        {/* CONFIRM */}
         <PasswordField
           label="Confirm Password"
           value={form.confirmPassword}
+          show={showPassword}
           onChange={handleChange("confirmPassword")}
+          toggle={() => setShowPassword((prev) => !prev)}
           placeholder="Re-enter password"
         />
+
         <LoadingButton
           text="Create Account & Join"
           isLoading={loading}
-          className="mt-4"
+          className="mt-4 w-full"
         />
       </form>
     </>
