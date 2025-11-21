@@ -74,7 +74,7 @@ export default function ProjectMembersPage() {
 
         const data = await getProjectMembers(workspaceId, projectId); // ✔ FIXED
 
-      const mapped = data.map((m: any, i: number) => ({
+      const mapped = data.content.map((m: any, i: number) => ({
         ...m,
         roleCode: m.roleCode || (m.roleName === "Project Admin" ? "PROJECT_ADMIN" : "PROJECT_MEMBER"), // ✅ thêm logic
         status: m.status || (i % 2 === 0 ? "ACTIVE" : "PENDING"),
