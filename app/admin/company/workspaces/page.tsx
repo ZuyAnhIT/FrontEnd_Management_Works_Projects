@@ -17,7 +17,7 @@ import {
 } from "@/services/apiWorkspace";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/components/ui/ToastProvider";
-import { Button } from "@/components/ui/button"; // Giả sử có component Button chuẩn
+import { Button } from "@/components/ui/button"; 
 
 import CreateWorkspaceModal from "@/components/features/admin/CreateWorkspaceModal";
 import WorkspaceCard from "@/components/features/admin/WorkspaceCard";
@@ -47,7 +47,7 @@ export default function CompanyWorkspacesPage() {
         const data = await getCompanyWorkspaces(companyId);
         setWorkspaces(data);
       } catch (err: any) {
-        showToast(err.message || "Không thể tải danh sách workspace.", "error");
+        showToast(err.message || "Failed to load workspaces.", "error");
       } finally {
         setLoading(false);
       }

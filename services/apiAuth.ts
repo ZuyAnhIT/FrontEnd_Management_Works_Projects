@@ -2,7 +2,7 @@
 import apiClient from "@/lib/apiClient";
 
 // ===================================================
-// 🧩 Đăng ký tài khoản mới
+// 🧩 Register new account
 // ===================================================
 export const registerUser = async (payload: {
   fullName: string;
@@ -16,7 +16,7 @@ export const registerUser = async (payload: {
 };
 
 // ===================================================
-// 🧩 Xác thực email (OTP)
+// 🧩 Verify email (OTP)
 // ===================================================
 export const verifyEmail = async (payload: { email: string; otp: string }) => {
   const res = await apiClient.post("/auth/verify-email", payload);
@@ -26,7 +26,7 @@ export const verifyEmail = async (payload: { email: string; otp: string }) => {
 };
 
 // ===================================================
-// 🧩 Đăng nhập tài khoản
+// 🧩 Login account
 // ===================================================
 export const loginUser = async (payload: {
   email: string;
@@ -35,7 +35,7 @@ export const loginUser = async (payload: {
   const res = await apiClient.post("/auth/login", payload);
   const data = res.data;
 
-  if (!data.success) throw new Error(data.message || "Đăng nhập thất bại!");
+  if (!data.success) throw new Error(data.message || "Login failed!");
 
   if (data.data?.accessToken && data.data?.refreshToken) {
     localStorage.setItem("accessToken", data.data.accessToken);
@@ -46,7 +46,7 @@ export const loginUser = async (payload: {
 };
 
 // ===================================================
-// 🧩 Đăng xuất (clear token)
+// 🧩 Logout (clear token)
 // ===================================================
 export const logoutUser = async () => {
   const refreshToken = localStorage.getItem("refreshToken");
@@ -63,7 +63,7 @@ export const logoutUser = async () => {
 };
 
 // ===================================================
-// 🧩 Đăng ký từ Lời mời (Trường hợp 1)
+// 🧩 Register from Invitation (Case 1)
 // ===================================================
 export const registerFromInvite = async (payload: {
   fullName: string;
@@ -75,22 +75,22 @@ export const registerFromInvite = async (payload: {
     const data = res.data;
 
     if (!data.success) {
-      throw new Error(data.message || "Không thể đăng ký từ lời mời.");
+      throw new Error(data.message || "Cannot register from invitation.");
     }
 
-    // API này trả về tokens để tự động đăng nhập
+    // API returns tokens for auto-login
     return data.data; // { accessToken, refreshToken, tokenType }
   } catch (err: any) {
-    console.error("Lỗi đăng ký từ lời mời:", err.response || err);
+    console.error("Error registering from invitation:", err.response || err);
     throw new Error(
       err.response?.data?.message ||
-        "Lỗi hệ thống, không thể đăng ký từ lời mời."
+        "System error, cannot register from invitation."
     );
   }
 };
 
 // ===================================================
-// 🧩 Quên mật khẩu
+// 🧩 Forgot password
 // ===================================================
 export const forgotPassword = async (email: string) => {
   const res = await apiClient.post("/auth/forgot-password", { email });
@@ -98,7 +98,7 @@ export const forgotPassword = async (email: string) => {
 };
 
 // ===================================================
-// 🧩 Đặt lại mật khẩu
+// 🧩 Reset password
 // ===================================================
 export const resetPassword = async (payload: {
   token: string;
@@ -108,14 +108,14 @@ export const resetPassword = async (payload: {
   return res.data; // response { success, message, data }
 };
 
-// 🧩 Đăng nhập bằng Google
+// 🧩 Login with Google
 // ===================================================
 export const loginWithGoogle = async (googleToken: string) => {
   const res = await apiClient.post("/auth/google", { googleToken });
   const data = res.data;
 
   if (!data.success)
-    throw new Error(data.message || "Đăng nhập Google thất bại!");
+    throw new Error(data.message || "Google login failed!");
 
   if (data.data?.accessToken && data.data?.refreshToken) {
     localStorage.setItem("accessToken", data.data.accessToken);

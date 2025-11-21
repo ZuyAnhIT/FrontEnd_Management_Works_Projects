@@ -1,45 +1,45 @@
 "use client";
 
 import { Check } from "lucide-react";
-import { motion } from "framer-motion"; // 1. Import motion
+import { motion } from "framer-motion";
 
 const plans = [
   {
-    name: "Miễn Phí",
-    price: "0₫",
+    name: "Free",
+    price: "$0",
     period: "",
-    desc: "Hoàn hảo để bắt đầu",
+    desc: "Perfect to get started",
     features: [
-      "Tối đa 5 thành viên",
-      "3 dự án",
-      "1 GB lưu trữ",
-      "Hỗ trợ cơ bản",
+      "Up to 5 members",
+      "3 projects",
+      "1 GB storage",
+      "Basic support",
     ],
     popular: false,
   },
   {
     name: "Pro",
-    price: "199,000₫",
-    period: "tháng",
-    desc: "Cho đội nhóm chuyên nghiệp",
+    price: "$9",
+    period: "/mo",
+    desc: "For professional teams",
     features: [
-      "Không giới hạn thành viên",
-      "Không giới hạn dự án",
-      "100 GB lưu trữ",
-      "Hỗ trợ ưu tiên 24/7",
+      "Unlimited members",
+      "Unlimited projects",
+      "100 GB storage",
+      "24/7 Priority support",
     ],
     popular: true,
   },
   {
     name: "Enterprise",
-    price: "Liên hệ",
+    price: "Contact",
     period: "",
-    desc: "Giải pháp doanh nghiệp",
+    desc: "For large organizations",
     features: [
-      "Tùy chỉnh hoàn toàn",
-      "Bảo mật nâng cao",
-      "Lưu trữ không giới hạn",
-      "Hỗ trợ chuyên biệt",
+      "Fully customizable",
+      "Advanced security",
+      "Unlimited storage",
+      "Dedicated support",
     ],
     popular: false,
   },
@@ -53,64 +53,71 @@ export default function PricingSection({
   onRegisterClick,
 }: PricingSectionProps) {
   return (
-    // 2. Bọc section bằng motion.section
     <motion.section
-      id="goi-dich-vu"
-      className="py-24 bg-gradient-to-b from-blue-50/40 to-white text-center scroll-mt-24"
+      id="pricing"
+      className="py-24 bg-slate-50 text-center scroll-mt-24"
       initial={{ opacity: 0, y: 50 }}
       whileInView={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, ease: "easeInOut" }}
       viewport={{ once: true, amount: 0.2 }}
     >
-      <h2 className="text-3xl font-bold text-gray-900 mb-12">Gói dịch vụ</h2>
-      <div className="grid md:grid-cols-3 gap-10 max-w-6xl mx-auto px-6">
+      <h2 className="text-3xl font-bold text-slate-900 mb-4">
+        Simple, transparent pricing
+      </h2>
+      <p className="text-slate-500 mb-12 max-w-2xl mx-auto">
+        Choose the plan that's right for your team. No hidden fees.
+      </p>
+
+      <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto px-6">
         {plans.map((plan, i) => (
-          // 3. Thêm hiệu ứng so le cho từng thẻ
           <motion.div
             key={i}
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: i * 0.1 }}
             viewport={{ once: true, amount: 0.5 }}
-            className={`relative p-8 rounded-2xl shadow-lg border 
-                       transition-transform duration-300 ease-in-out 
-                       transform hover:scale-105 ${
-                         plan.popular
-                           ? "bg-gradient-to-b from-blue-500 to-cyan-500 text-white scale-105"
-                           : // Thêm ease-in-out cho thẻ thường
-                             "bg-white text-gray-900 border-gray-200 hover:border-blue-300"
-                       }`}
+            className={`relative p-8 rounded-xl border transition-all duration-300 ease-in-out flex flex-col
+              ${
+                plan.popular
+                  ? "bg-white border-blue-600 shadow-xl scale-105 z-10 ring-1 ring-blue-600"
+                  : "bg-white border-slate-200 shadow-sm hover:shadow-md hover:border-blue-300"
+              }`}
           >
             {plan.popular && (
-              <div className="absolute top-0 right-0 bg-yellow-400 text-xs px-3 py-1 rounded-bl-lg font-semibold text-gray-900">
-                Phổ biến
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-blue-600 text-white text-xs px-3 py-1 rounded-full font-bold uppercase tracking-wider shadow-sm">
+                Most Popular
               </div>
             )}
-            <h3 className="text-2xl font-bold mb-2">{plan.name}</h3>
-            <p className="text-sm opacity-80 mb-4">{plan.desc}</p>
-            <div className="text-4xl font-extrabold mb-4">
-              {plan.price}
-              <span className="text-base font-normal opacity-80">
-                {plan.period}
-              </span>
+
+            <h3 className="text-xl font-bold text-slate-900 mb-2">{plan.name}</h3>
+            <p className="text-sm text-slate-500 mb-6">{plan.desc}</p>
+            
+            <div className="flex items-baseline justify-center mb-6">
+               <span className="text-4xl font-extrabold text-slate-900">{plan.price}</span>
+               <span className="text-slate-500 ml-1">{plan.period}</span>
             </div>
-            <ul className="space-y-2 mb-6">
+
+            <ul className="space-y-3 mb-8 flex-1 text-left">
               {plan.features.map((f, j) => (
-                <li key={j} className="flex items-center justify-center gap-2">
-                  <Check className="w-4 h-4" />
+                <li key={j} className="flex items-center gap-3 text-slate-700 text-sm">
+                  <div className={`p-0.5 rounded-full ${plan.popular ? 'bg-blue-100 text-blue-600' : 'bg-slate-100 text-slate-500'}`}>
+                      <Check className="w-3 h-3" />
+                  </div>
                   <span>{f}</span>
                 </li>
               ))}
             </ul>
+
             <button
               onClick={onRegisterClick}
-              className={`px-6 py-3 rounded-lg font-semibold transition-all ${
-                plan.popular
-                  ? "bg-white text-blue-600 hover:bg-gray-50"
-                  : "bg-gradient-to-r from-blue-500 to-cyan-500 text-white hover:opacity-90"
-              }`}
+              className={`w-full py-3 rounded-lg font-semibold text-sm transition-all duration-200
+                ${
+                  plan.popular
+                    ? "bg-blue-600 text-white hover:bg-blue-700 shadow-md hover:shadow-lg"
+                    : "bg-slate-100 text-slate-700 hover:bg-slate-200 hover:text-slate-900"
+                }`}
             >
-              Dùng thử ngay
+              {plan.price === "Contact" ? "Contact Sales" : "Start free trial"}
             </button>
           </motion.div>
         ))}

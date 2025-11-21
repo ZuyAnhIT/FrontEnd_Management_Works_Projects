@@ -1,4 +1,9 @@
-import { CreditCard, CheckCircle, Download, Sparkles } from "lucide-react";
+"use client";
+
+import { CreditCard, CheckCircle2, Download, Zap, Users, HardDrive, Calendar } from "lucide-react";
+import { Button } from "@/components/ui/button"; // Giả sử có Button component
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"; // Giả sử có Card components
+import { Badge } from "@/components/ui/badge"; // Giả sử có Badge component
 
 // Dữ liệu giả cho lịch sử
 const invoices = [
@@ -24,116 +29,117 @@ const invoices = [
 
 export default function BillingPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-white via-blue-50/40 to-white py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
+    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 py-8">
+      <div className="max-w-[1200px] mx-auto px-6 space-y-8">
+        
+        {/* 1. HEADER */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-1">
-              Gói dịch vụ & Thanh toán
-            </h1>
-            <p className="text-gray-600">
-              Theo dõi và quản lý gói VIP của công ty.
+            <h1 className="text-2xl font-bold text-slate-900">Billing & Plan</h1>
+            <p className="text-sm text-slate-500 mt-1">
+              Manage your subscription and payment history.
             </p>
           </div>
-          <button className="group flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-xl hover:from-blue-600 hover:to-cyan-600 transition-all duration-300 shadow-lg hover:shadow-xl font-semibold hover:scale-105">
-            <Sparkles className="w-5 h-5 group-hover:scale-110 transition-transform" />
-            Nâng cấp Gói
-          </button>
+          <Button className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm font-bold h-10 px-5 rounded-[3px] flex items-center gap-2">
+             <Zap className="w-4 h-4" /> Upgrade Plan
+          </Button>
         </div>
 
-        {/* Thẻ thông tin gói */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-          {/* Gói hiện tại */}
-          <div className="relative overflow-hidden bg-gradient-to-br from-blue-600 to-blue-700 rounded-2xl p-6 text-white shadow-2xl shadow-blue-500/30">
-            <div className="absolute -right-4 -bottom-4 w-24 h-24 bg-white/10 rounded-full blur-2xl"></div>
-            <div className="relative z-10">
-              <div className="text-sm opacity-80 mb-2">Gói hiện tại</div>
-              <div className="text-3xl font-bold mb-1">VIP Enterprise</div>
-              <div className="text-sm opacity-80">Gia hạn ngày: 31/12/2025</div>
-            </div>
-          </div>
-          {/* Thành viên */}
-          <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-xl shadow-gray-500/5">
-            <div className="text-sm text-gray-600 mb-2">
-              Thành viên đang sử dụng
-            </div>
-            <div className="text-3xl font-bold text-gray-900 mb-1">48 / ∞</div>
-            <div className="text-sm text-green-600 font-medium">
-              Không giới hạn
-            </div>
-          </div>
-          {/* Dung lượng */}
-          <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-xl shadow-gray-500/5">
-            <div className="text-sm text-gray-600 mb-2">Dung lượng đã dùng</div>
-            <div className="text-3xl font-bold text-gray-900 mb-1">
-              21.5 GB / ∞
-            </div>
-            <div className="text-sm text-green-600 font-medium">
-              Không giới hạn
-            </div>
-          </div>
+        {/* 2. PLAN OVERVIEW (Stats) */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          
+          {/* Current Plan Card (Nổi bật hơn chút) */}
+          <Card className="border border-blue-200 shadow-sm bg-blue-50/30">
+             <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                   <CardTitle className="text-sm font-bold text-blue-700 uppercase tracking-wider">Current Plan</CardTitle>
+                   <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100 border-blue-200">Active</Badge>
+                </div>
+             </CardHeader>
+             <CardContent>
+                <div className="text-3xl font-extrabold text-slate-900 mb-1">VIP Enterprise</div>
+                <div className="flex items-center gap-2 text-xs text-slate-500 mt-2">
+                   <Calendar className="w-3.5 h-3.5" />
+                   <span>Renews on: <strong>Dec 31, 2025</strong></span>
+                </div>
+             </CardContent>
+          </Card>
+
+          {/* Members Usage */}
+          <Card className="border border-slate-200 shadow-sm bg-white">
+             <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                   <Users className="w-4 h-4" /> Members
+                </CardTitle>
+             </CardHeader>
+             <CardContent>
+                <div className="flex items-baseline gap-1">
+                   <span className="text-3xl font-bold text-slate-900">48</span>
+                   <span className="text-lg text-slate-400 font-medium">/ ∞</span>
+                </div>
+                <p className="text-xs text-green-600 font-medium mt-2">Unlimited seats available</p>
+             </CardContent>
+          </Card>
+
+          {/* Storage Usage */}
+          <Card className="border border-slate-200 shadow-sm bg-white">
+             <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                   <HardDrive className="w-4 h-4" /> Storage
+                </CardTitle>
+             </CardHeader>
+             <CardContent>
+                <div className="flex items-baseline gap-1">
+                   <span className="text-3xl font-bold text-slate-900">21.5 GB</span>
+                   <span className="text-lg text-slate-400 font-medium">/ ∞</span>
+                </div>
+                 <p className="text-xs text-green-600 font-medium mt-2">Scale as you grow</p>
+             </CardContent>
+          </Card>
         </div>
 
-        {/* Lịch sử thanh toán */}
-        <div className="bg-white border border-gray-200 rounded-2xl shadow-xl shadow-gray-500/5 overflow-hidden">
-          <div className="p-6 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-              <CreditCard className="w-5 h-5 text-blue-600" />
-              Lịch sử thanh toán
-            </h2>
-          </div>
-          {/* Bảng (Table) */}
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase">
-                    Mã HĐ
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase">
-                    Ngày
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase">
-                    Trạng thái
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase">
-                    Tổng tiền
-                  </th>
-                  <th className="px-6 py-4 text-right text-xs font-bold text-gray-600 uppercase"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {invoices.map((invoice) => (
-                  <tr
-                    key={invoice.id}
-                    className="hover:bg-gray-50/50 transition-colors"
-                  >
-                    <td className="px-6 py-4 font-mono text-gray-700">
-                      {invoice.id}
-                    </td>
-                    <td className="px-6 py-4 text-gray-600">{invoice.date}</td>
-                    <td className="px-6 py-4">
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-green-50 text-green-700 rounded-full text-sm font-semibold border border-green-200">
-                        <CheckCircle className="w-4 h-4" />
-                        {invoice.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 font-semibold text-gray-900">
-                      {invoice.amount}
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <button className="group flex items-center gap-1.5 text-blue-600 hover:text-blue-800 font-medium">
-                        <Download className="w-4 h-4" />
-                        Tải về
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        {/* 3. BILLING HISTORY (Table) */}
+        <div className="space-y-4">
+           <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+              <CreditCard className="w-5 h-5 text-slate-500" /> Billing History
+           </h2>
+           
+           <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left">
+                  <thead className="bg-slate-50 border-b border-slate-200 text-xs uppercase text-slate-500 font-semibold">
+                    <tr>
+                      <th className="px-6 py-3">Invoice ID</th>
+                      <th className="px-6 py-3">Date</th>
+                      <th className="px-6 py-3">Status</th>
+                      <th className="px-6 py-3">Amount</th>
+                      <th className="px-6 py-3 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {invoices.map((invoice) => (
+                      <tr key={invoice.id} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="px-6 py-4 font-medium text-slate-900 font-mono">{invoice.id}</td>
+                        <td className="px-6 py-4 text-slate-600">{invoice.date}</td>
+                        <td className="px-6 py-4">
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-50 text-green-700 border border-green-200 uppercase tracking-wide">
+                            <CheckCircle2 className="w-3 h-3" /> {invoice.status}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 font-bold text-slate-900">{invoice.amount}</td>
+                        <td className="px-6 py-4 text-right">
+                          <button className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-700 hover:bg-blue-50 px-3 py-1.5 rounded-md transition-colors">
+                            <Download className="w-3.5 h-3.5" /> Download
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+           </div>
         </div>
+
       </div>
     </div>
   );

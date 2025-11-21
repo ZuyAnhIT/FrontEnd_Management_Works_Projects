@@ -7,21 +7,21 @@ export default function AuthFormVerify({ form, handleChange, isLoading }: any) {
   return (
     <>
       <InputField
-        label="Mã OTP"
+        label="OTP Code"
         icon={<Lock className="w-4 h-4 text-gray-400" />}
         type="text"
         value={form.otp}
         onChange={handleChange("otp")}
-        placeholder="Nhập mã OTP 6 ký tự"
+        placeholder="Enter 6-digit OTP"
         required
       />
-      <button
-        type="submit"
-        disabled={isLoading}
-        className="w-full py-2.5 rounded-lg font-semibold text-white bg-gradient-to-r from-blue-500 to-cyan-500 hover:opacity-90 transition disabled:opacity-60"
-      >
-        {isLoading ? "Đang xử lý..." : "Xác Thực OTP"}
-      </button>
+      
+      {/* Sử dụng LoadingButton để đồng bộ UI */}
+      <LoadingButton
+        text="Verify OTP"
+        isLoading={isLoading}
+        className="w-full mt-4"
+      />
     </>
   );
 }

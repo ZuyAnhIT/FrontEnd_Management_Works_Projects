@@ -2,17 +2,15 @@
 
 import { useState, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { KeyRound } from "lucide-react";
+import { KeyRound, CheckCircle2, AlertCircle } from "lucide-react";
 import PasswordField from "./PasswordField";
 import LoadingButton from "@/components/ui/LoadingButton";
-import { useToast } from "@/components/ui/ToastProvider";
 // ⛔️ Sửa đường dẫn nếu cần
 import { resetPassword } from "@/services/apiAuth";
 
 export default function ResetPasswordForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { showToast } = useToast();
 
   const [token, setToken] = useState<string | null>(null);
   const [newPassword, setNewPassword] = useState("");
@@ -31,7 +29,7 @@ export default function ResetPasswordForm() {
     if (tokenFromUrl) {
       setToken(tokenFromUrl);
     } else {
-      setMessage("Token không hợp lệ hoặc đã hết hạn.");
+      setMessage("Invalid or expired token.");
       setIsError(true);
     }
   }, [searchParams]);
@@ -40,17 +38,17 @@ export default function ResetPasswordForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token) {
-      setMessage("Token không hợp lệ.");
+      setMessage("Invalid token.");
       setIsError(true);
       return;
     }
     if (newPassword.length < 6) {
-      setMessage("Mật khẩu mới phải có ít nhất 6 ký tự.");
+      setMessage("Password must be at least 6 characters.");
       setIsError(true);
       return;
     }
     if (newPassword !== confirmNewPassword) {
-      setMessage("Mật khẩu xác nhận không khớp.");
+      setMessage("Passwords do not match.");
       setIsError(true);
       return;
     }
@@ -65,12 +63,12 @@ export default function ResetPasswordForm() {
         newPassword: newPassword,
       });
 
-      setMessage(res?.message || "Đặt lại mật khẩu thành công!");
+      setMessage(res?.message || "Password reset successfully!");
       setIsError(false);
       // Chuyển về trang đăng nhập sau 2 giây
       setTimeout(() => router.push("/log-in-out"), 2000);
     } catch (error: any) {
-      setMessage(error.message || "Token không hợp lệ hoặc đã hết hạn.");
+      setMessage(error.message || "Token invalid or expired.");
       setIsError(true);
     } finally {
       setLoading(false);
@@ -78,53 +76,74 @@ export default function ResetPasswordForm() {
   };
 
   if (!token && !message) {
-    return <div className="p-6 text-center">Đang xác thực token...</div>;
+    return (
+        <div className="p-8 text-center text-slate-500 text-sm font-medium">
+            Verifying token...
+        </div>
+    );
   }
 
   return (
     <>
-      {/* Header riêng của trang */}
-      <div className="bg-gradient-to-br from-blue-500 to-cyan-500 text-center py-6 px-4 relative">
-        <h2 className="text-lg sm:text-xl font-bold text-white mt-3">
-          Tạo Mật khẩu mới
+      {/* Header Minimalist */}
+      <div className="bg-white border-b border-slate-100 px-6 py-8 flex flex-col items-center text-center">
+        <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center shadow-sm mb-4">
+           <KeyRound className="w-6 h-6 text-white" />
+        </div>
+        <h2 className="text-xl font-bold text-slate-900 tracking-tight">
+           Reset Password
         </h2>
-        <p className="text-xs text-blue-100 mt-1">
-          Nhập mật khẩu mới cho tài khoản của bạn.
+        <p className="text-sm text-slate-500 mt-1">
+           Create a new strong password for your account.
         </p>
       </div>
 
-      {/* Form */}
-      <form className="p-5 space-y-3" onSubmit={handleSubmit}>
+      {/* Form Content */}
+      <form className="p-6 space-y-5" onSubmit={handleSubmit}>
+        
         <PasswordField
-          label="Mật khẩu mới"
+          label="New Password"
           value={newPassword}
           show={showPassword}
           toggle={() => setShowPassword(!showPassword)}
           onChange={(e) => setNewPassword(e.target.value)}
+          placeholder="Enter new password"
         />
+        
         <PasswordField
-          label="Xác nhận mật khẩu mới"
+          label="Confirm Password"
           value={confirmNewPassword}
           show={showConfirm}
           toggle={() => setShowConfirm(!showConfirm)}
           onChange={(e) => setConfirmNewPassword(e.target.value)}
+          placeholder="Re-enter password"
         />
 
-        <LoadingButton
-          type="submit"
-          isLoading={loading}
-          className="w-full mt-4"
-          text="Đặt lại mật khẩu"
-        />
+        <div className="pt-2">
+            <LoadingButton
+            type="submit"
+            isLoading={loading}
+            className="w-full bg-blue-600 hover:bg-blue-700 font-bold shadow-sm"
+            text="Reset Password"
+            loadingText="Resetting..."
+            />
+        </div>
 
-        {/* Hiển thị thông báo */}
+        {/* Hiển thị thông báo (Alert Style) */}
         {message && (
           <div
-            className={`mt-3 text-sm text-center p-3 rounded-lg ${
-              isError ? "bg-red-50 text-red-700" : "bg-green-50 text-green-700"
+            className={`mt-4 p-3 rounded-md flex items-start gap-3 text-sm font-medium border ${
+              isError 
+                ? "bg-red-50 text-red-700 border-red-100" 
+                : "bg-green-50 text-green-700 border-green-100"
             }`}
           >
-            {message}
+            {isError ? (
+                <AlertCircle className="w-5 h-5 shrink-0" />
+            ) : (
+                <CheckCircle2 className="w-5 h-5 shrink-0" />
+            )}
+            <span>{message}</span>
           </div>
         )}
       </form>

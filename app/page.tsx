@@ -18,7 +18,7 @@ export default function LandingPage() {
 
   const handleRegisterClick = () => {
     setIsAuthOpen(true);
-    showToast("Bắt đầu hành trình của bạn!", "info");
+    showToast("Start your journey today!", "info"); // Thông báo tiếng Anh
   };
 
   const handleLoginClick = () => {

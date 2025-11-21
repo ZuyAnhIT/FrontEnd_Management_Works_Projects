@@ -31,7 +31,7 @@ export default function AuthFormForgot({
 
   const handleSendEmail = async () => {
     if (!form.email.trim()) {
-      setMessage("Vui lòng nhập email hợp lệ.");
+      setMessage("Please enter a valid email.");
       setIsError(true);
       return;
     }
@@ -45,14 +45,14 @@ export default function AuthFormForgot({
 
       const res = await forgotPassword(form.email);
       setMessage(
-        res?.message || "Đã gửi liên kết. Vui lòng kiểm tra email (kể cả Spam)."
+        res?.message || "Link sent. Please check your email (including Spam)."
       );
       setIsError(false);
 
       // ❌ Không chuyển sang Step 2 nữa
       // setStep(2);
     } catch (error: any) {
-      setMessage(error.message || "Gửi email thất bại. Thử lại sau.");
+      setMessage(error.message || "Failed to send email. Please try again later.");
       setIsError(true);
     } finally {
       // setLoading(false);
@@ -86,7 +86,7 @@ export default function AuthFormForgot({
         isLoading={isLoading} // Dùng isLoading của cha
         onClick={handleSendEmail}
         className="w-full mt-4"
-        text="Gửi liên kết đặt lại mật khẩu"
+        text="Send reset link"
       />
 
       {/* 🎨 Hiển thị thông báo */}

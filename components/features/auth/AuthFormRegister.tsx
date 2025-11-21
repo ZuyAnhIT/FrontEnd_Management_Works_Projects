@@ -13,11 +13,11 @@ export default function AuthFormRegister({ form, handleChange, isLoading }: any)
   return (
     <>
       <InputField
-        label="Họ và tên"
+        label="Full Name"
         icon={<User className="w-4 h-4 text-gray-400" />}
         value={form.fullName}
         onChange={handleChange("fullName")}
-        placeholder="Nguyễn Văn A"
+        placeholder="John Doe"
         required
       />
 
@@ -32,7 +32,7 @@ export default function AuthFormRegister({ form, handleChange, isLoading }: any)
       />
 
       <PasswordField
-        label="Mật khẩu"
+        label="Password"
         value={form.password}
         show={showPassword}
         toggle={() => setShowPassword((prev) => !prev)}
@@ -40,20 +40,19 @@ export default function AuthFormRegister({ form, handleChange, isLoading }: any)
       />
 
       <PasswordField
-        label="Xác nhận mật khẩu"
+        label="Confirm Password"
         value={form.confirmPassword}
         show={showConfirm}
         toggle={() => setShowConfirm((prev) => !prev)}
         onChange={handleChange("confirmPassword")}
       />
 
-      <button
-        type="submit"
-        disabled={isLoading}
-        className="w-full py-2.5 mt-2 rounded-lg font-semibold text-white bg-gradient-to-r from-blue-500 to-cyan-500 hover:opacity-90 transition disabled:opacity-60"
-      >
-        {isLoading ? "Đang xử lý..." : "Tạo Tài Khoản"}
-      </button>
+      {/* Sử dụng LoadingButton thay cho button thường để đồng bộ UI */}
+      <LoadingButton
+        text="Create Account"
+        isLoading={isLoading}
+        className="w-full mt-4"
+      />
     </>
   );
 }

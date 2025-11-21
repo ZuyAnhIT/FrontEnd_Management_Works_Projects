@@ -41,21 +41,21 @@ export default function AuthFormLogin({
 
       {/* 🔒 Password */}
       <PasswordField
-        label="Mật khẩu"
+        label="Password"
         value={form.password}
         show={showPassword}
         toggle={() => setShowPassword((prev) => !prev)}
         onChange={handleChange("password")}
       />
 
-      {/* ⚙️ Options */}
+      {/* ⚙️ Tùy chọn */}
       <div className="flex justify-between items-center text-xs text-gray-500 mb-1">
         <label className="flex items-center gap-1 cursor-pointer select-none">
           <input
             type="checkbox"
             className="rounded border-gray-300 text-blue-500 focus:ring-blue-400"
           />
-          Ghi nhớ
+          Remember me
         </label>
 
         <button
@@ -63,16 +63,18 @@ export default function AuthFormLogin({
           onClick={() => setTab("forgot")}
           className="text-blue-600 hover:text-blue-700 font-medium hover:underline transition"
         >
-          Quên mật khẩu?
+          Forgot password?
         </button>
       </div>
 
-      {/* ✅ Submit */}
-      <LoadingButton
-        text="Đăng nhập"
-        isLoading={isLoading}
-        className="mt-3"
-      />
+      {/* ✅ Nút đăng nhập (Căn giữa) */}
+      <div className="flex justify-center mt-3">
+        <LoadingButton
+          text="Log in"
+          isLoading={isLoading}
+          className="w-full" 
+        />
+      </div>
     </>
   );
 }
