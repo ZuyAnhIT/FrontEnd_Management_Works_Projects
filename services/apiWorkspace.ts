@@ -1,134 +1,11 @@
 "use client";
 import apiClient from "@/lib/apiClient";
 
-// ===================================================
-// 🧩 Lấy danh sách workspace của công ty
-// ===================================================
-export const getCompanyWorkspaces = async (companyId: number) => {
-  const token = localStorage.getItem("accessToken");
-  if (!token) throw new Error("Người dùng chưa đăng nhập.");
+/* ============================================================
+   📌 Shared Interfaces
+============================================================ */
 
-  try {
-    const res = await apiClient.get(`/companies/${companyId}/workspaces`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-
-    const data = res.data;
-
-    if (!data.success) {
-      throw new Error(
-        data.message || "Không thể lấy danh sách không gian làm việc."
-      );
-    }
-
-    return data.data; // Trả về mảng workspace
-  } catch (err: any) {
-    console.error(" Lỗi lấy danh sách workspace:", err);
-    throw new Error(
-      err.response?.data?.message || "Lỗi hệ thống, vui lòng thử lại."
-    );
-  }
-};
-
-// ===================================================
-// 🧩 Tạo workspace mới cho công ty
-// ===================================================
-export const createWorkspace = async (
-  companyId: number,
-  payload: {
-    workspaceName: string;
-    description?: string;
-    coverImage?: string;
-    color?: string;
-  }
-) => {
-  const token = localStorage.getItem("accessToken");
-  if (!token) throw new Error("Người dùng chưa đăng nhập.");
-
-  try {
-    const res = await apiClient.post(
-      `/companies/${companyId}/workspaces`,
-      payload,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
-    );
-
-    const data = res.data;
-
-    if (!data.success) {
-      throw new Error(data.message || "Không thể tạo không gian làm việc mới.");
-    }
-
-    return data.data; // Trả về workspace vừa tạo
-  } catch (err: any) {
-    console.error(" Lỗi tạo workspace:", err);
-    throw new Error(
-      err.response?.data?.message || "Lỗi hệ thống, vui lòng thử lại."
-    );
-  }
-};
-
-// ===================================================
-// 🔹 Lấy chi tiết 1 workspace trong công ty
-// ===================================================
-export const getWorkspaceDetail = async (
-  companyId: number,
-  workspaceId: number
-): Promise<{
-  workspaceId: number;
-  companyId: number;
-  workspaceName: string;
-  description: string | null;
-  coverImage: string | null;
-  color: string;
-  createdById: number;
-  status: string;
-  createdAt: string;
-}> => {
-  const token = localStorage.getItem("accessToken");
-  if (!token) throw new Error("Người dùng chưa đăng nhập.");
-
-  try {
-    const res = await apiClient.get(
-      `/companies/${companyId}/workspaces/${workspaceId}`,
-      {
-        headers: { Authorization: `Bearer ${token}` },
-      }
-    );
-
-    const data = res.data;
-    if (!data.success) {
-      throw new Error(data.message || "Không thể lấy thông tin workspace.");
-    }
-
-    return data.data;
-  } catch (err: any) {
-    console.error(" Lỗi lấy chi tiết workspace:", err);
-    throw new Error(
-      err.response?.data?.message ||
-        "Lỗi hệ thống, không thể lấy chi tiết workspace."
-    );
-  }
-};
-
-// ===================================================
-// 🔹 Cập nhật thông tin Workspace trong công ty
-// ===================================================
-export const updateWorkspace = async (
-  companyId: number,
-  workspaceId: number,
-  payload: {
-    name?: string;
-    description?: string;
-    coverImage?: string;
-    color?: string;
-  }
-): Promise<{
+export interface Workspace {
   workspaceId: number;
   companyId: number;
   workspaceName: string;
@@ -138,140 +15,8 @@ export const updateWorkspace = async (
   createdById: number;
   status: string;
   createdAt: string;
-}> => {
-  const token = localStorage.getItem("accessToken");
-  if (!token) throw new Error("Người dùng chưa đăng nhập.");
+}
 
-  try {
-    const res = await apiClient.put(
-      `/companies/${companyId}/workspaces/${workspaceId}`,
-      payload,
-      {
-        headers: { Authorization: `Bearer ${token}` },
-      }
-    );
-
-    const data = res.data;
-    if (!data.success)
-      throw new Error(data.message || "Không thể cập nhật workspace.");
-
-    return data.data;
-  } catch (err: any) {
-    console.error(" Lỗi cập nhật workspace:", err);
-    throw new Error(
-      err.response?.data?.message ||
-        "Lỗi hệ thống, không thể cập nhật thông tin workspace."
-    );
-  }
-};
-
-// ===================================================
-// 🔹 Xóa 1 Workspace trong công ty
-// ===================================================
-export const deleteWorkspace = async (
-  companyId: number,
-  workspaceId: number
-): Promise<{ success: boolean; message: string }> => {
-  const token = localStorage.getItem("accessToken");
-  if (!token) throw new Error("Người dùng chưa đăng nhập.");
-
-  try {
-    const res = await apiClient.delete(
-      `/companies/${companyId}/workspaces/${workspaceId}`,
-      {
-        headers: { Authorization: `Bearer ${token}` },
-      }
-    );
-
-    const data = res.data;
-    if (!data.success)
-      throw new Error(data.message || "Không thể xóa workspace.");
-
-    return {
-      success: true,
-      message: data.message || "Đã xóa workspace thành công.",
-    };
-  } catch (err: any) {
-    console.error(" Lỗi xóa workspace:", err);
-    throw new Error(
-      err.response?.data?.message || "Lỗi hệ thống, không thể xóa workspace."
-    );
-  }
-};
-
-export const inviteMemberToWorkspace = async (
-  companyId: number,
-  workspaceId: number,
-  payload: { email: string; roleCode: string } // <-- Sửa từ roleId sang roleCode
-) => {
-  try {
-    const res = await apiClient.post(
-      `/companies/${companyId}/workspaces/${workspaceId}/invite-members`,
-      payload // Gửi payload { email, roleCode }
-    );
-    return res.data;
-  } catch (err: any) {
-    console.error("LỖI API:", err.response?.data || err.message);
-    throw err;
-  }
-};
-
-// ===================================================
-// 🔹 Cập nhật trạng thái workspace (ACTIVE / INACTIVE / ARCHIVED)
-// ===================================================
-export const updateWorkspaceStatus = async (
-  companyId: number,
-  workspaceId: number,
-  payload: { newStatus: string }
-): Promise<{
-  success: boolean;
-  message: string;
-  data: {
-    workspaceId: number;
-    companyId: number;
-    workspaceName: string;
-    description: string;
-    coverImage: string;
-    color: string;
-    createdById: number;
-    status: string;
-    createdAt: string;
-  };
-}> => {
-  if (!companyId || !workspaceId)
-    throw new Error("Thiếu companyId hoặc workspaceId.");
-
-  const token = localStorage.getItem("accessToken");
-  if (!token) throw new Error("Người dùng chưa đăng nhập.");
-
-  try {
-    const res = await apiClient.put(
-      `/companies/${companyId}/workspaces/${workspaceId}/status`,
-      payload,
-      {
-        headers: { Authorization: `Bearer ${token}` },
-      }
-    );
-
-    const data = res.data;
-
-    if (!data.success)
-      throw new Error(
-        data.message || "Không thể cập nhật trạng thái workspace."
-      );
-
-    return data;
-  } catch (err: any) {
-    console.error(" Lỗi cập nhật trạng thái workspace:", err);
-    throw new Error(
-      err.response?.data?.message ||
-        "Lỗi hệ thống, không thể cập nhật trạng thái workspace."
-    );
-  }
-};
-// ===================================================
-// 🔹 Interface dùng chung cho thành viên workspace
-// ===================================================
 export interface WorkspaceMember {
   memberId: number;
   userId: number;
@@ -279,239 +24,311 @@ export interface WorkspaceMember {
   email: string;
   avatarUrl: string;
   roleName: string;
-  roleCode: string;
+  phoneNumber: string;
   joinedAt: string;
   status: string;
 }
 
-// ===================================================
-// 🔹 1️⃣ Cập nhật trạng thái Workspace (ACTIVE / INACTIVE / ARCHIVED)
-// ===================================================
-export const updatMembereWorkspaceStatus = async (
+export interface PageResponse<T> {
+  content: T[];
+  pageNumber: number;
+  pageSize: number;
+  totalElements: number;
+  totalPages: number;
+  last: boolean;
+  first: boolean;
+}
+
+/* ============================================================
+   1️⃣ Get Workspace Detail
+============================================================ */
+export const getWorkspaceDetail = async (
   companyId: number,
-  workspaceId: number,
-  payload: { newStatus: string }
-): Promise<{
-  success: boolean;
-  message: string;
-  data: {
-    workspaceId: number;
-    companyId: number;
-    workspaceName: string;
-    description: string;
-    coverImage: string;
-    color: string;
-    createdById: number;
-    status: string;
-    createdAt: string;
-  };
-}> => {
-  if (!companyId || !workspaceId)
-    throw new Error("Thiếu companyId hoặc workspaceId.");
+  workspaceId: number
+): Promise<Workspace> => {
+  const res = await apiClient.get(
+    `/companies/${companyId}/workspaces/${workspaceId}`
+  );
 
-  const token = localStorage.getItem("accessToken");
-  if (!token) throw new Error("Người dùng chưa đăng nhập.");
-
-  try {
-    const res = await apiClient.put(
-      `/companies/${companyId}/workspaces/${workspaceId}/status`,
-      payload,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-
-    const data = res.data;
-    if (!data.success)
-      throw new Error(
-        data.message || "Không thể cập nhật trạng thái workspace."
-      );
-
-    return data;
-  } catch (err: any) {
-    console.error(" Lỗi cập nhật trạng thái workspace:", err);
-    throw new Error(
-      err.response?.data?.message ||
-        "Lỗi hệ thống, không thể cập nhật trạng thái workspace."
-    );
-  }
+  if (!res.data.success) throw new Error(res.data.message);
+  return res.data.data;
 };
 
-// ===================================================
-// 🔹 2️⃣ Cập nhật trạng thái thành viên trong Workspace
-// ===================================================
+/* ============================================================
+   2️⃣ Update Workspace
+============================================================ */
+export const updateWorkspace = async (
+  companyId: number,
+  workspaceId: number,
+  payload: {
+    name?: string;
+    description?: string;
+    coverImage?: string;
+    color?: string;
+  }
+): Promise<Workspace> => {
+  const res = await apiClient.put(
+    `/companies/${companyId}/workspaces/${workspaceId}`,
+    payload
+  );
+
+  if (!res.data.success) throw new Error(res.data.message);
+  return res.data.data;
+};
+
+/* ============================================================
+   3️⃣ Delete Workspace
+============================================================ */
+export const deleteWorkspace = async (
+  companyId: number,
+  workspaceId: number
+): Promise<void> => {
+  const res = await apiClient.delete(
+    `/companies/${companyId}/workspaces/${workspaceId}`
+  );
+
+  if (!res.data.success) throw new Error(res.data.message);
+};
+
+/* ============================================================
+   4️⃣ Update Workspace Status
+============================================================ */
+export const updateWorkspaceStatus = async (
+  companyId: number,
+  workspaceId: number,
+  newStatus: "ACTIVE" | "DELETED"
+) => {
+  const res = await apiClient.put(
+    `/companies/${companyId}/workspaces/${workspaceId}/status`,
+     { newStatus }
+  );
+
+  if (!res.data.success) {
+    throw new Error(res.data.message);
+  }
+
+  return res.data.data;
+};
+
+/* ============================================================
+   5️⃣ Update Workspace Member Status
+============================================================ */
 export const updateWorkspaceMemberStatus = async (
   companyId: number,
   workspaceId: number,
   memberId: number,
-  payload: { newStatus: string }
-): Promise<{
-  success: boolean;
-  message: string;
-  data: WorkspaceMember;
-}> => {
-  if (!companyId || !workspaceId || !memberId)
-    throw new Error("Thiếu ID công ty, workspace hoặc thành viên.");
+  newStatus: string
+): Promise<WorkspaceMember> => {
+  const res = await apiClient.put(
+    `/companies/${companyId}/workspaces/${workspaceId}/members/${memberId}/status`,
+    { newStatus }
+  );
 
-  const token = localStorage.getItem("accessToken");
-  if (!token) throw new Error("Người dùng chưa đăng nhập.");
-
-  try {
-    const res = await apiClient.put(
-      `/companies/${companyId}/workspaces/${workspaceId}/members/${memberId}/status`,
-      payload,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-
-    const data = res.data;
-    if (!data.success)
-      throw new Error(
-        data.message || "Không thể cập nhật trạng thái thành viên."
-      );
-
-    return data;
-  } catch (err: any) {
-    console.error(" Lỗi cập nhật trạng thái thành viên:", err);
-    throw new Error(
-      err.response?.data?.message ||
-        "Lỗi hệ thống, không thể cập nhật trạng thái thành viên."
-    );
-  }
+  if (!res.data.success) throw new Error(res.data.message);
+  return res.data.data;
 };
-// ===================================================
-// 🔹 3️⃣ Xóa thành viên khỏi Workspace (Dùng memberId)
-// ===================================================
-export const removeWorkspaceMember = async (
+
+/* ============================================================
+   6️⃣ Update Workspace Member Role
+============================================================ */
+export const updateWorkspaceMemberRole = async (
   companyId: number,
   workspaceId: number,
-  memberId: number // ✅ Đã đổi từ userId sang memberId
-) => {
-  if (!companyId || !workspaceId || !memberId)
-    throw new Error("Thiếu thông tin ID.");
+  memberId: number,
+  roleCode: string
+): Promise<void> => {
+  const res = await apiClient.put(
+    `/companies/${companyId}/workspaces/${workspaceId}/members/${memberId}/role`,
+    { roleCode }
+  );
 
-  const token = localStorage.getItem("accessToken");
-  if (!token) throw new Error("Người dùng chưa đăng nhập.");
-
-  try {
-    // ✅ API path đã đổi: .../members/{memberId}
-    const res = await apiClient.delete(
-      `/companies/${companyId}/workspaces/${workspaceId}/members/${memberId}`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-
-    const data = res.data;
-    if (!data.success)
-      throw new Error(data.message || "Không thể xóa thành viên.");
-
-    return data;
-  } catch (err: any) {
-    console.error("Lỗi xóa thành viên workspace:", err);
-    throw new Error(
-      err.response?.data?.message ??
-        err.message ??
-        "Lỗi hệ thống, không thể xóa thành viên."
-    );
-  }
+  if (!res.data.success) throw new Error(res.data.message);
 };
-// ===================================================
-// 🔹 3️⃣ Lấy danh sách thành viên trong Workspace
-// ===================================================
+
+/* ============================================================
+   7️⃣ Get Workspaces (Pagination)
+============================================================ */
+export const getCompanyWorkspaces = async (
+  companyId: number,
+  params: {
+    page?: number;
+    size?: number;
+    sortBy?: string;
+    sortDir?: "asc" | "desc";
+  }
+): Promise<PageResponse<Workspace>> => {
+
+  const res = await apiClient.get(
+    `/companies/${companyId}/workspaces`,
+    { params }
+  );
+
+  if (!res.data.success) {
+    throw new Error(res.data.message || "Failed to fetch workspaces.");
+  }
+
+  return res.data.data; // PageResponse<Workspace>
+};
+
+
+/* ============================================================
+   8️⃣ Create Workspace (Multipart Upload)
+============================================================ */
+export const createWorkspace = async (
+  companyId: number,
+  payload: {
+    workspaceName: string;
+    description?: string;
+    color?: string;
+    file?: File | null;
+  }
+): Promise<Workspace> => {
+  const formData = new FormData();
+
+  formData.append(
+    "data",
+    JSON.stringify({
+      workspaceName: payload.workspaceName,
+      description: payload.description,
+      color: payload.color,
+    })
+  );
+
+  if (payload.file) {
+    formData.append("file", payload.file);
+  }
+
+  const res = await apiClient.post(
+    `/companies/${companyId}/workspaces`,
+    formData,
+    {
+      headers: { "Content-Type": "multipart/form-data" },
+    }
+  );
+
+  if (!res.data.success) throw new Error(res.data.message);
+  return res.data.data;
+};
+
+/* ============================================================
+   9️⃣ Invite Member to Workspace
+============================================================ */
+export const inviteMemberToWorkspace = async (
+  companyId: number,
+  workspaceId: number,
+  payload: {
+    email: string;
+    roleCode: string;
+  }
+): Promise<void> => {
+  const res = await apiClient.post(
+    `/companies/${companyId}/workspaces/${workspaceId}/invite-members`,
+    payload
+  );
+
+  if (!res.data.success) throw new Error(res.data.message);
+};
+
+/* ============================================================
+   🔟 Get Workspace Members (Pagination)
+============================================================ */
 export const getWorkspaceMembers = async (
   companyId: number,
-  workspaceId: number
-): Promise<WorkspaceMember[]> => {
-  if (!companyId || !workspaceId)
-    throw new Error("Thiếu companyId hoặc workspaceId.");
-
-  const token = localStorage.getItem("accessToken");
-  if (!token) throw new Error("Người dùng chưa đăng nhập.");
-
-  try {
-    const res = await apiClient.get(
-      `/companies/${companyId}/workspaces/${workspaceId}/members`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-
-    const data = res.data;
-    if (!data.success)
-      throw new Error(
-        data.message || "Không thể lấy danh sách thành viên workspace."
-      );
-
-    return data.data as WorkspaceMember[];
-  } catch (err: any) {
-    console.error(" Lỗi lấy danh sách thành viên workspace:", err);
-    throw new Error(
-      err.response?.data?.message ||
-        "Lỗi hệ thống, không thể tải danh sách thành viên workspace."
-    );
+  workspaceId: number,
+  params: {
+    page?: number;
+    size?: number;
+    sortBy?: string;
+    sortDir?: "asc" | "desc";
   }
+): Promise<PageResponse<WorkspaceMember>> => {
+  const res = await apiClient.get(
+    `/companies/${companyId}/workspaces/${workspaceId}/members`,
+    { params }
+  );
+
+  if (!res.data.success) throw new Error(res.data.message);
+  return res.data.data;
 };
 
-// ===================================================
-// 🔹 4️⃣ Lấy chi tiết một thành viên trong Workspace
-// ===================================================
+/* ============================================================
+   1️⃣1️⃣ Get Workspace Member Detail
+============================================================ */
 export const getWorkspaceMemberDetail = async (
   companyId: number,
   workspaceId: number,
   memberId: number
 ): Promise<WorkspaceMember> => {
-  if (!companyId || !workspaceId || !memberId)
-    throw new Error("Thiếu companyId, workspaceId hoặc memberId.");
+  const res = await apiClient.get(
+    `/companies/${companyId}/workspaces/${workspaceId}/members/${memberId}`
+  );
 
-  const token = localStorage.getItem("accessToken");
-  if (!token) throw new Error("Người dùng chưa đăng nhập.");
-
-  try {
-    const res = await apiClient.get(
-      `/companies/${companyId}/workspaces/${workspaceId}/members/${memberId}`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-
-    const data = res.data;
-    if (!data.success)
-      throw new Error(data.message || "Không thể lấy thông tin thành viên.");
-
-    return data.data as WorkspaceMember;
-  } catch (err: any) {
-    console.error(" Lỗi lấy chi tiết thành viên workspace:", err);
-    throw new Error(
-      err.response?.data?.message ||
-        "Lỗi hệ thống, không thể lấy chi tiết thành viên workspace."
-    );
-  }
+  if (!res.data.success) throw new Error(res.data.message);
+  return res.data.data;
 };
-// ===================================================
-// 🔹 5️⃣ Cập nhật Vai trò (Role) thành viên trong Workspace
-// ===================================================
-export const updateWorkspaceMemberRole = async (
+
+/* ============================================================
+   1️⃣2️⃣ Remove Workspace Member
+============================================================ */
+export const removeWorkspaceMember = async (
   companyId: number,
   workspaceId: number,
-  memberId: number,
-  roleCode: string // "WORKSPACE_ADMIN" hoặc "WORKSPACE_MEMBER"
-) => {
-  if (!companyId || !workspaceId || !memberId)
-    throw new Error("Thiếu thông tin ID.");
+  memberId: number
+): Promise<void> => {
+  const res = await apiClient.delete(
+    `/companies/${companyId}/workspaces/${workspaceId}/members/${memberId}`
+  );
 
-  const token = localStorage.getItem("accessToken");
-  if (!token) throw new Error("Người dùng chưa đăng nhập.");
+  if (!res.data.success) throw new Error(res.data.message);
+};
 
-  try {
-    const res = await apiClient.put(
-      `/companies/${companyId}/workspaces/${workspaceId}/members/${memberId}/role`,
-      { roleCode }, // Payload
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-
-    const data = res.data;
-    if (!data.success)
-      throw new Error(data.message || "Không thể cập nhật vai trò thành viên.");
-
-    return data;
-  } catch (err: any) {
-    console.error("Lỗi cập nhật vai trò thành viên:", err);
-    throw new Error(
-      err.response?.data?.message ??
-        err.message ??
-        "Lỗi hệ thống, không thể cập nhật vai trò."
-    );
+/* ============================================================
+   1️⃣3️⃣ Search Workspace Members
+============================================================ */
+export const searchWorkspaceMembers = async (
+  companyId: number,
+  workspaceId: number,
+  params: {
+    name?: string;
+    email?: string;
+    role?: string;
+    phone?: string;
+    page?: number;
+    size?: number;
+    sortBy?: string;
+    sortDir?: "asc" | "desc";
   }
+): Promise<PageResponse<WorkspaceMember>> => {
+  const res = await apiClient.get(
+    `/companies/${companyId}/workspaces/${workspaceId}/members/search`,
+    { params }
+  );
+
+  if (!res.data.success) throw new Error(res.data.message);
+  return res.data.data;
+};
+
+/* ============================================================
+   1️⃣4️⃣ Search Workspaces
+============================================================ */
+export const searchCompanyWorkspaces = async (
+  companyId: number,
+  params: {
+    name?: string;
+    code?: string;
+    description?: string;
+    status?: "ACTIVE" | "ARCHIVED" | "DELETED";
+    page?: number;
+    size?: number;
+    sortBy?: string;
+    sortDir?: "asc" | "desc";
+  }
+): Promise<PageResponse<Workspace>> => {
+  const res = await apiClient.get(
+    `/companies/${companyId}/workspaces/search`,
+    { params }
+  );
+
+  if (!res.data.success) throw new Error(res.data.message);
+  return res.data.data;
 };
