@@ -13,7 +13,7 @@ interface LoadingButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
 
 export default function LoadingButton({
   text,
-  loadingText = "Đang xử lý...",
+  loadingText = "Processing...", // Translated from "Đang xử lý..."
   icon,
   isLoading = false,
   type = "submit",
@@ -25,7 +25,7 @@ export default function LoadingButton({
   ...props
 }: LoadingButtonProps) {
   
-  // 1. Hệ màu phẳng (Flat Colors) chuẩn Jira/Modern UI
+  // 1. Flat Colors (Jira/Modern UI Standard)
   const variants = {
     primary: "bg-blue-600 hover:bg-blue-700 text-white shadow-sm border border-transparent",
     secondary: "bg-slate-100 hover:bg-slate-200 text-slate-700 border border-transparent",
@@ -35,10 +35,10 @@ export default function LoadingButton({
     ghost: "bg-transparent hover:bg-slate-100 text-slate-600 border-transparent",
   };
 
-  // 2. Kích thước chuẩn
+  // 2. Standard sizes
   const sizes = {
     sm: "h-8 px-3 text-xs",
-    md: "h-10 px-4 text-sm", // Chuẩn thường dùng
+    md: "h-10 px-4 text-sm", // Standard size
     lg: "h-12 px-6 text-base",
   };
 
