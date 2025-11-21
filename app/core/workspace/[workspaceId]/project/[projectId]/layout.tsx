@@ -7,20 +7,27 @@ import ProjectNavTabs from '@/components/features/core/project/nav-tabs'
 import ProjectHeader from '@/components/features/core/project/header'
 import { CreateTaskModal } from '@/components/features/core/project/create-task-modal'
 import { CreateSprintModal } from '@/components/features/core/project/create-sprint-modal'
+import { useToast } from "@/components/ui/ToastProvider"
 
 export default function ProjectLayout({ children }: { children: React.ReactNode }) {
-  const { projectId } = useParams() as { projectId: string }
+  const { showToast } = useToast()
+  const params = useParams()
+  
+  const projectId = params.projectId as string
+  const workspaceId = Number(params.workspaceId) || 0
 
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [showTaskModal, setShowTaskModal] = useState(false)
   const [showSprintModal, setShowSprintModal] = useState(false)
 
-  const projectName = "Project"
+  // TODO: Fetch project name from API/Context based on projectId
+  const projectName = "Project" 
 
   return (
-    <div className="flex h-screen bg-background overflow-hidden">
+    // 1. Main Container: Full viewport height, no body scroll
+    <div className="flex h-screen bg-white overflow-hidden font-sans text-slate-900">
 
-      {/* Sidebar */}
+      {/* Sidebar (Fixed Left) */}
       <ProjectCoreSidebar
         projectId={projectId}
         projectName={projectName}
@@ -30,49 +37,50 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
         onCreateSprint={() => setShowSprintModal(true)}
       />
 
-      {/* Main */}
-      <div className="flex-1 flex flex-col min-w-0">
+      {/* Right Content Wrapper */}
+      <div className="flex-1 flex flex-col min-w-0 bg-slate-50">
 
-        {/* Header */}
-        <div className="shrink-0">
+        {/* Header Area (Fixed Top) */}
+        <div className="flex-col bg-white border-b border-slate-200 shadow-sm z-20 relative">
           <ProjectHeader
             projectName={projectName}
             onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
             onTaskCreate={() => setShowTaskModal(true)}
             onSprintCreate={() => setShowSprintModal(true)}
           />
-
+          
           <ProjectNavTabs
             projectId={projectId}
             onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
           />
         </div>
 
-        {/* Content */}
-        <main className="flex-1 overflow-y-auto p-4">
+        {/* Main Content Area (Scrollable) */}
+        {/* ⚠️ Loại bỏ padding p-4 để Board/Backlog có thể full-width */}
+        <main className="flex-1 overflow-y-auto overflow-x-hidden scroll-smooth">
           {children}
         </main>
       </div>
 
-      {/* Task Modal */}
+      {/* --- MODALS --- */}
+
       <CreateTaskModal
         isOpen={showTaskModal}
         onClose={() => setShowTaskModal(false)}
         projectId={Number(projectId)}
-        workspaceId={1}    // ⚠ sau này bạn thay bằng real workspaceId
+        workspaceId={workspaceId}
         onCreated={() => {
-          console.log("[API] Task created")
+          showToast("Task created successfully", "success") // ✅ Thay console.log bằng toast
           setShowTaskModal(false)
         }}
       />
 
-      {/* Sprint Modal */}
       <CreateSprintModal
         isOpen={showSprintModal}
         onClose={() => setShowSprintModal(false)}
         projectId={Number(projectId)}
         onCreated={() => {
-          console.log("[API] Sprint created")
+          showToast("Sprint created successfully", "success") // ✅ Thay console.log bằng toast
           setShowSprintModal(false)
         }}
       />

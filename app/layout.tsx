@@ -5,11 +5,7 @@ import { ToastProvider } from "@/components/ui/ToastProvider";
 import { AuthProvider } from "@/context/AuthContext";
 import { GoogleOAuthProvider } from "@react-oauth/google";
 
-// ❌ Xóa hai dòng này vì chúng không tồn tại thật sự
-// import { GeistSans } from "geist/font/sans";
-// import { GeistMono } from "geist/font/mono";
-
-// ✅ Đặt biến đúng tên, không cần chữ hoa ở giữa
+// Cấu hình font chữ
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -21,8 +17,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "WorkNet",
-  description: "Quản lý dự án thông minh",
+  title: "WorkNet - Smart Project Management",
+  description: "Manage projects, tasks, and teams efficiently.",
 };
 
 export default function RootLayout({
@@ -33,15 +29,17 @@ export default function RootLayout({
   return (
     <html lang="vi">
       <body
-        // ✅ Dùng biến đã khai báo đúng tên
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        // Thêm bg-slate-50 text-slate-900 để thiết lập style mặc định toàn app (Minimalist Jira)
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-slate-50 text-slate-900`}
       >
         <GoogleOAuthProvider
           clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!}
         >
-          {/* ✅ ToastProvider nên nằm ngoài AuthProvider */}
+          {/* ToastProvider bọc ngoài cùng để thông báo luôn hiển thị trên mọi lớp */}
           <ToastProvider>
-            <AuthProvider>{children}</AuthProvider>
+            <AuthProvider>
+              {children}
+            </AuthProvider>
           </ToastProvider>
         </GoogleOAuthProvider>
       </body>

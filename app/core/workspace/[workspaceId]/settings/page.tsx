@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   Settings,
-  Sparkles,
   Loader2,
   Save,
   Palette,
@@ -11,9 +10,9 @@ import {
   Trash2,
   AlertTriangle,
   Image as ImageIcon,
+  Building
 } from "lucide-react";
 
-// ⛔️ Sửa đường dẫn nếu bạn chưa di chuyển file
 import {
   getWorkspaceDetail,
   updateWorkspace,
@@ -23,8 +22,10 @@ import {
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/components/ui/ToastProvider";
 import LoadingButton from "@/components/ui/LoadingButton";
-// ✅ 1. Import Modal Xác nhận
 import ConfirmationModal from "@/components/ui/ConfirmationModal";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"; // Giả sử có
+import { Input } from "@/components/ui/input"; // Giả sử có
+import { Textarea } from "@/components/ui/textarea"; // Giả sử có
 
 export default function WorkspaceSettingsPage() {
   const { showToast } = useToast();
@@ -32,16 +33,13 @@ export default function WorkspaceSettingsPage() {
   const router = useRouter();
   const workspaceId = Number(params.workspaceId);
 
-  // ✅ Lấy user và companyId từ Context
   const { user, isLoading: isAuthLoading } = useAuth();
   const companyId = user?.company?.companyId || null;
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-
-  // ✅ 2. State cho Modal Xóa
-  const [deleting, setDeleting] = useState(false); // Dùng cho nút loading
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false); // Dùng để Mở/Đóng
+  const [deleting, setDeleting] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
   const [form, setForm] = useState({
     workspaceName: "",
@@ -50,12 +48,11 @@ export default function WorkspaceSettingsPage() {
     color: "#3B82F6",
   });
 
-  // 🧩 1. Lấy thông tin chi tiết workspace
   useEffect(() => {
     if (isAuthLoading) return;
     if (!companyId || !workspaceId) {
       if (!isAuthLoading)
-        showToast("Lỗi: Không tìm thấy thông tin công ty/workspace", "error");
+        showToast("Error: Workspace not found", "error");
       setLoading(false);
       return;
     }
@@ -71,7 +68,7 @@ export default function WorkspaceSettingsPage() {
           color: data.color || "#3B82F6",
         });
       } catch (err: any) {
-        showToast(err.message || "Không thể tải thông tin phòng ban!", "error");
+        showToast(err.message || "Failed to load settings", "error");
       } finally {
         setLoading(false);
       }
@@ -83,11 +80,10 @@ export default function WorkspaceSettingsPage() {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
 
-  // 🧩 2. Xử lý Cập nhật
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.workspaceName.trim()) {
-      showToast("Vui lòng nhập tên phòng ban!", "warning");
+      showToast("Workspace name is required", "warning");
       return;
     }
     if (!companyId) return;
@@ -100,197 +96,183 @@ export default function WorkspaceSettingsPage() {
         coverImage: form.coverImage,
         color: form.color,
       });
-      showToast("Cập nhật thông tin thành công!", "success");
+      showToast("Settings updated successfully", "success");
     } catch (err: any) {
-      showToast(err.message || "Cập nhật thất bại!", "error");
+      showToast(err.message || "Update failed", "error");
     } finally {
       setSaving(false);
     }
   };
 
-  // 🧩 3. ✅ SỬA LẠI: Hàm này chỉ MỞ MODAL
   const openDeleteModal = () => {
-    if (!form.workspaceName) return; // Không cho xóa nếu form chưa tải
+    if (!form.workspaceName) return;
     setIsDeleteModalOpen(true);
   };
 
-  // 🧩 4. ✅ HÀM MỚI: Logic Xóa (được gọi bởi Modal)
   const handleConfirmDelete = async () => {
     if (!companyId) return;
 
     setDeleting(true);
     try {
       await deleteWorkspace(companyId, workspaceId);
-      showToast("Đã xóa workspace thành công!", "success");
-      setIsDeleteModalOpen(false); // Đóng modal
-      router.push("/core"); // Chuyển về trang dashboard core
+      showToast("Workspace deleted successfully", "success");
+      setIsDeleteModalOpen(false); 
+      router.push("/core"); 
     } catch (err: any) {
-      showToast(err.message || "Xóa thất bại!", "error");
-      setDeleting(false); // Chỉ set false khi lỗi (để giữ modal)
+      showToast(err.message || "Delete failed", "error");
+      setDeleting(false); 
     }
-    // Không cần setDeleting(false) khi thành công vì trang sẽ chuyển hướng
   };
 
   if (isAuthLoading || loading)
     return (
-      <div className="min-h-[80vh] flex items-center justify-center">
-        <Loader2 className="w-12 h-12 text-blue-500 animate-spin" />
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
       </div>
     );
 
   return (
-    <div className="max-w-4xl mx-auto py-8 space-y-8 px-4">
-      {/* 🎨 Thẻ (Card) Thông tin chính */}
-      <div className="bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden animate-fadeInUp">
-        {/* Header của thẻ */}
-        <div className="p-6 border-b border-gray-200">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-blue-100 flex items-center justify-center rounded-lg">
-              <Settings className="w-6 h-6 text-blue-600" />
-            </div>
-            <div>
-              <h1 className="text-xl font-semibold text-gray-900">
-                Cài đặt Workspace
-              </h1>
-              <p className="text-sm text-gray-500">
-                Chỉnh sửa thông tin chi tiết cho phòng ban của bạn.
-              </p>
-            </div>
-          </div>
+    <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
+      <div className="max-w-3xl mx-auto py-10 px-6 space-y-8">
+        
+        {/* Header Page */}
+        <div>
+            <h1 className="text-2xl font-bold text-slate-900">Workspace Settings</h1>
+            <p className="text-sm text-slate-500 mt-1">Manage general details and danger zone</p>
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit}>
-          <div className="p-6 space-y-5">
-            {/* Tên Workspace */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Tên Workspace <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                value={form.workspaceName}
-                onChange={(e) => handleChange("workspaceName", e.target.value)}
-                className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
-                required
-              />
-            </div>
+        {/* 1. GENERAL SETTINGS CARD */}
+        <Card className="bg-white border border-slate-200 shadow-sm rounded-xl overflow-hidden">
+          <CardHeader className="px-6 py-5 border-b border-slate-100 bg-white">
+             <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-50 rounded-md">
+                   <Settings className="w-5 h-5 text-blue-600" />
+                </div>
+                <div>
+                   <CardTitle className="text-lg font-bold text-slate-900">General Details</CardTitle>
+                   <p className="text-xs text-slate-500">Update workspace information</p>
+                </div>
+             </div>
+          </CardHeader>
 
-            {/* Mô tả */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Mô tả
-              </label>
-              <textarea
-                value={form.description}
-                onChange={(e) => handleChange("description", e.target.value)}
-                rows={3}
-                placeholder="Mô tả mục đích của phòng ban này..."
-                className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none resize-none"
-              />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              {/* Ảnh bìa */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">
-                  Ảnh bìa (URL)
+          <CardContent className="p-6">
+            <form onSubmit={handleSubmit} className="space-y-6">
+              
+              {/* Name */}
+              <div className="space-y-1.5">
+                <label className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+                   <Building className="w-4 h-4 text-slate-500" />
+                   Name <span className="text-red-500">*</span>
                 </label>
-                <div className="relative">
-                  <ImageIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <input
-                    type="text"
-                    value={form.coverImage}
-                    onChange={(e) => handleChange("coverImage", e.target.value)}
-                    placeholder="https://example.com/image.jpg"
-                    className="pl-10 pr-4 py-3 w-full border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                  />
+                <Input
+                  value={form.workspaceName}
+                  onChange={(e) => handleChange("workspaceName", e.target.value)}
+                  className="h-10 border-slate-300 focus:ring-blue-100 focus:border-blue-600"
+                />
+              </div>
+
+              {/* Description */}
+              <div className="space-y-1.5">
+                <label className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+                   <FileText className="w-4 h-4 text-slate-500" />
+                   Description
+                </label>
+                <Textarea
+                  value={form.description}
+                  onChange={(e) => handleChange("description", e.target.value)}
+                  rows={3}
+                  className="resize-none border-slate-300 focus:ring-blue-100 focus:border-blue-600"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Cover Image */}
+                <div className="space-y-1.5">
+                   <label className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+                      <ImageIcon className="w-4 h-4 text-slate-500" /> Cover URL
+                   </label>
+                   <Input
+                      value={form.coverImage}
+                      onChange={(e) => handleChange("coverImage", e.target.value)}
+                      placeholder="https://..."
+                      className="h-10 border-slate-300 focus:ring-blue-100 focus:border-blue-600"
+                   />
+                </div>
+
+                {/* Color */}
+                <div className="space-y-1.5">
+                   <label className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+                      <Palette className="w-4 h-4 text-slate-500" /> Theme Color
+                   </label>
+                   <div className="flex items-center gap-3 h-10 px-3 border border-slate-300 rounded-md bg-white">
+                      <input
+                        type="color"
+                        value={form.color}
+                        onChange={(e) => handleChange("color", e.target.value)}
+                        className="w-6 h-6 border-none rounded cursor-pointer bg-transparent p-0"
+                      />
+                      <span className="text-sm font-mono text-slate-600">{form.color}</span>
+                   </div>
                 </div>
               </div>
 
-              {/* Màu sắc */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">
-                  Màu đại diện
-                </label>
-                <div className="flex items-center gap-3 border-2 border-gray-200 rounded-xl px-4 py-3">
-                  <Palette className="w-4 h-4 text-gray-400" />
-                  <input
-                    type="color"
-                    value={form.color}
-                    onChange={(e) => handleChange("color", e.target.value)}
-                    className="w-10 h-6 border-none rounded cursor-pointer"
-                  />
-                  <span className="font-mono text-gray-700">{form.color}</span>
-                </div>
+              {/* Submit Button */}
+              <div className="pt-4 border-t border-slate-100 flex justify-end">
+                <LoadingButton
+                  type="submit"
+                  isLoading={saving}
+                  text="Save Changes"
+                  loadingText="Saving..."
+                  className="bg-blue-600 hover:bg-blue-700 font-bold shadow-sm px-6"
+                />
               </div>
-            </div>
-          </div>
+            </form>
+          </CardContent>
+        </Card>
 
-          {/* Footer của thẻ (Nút Lưu) */}
-          <div className="bg-gray-50 px-6 py-4 border-t border-gray-200 rounded-b-xl">
-            <LoadingButton
-              type="submit"
-              isLoading={saving}
-              text="Lưu thay đổi"
-              loadingText="Đang lưu..."
-              className="px-6 py-3"
-              icon={<Save className="w-4 h-4 mr-2" />}
-            />
-          </div>
-        </form>
+        {/* 2. DANGER ZONE CARD */}
+        <Card className="bg-white border border-red-200 shadow-sm rounded-xl overflow-hidden">
+          <CardHeader className="px-6 py-5 border-b border-red-100 bg-red-50/50">
+             <div className="flex items-center gap-3">
+                <div className="p-2 bg-red-100 rounded-md border border-red-200">
+                   <AlertTriangle className="w-5 h-5 text-red-600" />
+                </div>
+                <div>
+                   <CardTitle className="text-lg font-bold text-red-900">Danger Zone</CardTitle>
+                   <p className="text-xs text-red-700">Irreversible actions</p>
+                </div>
+             </div>
+          </CardHeader>
+
+          <CardContent className="p-6 flex items-center justify-between gap-4">
+             <div>
+                <h4 className="font-bold text-slate-900 text-sm">Delete this Workspace</h4>
+                <p className="text-xs text-slate-500 mt-1 max-w-md">
+                   Once you delete a workspace, there is no going back. Please be certain.
+                </p>
+             </div>
+             <LoadingButton
+                type="button"
+                onClick={openDeleteModal}
+                isLoading={deleting}
+                text="Delete Workspace"
+                loadingText="Deleting..."
+                className="bg-white border border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 font-semibold shadow-sm"
+             />
+          </CardContent>
+        </Card>
+
+        {/* CONFIRM MODAL */}
+        <ConfirmationModal
+          isOpen={isDeleteModalOpen}
+          onClose={() => setIsDeleteModalOpen(false)}
+          onConfirm={handleConfirmDelete}
+          isLoading={deleting}
+          title="Delete Workspace?"
+          description={`This will permanently delete "${form.workspaceName}" and all of its data.`}
+          confirmText="Delete"
+        />
       </div>
-
-      {/* 🎨 Thẻ (Card) Khu vực Nguy hiểm */}
-      <div className="bg-white rounded-xl shadow-xl border border-red-200 overflow-hidden animate-fadeInUp">
-        <div className="p-6 border-b border-red-200">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-red-100 flex items-center justify-center rounded-lg">
-              <AlertTriangle className="w-6 h-6 text-red-600" />
-            </div>
-            <div>
-              <h1 className="text-xl font-semibold text-gray-900">
-                Khu vực Nguy hiểm
-              </h1>
-              <p className="text-sm text-gray-500">
-                Các hành động này không thể hoàn tác.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="p-6 space-y-4">
-          <div>
-            <h3 className="font-semibold text-gray-900">Xóa Phòng ban này</h3>
-            <p className="text-sm text-gray-600 mt-1">
-              Một khi bạn xóa, tất cả dự án và công việc bên trong sẽ bị xóa
-              vĩnh viễn.
-            </p>
-          </div>
-
-          {/* ✅ SỬA LẠI: Nút này gọi 'openDeleteModal' */}
-          <LoadingButton
-            type="button"
-            onClick={openDeleteModal}
-            isLoading={deleting} // Vô hiệu hóa nút khi modal đang xử lý
-            text="Xóa Workspace này"
-            loadingText="Đang xóa..."
-            className="bg-red-600 hover:bg-red-700 focus:ring-red-500" // 🎨 Đổi màu nút
-            icon={<Trash2 className="w-4 h-4 mr-2" />}
-          />
-        </div>
-      </div>
-
-      {/* ✅ 5. THÊM MODAL XÁC NHẬN XÓA */}
-      <ConfirmationModal
-        isOpen={isDeleteModalOpen}
-        onClose={() => setIsDeleteModalOpen(false)}
-        onConfirm={handleConfirmDelete}
-        isLoading={deleting}
-        title="Xác nhận Xóa Workspace"
-        description={`Bạn có chắc chắn muốn xóa workspace "${form.workspaceName}"? Mọi dự án và công việc bên trong sẽ bị xóa vĩnh viễn. Hành động này không thể hoàn tác.`}
-        confirmText="Vẫn Xóa"
-      />
     </div>
   );
 }

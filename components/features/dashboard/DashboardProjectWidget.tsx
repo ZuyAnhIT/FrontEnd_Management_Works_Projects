@@ -1,6 +1,6 @@
 "use client";
 import { DashboardMyProject } from '@/services/apiDashboard';
-import { Briefcase, FolderKanban, Loader2, ArrowRight, Layout } from 'lucide-react';
+import { Briefcase, FolderKanban, Loader2, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 
 interface ProjectWidgetProps {
@@ -24,12 +24,12 @@ export default function DashboardProjectWidget({ projects, loading }: ProjectWid
                 <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-sm mb-3 border border-slate-100">
                     <Briefcase className="w-5 h-5 text-slate-400" />
                 </div>
-                <p className="text-sm text-slate-500 font-medium">Bạn chưa tham gia dự án nào.</p>
+                <p className="text-sm text-slate-500 font-medium">You haven't joined any projects yet.</p>
             </div>
         );
     }
     
-    // Chỉ hiển thị tối đa 5 dự án gần đây
+    // Show max 5 recent projects
     const recentProjects = projects.slice(0, 5);
 
     return (

@@ -1,5 +1,5 @@
 "use client";
-import { X, ArrowLeft } from "lucide-react";
+import { X, ArrowLeft, LayoutDashboard } from "lucide-react";
 
 export default function AuthHeader({
   tab,
@@ -10,43 +10,61 @@ export default function AuthHeader({
   setTab: (t: any) => void;
   onClose: () => void;
 }) {
+  // Nội dung text theo tab
+  const headerContent = {
+    login: {
+      title: "Welcome back",
+      subtitle: "Log in to continue to WorkNet",
+    },
+    register: {
+      title: "Create an account",
+      subtitle: "Sign up to get started",
+    },
+    verify: {
+      title: "Verify your email",
+      subtitle: "Enter the code sent to your email",
+    },
+    forgot: {
+      title: "Reset password",
+      subtitle: "Enter your email to reset password",
+    },
+  }[tab] || { title: "Welcome", subtitle: "Please authenticate" };
+
   return (
-    <div className="bg-gradient-to-br from-blue-500 to-cyan-500 text-center py-6 px-4 relative">
+    <div className="bg-white border-b border-slate-100 px-6 py-8 relative flex flex-col items-center text-center">
+      
+      {/* Nút Quay lại (chỉ hiện ở trang con) */}
       {(tab === "verify" || tab === "forgot") && (
         <button
           onClick={() => setTab("login")}
-          className="absolute left-3 top-5 p-2 rounded-full hover:bg-white/20 transition"
+          className="absolute left-4 top-4 p-2 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+          title="Back"
         >
-          <ArrowLeft className="w-5 h-5 text-white" />
+          <ArrowLeft className="w-5 h-5" />
         </button>
       )}
+
+      {/* Nút Đóng */}
       <button
         onClick={onClose}
-        className="absolute right-3 top-5 p-2 rounded-full hover:bg-white/20 text-white"
+        className="absolute right-4 top-4 p-2 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+        title="Close"
       >
         <X className="w-5 h-5" />
       </button>
 
-      <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-white text-blue-600 font-bold text-lg shadow">
-        WN
+      {/* Logo Branding */}
+      <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center shadow-sm mb-4">
+        {/* Dùng icon hoặc text viết tắt */}
+        <LayoutDashboard className="w-6 h-6 text-white" />
       </div>
-      <h2 className="text-lg sm:text-xl font-bold text-white mt-3">
-        {tab === "login"
-          ? "Chào mừng trở lại"
-          : tab === "register"
-          ? "Tạo tài khoản mới"
-          : tab === "verify"
-          ? "Xác thực Email"
-          : "Quên mật khẩu"}
+
+      {/* Tiêu đề & Mô tả */}
+      <h2 className="text-xl font-bold text-slate-900 tracking-tight">
+        {headerContent.title}
       </h2>
-      <p className="text-xs text-blue-100 mt-1">
-        {tab === "login"
-          ? "Đăng nhập để tiếp tục làm việc"
-          : tab === "register"
-          ? "Đăng ký nhanh chóng & miễn phí"
-          : tab === "verify"
-          ? "Nhập mã OTP được gửi về email"
-          : "Nhập email để đặt lại mật khẩu"}
+      <p className="text-sm text-slate-500 mt-1">
+        {headerContent.subtitle}
       </p>
     </div>
   );

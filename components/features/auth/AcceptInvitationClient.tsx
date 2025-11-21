@@ -4,21 +4,20 @@ import { useState, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/components/ui/ToastProvider";
-// ⛔️ Sửa đường dẫn nếu cần
 import {
   getInvitationDetails,
   acceptInvitation,
 } from "@/services/apiInvitation";
 import { registerFromInvite } from "@/services/apiAuth";
-import { Loader2, User, Mail, LockKeyhole } from "lucide-react";
+import { Loader2, User, Mail } from "lucide-react";
 
-// Tái sử dụng component
+// Reuse components
 import AuthFormLogin from "./AuthFormLogin";
 import InputField from "./InputField";
 import PasswordField from "./PasswordField";
 import LoadingButton from "@/components/ui/LoadingButton";
 
-// Kiểu dữ liệu trả về từ API /details
+// Type for /details API response
 interface InviteDetails {
   email: string;
   companyName: string;
@@ -26,7 +25,7 @@ interface InviteDetails {
 }
 
 // ----------------------------------------
-// Component cho TRƯỜNG HỢP 1: Người dùng mới
+// Component for CASE 1: New User
 // ----------------------------------------
 function NewUserFlow({
   details,
@@ -36,7 +35,7 @@ function NewUserFlow({
   token: string;
 }) {
   const { showToast } = useToast();
-  const { loginWithTokens } = useAuth(); // Lấy hàm login từ Context
+  const { loginWithTokens } = useAuth();
   const [loading, setLoading] = useState(false);
 
   const [form, setForm] = useState({
@@ -53,7 +52,7 @@ function NewUserFlow({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (form.password !== form.confirmPassword) {
-      showToast("Mật khẩu xác nhận không khớp!", "error");
+      showToast("Passwords do not match!", "error");
       return;
     }
     setLoading(true);
@@ -63,8 +62,8 @@ function NewUserFlow({
         password: form.password,
         invitationToken: token,
       });
-      showToast("Đăng ký & tham gia công ty thành công!", "success");
-      // Tự động đăng nhập và điều hướng
+      showToast("Registration & company join successful!", "success");
+      // Auto login and redirect
       await loginWithTokens(data.accessToken, data.refreshToken);
     } catch (err: any) {
       showToast(err.message, "error");
@@ -76,42 +75,42 @@ function NewUserFlow({
     <>
       <div className="bg-gradient-to-br from-blue-500 to-cyan-500 text-center py-6 px-4">
         <h2 className="text-lg sm:text-xl font-bold text-white mt-3">
-          Tham gia {details.companyName}
+          Join {details.companyName}
         </h2>
         <p className="text-xs text-blue-100 mt-1">
-          Tạo tài khoản để chấp nhận lời mời.
+          Create an account to accept the invitation.
         </p>
       </div>
       <form className="p-6 space-y-4" onSubmit={handleSubmit}>
         <InputField
-          label="Email (Đã mời)"
+          label="Email (Invited)"
           icon={<Mail className="w-4 h-4 text-gray-400" />}
           type="email"
           value={details.email}
-          disabled // Khóa email
+          disabled // Lock email
         />
         <InputField
-          label="Họ và tên"
+          label="Full Name"
           icon={<User className="w-4 h-4 text-gray-400" />}
           value={form.fullName}
           onChange={handleChange("fullName")}
-          placeholder="Nhập họ và tên của bạn"
+          placeholder="Enter your full name"
           required
         />
         <PasswordField
-          label="Mật khẩu"
+          label="Password"
           value={form.password}
           onChange={handleChange("password")}
-          placeholder="Tạo mật khẩu (ít nhất 6 ký tự)"
+          placeholder="Create a password (min 6 chars)"
         />
         <PasswordField
-          label="Xác nhận mật khẩu"
+          label="Confirm Password"
           value={form.confirmPassword}
           onChange={handleChange("confirmPassword")}
-          placeholder="Nhập lại mật khẩu"
+          placeholder="Re-enter password"
         />
         <LoadingButton
-          text="Tạo tài khoản & Tham gia"
+          text="Create Account & Join"
           isLoading={loading}
           className="mt-4"
         />
@@ -121,7 +120,7 @@ function NewUserFlow({
 }
 
 // ----------------------------------------
-// Component cho TRƯỜNG HỢP 2: Người dùng cũ
+// Component for CASE 2: Existing User
 // ----------------------------------------
 function ExistingUserFlow({
   details,
@@ -135,7 +134,7 @@ function ExistingUserFlow({
   const { user, isAuthenticated, login, isLoading } = useAuth();
   const [isAccepting, setIsAccepting] = useState(false);
 
-  // State cho form login
+  // State for login form
   const [form, setForm] = useState({ email: "", password: "" });
   const handleChange =
     (field: "email" | "password") =>
@@ -143,90 +142,87 @@ function ExistingUserFlow({
       setForm((prev) => ({ ...prev, [field]: e.target.value }));
     };
 
-  // Hàm xử lý khi user đã đăng nhập
+  // Handle accept when already logged in
   const handleAccept = async () => {
     setIsAccepting(true);
     try {
       await acceptInvitation(token);
-      showToast("Chấp nhận lời mời thành công!", "success");
-      router.push("/admin"); // Chuyển đến trang admin
+      showToast("Invitation accepted successfully!", "success");
+      router.push("/admin"); // Redirect to admin
     } catch (err: any) {
-      // ✅ SỬA LỖI: Đã thêm dấu {
       showToast(err.message, "error");
       setIsAccepting(false);
     }
   };
 
-  // Hàm xử lý submit form login
+  // Handle login submit
   const handleSubmitLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Dùng hàm login từ AuthContext
     try {
       await login(form.email, form.password);
-      // AuthContext sẽ tự động điều hướng khi thành công
-      // và trang này sẽ tự động re-render, rơi vào (isAuthenticated = true)
+      // AuthContext handles redirect on success
+      // Page re-renders with isAuthenticated = true
     } catch (err: any) {
-      showToast(err.message || "Đăng nhập thất bại", "error");
+      showToast(err.message || "Login failed", "error");
     }
   };
 
-  // --- Logic Render ---
+  // --- Render Logic ---
 
-  // 1. Đã đăng nhập
+  // 1. Logged in
   if (isAuthenticated && user) {
-    // 1a. Đăng nhập đúng tài khoản
+    // 1a. Correct account
     if (user.email === details.email) {
       return (
         <div className="p-6 text-center space-y-4">
           <h2 className="text-lg font-semibold text-gray-900">
-            Chấp nhận lời mời?
+            Accept Invitation?
           </h2>
           <p className="text-sm text-gray-600">
-            <b>{details.companyName}</b> đã mời bạn tham gia.
+            <b>{details.companyName}</b> has invited you to join.
           </p>
           <LoadingButton
-            text="Chấp nhận"
+            text="Accept"
             isLoading={isAccepting}
             onClick={handleAccept}
           />
         </div>
       );
     }
-    // 1b. Đăng nhập sai tài khoản
+    // 1b. Wrong account
     return (
       <div className="p-6 text-center space-y-4">
-        <h2 className="text-lg font-semibold text-red-600">Lỗi Tài khoản</h2>
+        <h2 className="text-lg font-semibold text-red-600">Account Error</h2>
         <p className="text-sm text-gray-600">
-          Lời mời này dành cho <b>{details.email}</b>, nhưng bạn đang đăng nhập
-          với tài khoản <b>{user.email}</b>.
+          This invitation is for <b>{details.email}</b>, but you are logged in as <b>{user.email}</b>.
         </p>
-        <p className="text-sm text-gray-600">Vui lòng đăng xuất và thử lại.</p>
+        <p className="text-sm text-gray-600">Please logout and try again.</p>
       </div>
     );
   }
 
-  // 2. Chưa đăng nhập
+  // 2. Not logged in
   return (
     <>
       <div className="bg-gradient-to-br from-blue-500 to-cyan-500 text-center py-6 px-4">
         <h2 className="text-lg sm:text-xl font-bold text-white mt-3">
-          Tham gia {details.companyName}
+          Join {details.companyName}
         </h2>
         <p className="text-xs text-blue-100 mt-1">
-          Lời mời này dành cho <b>{details.email}</b>.
+          This invitation is for <b>{details.email}</b>.
         </p>
         <p className="text-xs text-blue-100 mt-1">
-          Vui lòng đăng nhập để chấp nhận.
+          Please login to accept.
         </p>
       </div>
 
-      {/* Hiển thị form Login */}
+      {/* Show Login Form */}
       <form className="p-6 space-y-4" onSubmit={handleSubmitLogin}>
         <AuthFormLogin
           form={form}
           handleChange={handleChange as any}
-          isLoading={isLoading} // Dùng loading của AuthContext
-          setTab={() => {}} // không cần
+          isLoading={isLoading}
+          setTab={() => {}} // not needed
         />
       </form>
     </>
@@ -234,11 +230,10 @@ function ExistingUserFlow({
 }
 
 // ----------------------------------------
-// Component "CHA" (Hub Logic)
+// "PARENT" Component (Logic Hub)
 // ----------------------------------------
 export default function AcceptInvitationClient() {
   const searchParams = useSearchParams();
-  const router = useRouter();
   const { showToast } = useToast();
 
   const [loading, setLoading] = useState(true);
@@ -246,11 +241,11 @@ export default function AcceptInvitationClient() {
   const [details, setDetails] = useState<InviteDetails | null>(null);
   const [token, setToken] = useState<string | null>(null);
 
-  // Bước 3 & 4: "Hỏi" Backend
+  // Step 3 & 4: "Ask" Backend
   useEffect(() => {
     const tokenFromUrl = searchParams.get("token");
     if (!tokenFromUrl) {
-      setError("Token mời không hợp lệ.");
+      setError("Invalid invitation token.");
       setLoading(false);
       return;
     }
@@ -269,21 +264,21 @@ export default function AcceptInvitationClient() {
     fetchDetails();
   }, [searchParams]);
 
-  // --- Logic Render (Bước 5) ---
+  // --- Render Logic (Step 5) ---
   if (loading) {
     return (
       <div className="p-8 text-center flex items-center justify-center gap-2">
-        <Loader2 className="w-6 h-6 animate-spin" /> Đang xác thực lời mời...
+        <Loader2 className="w-6 h-6 animate-spin" /> Verifying invitation...
       </div>
     );
   }
 
   if (error) {
-    return <div className="p-8 text-center text-red-600">{error};</div>;
+    return <div className="p-8 text-center text-red-600">{error}</div>;
   }
 
   if (details && token) {
-    // Bước 5: Ra quyết định
+    // Step 5: Decision making
     if (details.accountExists) {
       return <ExistingUserFlow details={details} token={token} />;
     } else {
@@ -291,5 +286,5 @@ export default function AcceptInvitationClient() {
     }
   }
 
-  return null; // Trường hợp không mong muốn
+  return null; // Unexpected case
 }

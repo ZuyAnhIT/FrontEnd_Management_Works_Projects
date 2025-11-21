@@ -69,15 +69,18 @@ export default function AdminSidebar({
         />
       )}
 
+      {/* SIDEBAR CONTAINER */}
       <aside
-        className={`fixed lg:static inset-y-0 left-0 z-50 
-        ${collapsed ? "w-[64px]" : "w-64"} 
-        bg-[#F4F5F7] border-r border-slate-200
-        transition-all duration-300 ease-in-out flex flex-col
-        ${isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
+        className={`
+          fixed top-0 bottom-0 left-0 z-50
+          bg-[#F4F5F7] border-r border-slate-200
+          flex flex-col transition-all duration-300 ease-in-out
+          ${collapsed ? "w-[64px]" : "w-64"} 
+          ${isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
+        `}
       >
-        {/* ===== HEADER ===== */}
-        <div className="h-16 flex items-center justify-between px-4 border-b border-slate-200/50 bg-[#F4F5F7]">
+        {/* ===== HEADER (FIXED TOP) ===== */}
+        <div className="h-16 flex items-center justify-between px-4 border-b border-slate-200/50 bg-[#F4F5F7] shrink-0">
           <div className={`flex items-center gap-3 overflow-hidden transition-all ${collapsed ? 'justify-center w-full' : ''}`}>
             
             {/* Logo Icon */}
@@ -140,7 +143,11 @@ export default function AdminSidebar({
           
           {/* Settings Link (Static) */}
           <div className="space-y-1 border-t border-slate-200 pt-4 mx-1">
-             <button className={`group w-full flex items-center rounded-md transition-all duration-200 text-slate-600 hover:bg-slate-200/60 hover:text-slate-900 ${collapsed ? 'justify-center px-0 py-3' : 'px-3 py-2 gap-3'}`}>
+             <button 
+                onClick={() => router.push("/admin/settings")}
+                className={`group w-full flex items-center rounded-md transition-all duration-200 text-slate-600 hover:bg-slate-200/60 hover:text-slate-900 ${collapsed ? 'justify-center px-0 py-3' : 'px-3 py-2 gap-3'}`}
+                title={collapsed ? "Global Settings" : undefined}
+             >
                  <Settings className={`${collapsed ? 'w-5 h-5' : 'w-4 h-4'} text-slate-500 group-hover:text-slate-700`} />
                  {!collapsed && <span className="text-sm font-medium">Global Settings</span>}
              </button>
@@ -148,8 +155,8 @@ export default function AdminSidebar({
 
         </nav>
 
-        {/* ===== FOOTER: COLLAPSE TOGGLE ===== */}
-        <div className="p-4 border-t border-slate-200 bg-[#F4F5F7]">
+        {/* ===== FOOTER: COLLAPSE TOGGLE (FIXED BOTTOM) ===== */}
+        <div className="p-4 border-t border-slate-200 bg-[#F4F5F7] shrink-0">
            <button
              onClick={() => setCollapsed(!collapsed)}
              className={`
@@ -171,6 +178,11 @@ export default function AdminSidebar({
            </button>
         </div>
       </aside>
+
+      {/* ⚠️ QUAN TRỌNG: Placeholder div để đẩy nội dung chính sang phải */}
+      <div 
+         className={`hidden lg:block transition-all duration-300 ease-in-out ${collapsed ? "w-[64px]" : "w-64"}`} 
+      />
 
       <style jsx>{`
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
