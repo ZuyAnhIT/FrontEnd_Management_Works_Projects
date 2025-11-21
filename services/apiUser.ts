@@ -14,7 +14,7 @@ export const getCurrentUser = async (): Promise<{
   dateOfBirth: string | null;
   gender: "MALE" | "FEMALE" | "OTHER" | null;
   status: string | null;
-  systemRoles: string | null;
+  systemRoles: string[];
   company: {
     companyId: number | null;
     companyName: string | null;
