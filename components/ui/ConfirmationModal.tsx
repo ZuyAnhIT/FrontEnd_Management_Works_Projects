@@ -12,9 +12,12 @@ interface ConfirmationModalProps {
   description: string;
   confirmText?: string;
   cancelText?: string;
+  modalVariant?: "danger" | "warning" | "info"; // ✔ THÊM DÒNG NÀY
 }
 
+
 export default function ConfirmationModal({
+  
   isOpen,
   onClose,
   onConfirm,
@@ -23,7 +26,9 @@ export default function ConfirmationModal({
   description,
   confirmText = "Delete",
   cancelText = "Cancel",
+   modalVariant = "danger",
 }: ConfirmationModalProps) {
+  
   if (!isOpen) return null;
 
   return (
@@ -49,7 +54,18 @@ export default function ConfirmationModal({
           {/* Icon cảnh báo bên trái */}
           <div className="flex-shrink-0">
             <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center border border-red-100">
-              <AlertTriangle className="w-5 h-5 text-red-600" />
+              <AlertTriangle
+  className={
+    "w-5 h-5 " +
+    (modalVariant === "danger"
+      ? "text-red-600"
+      : modalVariant === "warning"
+      ? "text-amber-600"
+      : "text-blue-600")
+  }
+/>
+
+
             </div>
           </div>
 
