@@ -1,178 +1,140 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { 
-  Users, FolderKanban, Briefcase, Target, 
-  Clock, Layout, Loader2, CheckCircle, Zap 
-} from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import { useToast } from "@/components/ui/ToastProvider";
 import { 
-  getDashboardWorkspaces, 
-  getDashboardMyTasks, 
-  getDashboardMyProjects, 
-  getDashboardCompanies, 
-  DashboardMyTask, 
-  DashboardWorkspace 
-} from "@/services/apiDashboard"; 
-import WorkspaceCard from "@/components/features/core/workspace/WorkspaceCard"; 
-import DashboardTaskWidget from "@/components/features/dashboard/DashboardTaskWidget"; 
-import DashboardProjectWidget from "@/components/features/dashboard/DashboardProjectWidget"; 
-import StatsCard, { StatsCardVariant } from "@/components/features/admin/StartsCard"; // Giả sử đã có component này
+  FolderKanban, 
+  ArrowRight, 
+  ShieldCheck, 
+  User, 
+  Loader2 
+} from "lucide-react";
 
-interface DashboardData {
-  workspaces: DashboardWorkspace[];
-  tasks: DashboardMyTask[];
-  projects: any[];
-  company: any[];
+// Định nghĩa lại Interface dựa trên API users/me
+interface WorkspaceMembership {
+  workspaceId: number;
+  workspaceName: string;
+  companyId: number;
+  roleCode: string; // "WORKSPACE_ADMIN" | "WORKSPACE_MEMBER"
 }
 
 export default function CoreDashboardPage() {
-  const { showToast } = useToast();
-  const { user, isLoading: isAuthLoading, role } = useAuth();
+  const router = useRouter();
+  // Lấy user và activeCompany từ AuthContext
+  // user chứa mảng workspaceMemberships
+  // activeCompany chứa công ty đang được chọn (để lọc workspace thuộc công ty này)
+  const { user, activeCompany, isLoading } = useAuth();
+  const [mounted, setMounted] = useState(false);
 
-  const [data, setData] = useState<DashboardData>({
-      workspaces: [], tasks: [], projects: [], company: [],
-  });
-  const [loading, setLoading] = useState(true);
+  useEffect(() => setMounted(true), []);
 
-  useEffect(() => {
-    if (isAuthLoading) return;
+  // 1. Lọc Workspace theo Công ty đang Active
+  // API /users/me trả về TẤT CẢ workspace của user ở MỌI công ty.
+  // Chúng ta chỉ hiển thị workspace thuộc activeCompany hiện tại.
+  const myWorkspaces = (user?.workspaceMemberships || []).filter(
+    (ws) => ws.companyId === activeCompany?.companyId
+  );
 
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        const [workspacesRes, tasksRes, projectsRes, companyRes] = await Promise.all([
-            getDashboardWorkspaces(),
-            getDashboardMyTasks(),
-            getDashboardMyProjects(),
-            getDashboardCompanies(),
-        ]);
-        
-        setData({
-          workspaces: workspacesRes || [],
-          tasks: tasksRes || [],
-          projects: projectsRes || [],
-          company: companyRes || [],
-        });
+  const handleEnterWorkspace = (workspaceId: number) => {
+    router.push(`/core/workspace/${workspaceId}`);
+  };
 
-      } catch (err: any) {
-        showToast(err.message || "Failed to load dashboard data", "error");
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, [isAuthLoading, showToast]); 
-
-  const totalWorkspaces = data.workspaces.length;
-  const totalProjects = data.projects.length; 
-  const totalTasks = data.tasks.length;
-  const company = data.company[0]; 
-
-  if (isAuthLoading || loading)
+  if (isLoading || !mounted) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
       </div>
     );
-    
+  }
+
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 p-8">
-      <div className="max-w-[1600px] mx-auto space-y-8">
+    <div className="min-h-screen bg-slate-50/50 font-sans text-slate-900 p-6 sm:p-8">
+      <div className="max-w-7xl mx-auto">
         
-        {/* 1. Header Section */}
-        <div className="flex flex-col gap-1 mb-6">
-          <h1 className="text-2xl font-bold text-slate-900">
-            Your Work
+        {/* --- HEADER --- */}
+        <div className="mb-10">
+          <h1 className="text-3xl font-bold text-slate-900 mb-2">
+            My Workspaces
           </h1>
-          <p className="text-slate-500 text-sm">
-             Welcome back, <span className="font-semibold text-slate-700">{user?.fullName}</span>. Here's what's happening today.
+          <p className="text-slate-500 text-lg">
+            Select a workspace in <span className="font-semibold text-slate-700">{activeCompany?.companyName}</span> to start working.
           </p>
         </div>
 
-        {/* 2. Stats Row (4 Cards) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            <StatsCard 
-                icon={Clock} 
-                label="My Open Tasks" 
-                value={totalTasks} 
-                variant="orange"
-            />
-            <StatsCard 
-                icon={Briefcase} 
-                label="Active Projects" 
-                value={totalProjects} 
-                variant="purple" 
-            />
-            <StatsCard 
-                icon={FolderKanban} 
-                label="Workspaces" 
-                value={totalWorkspaces} 
-                variant="blue" 
-            />
-            <StatsCard 
-                icon={Layout} 
-                label="Company" 
-                value={company?.companyName || "N/A"} 
-                variant="green" 
-            />
-        </div>
-        
-        {/* 3. Main Content Layout (2 Columns) */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            
-            {/* Left Column (Task & Projects) - Chiếm 2/3 */}
-            <div className="lg:col-span-2 space-y-8">
-                
-                {/* 3a. Tasks Widget */}
-                <section>
-                    <div className="flex items-center justify-between mb-4">
-                        <h2 className="text-lg font-bold text-slate-800">Recent Tasks</h2>
+        {/* --- WORKSPACE LIST GRID --- */}
+        {myWorkspaces.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {myWorkspaces.map((ws: WorkspaceMembership) => {
+              const isAdmin = ws.roleCode === "WORKSPACE_ADMIN";
+              
+              return (
+                <div 
+                  key={ws.workspaceId}
+                  onClick={() => handleEnterWorkspace(ws.workspaceId)}
+                  className="group relative bg-white rounded-2xl border border-slate-200 p-6 shadow-sm hover:shadow-xl hover:border-blue-300 transition-all duration-300 cursor-pointer flex flex-col justify-between min-h-[200px]"
+                >
+                  {/* Top: Icon & Badge */}
+                  <div className="flex justify-between items-start mb-4">
+                    <div className={`w-14 h-14 rounded-xl flex items-center justify-center text-2xl font-bold shadow-sm transition-colors
+                      ${isAdmin ? 'bg-purple-600 text-white' : 'bg-slate-100 text-slate-600 group-hover:bg-purple-50 group-hover:text-purple-600'}`}
+                    >
+                      {ws.workspaceName.charAt(0).toUpperCase()}
                     </div>
-                    <DashboardTaskWidget tasks={data.tasks} loading={loading} />
-                </section>
 
-                {/* 3b. Projects Widget */}
-                <section>
-                    <div className="flex items-center justify-between mb-4">
-                        <h2 className="text-lg font-bold text-slate-800">Recent Projects</h2>
-                    </div>
-                    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-1">
-                       <DashboardProjectWidget projects={data.projects} loading={loading} />
-                    </div>
-                </section>
-            </div>
+                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border
+                      ${isAdmin 
+                        ? 'bg-purple-50 text-purple-700 border-purple-200' 
+                        : 'bg-slate-50 text-slate-600 border-slate-200'}`}
+                    >
+                      {isAdmin ? (
+                        <>
+                          <ShieldCheck className="w-3.5 h-3.5" />
+                          Admin
+                        </>
+                      ) : (
+                        <>
+                          <User className="w-3.5 h-3.5" />
+                          Member
+                        </>
+                      )}
+                    </span>
+                  </div>
 
-            {/* Right Column (Workspaces) - Chiếm 1/3 */}
-            <div className="space-y-8">
-                <section>
-                    <div className="flex items-center justify-between mb-4">
-                        <h2 className="text-lg font-bold text-slate-800">Workspaces</h2>
-                        <span className="bg-slate-200 text-slate-600 text-xs font-bold px-2 py-1 rounded-full">{totalWorkspaces}</span>
-                    </div>
-                    
-                    {data.workspaces.length === 0 ? (
-                         <div className="bg-white border-2 border-dashed border-slate-200 rounded-xl p-8 text-center">
-                            <FolderKanban className="w-10 h-10 text-slate-300 mx-auto mb-2" />
-                            <p className="text-sm text-slate-500 font-medium">No workspaces yet.</p>
-                         </div>
-                    ) : (
-                        <div className="grid grid-cols-1 gap-4">
-                            {data.workspaces.map((ws) => (
-                                <WorkspaceCard 
-                                    key={ws.workspaceId}
-                                    workspace={ws} 
-                                    onNavigate={(id: number) => window.location.href = `/core/workspace/${id}`}
-                                    viewMode="list" 
-                                />
-                            ))}
-                        </div>
-                    )}
-                </section>
-            </div>
+                  {/* Content: Name & ID */}
+                  <div>
+                    <h3 className="text-xl font-bold text-slate-900 group-hover:text-purple-700 transition-colors line-clamp-1">
+                      {ws.workspaceName}
+                    </h3>
+                    <p className="text-sm text-slate-400 mt-1">
+                      Workspace ID: #{ws.workspaceId}
+                    </p>
+                  </div>
 
-        </div>
+                  {/* Bottom: Action Arrow */}
+                  <div className="mt-6 flex items-center text-sm font-semibold text-purple-600 opacity-0 -translate-x-4 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300">
+                    Open Workspace <ArrowRight className="w-4 h-4 ml-2" />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          // --- EMPTY STATE ---
+          <div className="flex flex-col items-center justify-center py-24 bg-white rounded-2xl border-2 border-dashed border-slate-200 text-center">
+             <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mb-6">
+                <FolderKanban className="w-10 h-10 text-slate-300" />
+             </div>
+             <h2 className="text-2xl font-bold text-slate-900 mb-2">No Workspaces Found</h2>
+             <p className="text-slate-500 max-w-md text-lg">
+               You haven't been added to any workspaces in this company yet.
+             </p>
+             <p className="text-slate-400 text-sm mt-2">
+               Contact your Company Admin to get access.
+             </p>
+          </div>
+        )}
+
       </div>
     </div>
   );

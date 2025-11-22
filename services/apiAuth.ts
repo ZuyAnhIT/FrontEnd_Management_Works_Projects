@@ -1,8 +1,7 @@
-"use client";
 import apiClient from "@/lib/apiClient";
 
 // ===================================================
-// 🧩 Register new account
+// 🧩 Đăng ký tài khoản mới
 // ===================================================
 export const registerUser = async (payload: {
   fullName: string;
@@ -16,7 +15,7 @@ export const registerUser = async (payload: {
 };
 
 // ===================================================
-// 🧩 Verify email (OTP)
+// 🧩 Xác thực Email (OTP)
 // ===================================================
 export const verifyEmail = async (payload: { email: string; otp: string }) => {
   const res = await apiClient.post("/auth/verify-email", payload);
@@ -26,7 +25,7 @@ export const verifyEmail = async (payload: { email: string; otp: string }) => {
 };
 
 // ===================================================
-// 🧩 Login account
+// 🧩 Đăng nhập (Login)
 // ===================================================
 export const loginUser = async (payload: {
   email: string;
@@ -37,6 +36,7 @@ export const loginUser = async (payload: {
 
   if (!data.success) throw new Error(data.message || "Login failed!");
 
+  // Lưu token ngay khi API trả về thành công
   if (data.data?.accessToken && data.data?.refreshToken) {
     localStorage.setItem("accessToken", data.data.accessToken);
     localStorage.setItem("refreshToken", data.data.refreshToken);
@@ -46,24 +46,25 @@ export const loginUser = async (payload: {
 };
 
 // ===================================================
-// 🧩 Logout (clear token)
+// 🧩 Đăng xuất (Logout)
 // ===================================================
 export const logoutUser = async () => {
   const refreshToken = localStorage.getItem("refreshToken");
   try {
-    const res = await apiClient.post("/auth/logout", { refreshToken });
-    const data = res.data;
-    if (data.code && data.code !== 200) throw new Error(data.message);
-    localStorage.clear();
-    return data;
+    // Gọi API logout để hủy token ở server (nếu có)
+    if (refreshToken) {
+      await apiClient.post("/auth/logout", { refreshToken });
+    }
   } catch (error) {
+    console.error("Logout API error (ignoring):", error);
+  } finally {
+    // Luôn luôn xóa data ở client dù API có lỗi hay không
     localStorage.clear();
-    throw error;
   }
 };
 
 // ===================================================
-// 🧩 Register from Invitation (Case 1)
+// 🧩 Đăng ký từ lời mời (Invitation)
 // ===================================================
 export const registerFromInvite = async (payload: {
   fullName: string;
@@ -77,45 +78,41 @@ export const registerFromInvite = async (payload: {
     if (!data.success) {
       throw new Error(data.message || "Cannot register from invitation.");
     }
-
-    // API returns tokens for auto-login
-    return data.data; // { accessToken, refreshToken, tokenType }
+    return data.data;
   } catch (err: any) {
-    console.error("Error registering from invitation:", err.response || err);
     throw new Error(
-      err.response?.data?.message ||
-        "System error, cannot register from invitation."
+      err.response?.data?.message || "System error, cannot register from invitation."
     );
   }
 };
 
 // ===================================================
-// 🧩 Forgot password
+// 🧩 Quên mật khẩu
 // ===================================================
 export const forgotPassword = async (email: string) => {
   const res = await apiClient.post("/auth/forgot-password", { email });
-  return res.data; // response { success, message, data }
+  return res.data;
 };
 
 // ===================================================
-// 🧩 Reset password
+// 🧩 Đặt lại mật khẩu mới
 // ===================================================
 export const resetPassword = async (payload: {
   token: string;
   newPassword: string;
 }) => {
   const res = await apiClient.post("/auth/reset-password", payload);
-  return res.data; // response { success, message, data }
+  return res.data;
 };
 
-// 🧩 Login with Google
+// ===================================================
+// 🧩 Đăng nhập bằng Google
 // ===================================================
 export const loginWithGoogle = async (googleToken: string) => {
   const res = await apiClient.post("/auth/google", { googleToken });
   const data = res.data;
 
-  if (!data.success)
-    throw new Error(data.message || "Google login failed!");
+  if (!data.success) throw new Error(data.message || "Google login failed!");
 
   if (data.data?.accessToken && data.data?.refreshToken) {
     localStorage.setItem("accessToken", data.data.accessToken);

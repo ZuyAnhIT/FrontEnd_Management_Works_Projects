@@ -1,282 +1,441 @@
 "use client";
 
-import { useEffect, useState } from "react";
+// =================================================================
+// 1️⃣ IMPORTS
+// =================================================================
+import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
-  FolderKanban,
-  Plus,
-  Trash2,
   Search,
+  Loader2,
+  Plus,
+  ChevronsLeft,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsRight,
   Grid,
   List as ListIcon,
   Filter,
-  Archive,
-  Loader2
+  Briefcase
 } from "lucide-react";
 
+import { useAuth } from "@/context/AuthContext";
+import { useToast } from "@/components/ui/ToastProvider";
+import { Button } from "@/components/ui/button";
+
+// API Services
 import {
   getProjects,
-  getTrashedProjects,
-  createProject,
+  searchProjects, // ✅ Import thêm hàm search
   deleteProject,
+  updateProjectStatus,
+  Project,
+  PageResponse
 } from "@/services/apiProject";
-import { useToast } from "@/components/ui/ToastProvider";
-import { Button } from "@/components/ui/button"; // Giả sử có
 
+// Components
 import ProjectCard from "@/components/features/core/project/ProjectCard";
 import CreateProjectModal from "@/components/features/core/project/CreateProjectModal";
 import ConfirmationModal from "@/components/ui/ConfirmationModal";
 
+// =================================================================
+// 2️⃣ CONSTANTS & TYPES
+// =================================================================
+
+const SEARCH_FIELDS = [
+  { value: "name", label: "Project Name" },
+  { value: "code", label: "Project Code" }, 
+  { value: "manager", label: "Manager" },   
+];
+
+const STATUS_OPTIONS = [
+  { value: "ALL", label: "All Statuses" },
+  { value: "ACTIVE", label: "Active" },
+  { value: "NEW", label: "New" },
+  { value: "IN_PROGRESS", label: "In Progress" },
+  { value: "PAUSED", label: "Paused" },
+  { value: "COMPLETED", label: "Completed" },
+  { value: "CANCELLED", label: "Cancelled" },
+];
+
+type ProjectSearchParams = {
+  page: number;
+  size: number;
+  sortBy: string;
+  sortDir: string;
+  status?: string;
+  // Search keys
+  name?: string;
+  code?: string;
+  manager?: string;
+  [key: string]: any;
+};
+
+// =================================================================
+// 3️⃣ COMPONENT CHÍNH
+// =================================================================
 export default function ProjectPage() {
-  const { showToast } = useToast();
+  const router = useRouter();
   const params = useParams();
   const workspaceId = Number(params.workspaceId);
+  const { showToast } = useToast();
+  
+  const { activeCompany, isLoading: isAuthLoading } = useAuth();
+  const companyId = activeCompany?.companyId;
 
-  const [projects, setProjects] = useState<any[]>([]);
-  const [trashedProjects, setTrashedProjects] = useState<any[]>([]);
+  // --- STATE DATA ---
+  const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showModal, setShowModal] = useState(false);
-  const [activeTab, setActiveTab] = useState<"active" | "trash">("active");
-  const [searchQuery, setSearchQuery] = useState("");
+
+  // --- STATE UI ---
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-  const [filterPriority, setFilterPriority] = useState<string>("all");
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  
+  // --- STATE SEARCH & FILTER ---
+  const [searchBy, setSearchBy] = useState("name");
+  const [searchValue, setSearchValue] = useState("");
+  const [filterStatus, setFilterStatus] = useState<string>("ALL");
 
+  // --- STATE DELETE ---
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
-  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [projectToDelete, setProjectToDelete] = useState<number | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  const loadProjects = async () => {
-    if (!workspaceId || isNaN(workspaceId)) {
-      setLoading(false);
-      return;
-    }
+  // --- STATE PAGINATION ---
+  const [pagination, setPagination] = useState<Omit<PageResponse<Project>, "content">>({
+    pageNumber: 0,
+    pageSize: 12,
+    totalElements: 0,
+    totalPages: 0,
+    first: true,
+    last: true,
+  });
+
+  const [searchParams, setSearchParams] = useState<ProjectSearchParams>({
+    page: 0,
+    size: 12,
+    sortBy: "createdAt",
+    sortDir: "desc",
+    status: undefined, 
+  });
+
+  // ===============================================================
+  // 4️⃣ FETCH DATA LOGIC (Đã sửa logic gọi Search vs List)
+  // ===============================================================
+  const fetchProjects = useCallback(async (params: ProjectSearchParams) => {
+    if (!workspaceId || !companyId) return;
+    setLoading(true);
 
     try {
-      setLoading(true);
+      // Tách các trường search ra để kiểm tra
+      const { name, code, manager, ...otherParams } = params;
+      
+      // Kiểm tra xem có đang search không (có ít nhất 1 trường có giá trị)
+      const isSearching = (name && name.trim() !== "") || 
+                          (code && code.trim() !== "") || 
+                          (manager && manager.trim() !== "");
 
-      // getProjects trả về PageResponse<Project>
-      const page = await getProjects(workspaceId);
+      let data: PageResponse<Project>;
 
-      // getTrashedProjects đã trả về array
-      const trash = await getTrashedProjects(workspaceId);
+      if (isSearching) {
+        // ✅ Gọi API Search (nếu đang tìm kiếm)
+        // Lưu ý: searchProjects nhận params đầy đủ để có cả phân trang/sort
+        data = await searchProjects(companyId, workspaceId, params);
+      } else {
+        // ✅ Gọi API List thường (nếu không tìm kiếm)
+        // Chỉ gửi otherParams (page, size, status...)
+        data = await getProjects(companyId, workspaceId, otherParams);
+      }
 
-      setProjects(page.content || []);
-      setTrashedProjects(trash || []);
+      setProjects(data.content || []);
+      setPagination({
+        pageNumber: data.pageNumber,
+        pageSize: data.pageSize,
+        totalElements: data.totalElements,
+        totalPages: data.totalPages,
+        first: data.first,
+        last: data.last,
+      });
 
     } catch (err: any) {
+      // Xóa log lỗi để console sạch hơn (hoặc giữ lại nếu cần debug)
+      // console.error("Fetch error:", err); 
       showToast(err.message || "Failed to load projects", "error");
+      setProjects([]);
     } finally {
       setLoading(false);
     }
-  };
+  }, [companyId, workspaceId, showToast]);
 
-
+  // Auto reload (Debounce)
   useEffect(() => {
-    if (workspaceId) {
-      loadProjects();
-    }
-  }, [workspaceId]);
+    if (!workspaceId || !companyId) return;
+    
+    const t = setTimeout(() => fetchProjects(searchParams), 300);
+    return () => clearTimeout(t);
+  }, [searchParams, workspaceId, companyId, fetchProjects]);
 
-  const handleCreateSuccess = (newProject: any) => {
-    setProjects((prev) => [newProject, ...prev]);
-    setShowModal(false);
-    showToast("Project created successfully!", "success");
+
+  // ===============================================================
+  // 5️⃣ HANDLERS
+  // ===============================================================
+
+  const handlePageChange = (newPage: number) => {
+    setSearchParams((prev) => ({ ...prev, page: newPage }));
   };
 
-  const handleDelete = (id: number) => {
-    setDeleteTargetId(id);
+  const handleSort = (field: string) => {
+    setSearchParams((prev) => ({
+      ...prev,
+      sortBy: field,
+      sortDir: prev.sortBy === field && prev.sortDir === "desc" ? "asc" : "desc",
+      page: 0,
+    }));
+  };
+
+  const handleSearchChange = (text: string) => {
+    setSearchValue(text);
+    
+    setSearchParams((prev) => {
+        const newParams = { ...prev };
+        // Xóa sạch key cũ để tránh conflict
+        delete newParams.name;
+        delete newParams.code;
+        delete newParams.manager;
+        
+        newParams.page = 0;
+
+        if (text.trim() !== "") {
+            newParams[searchBy] = text.trim();
+        }
+        return newParams;
+    });
+  };
+
+  const handleSearchByChange = (field: string) => {
+    setSearchBy(field);
+    setSearchValue(""); 
+    setSearchParams((prev) => {
+        const newParams = { ...prev };
+        delete newParams.name;
+        delete newParams.code;
+        delete newParams.manager;
+        return { ...newParams, page: 0 };
+    });
+  };
+
+  const handleStatusChange = (status: string) => {
+    setFilterStatus(status);
+    setSearchParams((prev) => ({
+      ...prev,
+      page: 0,
+      status: status === "ALL" ? undefined : status,
+    }));
+  };
+
+  const handleCreateSuccess = () => {
+    setShowCreateModal(false);
+    showToast("Project created successfully!", "success");
+    fetchProjects(searchParams);
+  };
+
+  // --- DELETE LOGIC ---
+  const handleDeleteClick = (id: number) => {
+    setProjectToDelete(id);
     setIsDeleteModalOpen(true);
   };
 
-  const confirmDelete = async () => {
-    if (!deleteTargetId) return;
-
+  const handleConfirmDelete = async () => {
+    if (!projectToDelete || !workspaceId || !companyId) return;
+    setIsDeleting(true);
     try {
-      setDeleteLoading(true);
-      await deleteProject(workspaceId, deleteTargetId);
+      await deleteProject(companyId, workspaceId, projectToDelete);
       showToast("Project moved to trash!", "success");
-
-      // Refresh data logic (Simple version: reload all)
-      loadProjects();
+      fetchProjects(searchParams);
     } catch (err: any) {
       showToast(err.message || "Failed to delete project", "error");
     } finally {
-      setDeleteLoading(false);
+      setIsDeleting(false);
       setIsDeleteModalOpen(false);
-      setDeleteTargetId(null);
+      setProjectToDelete(null);
     }
   };
 
-  const currentList = activeTab === "active" ? projects : trashedProjects;
-  const filteredList = currentList
-    .filter((p) =>
-      p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.projectCode.toLowerCase().includes(searchQuery.toLowerCase())
-    )
-    .filter((p) =>
-      filterPriority === "all" ? true : p.priority === filterPriority
-    );
+  const handleRestore = async (id: number) => {
+    if (!workspaceId || !companyId) return;
+    try {
+      await updateProjectStatus(companyId, workspaceId, id, "ACTIVE");
+      showToast("Project restored successfully!", "success");
+      fetchProjects(searchParams);
+    } catch (err: any) {
+      showToast(err.message || "Failed to restore project", "error");
+    }
+  };
 
-  if (loading)
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
-      </div>
-    );
+  const goToProjectBoard = (projectId: number) => {
+    router.push(`/core/workspace/${workspaceId}/project/${projectId}/board`);
+  };
+
+
+  // ===============================================================
+  // 6️⃣ RENDER UI
+  // ===============================================================
+
+  if (isAuthLoading) return <div className="flex items-center justify-center h-screen bg-slate-50"><Loader2 className="w-10 h-10 text-blue-600 animate-spin" /></div>;
+
+  if (!companyId) return <div className="p-8 text-center">No Active Company</div>;
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
-      <div className="max-w-[1600px] mx-auto px-6 py-8 space-y-6">
+    <div className="min-h-screen bg-slate-50 px-6 py-8 font-sans text-slate-900">
+      <div className="max-w-[1600px] mx-auto space-y-6">
 
         {/* HEADER */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Projects</h1>
-            <p className="text-sm text-slate-500 mt-1">Create and manage your team projects</p>
+            <h1 className="text-2xl font-bold text-slate-900">
+               Projects <span className="text-slate-400 text-lg ml-2">({pagination.totalElements})</span>
+            </h1>
+            <p className="text-sm text-slate-500 mt-1">Manage projects and tasks.</p>
           </div>
-          {activeTab === "active" && (
-            <Button
-              onClick={() => setShowModal(true)}
-              className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm font-bold h-10 px-5 rounded-[3px] flex items-center gap-2"
-            >
-              <Plus className="w-4 h-4" /> Create Project
-            </Button>
-          )}
+
+          <Button
+            onClick={() => setShowCreateModal(true)}
+            className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm font-bold h-10 px-5 rounded-[3px] flex items-center gap-2"
+          >
+            <Plus className="w-4 h-4" /> Create Project
+          </Button>
         </div>
 
         {/* TOOLBAR */}
-        <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm flex flex-col md:flex-row gap-4 items-center justify-between">
+        <div className="bg-white p-4 border border-slate-200 rounded-xl shadow-sm flex flex-col lg:flex-row gap-4 items-center justify-between">
+          
+          <div className="flex flex-col md:flex-row items-center gap-3 w-full lg:w-auto">
+             
+             {/* Search Field Select */}
+             <div className="relative w-full md:w-36">
+                <select
+                  value={searchBy}
+                  onChange={(e) => handleSearchByChange(e.target.value)}
+                  className="w-full h-10 pl-3 pr-7 border border-slate-300 rounded-lg text-sm bg-slate-50 focus:ring-2 focus:ring-blue-100 focus:border-blue-500 appearance-none cursor-pointer"
+                >
+                   {SEARCH_FIELDS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
+                </select>
+                <Filter className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+             </div>
 
-          {/* Tabs & Search Group */}
-          <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto items-center">
-            {/* Tabs */}
-            <div className="flex bg-slate-100 p-1 rounded-md border border-slate-200">
-              <button
-                onClick={() => setActiveTab("active")}
-                className={`px-4 py-1.5 rounded-sm text-sm font-medium transition-all flex items-center gap-2 ${activeTab === "active" ? "bg-white text-blue-700 shadow-sm" : "text-slate-600 hover:text-slate-900"
-                  }`}
-              >
-                <FolderKanban className="w-4 h-4" /> Active
-              </button>
-              <button
-                onClick={() => setActiveTab("trash")}
-                className={`px-4 py-1.5 rounded-sm text-sm font-medium transition-all flex items-center gap-2 ${activeTab === "trash" ? "bg-white text-red-600 shadow-sm" : "text-slate-600 hover:text-slate-900"
-                  }`}
-              >
-                <Trash2 className="w-4 h-4" /> Trash
-              </button>
-            </div>
+             {/* Search Input */}
+             <div className="relative w-full md:w-64 group">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
+                <input
+                  value={searchValue}
+                  onChange={(e) => handleSearchChange(e.target.value)}
+                  placeholder={`Search by ${searchBy}...`}
+                  className="w-full h-10 pl-9 pr-3 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition-all"
+                />
+             </div>
 
-            {/* Search */}
-            <div className="relative w-full md:w-80 group">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search projects..."
-                className="w-full pl-9 pr-4 h-9 bg-white border border-slate-200 rounded-md text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
-              />
-            </div>
+             {/* Status Filter */}
+             <div className="relative w-full md:w-44">
+                <select
+                   value={filterStatus}
+                   onChange={(e) => handleStatusChange(e.target.value)}
+                   className="w-full h-10 pl-3 pr-8 border border-slate-300 rounded-lg text-sm font-medium focus:ring-2 focus:ring-blue-100 focus:border-blue-500 appearance-none cursor-pointer bg-white text-slate-700"
+                >
+                   {STATUS_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                </select>
+             </div>
           </div>
 
-          {/* Right Filters */}
-          <div className="flex items-center gap-3 w-full md:w-auto">
-            {/* Priority Filter */}
-            <div className="relative">
-              <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
-              <select
-                value={filterPriority}
-                onChange={(e) => setFilterPriority(e.target.value)}
-                className="h-9 pl-9 pr-8 bg-white border border-slate-200 rounded-md text-sm font-medium text-slate-700 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 appearance-none cursor-pointer hover:bg-slate-50 transition-colors"
-              >
-                <option value="all">All Priorities</option>
-                <option value="HIGH">High</option>
-                <option value="MEDIUM">Medium</option>
-                <option value="LOW">Low</option>
-              </select>
-            </div>
+          {/* Right: Sort & View */}
+          <div className="flex items-center gap-3 w-full md:w-auto justify-end">
+             <div className="flex gap-2">
+                <select
+                  value={searchParams.sortBy}
+                  onChange={(e) => handleSort(e.target.value)}
+                  className="h-10 pl-3 pr-8 border border-slate-300 rounded-lg text-sm bg-white cursor-pointer focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
+                >
+                   <option value="createdAt">Created Date</option>
+                   <option value="name">Name</option>
+                   <option value="priority">Priority</option>
+                </select>
+                
+                <select
+                  value={searchParams.sortDir}
+                  onChange={(e) => setSearchParams(prev => ({ ...prev, sortDir: e.target.value }))}
+                  className="h-10 px-3 border border-slate-300 rounded-lg text-sm bg-white cursor-pointer focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
+                >
+                   <option value="desc">Desc</option>
+                   <option value="asc">Asc</option>
+                </select>
+             </div>
 
-            {/* View Toggle */}
-            <div className="flex bg-slate-100 p-1 rounded-md border border-slate-200">
-              <button
-                onClick={() => setViewMode("grid")}
-                className={`p-1.5 rounded-sm transition-all ${viewMode === 'grid' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
-              >
-                <Grid className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => setViewMode("list")}
-                className={`p-1.5 rounded-sm transition-all ${viewMode === 'list' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
-              >
-                <ListIcon className="w-4 h-4" />
-              </button>
-            </div>
+             <div className="flex bg-slate-100 p-1 rounded-lg border border-slate-200">
+                <button onClick={() => setViewMode("grid")} className={`p-1.5 rounded-md transition-all ${viewMode === "grid" ? "bg-white shadow-sm text-blue-600" : "text-slate-500 hover:text-slate-700"}`}><Grid className="w-4 h-4" /></button>
+                <button onClick={() => setViewMode("list")} className={`p-1.5 rounded-md transition-all ${viewMode === "list" ? "bg-white shadow-sm text-blue-600" : "text-slate-500 hover:text-slate-700"}`}><ListIcon className="w-4 h-4" /></button>
+             </div>
           </div>
         </div>
 
         {/* CONTENT */}
-        {filteredList.length === 0 ? (
+        {loading ? (
+            <div className="flex justify-center py-20"><Loader2 className="w-10 h-10 text-blue-600 animate-spin" /></div>
+        ) : projects.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 border-2 border-dashed border-slate-200 rounded-xl bg-white">
-            <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4 border border-slate-100">
-              {activeTab === 'trash' ? <Trash2 className="w-8 h-8 text-slate-300" /> : <FolderKanban className="w-8 h-8 text-slate-300" />}
+            <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
+                <Briefcase className="w-8 h-8 text-slate-300" />
             </div>
-            <h3 className="text-lg font-bold text-slate-900 mb-1">
-              {searchQuery || filterPriority !== "all" ? "No projects found" : activeTab === 'trash' ? "Trash is empty" : "No projects yet"}
-            </h3>
-            <p className="text-sm text-slate-500 mb-6 max-w-xs text-center">
-              {searchQuery || filterPriority !== "all"
-                ? "Try adjusting your filters."
-                : activeTab === 'active' ? "Create your first project to get started." : "Deleted projects will appear here."}
-            </p>
-            {activeTab === "active" && !searchQuery && filterPriority === "all" && (
-              <Button
-                onClick={() => setShowModal(true)}
-                variant="outline"
-                className="border-slate-300 text-slate-700"
-              >
-                <Plus className="w-4 h-4 mr-2" /> Create Project
-              </Button>
-            )}
+            <h3 className="text-lg font-bold text-slate-900">No projects found</h3>
+            <p className="text-sm text-slate-500 mt-1">Try adjusting your search or filters.</p>
           </div>
         ) : (
-          <div className={`animate-in fade-in duration-500 ${viewMode === "grid"
-              ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
-              : "flex flex-col space-y-3"
-            }`}>
-            {filteredList.map((p, idx) => (
-              <div key={p.id}>
-                <ProjectCard
-                  p={p}
-                  onDelete={handleDelete}
-                  isTrash={activeTab === "trash"}
-                  workspaceId={workspaceId}
-                  viewMode={viewMode}
-                />
-              </div>
+          <div className={viewMode === "grid" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6" : "flex flex-col gap-3"}>
+            {projects.map((p) => (
+              <ProjectCard
+                key={p.id}
+                p={p}
+                viewMode={viewMode}
+                isTrash={p.status === "DELETED"}
+                onDelete={handleDeleteClick}
+                onRestore={handleRestore}
+                onNavigate={() => goToProjectBoard(p.id)}
+              />
             ))}
           </div>
         )}
 
+        {/* PAGINATION */}
+        {projects.length > 0 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between pt-4 gap-4">
+                <p className="text-sm text-slate-600">
+                    Showing <span className="font-semibold text-slate-900">{(pagination.pageNumber * pagination.pageSize) + 1}</span> to <span className="font-semibold text-slate-900">{Math.min((pagination.pageNumber + 1) * pagination.pageSize, pagination.totalElements)}</span> of <span className="font-semibold text-slate-900">{pagination.totalElements}</span> results
+                </p>
+                <div className="flex items-center gap-1">
+                    <Button onClick={() => handlePageChange(0)} disabled={pagination.first} variant="outline" size="icon" className="h-9 w-9"><ChevronsLeft className="w-4 h-4" /></Button>
+                    <Button onClick={() => handlePageChange(pagination.pageNumber - 1)} disabled={pagination.first} variant="outline" size="icon" className="h-9 w-9"><ChevronLeft className="w-4 h-4" /></Button>
+                    <span className="text-sm font-medium px-2">Page {pagination.pageNumber + 1} / {pagination.totalPages || 1}</span>
+                    <Button onClick={() => handlePageChange(pagination.pageNumber + 1)} disabled={pagination.last} variant="outline" size="icon" className="h-9 w-9"><ChevronRight className="w-4 h-4" /></Button>
+                    <Button onClick={() => handlePageChange(pagination.totalPages - 1)} disabled={pagination.last} variant="outline" size="icon" className="h-9 w-9"><ChevronsRight className="w-4 h-4" /></Button>
+                </div>
+            </div>
+        )}
+
+        {/* MODALS */}
+        {workspaceId && companyId && (
+            <CreateProjectModal isOpen={showCreateModal} onClose={() => setShowCreateModal(false)} workspaceId={workspaceId} companyId={companyId} onSuccess={handleCreateSuccess} />
+        )}
+
         <ConfirmationModal
           isOpen={isDeleteModalOpen}
-          onClose={() => {
-            if (!deleteLoading) setIsDeleteModalOpen(false);
-          }}
-          onConfirm={confirmDelete}
-          isLoading={deleteLoading}
+          onClose={() => setIsDeleteModalOpen(false)}
+          onConfirm={handleConfirmDelete}
+          isLoading={isDeleting}
           title="Delete Project?"
           description="This project will be moved to trash. You can restore it later."
-          confirmText="Move to Trash"
+          confirmText="Delete"
           cancelText="Cancel"
+          modalVariant="danger"
         />
 
-        <CreateProjectModal
-          isOpen={showModal}
-          onClose={() => setShowModal(false)}
-          workspaceId={workspaceId}
-          onSuccess={handleCreateSuccess}
-        />
       </div>
     </div>
   );

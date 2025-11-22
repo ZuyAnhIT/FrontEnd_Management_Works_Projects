@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Mail } from "lucide-react";
+import { Mail, Lock } from "lucide-react"; // Import thêm icon Lock
 import InputField from "./InputField";
 import PasswordField from "./PasswordField";
 import LoadingButton from "@/components/ui/LoadingButton";
@@ -27,19 +27,19 @@ export default function AuthFormLogin({
   const [showPassword, setShowPassword] = useState(false);
 
   return (
-    <>
-      {/* 📨 Email */}
+    <div className="space-y-4">
+      {/* 📨 Email Field */}
       <InputField
-        label="Email"
+        label="Email Address"
         icon={<Mail className="w-4 h-4 text-gray-400" />}
         type="email"
         value={form.email}
         onChange={handleChange("email")}
-        placeholder="user@gmail.com"
+        placeholder="name@company.com"
         required
       />
 
-      {/* 🔒 Password */}
+      {/* 🔒 Password Field */}
       <PasswordField
         label="Password"
         value={form.password}
@@ -48,33 +48,31 @@ export default function AuthFormLogin({
         onChange={handleChange("password")}
       />
 
-      {/* ⚙️ Tùy chọn */}
-      <div className="flex justify-between items-center text-xs text-gray-500 mb-1">
-        <label className="flex items-center gap-1 cursor-pointer select-none">
+      {/* ⚙️ Options: Remember & Forgot Password */}
+      <div className="flex justify-between items-center text-sm">
+        <label className="flex items-center gap-2 cursor-pointer text-gray-600 hover:text-gray-900">
           <input
             type="checkbox"
-            className="rounded border-gray-300 text-blue-500 focus:ring-blue-400"
+            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
           />
-          Remember me
+          <span className="text-xs sm:text-sm">Remember me</span>
         </label>
 
         <button
           type="button"
           onClick={() => setTab("forgot")}
-          className="text-blue-600 hover:text-blue-700 font-medium hover:underline transition"
+          className="text-xs sm:text-sm font-medium text-blue-600 hover:text-blue-500 hover:underline"
         >
           Forgot password?
         </button>
       </div>
 
-      {/* ✅ Nút đăng nhập (Căn giữa) */}
-      <div className="flex justify-center mt-3">
-        <LoadingButton
-          text="Log in"
-          isLoading={isLoading}
-          className="w-full" 
-        />
-      </div>
-    </>
+      {/* ✅ Submit Button */}
+      <LoadingButton
+        text="Sign in to your account"
+        isLoading={isLoading}
+        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-lg transition-all shadow-sm hover:shadow"
+      />
+    </div>
   );
 }
