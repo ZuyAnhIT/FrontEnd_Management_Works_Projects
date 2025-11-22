@@ -1,8 +1,7 @@
-"use client";
 import apiClient from "@/lib/apiClient";
 
 // ===================================================
-// 🧩 Interfaces — Match Backend Exactly
+// 🧩 Interfaces & Types
 // ===================================================
 
 export interface Company {
@@ -40,12 +39,21 @@ export interface PageResponse<T> {
   last: boolean;
 }
 
+// Interface Payload cho Update Company (Hỗ trợ File)
+export interface UpdateCompanyPayload {
+  companyName?: string;
+  description?: string;
+  address?: string;
+  phoneNumber?: string;
+  email?: string;
+  website?: string;
+  logoFile?: File | null; // ✨ File ảnh thực tế từ máy
+}
+
 // ===================================================
 // 1️⃣ Get Company by ID
 // ===================================================
-export const getCompanyById = async (
-  companyId: number
-): Promise<Company> => {
+export const getCompanyById = async (companyId: number): Promise<Company> => {
   try {
     const res = await apiClient.get(`/companies/${companyId}`);
     if (!res.data.success) {
@@ -61,20 +69,56 @@ export const getCompanyById = async (
 };
 
 // ===================================================
-// 2️⃣ Update Company
+// 2️⃣ Update Company (Multipart/Form-data) - FIX LỖI
 // ===================================================
 export const updateCompany = async (
   companyId: number,
-  payload: Partial<Company>
+  payload: UpdateCompanyPayload
 ): Promise<Company> => {
   try {
-    const res = await apiClient.put(`/companies/${companyId}`, payload);
+    const formData = new FormData();
+
+    // --- BƯỚC 1: Đóng gói dữ liệu JSON (Key: "data") ---
+    // Gom tất cả các trường text vào một object
+    const jsonPart = {
+      companyName: payload.companyName,
+      description: payload.description,
+      address: payload.address,
+      phoneNumber: payload.phoneNumber,
+      email: payload.email,
+      website: payload.website,
+      // Lưu ý: Không gửi logo dạng string ở đây nếu backend tự xử lý khi có file
+    };
+
+    // Ép kiểu JSON thành Blob với content-type application/json
+    // Đây là mấu chốt để Backend Spring Boot hiểu được @RequestPart("data")
+    const jsonBlob = new Blob([JSON.stringify(jsonPart)], {
+      type: "application/json",
+    });
+    formData.append("data", jsonBlob);
+
+    // --- BƯỚC 2: Đóng gói File Ảnh (Key: "file") ---
+    if (payload.logoFile) {
+      formData.append("file", payload.logoFile);
+    }
+
+    // --- BƯỚC 3: Gửi Request ---
+    // Axios sẽ tự động thêm boundary vào Content-Type multipart/form-data
+    const res = await apiClient.put(`/companies/${companyId}`, formData, {
+      headers: {
+        // Đè header để đảm bảo không bị nhận nhầm là application/json thường
+        "Content-Type": "multipart/form-data", 
+      },
+    });
+
     if (!res.data.success) {
       throw new Error(res.data.message || "Failed to update company.");
     }
     return res.data.data;
   } catch (err: any) {
-    console.error("Error updating company:", err);
+    // Log lỗi chi tiết ra console để debug (F12)
+    console.error("Error updating company:", err.response?.data || err);
+    
     throw new Error(
       err.response?.data?.message || "Unable to update company."
     );

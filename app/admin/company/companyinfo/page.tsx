@@ -1,47 +1,78 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   Building2,
   MapPin,
   Phone,
   Mail,
   Globe,
-  Save,
-  FileText,
-  Image as ImageIcon,
-  Loader2,
+  Check,
   Layout,
-  Check
+  Loader2,
+  Image as ImageIcon,
+  Camera,
+  UploadCloud
 } from "lucide-react";
 
 import { getCompanyById, updateCompany } from "@/services/apiCompany";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/components/ui/ToastProvider";
-import { Button } from "@/components/ui/button"; // Giả sử có Button component
-import { Input } from "@/components/ui/input";   // Giả sử có Input component
-import { Textarea } from "@/components/ui/textarea"; // Giả sử có Textarea component
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"; // Giả sử có Card components
+import { Button } from "@/components/ui/button"; 
+import { Input } from "@/components/ui/input";   
+import { Textarea } from "@/components/ui/textarea"; 
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"; 
+
+// --- HÀM TIỆN ÍCH: XỬ LÝ URL ẢNH ---
+// Giúp hiển thị ảnh đúng dù backend trả về đường dẫn tương đối hoặc tuyệt đối
+const getFullImageUrl = (path: string | null | undefined) => {
+  if (!path) return null;
+  // 1. Nếu là ảnh preview từ máy (blob:) hoặc ảnh online (http) thì giữ nguyên
+  if (path.startsWith("blob:") || path.startsWith("http")) return path;
+  
+  // 2. Lấy domain backend
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8082";
+  
+  // 3. Chuẩn hóa đường dẫn (thêm uploads/ nếu thiếu)
+  let cleanPath = path.startsWith("/") ? path.slice(1) : path;
+  if (!cleanPath.startsWith("uploads/")) cleanPath = `uploads/${cleanPath}`;
+  
+  return `${API_URL}/${cleanPath}`;
+};
 
 export default function CompanyInfoPage() {
   const { showToast } = useToast();
-  const { user, isLoading: isAuthLoading } = useAuth();
+  
+  // 1. Lấy activeCompany từ Context (Công ty đang được chọn để quản lý)
+  const { activeCompany, refreshUser, isLoading: isAuthLoading } = useAuth();
 
+  // State quản lý loading
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  const companyId = user?.company?.companyId || null;
+  // Ref cho input file ẩn
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Lấy ID công ty hiện tại
+  const companyId = activeCompany?.companyId || null;
+
+  // State Form dữ liệu text
   const [form, setForm] = useState({
     companyName: "",
     description: "",
-    logo: "",
     address: "",
     phoneNumber: "",
     email: "",
     website: "",
   });
 
+  // State xử lý File Logo (Upload & Preview)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+
+  // =================================================================
+  // 2️⃣ USE EFFECT: TẢI DỮ LIỆU CÔNG TY
+  // =================================================================
   useEffect(() => {
     if (isAuthLoading) return;
 
@@ -53,16 +84,22 @@ export default function CompanyInfoPage() {
     const fetchCompany = async () => {
       try {
         setLoading(true);
+        // Gọi API lấy chi tiết
         const data = await getCompanyById(companyId);
+        
+        // Đổ dữ liệu vào Form
         setForm({
           companyName: data.companyName || "",
           description: data.description || "",
-          logo: data.logo || "",
           address: data.address || "",
           phoneNumber: data.phoneNumber || "",
           email: data.email || "",
           website: data.website || "",
         });
+
+        // Tạo link preview chuẩn từ dữ liệu server
+        setLogoPreview(getFullImageUrl(data.logo));
+
       } catch (err: any) {
         showToast(err.message || "Failed to load company info", "error");
       } finally {
@@ -73,10 +110,47 @@ export default function CompanyInfoPage() {
     fetchCompany();
   }, [companyId, isAuthLoading, showToast]);
 
+  // Cleanup URL preview để tránh memory leak khi component unmount
+  useEffect(() => {
+    return () => {
+      if (logoPreview && logoPreview.startsWith("blob:")) {
+        URL.revokeObjectURL(logoPreview);
+      }
+    };
+  }, [logoPreview]);
+
+  // =================================================================
+  // 3️⃣ HANDLERS: XỬ LÝ SỰ KIỆN (CHANGE, UPLOAD, SUBMIT)
+  // =================================================================
+  
+  // Xử lý thay đổi input text
   const handleChange = (field: string, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
 
+  // Xử lý chọn file ảnh từ máy
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate kích thước (5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      showToast("File size must be less than 5MB", "error");
+      return;
+    }
+    // Validate định dạng ảnh
+    if (!file.type.startsWith("image/")) {
+      showToast("Please select a valid image file", "error");
+      return;
+    }
+
+    // Tạo Preview ngay lập tức (UX Instant Feedback)
+    const objectUrl = URL.createObjectURL(file);
+    setLogoPreview(objectUrl);
+    setSelectedFile(file);
+  };
+
+  // Xử lý Submit Form
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -89,19 +163,22 @@ export default function CompanyInfoPage() {
 
     try {
       setSaving(true);
-      await updateCompany(companyId, form);
+      
+      // Gọi API updateCompany (đã hỗ trợ Multipart/Form-data)
+      await updateCompany(companyId, {
+        ...form,
+        logoFile: selectedFile, // Truyền file thực tế vào
+      });
+      
       showToast("Company information updated successfully!", "success");
 
-      const updated = await getCompanyById(companyId);
-      setForm({
-        companyName: updated.companyName || "",
-        description: updated.description || "",
-        logo: updated.logo || "",
-        address: updated.address || "",
-        phoneNumber: updated.phoneNumber || "",
-        email: updated.email || "",
-        website: updated.website || "",
-      });
+      // 🔄 Quan trọng: Refresh User để cập nhật lại Logo trên Sidebar/Header nếu cần
+      await refreshUser();
+      
+      // Reset file đã chọn (để input file rỗng)
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      setSelectedFile(null);
+
     } catch (err: any) {
       showToast(err.message || "Update failed.", "error");
     } finally {
@@ -109,6 +186,11 @@ export default function CompanyInfoPage() {
     }
   };
 
+  // =================================================================
+  // 4️⃣ RENDER UI
+  // =================================================================
+
+  // Màn hình Loading
   if (isAuthLoading || loading)
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
@@ -119,43 +201,46 @@ export default function CompanyInfoPage() {
       </div>
     );
 
-  if (!companyId && !isAuthLoading)
+  // Màn hình Lỗi (Không có Active Company)
+  if (!companyId)
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="text-center border-2 border-dashed border-slate-200 p-12 rounded-xl bg-white">
           <div className="w-16 h-16 mx-auto mb-4 bg-slate-50 rounded-full flex items-center justify-center border border-slate-100">
             <Building2 className="w-8 h-8 text-slate-400" />
           </div>
-          <h3 className="text-lg font-bold text-slate-900">No Company Found</h3>
+          <h3 className="text-lg font-bold text-slate-900">No Active Workspace</h3>
           <p className="text-slate-500 text-sm mt-1">
-            You are not associated with any company yet.
+            Please select a company from the dashboard to manage.
           </p>
         </div>
       </div>
     );
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
+    <div className="min-h-screen bg-slate-50/50 font-sans text-slate-900">
       <div className="max-w-4xl mx-auto px-6 py-8 space-y-6">
         
-        {/* HEADER SECTION */}
+        {/* --- HEADER SECTION --- */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
            <div className="flex items-center gap-4">
-              {/* Logo Preview on Header */}
-              <div className="w-14 h-14 bg-white border border-slate-200 rounded-lg flex items-center justify-center shadow-sm overflow-hidden">
-                 {form.logo ? (
-                    <img src={form.logo} alt="Logo" className="w-full h-full object-contain" />
+              {/* Logo Preview nhỏ trên Header */}
+              <div className="w-16 h-16 bg-white border border-slate-200 rounded-xl flex items-center justify-center shadow-sm overflow-hidden">
+                 {logoPreview ? (
+                    <img src={logoPreview} alt="Logo" className="w-full h-full object-contain p-1" />
                  ) : (
-                    <Building2 className="w-6 h-6 text-slate-300" />
+                    <Building2 className="w-8 h-8 text-slate-300" />
                  )}
               </div>
               <div>
                  <h1 className="text-2xl font-bold text-slate-900">Company Profile</h1>
-                 <p className="text-sm text-slate-500">Manage your organization details and branding</p>
+                 <p className="text-sm text-slate-500">
+                    Manage details for <span className="font-semibold text-blue-600">{activeCompany?.companyName}</span>
+                 </p>
               </div>
            </div>
 
-           {/* Save Button (Header Action) */}
+           {/* Nút Save Changes */}
            <Button 
               onClick={handleSubmit} 
               disabled={saving}
@@ -166,18 +251,59 @@ export default function CompanyInfoPage() {
            </Button>
         </div>
 
-        {/* FORM CONTENT */}
+        {/* --- FORM CONTENT --- */}
         <form onSubmit={handleSubmit} className="space-y-6">
           
-          {/* General Info Card */}
+          {/* CARD 1: THÔNG TIN CHUNG & LOGO */}
           <Card className="border border-slate-200 shadow-sm bg-white">
              <CardHeader className="border-b border-slate-100 pb-4">
                 <CardTitle className="text-base font-bold text-slate-800 flex items-center gap-2">
                    <Layout className="w-4 h-4 text-slate-500" /> General Information
                 </CardTitle>
              </CardHeader>
-             <CardContent className="p-6 space-y-5">
-                {/* Company Name */}
+             <CardContent className="p-6 space-y-6">
+                
+                {/* Khu vực Upload Logo */}
+                <div className="flex flex-col sm:flex-row gap-6 items-start sm:items-center p-4 bg-slate-50 rounded-lg border border-dashed border-slate-200">
+                    <div 
+                        className="relative group cursor-pointer shrink-0"
+                        onClick={() => fileInputRef.current?.click()}
+                    >
+                        <div className="w-24 h-24 bg-white border-2 border-white shadow-sm rounded-lg flex items-center justify-center overflow-hidden">
+                            {logoPreview ? (
+                                <img src={logoPreview} alt="Logo Preview" className="w-full h-full object-contain p-1" />
+                            ) : (
+                                <ImageIcon className="w-8 h-8 text-slate-300" />
+                            )}
+                            
+                            {/* Overlay khi hover */}
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all duration-200 flex items-center justify-center rounded-lg">
+                                <Camera className="w-6 h-6 text-white" />
+                            </div>
+                        </div>
+                        
+                        {/* Icon badge upload */}
+                        <div className="absolute -bottom-2 -right-2 bg-blue-600 text-white p-1.5 rounded-full shadow-md border-2 border-white">
+                            <UploadCloud className="w-3.5 h-3.5" />
+                        </div>
+                    </div>
+
+                    <div className="space-y-1">
+                        <h3 className="font-semibold text-slate-900">Company Logo</h3>
+                        <p className="text-xs text-slate-500 max-w-xs">
+                            Click the image to upload. Supports JPG, PNG. <br/> Max size 5MB. Recommended size: 512x512px.
+                        </p>
+                        <input 
+                            type="file" 
+                            ref={fileInputRef} 
+                            className="hidden" 
+                            accept="image/png, image/jpeg, image/jpg"
+                            onChange={handleFileChange}
+                        />
+                    </div>
+                </div>
+
+                {/* Tên công ty */}
                 <div className="space-y-1.5">
                    <label className="text-sm font-semibold text-slate-900 flex items-center gap-2">
                       Company Name <span className="text-red-500">*</span>
@@ -186,27 +312,25 @@ export default function CompanyInfoPage() {
                       value={form.companyName}
                       onChange={(e) => handleChange("companyName", e.target.value)}
                       placeholder="e.g. Acme Corp"
-                      className="h-10 border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-600 transition-all shadow-sm"
+                      className="h-10 border-slate-300"
                    />
                 </div>
 
-                {/* Description */}
+                {/* Mô tả */}
                 <div className="space-y-1.5">
-                   <label className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-                      Description
-                   </label>
+                   <label className="text-sm font-semibold text-slate-900">Description</label>
                    <Textarea
                       value={form.description}
                       onChange={(e) => handleChange("description", e.target.value)}
                       placeholder="Brief description of your company..."
-                      rows={4}
-                      className="resize-none border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-600 transition-all shadow-sm"
+                      rows={3}
+                      className="resize-none border-slate-300"
                    />
                 </div>
              </CardContent>
           </Card>
 
-          {/* Contact Info Card */}
+          {/* CARD 2: THÔNG TIN LIÊN HỆ */}
           <Card className="border border-slate-200 shadow-sm bg-white">
              <CardHeader className="border-b border-slate-100 pb-4">
                 <CardTitle className="text-base font-bold text-slate-800 flex items-center gap-2">
@@ -214,7 +338,8 @@ export default function CompanyInfoPage() {
                 </CardTitle>
              </CardHeader>
              <CardContent className="p-6 grid md:grid-cols-2 gap-6">
-                {/* Address */}
+                
+                {/* Địa chỉ */}
                 <div className="space-y-1.5 md:col-span-2">
                    <label className="text-sm font-semibold text-slate-900">Address</label>
                    <div className="relative">
@@ -222,13 +347,13 @@ export default function CompanyInfoPage() {
                       <Input
                          value={form.address}
                          onChange={(e) => handleChange("address", e.target.value)}
+                         className="pl-9 h-10 border-slate-300"
                          placeholder="123 Business Rd, Tech City"
-                         className="pl-9 h-10 border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-600 transition-all shadow-sm"
                       />
                    </div>
                 </div>
 
-                {/* Phone */}
+                {/* Số điện thoại */}
                 <div className="space-y-1.5">
                    <label className="text-sm font-semibold text-slate-900">Phone Number</label>
                    <div className="relative">
@@ -236,23 +361,22 @@ export default function CompanyInfoPage() {
                       <Input
                          value={form.phoneNumber}
                          onChange={(e) => handleChange("phoneNumber", e.target.value)}
+                         className="pl-9 h-10 border-slate-300"
                          placeholder="+1 (555) 000-0000"
-                         className="pl-9 h-10 border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-600 transition-all shadow-sm"
                       />
                    </div>
                 </div>
 
-                {/* Email */}
+                {/* Email Liên hệ */}
                 <div className="space-y-1.5">
                    <label className="text-sm font-semibold text-slate-900">Email Address</label>
                    <div className="relative">
                       <Mail className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
                       <Input
-                         type="email"
                          value={form.email}
                          onChange={(e) => handleChange("email", e.target.value)}
+                         className="pl-9 h-10 border-slate-300"
                          placeholder="contact@acme.com"
-                         className="pl-9 h-10 border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-600 transition-all shadow-sm"
                       />
                    </div>
                 </div>
@@ -265,60 +389,13 @@ export default function CompanyInfoPage() {
                       <Input
                          value={form.website}
                          onChange={(e) => handleChange("website", e.target.value)}
+                         className="pl-9 h-10 border-slate-300"
                          placeholder="https://acme.com"
-                         className="pl-9 h-10 border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-600 transition-all shadow-sm"
                       />
                    </div>
                 </div>
              </CardContent>
           </Card>
-
-          {/* Branding Card */}
-          <Card className="border border-slate-200 shadow-sm bg-white">
-             <CardHeader className="border-b border-slate-100 pb-4">
-                <CardTitle className="text-base font-bold text-slate-800 flex items-center gap-2">
-                   <ImageIcon className="w-4 h-4 text-slate-500" /> Branding
-                </CardTitle>
-             </CardHeader>
-             <CardContent className="p-6 space-y-4">
-                <div className="space-y-1.5">
-                   <label className="text-sm font-semibold text-slate-900">Logo URL</label>
-                   <Input
-                      value={form.logo}
-                      onChange={(e) => handleChange("logo", e.target.value)}
-                      placeholder="https://example.com/logo.png"
-                      className="h-10 border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-600 transition-all shadow-sm"
-                   />
-                </div>
-                
-                {/* Logo Preview Area */}
-                <div className="p-6 bg-slate-50 border border-dashed border-slate-200 rounded-lg flex flex-col items-center justify-center gap-3">
-                    {form.logo ? (
-                       <img 
-                          src={form.logo} 
-                          alt="Company Logo Preview" 
-                          className="h-24 w-auto object-contain p-2 bg-white border border-slate-100 rounded-md shadow-sm"
-                       />
-                    ) : (
-                       <div className="h-24 w-24 bg-white border border-slate-100 rounded-md flex items-center justify-center">
-                          <ImageIcon className="w-8 h-8 text-slate-300" />
-                       </div>
-                    )}
-                    <p className="text-xs text-slate-400 font-medium">Logo Preview</p>
-                </div>
-             </CardContent>
-          </Card>
-
-          {/* Bottom Submit Button (Mobile only) */}
-          <div className="md:hidden pt-4">
-             <Button 
-                type="submit" 
-                disabled={saving}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white h-11 font-bold shadow-lg"
-             >
-                {saving ? "Saving Changes..." : "Save Changes"}
-             </Button>
-          </div>
 
         </form>
       </div>

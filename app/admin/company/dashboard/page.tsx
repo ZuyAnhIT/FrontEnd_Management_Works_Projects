@@ -6,14 +6,13 @@ import {
   CreditCard,
   Building2,
   UserPlus,
-  ArrowRight,
   ChevronRight
 } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
-import { Button } from "@/components/ui/button"; // Giả sử có component Button chuẩn
+import { Button } from "@/components/ui/button";
 
-// 1. Định nghĩa lại action links với variant màu mới
+// 1. Định nghĩa các liên kết hành động (Action Links)
 const actionLinks = [
   {
     icon: Building2,
@@ -45,7 +44,7 @@ const actionLinks = [
   },
 ];
 
-// 2. Style Map Minimalist (Pastel Background + Text Color)
+// 2. Style Map cho các icon (Màu nền & Màu chữ)
 const variantStyles: Record<string, string> = {
   blue: "bg-blue-50 text-blue-600 group-hover:bg-blue-100",
   green: "bg-green-50 text-green-600 group-hover:bg-green-100",
@@ -54,24 +53,26 @@ const variantStyles: Record<string, string> = {
 };
 
 export default function CompanyDashboardPage() {
-  const { user } = useAuth();
+  // 3. Lấy user và activeCompany từ AuthContext
+  // activeCompany chính là công ty mà user đã click chọn ở trang Admin Hub
+  const { user, activeCompany } = useAuth();
 
   return (
     <div className="min-h-screen bg-slate-50/50 p-8 font-sans text-slate-900">
       
-      {/* 3. Header Section */}
+      {/* --- HEADER SECTION --- */}
       <div className="max-w-5xl mx-auto mb-8">
         <h1 className="text-2xl font-bold text-slate-900">
-          Welcome back, {user?.fullName || "Admin"}!
+           Dashboard: <span className="text-blue-600">{activeCompany?.companyName || "My Company"}</span>
         </h1>
         <p className="text-slate-500 text-sm mt-1">
-          Manage your company settings and team members from one place.
+          Welcome back, {user?.fullName}. Manage your organization from here.
         </p>
       </div>
 
       <div className="max-w-5xl mx-auto space-y-8">
         
-        {/* 4. CTA Banner (Minimalist Style) */}
+        {/* --- CTA BANNER (Mời thành viên nhanh) --- */}
         <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
            <div className="flex items-center gap-4">
               <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center shadow-sm shrink-0">
@@ -90,11 +91,12 @@ export default function CompanyDashboardPage() {
            </Link>
         </div>
 
-        {/* 5. Quick Actions Grid */}
+        {/* --- QUICK ACTIONS GRID (Các nút điều hướng) --- */}
         <div>
            <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-4">Quick Actions</h3>
            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {actionLinks.map((item) => {
+                // Lấy style class dựa trên variant
                 const styleClass = variantStyles[item.variant] || variantStyles.blue;
 
                 return (
@@ -103,19 +105,21 @@ export default function CompanyDashboardPage() {
                     href={item.href}
                     className="group flex items-start gap-4 p-5 bg-white rounded-xl border border-slate-200 hover:border-blue-300 hover:shadow-md transition-all duration-200"
                   >
+                    {/* Icon Box */}
                     <div className={`w-12 h-12 rounded-lg flex items-center justify-center shrink-0 transition-colors ${styleClass}`}>
                       <item.icon className="w-6 h-6" />
                     </div>
                     
+                    {/* Text Content */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
-                         <h3 className="text-base font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
-                            {item.title}
-                         </h3>
-                         <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-blue-500 group-hover:translate-x-1 transition-all" />
+                          <h3 className="text-base font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
+                             {item.title}
+                          </h3>
+                          <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-blue-500 group-hover:translate-x-1 transition-all" />
                       </div>
                       <p className="text-sm text-slate-500 mt-1 line-clamp-2">
-                         {item.desc}
+                          {item.desc}
                       </p>
                     </div>
                   </Link>

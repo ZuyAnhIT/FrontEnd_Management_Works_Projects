@@ -7,47 +7,16 @@ import {
   ReactNode,
   useCallback,
 } from "react";
-import { getCurrentUser } from "@/services/apiUser";
+import { getCurrentUser, UserProfile, CompanyMembership } from "@/services/apiUser";
 import { loginUser, logoutUser } from "@/services/apiAuth";
 import { useRouter, usePathname } from "next/navigation";
 import { useToast } from "@/components/ui/ToastProvider";
 
-// Define detailed User type
-interface User {
-  id: number;
-  fullName: string;
-  email: string;
+// ============================================================
+// 1️⃣ ĐỊNH NGHĨA TYPE & INTERFACE
+// ============================================================
 
-  avatarUrl: string | null;
-  gender: "MALE" | "FEMALE" | "OTHER" | null;
-  dateOfBirth: string | null;
-  phoneNumber: string | null;
-  status: string | null;
-
-  systemRoles: string[];
-
-  company: {
-    companyId: number | null;
-    companyName: string | null;
-    roleCode: string | null;
-  } | null;
-
-  workspaces: {
-    workspaceId: number;
-    workspaceName: string;
-    companyId: number;
-    roleCode: string;
-  }[];
-
-  projects: {
-    projectId: number;
-    projectName: string;
-    workspaceId: number;
-    roleCode: string;
-  }[];
-}
-
-// Role definition
+// Các vai trò trong hệ thống Frontend
 type AppRole =
   | "SYSTEM_ADMIN"
   | "COMPANY_ADMIN"
@@ -56,392 +25,297 @@ type AppRole =
   | "WORKSPACE_MEMBER"
   | "PROJECT_ADMIN"
   | "PROJECT_MEMBER"
-  | "USER"
-  | "GUEST_PROJECT"
+  | "USER" // User mới, chưa thuộc công ty nào
   | null;
 
 interface AuthContextType {
-  user: User | null;
-  role: AppRole;
+  user: UserProfile | null;
+  activeCompany: CompanyMembership | null; // Công ty đang được chọn
+  role: AppRole;                           // Vai trò trong công ty đang chọn
   isLoading: boolean;
   isAuthenticated: boolean;
+
+  // Actions
   login: (email: string, password: string) => Promise<void>;
   loginWithTokens: (accessToken: string, refreshToken: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
+  selectCompany: (companyId: number) => void; // Hàm chuyển đổi công ty
   hasPermission: (permission: string) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Danh sách các trang Public (Không cần Login)
 const PUBLIC_PAGES = [
   "/",
   "/accept-invitation",
   "/register-from-invite",
   "/reset-password",
-  "/create-company",
 ];
 
-const ROLE_DASHBOARDS: Record<string, string> = {
-  SYSTEM_ADMIN: "/adminss/dashboard",
-  COMPANY_ADMIN: "/admin",
-  COMPANY_MEMBER: "/admin",
-  WORKSPACE_ADMIN: "/core",
-  WORKSPACE_MEMBER: "/core",
-  PROJECT_ADMIN: "/core/workspace/${workspaceId}/project/${projectId}",
-  PROJECT_MEMBER: "/core/workspace/${workspaceId}/project/${projectId}",
-  USER: "/create-company",
-  GUEST_PROJECT: "/projects",
-};
-
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  // ============================================================
+  // 2️⃣ STATE MANAGEMENT
+  // ============================================================
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [activeCompany, setActiveCompany] = useState<CompanyMembership | null>(null);
   const [role, setRole] = useState<AppRole>(null);
   const [isLoading, setIsLoading] = useState(true);
+
   const router = useRouter();
   const pathname = usePathname();
   const { showToast } = useToast();
 
-  // ----------------------------------------------------------------
-  // HELPER 1: DETERMINE ROLE
-  // ----------------------------------------------------------------
-  const determineRole = useCallback((user: User): AppRole => {
-    let mainRole: AppRole = "USER";
+  // ============================================================
+  // 3️⃣ LOGIC: CHỌN CÔNG TY (SWITCH CONTEXT)
+  // ============================================================
+  const handleSelectCompany = useCallback((companyId: number, userData: UserProfile) => {
+    // Tìm xem user có thuộc công ty này không
+    const selected = userData.companyMemberships?.find(c => c.companyId === companyId);
+    
+    if (selected) {
+      console.log(`🏢 [AuthContext] Switched context to: ${selected.companyName}`);
+      
+      // Cập nhật State Active
+      setActiveCompany(selected);
+      setRole(selected.roleCode as AppRole);
+      
+      // Lưu ID công ty vào LocalStorage (để F5 không bị mất)
+      localStorage.setItem("lastActiveCompanyId", companyId.toString());
 
-    if (user.systemRoles?.includes("SYSTEM_ADMIN")) {
-      mainRole = "SYSTEM_ADMIN";
-    } else if (user.company?.roleCode === "COMPANY_ADMIN") {
-      mainRole = "COMPANY_ADMIN";
-    } else if (user.workspaces?.some((w) => w.roleCode === "WORKSPACE_ADMIN")) {
-      mainRole = "WORKSPACE_ADMIN";
-    } else if (user.projects?.some((p) => p.roleCode === "PROJECT_ADMIN")) {
-      mainRole = "PROJECT_ADMIN";
-    } else if (user.company?.roleCode === "COMPANY_MEMBER") {
-      mainRole = "COMPANY_MEMBER";
-    } else if (user.workspaces?.some((w) => w.roleCode === "WORKSPACE_MEMBER")) {
-      mainRole = "WORKSPACE_MEMBER";
-    } else if (user.projects?.some((p) => p.roleCode === "PROJECT_MEMBER")) {
-      mainRole = "PROJECT_MEMBER";
-    }
-
-    console.log("🎯 Role determined:", mainRole);
-    return mainRole;
-  }, []);
-
-  // ----------------------------------------------------------------
-  // HELPER 2: GET TARGET DASHBOARD BY ROLE
-  // ----------------------------------------------------------------
-  const getTargetDashboard = useCallback(
-    (userRole: AppRole, userData: User): string => {
-      if (!userRole) return "/core";
-
-      // Check if user needs onboarding
-      const needsOnboarding =
-        userRole === "USER" &&
-        !userData.company &&
-        (!userData.workspaces || userData.workspaces.length === 0);
-
-      if (needsOnboarding) {
-        return "/create-company";
-      }
-
-      return ROLE_DASHBOARDS[userRole] || "/core";
-    },
-    []
-  );
-
-  // ----------------------------------------------------------------
-  // HELPER 3: FETCH AND SET USER
-  // ----------------------------------------------------------------
-  const fetchAndSetUser = useCallback(async () => {
-    console.log("🔄 Starting fetchAndSetUser...");
-    try {
-      const data = await getCurrentUser();
-      if (data) {
-        const mainRole = determineRole(data);
-
-        setUser(data);
-        setRole(mainRole);
-        localStorage.setItem("user", JSON.stringify(data));
-        localStorage.setItem("userRole", mainRole ?? "");
-
-        console.log("✅ User and role set:", {
-          user: data.email,
-          role: mainRole,
-        });
-        return { user: data, role: mainRole };
+      // Điều hướng thông minh dựa trên Role
+      if (selected.roleCode === "COMPANY_ADMIN") {
+        // Admin thì vào Dashboard quản trị
+        router.push("/admin/company/dashboard");
       } else {
-        throw new Error("Invalid user data");
+        // Member thì vào khu vực làm việc Core
+        router.push("/core/dashboard");
+      }
+    } else {
+      console.error("❌ [AuthContext] Invalid Company ID");
+      showToast("You are not a member of this company", "error");
+    }
+  }, [router, showToast]);
+
+  // ============================================================
+  // 4️⃣ LOGIC: LẤY USER & KHÔI PHỤC PHIÊN (RESTORE SESSION)
+  // ============================================================
+  const fetchAndSetUser = useCallback(async () => {
+    try {
+      const userData = await getCurrentUser();
+
+      if (userData) {
+        // 🛡️ Safety Check: Đảm bảo luôn là mảng
+        if (!Array.isArray(userData.companyMemberships)) {
+            userData.companyMemberships = [];
+        }
+
+        setUser(userData);
+
+        // 🔄 Khôi phục ngữ cảnh nếu F5
+        const lastCompanyId = localStorage.getItem("lastActiveCompanyId");
+        const memberships = userData.companyMemberships;
+
+        if (lastCompanyId && memberships.length > 0) {
+          const targetId = parseInt(lastCompanyId);
+          const targetCompany = memberships.find(c => c.companyId === targetId);
+          
+          if (targetCompany) {
+            setActiveCompany(targetCompany);
+            setRole(targetCompany.roleCode as AppRole);
+          } else {
+             // Nếu công ty cũ không còn hiệu lực -> Reset cache
+             localStorage.removeItem("lastActiveCompanyId");
+          }
+        }
+
+        return { user: userData };
       }
     } catch (e) {
-      console.error("❌ Error fetchAndSetUser:", e);
-      setUser(null);
-      setRole(null);
+      console.error("❌ [AuthContext] Fetch user failed:", e);
       localStorage.clear();
-      throw e;
+      setUser(null);
     }
-  }, [determineRole]);
+    return null;
+  }, []);
 
-  // ----------------------------------------------------------------
-  // FEATURE 1: AUTO CHECK LOGIN ON LOAD
-  // ----------------------------------------------------------------
+  // ============================================================
+  // 5️⃣ EFFECT: CHẠY KHI LOAD TRANG (CHECK TOKEN)
+  // ============================================================
   useEffect(() => {
-    const checkLogin = async () => {
-      console.log("🔍 Checking auth on page load...");
+    const initAuth = async () => {
       const token = localStorage.getItem("accessToken");
-
       if (token) {
-        try {
-          await fetchAndSetUser();
-        } catch (e) {
-          console.error("❌ Auth check failed, logging out:", e);
-          router.push("/");
-        }
-      } else {
-        console.log("⚠️ No token found, skipping auth check");
+        await fetchAndSetUser();
       }
-
-      setIsLoading(false);
-      console.log("✅ Auth check completed, isLoading = false");
+      setIsLoading(false); // Loading xong
     };
+    initAuth();
+  }, [fetchAndSetUser]);
 
-    checkLogin();
-  }, [fetchAndSetUser, router]);
+  // ============================================================
+  // 6️⃣ LOGIC: XỬ LÝ ĐIỀU HƯỚNG SAU KHI LOGIN (QUAN TRỌNG)
+  // ============================================================
+  const processLoginSuccess = async () => {
+    const result = await fetchAndSetUser();
+    
+    if (!result || !result.user) {
+        return;
+    }
 
-  // ----------------------------------------------------------------
-  // FEATURE 2: GUARD LOGIC - PROTECT ONLY, NO REDIRECT AFTER LOGIN
-  // ----------------------------------------------------------------
-  useEffect(() => {
-    console.log("🛡️ Guard effect triggered:", {
-      isLoading,
-      user: user?.email,
-      role,
-      pathname,
-    });
+    const userData = result.user;
+    const memberships = userData.companyMemberships || [];
 
-    if (isLoading) {
-      console.log("⏳ isLoading = true, skipping guard");
+    console.log(`📊 [AuthContext] Memberships found: ${memberships.length}`);
+
+    // CASE 1: Chưa có công ty nào (Newbie)
+    if (memberships.length === 0) {
+      console.log("🚀 Newbie -> Redirect to Admin Hub (/admin)");
+      setRole("USER");
+      router.push("/admin");
       return;
     }
 
-    const isPublic = PUBLIC_PAGES.some((p) => pathname.startsWith(p));
-    console.log("📍 Is current page public?", isPublic);
-
-    if (user && role) {
-      const isOnboardingPage = pathname.startsWith("/create-company");
-      const needsOnboarding =
-        role === "USER" &&
-        !user.company &&
-        (!user.workspaces || user.workspaces.length === 0);
-
-      console.log("👤 User logged in:", {
-        role,
-        needsOnboarding,
-        isOnboardingPage,
-        pathname,
-      });
-
-      // 1. FORCE ONBOARDING (ONLY IF ON ANOTHER PAGE)
-      if (
-        needsOnboarding &&
-        !isOnboardingPage &&
-        !pathname.startsWith("/(auth)")
-      ) {
-        console.log("🚀 Guard: Redirect → /create-company (onboarding)");
-        showToast("Welcome! Please create a company to get started.", "info");
-        router.push("/create-company");
-        return;
-      }
-
-      // 2. PROTECT ADMIN (BLOCK ONLY, NO REDIRECT)
-      if (
-        pathname.startsWith("/admin") &&
-        role !== "COMPANY_ADMIN" &&
-        role !== "COMPANY_MEMBER"
-      ) {
-        console.log("🚫 Guard: No access to /admin");
-        showToast("You do not have permission to access the Admin page", "error");
-        router.push("/core");
-      }
-    } else if (!isPublic) {
-      // 3. NOT LOGGED IN
-      console.log("🚀 Guard: Redirect → / (not auth)");
-      showToast("Please login to continue", "warning");
-      router.push("/");
+    // CASE 2: Có đúng 1 công ty -> Tự động chọn và vào luôn Dashboard
+    if (memberships.length === 1) {
+      console.log("🚀 Single company -> Auto select");
+      handleSelectCompany(memberships[0].companyId, userData);
+      return;
     }
-  }, [isLoading, user, role, pathname, router, showToast]);
 
-  // ----------------------------------------------------------------
-  // FEATURE 3: LOGIN FUNCTION (FOR MODAL) - ACTIVE REDIRECT
-  // ----------------------------------------------------------------
+    // CASE 3: Có nhiều công ty -> Chuyển sang Admin Hub để chọn
+    if (memberships.length > 1) {
+      console.log("🚀 Multiple companies -> Redirect to Admin Hub (/admin)");
+      router.push("/admin"); 
+      return;
+    }
+  };
+
+  // ============================================================
+  // 7️⃣ CÁC HÀM ACTIONS (LOGIN, LOGOUT...)
+  // ============================================================
+  
   const login = async (email: string, password: string) => {
-    console.log("🔑 Starting login...");
     setIsLoading(true);
-
     try {
-      const res = await loginUser({ email, password });
-
-      if (!res?.data?.accessToken) {
-        throw new Error(res.message || "Login failed!");
-      }
-
-      // Save tokens
-      localStorage.setItem("accessToken", res.data.accessToken);
-      localStorage.setItem("refreshToken", res.data.refreshToken);
-      console.log("💾 Tokens saved to localStorage");
-
-      // Fetch user info
-      const { user: userData, role: userRole } = await fetchAndSetUser();
-      console.log("✅ User and role retrieved:", {
-        user: userData.email,
-        role: userRole,
-      });
-
-      // Determine target page
-      const targetPage = getTargetDashboard(userRole, userData);
-      console.log("🎯 Target page:", targetPage);
-
+      await loginUser({ email, password });
       showToast("Login successful!", "success");
-
-      // ✅ IMPORTANT: Active Redirect here
-      console.log("🚀 Redirecting to:", targetPage);
-
-      // Use window.location.href instead of router.push to ensure redirect
-      window.location.href = targetPage;
+      await processLoginSuccess();
     } catch (error: any) {
-      console.error("❌ Login error:", error);
-      setIsLoading(false); // Only set false on error
-      showToast(
-        error.response?.data?.message || error.message || "Login failed!",
-        "error"
-      );
-      throw error;
-    }
-    // ⚠️ DO NOT set isLoading = false here because redirecting
-  };
-
-  // ----------------------------------------------------------------
-  // FEATURE 4: LOGIN WITH TOKENS (FOR GOOGLE/INVITE) - ACTIVE REDIRECT
-  // ----------------------------------------------------------------
-  const loginWithTokens = async (accessToken: string, refreshToken: string) => {
-    console.log("🔑 Starting loginWithTokens...");
-    setIsLoading(true);
-
-    try {
-      // Save tokens
-      localStorage.setItem("accessToken", accessToken);
-      localStorage.setItem("refreshToken", refreshToken);
-      console.log("💾 Tokens saved to localStorage");
-
-      // Fetch user info
-      const { user: userData, role: userRole } = await fetchAndSetUser();
-      console.log("✅ User and role retrieved:", {
-        user: userData.email,
-        role: userRole,
-      });
-
-      // Determine target page
-      const targetPage = getTargetDashboard(userRole, userData);
-      console.log("🎯 Target page:", targetPage);
-
-      showToast("Login successful!", "success");
-
-      // ✅ IMPORTANT: Active Redirect here
-      console.log("🚀 Redirecting to:", targetPage);
-
-      // Use window.location.href instead of router.push to ensure redirect
-      window.location.href = targetPage;
-    } catch (error: any) {
-      console.error("❌ Error loginWithTokens:", error);
-      setIsLoading(false); // Only set false on error
-      showToast(
-        error.response?.data?.message || error.message || "Login failed!",
-        "error"
-      );
-      throw error;
-    }
-    // ⚠️ DO NOT set isLoading = false here because redirecting
-  };
-
-  // ----------------------------------------------------------------
-  // FEATURE 5: LOGOUT
-  // ----------------------------------------------------------------
-  const logout = async () => {
-    console.log("🚪 Logging out...");
-    setIsLoading(true);
-
-    try {
-      await logoutUser();
-      setUser(null);
-      setRole(null);
-      localStorage.clear();
-      showToast("Logged out successfully!", "success");
-      router.push("/");
-    } catch (error: any) {
-      console.error("❌ Logout error:", error);
-      showToast("Error logging out!", "error");
+      showToast(error.message || "Login failed", "error");
     } finally {
+      // ✅ FIX: Luôn tắt loading dù thành công hay thất bại để tránh treo UI
       setIsLoading(false);
     }
   };
 
-  // ----------------------------------------------------------------
-  // FEATURE 6: REFRESH USER
-  // ----------------------------------------------------------------
-  const refreshUser = useCallback(async () => {
-    console.log("🔄 Refreshing user...");
+  const loginWithTokens = async (accessToken: string, refreshToken: string) => {
+    setIsLoading(true);
     try {
-      await fetchAndSetUser();
-      showToast("Information updated successfully!", "success");
-    } catch (e) {
-      console.error("❌ Error refreshing user:", e);
-      showToast("Could not update information!", "error");
+        localStorage.setItem("accessToken", accessToken);
+        localStorage.setItem("refreshToken", refreshToken);
+        showToast("Login successful!", "success");
+        await processLoginSuccess();
+    } catch (error) {
+        console.error(error);
+    } finally {
+        // ✅ FIX: Luôn tắt loading
+        setIsLoading(false);
     }
-  }, [fetchAndSetUser, showToast]);
-
-  // ----------------------------------------------------------------
-  // FEATURE 7: CHECK PERMISSION
-  // ----------------------------------------------------------------
-  const hasPermission = (permission: string): boolean => {
-    if (!user || !role) return false;
-
-    const permissions: Record<string, string[]> = {
-      SYSTEM_ADMIN: ["*"],
-      COMPANY_ADMIN: ["company.*", "workspace.*", "project.*"],
-      COMPANY_MEMBER: ["workspace.view", "project.view"],
-      WORKSPACE_ADMIN: ["workspace.*", "project.*"],
-      WORKSPACE_MEMBER: ["project.view"],
-      PROJECT_ADMIN: ["project.*"],
-      PROJECT_MEMBER: [""],
-      USER: [],
-      GUEST_PROJECT: ["project.view"],
-    };
-
-    const userPermissions = permissions[role] || [];
-
-    if (userPermissions.includes("*")) return true;
-    if (userPermissions.includes(permission)) return true;
-
-    return userPermissions.some((p) => {
-      if (p.endsWith(".*")) {
-        const prefix = p.slice(0, -2);
-        return permission.startsWith(prefix + ".");
-      }
-      return false;
-    });
   };
+
+  const logout = async () => {
+    setIsLoading(true);
+    try {
+        await logoutUser();
+    } catch(err) {
+        // Ignore logout api error
+    } finally {
+        setUser(null);
+        setActiveCompany(null);
+        setRole(null);
+        localStorage.clear();
+        showToast("Logged out", "success");
+        router.push("/");
+        setIsLoading(false);
+    }
+  };
+
+  const selectCompany = (companyId: number) => {
+    if(user) handleSelectCompany(companyId, user);
+  };
+
+  const hasPermission = (permission: string) => {
+    if (!role) return false;
+    if (role === "SYSTEM_ADMIN" || role === "COMPANY_ADMIN") return true;
+    return false;
+  };
+
+  // ============================================================
+  // 8️⃣ GUARD LOGIC (BẢO VỆ ROUTE)
+  // ============================================================
+  useEffect(() => {
+    if (isLoading) return; // Đợi loading xong mới check
+
+    const isPublicPage = PUBLIC_PAGES.some((p) => pathname.startsWith(p));
+    const isAuthPage = pathname.startsWith("/(auth)") || pathname === "/";
+    
+    // --- A. CHƯA LOGIN ---
+    if (!user) {
+      if (!isPublicPage && !isAuthPage) {
+        // Cố truy cập trang kín -> Đá về Home
+        router.push("/");
+      }
+      return;
+    }
+
+    // --- B. ĐÃ LOGIN ---
+    const memberships = user.companyMemberships || [];
+
+    // 1. Nếu đang ở trang Login/Register/Home (Auth Pages)
+    // -> Phải điều hướng vào trong ứng dụng
+    if (isAuthPage) {
+        if (memberships.length === 0) {
+            // Chưa có công ty -> Vào Admin Hub để tạo
+            router.push("/admin");
+        }
+        else if (memberships.length === 1) {
+            // 1 công ty -> Auto vào Dashboard
+            handleSelectCompany(memberships[0].companyId, user);
+        }
+        else {
+            // >1 công ty -> Vào Admin Hub để chọn
+            router.push("/admin");
+        }
+        return;
+    }
+
+    // 2. Bảo vệ các trang Admin sâu (Ví dụ: /admin/company/billing...)
+    // Trang "/admin" (Hub) thì ai login rồi cũng được vào.
+    // Chỉ chặn các trang con "/admin/..."
+    if (pathname.startsWith("/admin/") && pathname !== "/admin") {
+        if (role !== "COMPANY_ADMIN") {
+            showToast("Access denied. Company Admin only.", "error");
+            router.push("/core/dashboard");
+        }
+    }
+
+  }, [user, role, pathname, isLoading, router, showToast, handleSelectCompany]);
 
   return (
     <AuthContext.Provider
       value={{
         user,
         role,
+        activeCompany,
         isLoading,
-        login,
-        logout,
-        loginWithTokens,
-        refreshUser,
         isAuthenticated: !!user,
+        login,
+        loginWithTokens,
+        logout,
+        refreshUser: fetchAndSetUser,
+        selectCompany,
         hasPermission,
       }}
     >

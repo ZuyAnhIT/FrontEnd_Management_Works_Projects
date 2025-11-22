@@ -1,80 +1,87 @@
 "use client";
 
-import { Users, FolderKanban, Briefcase, CheckSquare, Clock } from "lucide-react";
-import StatsCard, { StatsCardVariant } from "@/components/features/admin/StartsCard"; 
+import { useState, useEffect } from "react";
+import { useAuth } from "@/context/AuthContext";
+import CompanyList from "@/components/features/company/CompanyList";
+import CreateCompanyModal from "@/components/features/company/CreateCompanyModal";
+import { Building2, Plus } from "lucide-react";
 
-export default function DashboardPage() {
-  // 1. Updated data structure to match optimized StatsCard
-  const stats = [
-    {
-      icon: Users,
-      value: "48",
-      label: "Total Members",
-      variant: "blue" as StatsCardVariant,
-      trend: "+12% from last month",
-    },
-    {
-      icon: FolderKanban,
-      value: "6",
-      label: "Departments",
-      variant: "purple" as StatsCardVariant,
-      trend: "Stable",
-    },
-    {
-      icon: Briefcase,
-      value: "23",
-      label: "Active Projects",
-      variant: "green" as StatsCardVariant,
-      trend: "+3 new projects",
-    },
-    {
-      icon: CheckSquare, 
-      value: "187",
-      label: "Tasks Completed",
-      variant: "orange" as StatsCardVariant,
-      trend: "+24 this week",
-    },
-  ];
+export default function AdminHubPage() {
+  const { user, selectCompany, refreshUser, isLoading } = useAuth();
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
+
+  if (isLoading || !mounted) return null; // Hoặc loading spinner
+
+  const memberships = user?.companyMemberships || [];
+
+  // Xử lý khi tạo xong: Refresh lại data user để cập nhật danh sách
+  const handleCreateSuccess = async () => {
+    await refreshUser(); 
+  };
 
   return (
-    // 2. Light gray background for full screen
-    <div className="min-h-screen bg-slate-50/50 p-8 font-sans text-slate-900">
+    <div className="p-6 sm:p-8 max-w-7xl mx-auto font-sans">
       
-      {/* Header Section */}
+      {/* --- HEADER --- */}
       <div className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 mb-1">
-            Overview
+          <h1 className="text-2xl font-bold text-slate-900">
+            {memberships.length > 0 ? "Workspaces Overview" : "Welcome to MyPMS"}
           </h1>
-          <p className="text-sm text-slate-500 font-medium">
-            Welcome back, <span className="text-slate-800">Admin User</span>!
+          <p className="text-slate-500 mt-1">
+            {memberships.length > 0 
+              ? "Select a workspace to manage or start working."
+              : "Let's get you started by creating your first organization."}
           </p>
         </div>
 
-        {/* Date Indicator (Optional) */}
-        <div className="flex items-center gap-2 text-sm text-slate-500 bg-white px-3 py-1.5 rounded-md border border-slate-200 shadow-sm">
-            <Clock className="w-4 h-4" />
-            <span>{new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span>
+        {/* Nút tạo nhanh trên header (Chỉ hiện khi đã có công ty) */}
+        {memberships.length > 0 && (
+          <button
+             onClick={() => setIsCreateModalOpen(true)}
+             className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-all"
+          >
+            <Plus className="w-4 h-4" /> New Workspace
+          </button>
+        )}
+      </div>
+
+      {/* --- CONTENT --- */}
+      {memberships.length > 0 ? (
+        // CASE 1: Đã có công ty -> Hiện danh sách
+        <CompanyList 
+          memberships={memberships}
+          onSelect={selectCompany}
+          onAddClick={() => setIsCreateModalOpen(true)}
+        />
+      ) : (
+        // CASE 2: Chưa có công ty (Newbie) -> Hiện màn hình Onboarding đẹp
+        <div className="flex flex-col items-center justify-center py-16 bg-white rounded-2xl border border-dashed border-slate-300 text-center animate-in fade-in slide-in-from-bottom-4">
+           <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mb-6">
+              <Building2 className="w-10 h-10 text-blue-600" />
+           </div>
+           <h2 className="text-xl font-bold text-slate-900 mb-2">No Organization Found</h2>
+           <p className="text-slate-500 max-w-md mb-8">
+             You are not a member of any organization yet. Create your own company to invite members and manage projects.
+           </p>
+           <button
+             onClick={() => setIsCreateModalOpen(true)}
+             className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-blue-200 hover:shadow-blue-300 transition-all transform hover:-translate-y-1"
+           >
+             Create My First Company
+           </button>
         </div>
-      </div>
+      )}
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {stats.map((stat, index) => (
-          <StatsCard 
-            key={index} 
-            icon={stat.icon}
-            value={stat.value}
-            label={stat.label}
-            variant={stat.variant}
-            trend={stat.trend}
-          />
-        ))}
-      </div>
-      
-      {/* This area can accommodate Charts or Tables later */}
-      {/* <div className="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-6"> ... </div> */}
-
+      {/* --- MODAL (Luôn sẵn sàng được gọi) --- */}
+      <CreateCompanyModal 
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onSuccess={handleCreateSuccess}
+      />
     </div>
   );
 }
