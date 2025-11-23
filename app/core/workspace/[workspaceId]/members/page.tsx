@@ -76,7 +76,9 @@ export default function WorkspaceMembersPage() {
   const [loading, setLoading] = useState(true);
 
   // State Pagination & Search
-  const [pagination, setPagination] = useState<Omit<PageResponse<WorkspaceMember>, 'content'>>({
+  const [pagination, setPagination] = useState<
+    Omit<PageResponse<WorkspaceMember>, "content">
+  >({
     pageNumber: 0,
     pageSize: DEFAULT_PAGE_SIZE,
     totalElements: 0,
@@ -101,59 +103,66 @@ export default function WorkspaceMembersPage() {
   const [inviteRoleCode, setInviteRoleCode] = useState("WORKSPACE_MEMBER");
 
   const [showEditModal, setShowEditModal] = useState(false);
-  const [selectedMember, setSelectedMember] = useState<WorkspaceMember | null>(null);
+  const [selectedMember, setSelectedMember] = useState<WorkspaceMember | null>(
+    null
+  );
   const [newStatus, setNewStatus] = useState("");
   const [newRole, setNewRole] = useState("");
   const [isUpdating, setIsUpdating] = useState(false);
 
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [memberToDelete, setMemberToDelete] = useState<WorkspaceMember | null>(null);
+  const [memberToDelete, setMemberToDelete] = useState<WorkspaceMember | null>(
+    null
+  );
 
   const [showDetailModal, setShowDetailModal] = useState(false);
-  const [detailMember, setDetailMember] = useState<WorkspaceMember | null>(null);
+  const [detailMember, setDetailMember] = useState<WorkspaceMember | null>(
+    null
+  );
   const [loadingDetail, setLoadingDetail] = useState(false);
-
 
   // ===================================================
   // 🔄 FETCH DATA LOGIC
   // ===================================================
-  const fetchMembers = useCallback(async (params: MemberSearchParams) => {
-    if (!companyId || !workspaceId) return;
-    setLoading(true);
+  const fetchMembers = useCallback(
+    async (params: MemberSearchParams) => {
+      if (!companyId || !workspaceId) return;
+      setLoading(true);
 
-    try {
-      const { name, email, phone, role, ...apiParams } = params;
-      let data: PageResponse<WorkspaceMember>;
+      try {
+        const { name, email, phone, role, ...apiParams } = params;
+        let data: PageResponse<WorkspaceMember>;
 
-      const isSearching = name || email || phone || role;
+        const isSearching = name || email || phone || role;
 
-      if (isSearching) {
-        // Gọi API Search Workspace Members
-        data = await searchWorkspaceMembers(companyId, workspaceId, params);
-      } else {
-        // Gọi API Get All
-        data = await getWorkspaceMembers(companyId, workspaceId, apiParams);
+        if (isSearching) {
+          // Gọi API Search Workspace Members
+          data = await searchWorkspaceMembers(companyId, workspaceId, params);
+        } else {
+          // Gọi API Get All
+          data = await getWorkspaceMembers(companyId, workspaceId, apiParams);
+        }
+
+        setMembers(data.content || []);
+        setPagination({
+          pageNumber: data.pageNumber,
+          pageSize: data.pageSize,
+          totalElements: data.totalElements,
+          totalPages: data.totalPages,
+          first: data.first,
+          last: data.last,
+        });
+      } catch (err: any) {
+        console.error("Fetch Error:", err);
+        showToast(err.message || "Failed to load members", "error");
+        setMembers([]);
+      } finally {
+        setLoading(false);
       }
-
-      setMembers(data.content || []);
-      setPagination({
-        pageNumber: data.pageNumber,
-        pageSize: data.pageSize,
-        totalElements: data.totalElements,
-        totalPages: data.totalPages,
-        first: data.first,
-        last: data.last,
-      });
-
-    } catch (err: any) {
-      console.error("Fetch Error:", err);
-      showToast(err.message || "Failed to load members", "error");
-      setMembers([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [companyId, workspaceId, showToast]);
+    },
+    [companyId, workspaceId, showToast]
+  );
 
   // Auto reload khi params thay đổi
   useEffect(() => {
@@ -161,7 +170,6 @@ export default function WorkspaceMembersPage() {
     const t = setTimeout(() => fetchMembers(searchParams), 300);
     return () => clearTimeout(t);
   }, [searchParams, companyId, workspaceId, isAuthLoading, fetchMembers]);
-
 
   // ===================================================
   // ⚙️ HANDLERS
@@ -176,7 +184,8 @@ export default function WorkspaceMembersPage() {
     setSearchParams((prev) => ({
       ...prev,
       sortBy: field,
-      sortDir: prev.sortBy === field && prev.sortDir === "desc" ? "asc" : "desc",
+      sortDir:
+        prev.sortBy === field && prev.sortDir === "desc" ? "asc" : "desc",
       page: 0,
     }));
   };
@@ -187,7 +196,10 @@ export default function WorkspaceMembersPage() {
     setSearchParams((prev) => ({
       ...prev,
       page: 0,
-      name: undefined, email: undefined, phone: undefined, role: undefined,
+      name: undefined,
+      email: undefined,
+      phone: undefined,
+      role: undefined,
       [searchBy]: text,
     }));
   };
@@ -197,7 +209,10 @@ export default function WorkspaceMembersPage() {
     setSearchParams((prev) => ({
       ...prev,
       page: 0,
-      name: undefined, email: undefined, phone: undefined, role: undefined,
+      name: undefined,
+      email: undefined,
+      phone: undefined,
+      role: undefined,
       [field]: searchValue,
     }));
   };
@@ -247,10 +262,24 @@ export default function WorkspaceMembersPage() {
     try {
       const promises = [];
       if (newStatus !== "") {
-        promises.push(updateWorkspaceMemberStatus(companyId, workspaceId, selectedMember.memberId, newStatus));
+        promises.push(
+          updateWorkspaceMemberStatus(
+            companyId,
+            workspaceId,
+            selectedMember.memberId,
+            newStatus
+          )
+        );
       }
       if (newRole !== "") {
-        promises.push(updateWorkspaceMemberRole(companyId, workspaceId, selectedMember.memberId, newRole));
+        promises.push(
+          updateWorkspaceMemberRole(
+            companyId,
+            workspaceId,
+            selectedMember.memberId,
+            newRole
+          )
+        );
       }
       await Promise.all(promises);
 
@@ -278,7 +307,11 @@ export default function WorkspaceMembersPage() {
     if (!companyId || !workspaceId || !memberToDelete) return;
     setIsDeleting(true);
     try {
-      await removeWorkspaceMember(companyId, workspaceId, memberToDelete.memberId);
+      await removeWorkspaceMember(
+        companyId,
+        workspaceId,
+        memberToDelete.memberId
+      );
       showToast("Member removed successfully", "success");
       setIsDeleteModalOpen(false);
       fetchMembers(searchParams);
@@ -296,7 +329,11 @@ export default function WorkspaceMembersPage() {
     setLoadingDetail(true);
     setShowDetailModal(true);
     try {
-      const detail = await getWorkspaceMemberDetail(companyId, workspaceId, memberId);
+      const detail = await getWorkspaceMemberDetail(
+        companyId,
+        workspaceId,
+        memberId
+      );
       setDetailMember(detail);
     } catch (err: any) {
       showToast("Failed to load details", "error");
@@ -306,18 +343,29 @@ export default function WorkspaceMembersPage() {
     }
   };
 
-
   // ===================================================
   // 🎨 HELPERS
   // ===================================================
   const renderStatusBadge = (status: string) => {
     switch (status) {
       case "ACTIVE":
-        return <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200"><CheckCircle className="w-3 h-3" /> Active</div>;
+        return (
+          <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
+            <CheckCircle className="w-3 h-3" /> Active
+          </div>
+        );
       case "SUSPENDED":
-        return <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200"><Clock className="w-3 h-3" /> Suspended</div>;
+        return (
+          <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+            <Clock className="w-3 h-3" /> Suspended
+          </div>
+        );
       default:
-        return <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-50 text-slate-500 border border-slate-200">{status}</div>;
+        return (
+          <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-50 text-slate-500 border border-slate-200">
+            {status}
+          </div>
+        );
     }
   };
 
@@ -325,10 +373,14 @@ export default function WorkspaceMembersPage() {
     // Check role name string (Backend trả về 'Workspace Administrator' hoặc 'Workspace Member')
     const isAdmin = m.roleName?.toUpperCase().includes("ADMIN");
     const Icon = isAdmin ? Crown : Shield;
-    const style = isAdmin ? "bg-purple-50 text-purple-700 border-purple-200" : "bg-blue-50 text-blue-700 border-blue-200";
+    const style = isAdmin
+      ? "bg-purple-50 text-purple-700 border-purple-200"
+      : "bg-blue-50 text-blue-700 border-blue-200";
 
     return (
-      <div className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${style}`}>
+      <div
+        className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${style}`}
+      >
         <Icon className="w-3 h-3" />
         {m.roleName || "Member"}
       </div>
@@ -337,9 +389,12 @@ export default function WorkspaceMembersPage() {
 
   const formatDateTime = (date?: string | null): string => {
     if (!date) return "—";
-    return new Date(date).toLocaleDateString("en-US", { month: 'short', day: 'numeric', year: 'numeric' });
+    return new Date(date).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
   };
-
 
   // ===================================================
   // 🖥️ RENDER UI
@@ -356,14 +411,18 @@ export default function WorkspaceMembersPage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-white via-blue-50/30 to-white py-8 font-sans text-slate-900">
       <div className="max-w-[1600px] mx-auto px-6 space-y-6">
-
         {/* HEADER */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-slate-900">
-              Workspace Members <span className="text-slate-400 text-lg ml-2">({pagination.totalElements})</span>
+              Workspace Members{" "}
+              <span className="text-slate-400 text-lg ml-2">
+                ({pagination.totalElements})
+              </span>
             </h1>
-            <p className="text-sm text-slate-500 mt-1">Manage members within this specific workspace.</p>
+            <p className="text-sm text-slate-500 mt-1">
+              Manage members within this specific workspace.
+            </p>
           </div>
           <Button
             onClick={() => setShowInviteModal(true)}
@@ -379,7 +438,9 @@ export default function WorkspaceMembersPage() {
             <select
               value={searchBy}
               onChange={(e) => handleSearchByChange(e.target.value)}
-              className="w-full h-10 pl-3 pr-8 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-500 bg-slate-50 cursor-pointer"
+              className="w-full h-10 pl-3 pr-8 border border-slate-300 rounded-lg text-sm
+               focus:ring-2 focus:ring-blue-100 focus:border-blue-500 bg-slate-50 
+               cursor-pointer appearance-none [-webkit-appearance:none] [-moz-appearance:none]"
             >
               <option value="name">Name</option>
               <option value="email">Email</option>
@@ -422,18 +483,50 @@ export default function WorkspaceMembersPage() {
               disableEdit={(m) => m.userId === user?.id} // Không sửa chính mình
               disableDelete={(m) => m.userId === user?.id} // Không xóa chính mình
             />
-            
+
             {/* Pagination Controls */}
             <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100">
-               <p className="text-sm text-slate-500">
-                  Page {pagination.pageNumber + 1} of {pagination.totalPages || 1}
-               </p>
-               <div className="flex gap-1">
-                  <Button onClick={() => handlePageChange(0)} disabled={pagination.first} variant="outline" size="icon" className="h-8 w-8"><ChevronsLeft className="w-4 h-4"/></Button>
-                  <Button onClick={() => handlePageChange(pagination.pageNumber - 1)} disabled={pagination.first} variant="outline" size="icon" className="h-8 w-8"><ChevronLeft className="w-4 h-4"/></Button>
-                  <Button onClick={() => handlePageChange(pagination.pageNumber + 1)} disabled={pagination.last} variant="outline" size="icon" className="h-8 w-8"><ChevronRight className="w-4 h-4"/></Button>
-                  <Button onClick={() => handlePageChange(pagination.totalPages - 1)} disabled={pagination.last} variant="outline" size="icon" className="h-8 w-8"><ChevronsRight className="w-4 h-4"/></Button>
-               </div>
+              <p className="text-sm text-slate-500">
+                Page {pagination.pageNumber + 1} of {pagination.totalPages || 1}
+              </p>
+              <div className="flex gap-1">
+                <Button
+                  onClick={() => handlePageChange(0)}
+                  disabled={pagination.first}
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                >
+                  <ChevronsLeft className="w-4 h-4" />
+                </Button>
+                <Button
+                  onClick={() => handlePageChange(pagination.pageNumber - 1)}
+                  disabled={pagination.first}
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+                <Button
+                  onClick={() => handlePageChange(pagination.pageNumber + 1)}
+                  disabled={pagination.last}
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+                <Button
+                  onClick={() => handlePageChange(pagination.totalPages - 1)}
+                  disabled={pagination.last}
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                >
+                  <ChevronsRight className="w-4 h-4" />
+                </Button>
+              </div>
             </div>
           </div>
         ) : (
@@ -441,13 +534,17 @@ export default function WorkspaceMembersPage() {
             <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
               <Users className="w-8 h-8 text-slate-300" />
             </div>
-            <h3 className="text-lg font-bold text-slate-900">No members found</h3>
-            <p className="text-sm text-slate-500 mt-1">Try inviting a new member to this workspace.</p>
+            <h3 className="text-lg font-bold text-slate-900">
+              No members found
+            </h3>
+            <p className="text-sm text-slate-500 mt-1">
+              Try inviting a new member to this workspace.
+            </p>
           </div>
         )}
 
         {/* --- MODALS --- */}
-        
+
         {/* Invite Modal */}
         <InviteMemberModal
           isOpen={showInviteModal}
@@ -471,11 +568,11 @@ export default function WorkspaceMembersPage() {
           loading={loadingDetail}
           title="Member Details"
           fields={[
-             { label: "Full Name", key: "fullName" },
-             { label: "Email", key: "email" },
-             { label: "Role", key: "roleName" },
-             { label: "Joined At", key: "joinedAt" },
-             { label: "Phone", key: "phoneNumber" },
+            { label: "Full Name", key: "fullName" },
+            { label: "Email", key: "email" },
+            { label: "Role", key: "roleName" },
+            { label: "Joined At", key: "joinedAt" },
+            { label: "Phone", key: "phoneNumber" },
           ]}
         />
 
@@ -496,63 +593,94 @@ export default function WorkspaceMembersPage() {
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in">
             <div className="w-full max-w-md bg-white rounded-xl shadow-2xl overflow-hidden animate-in zoom-in-95">
               <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                <h3 className="font-bold text-slate-900">Edit Workspace Member</h3>
-                <button onClick={() => setShowEditModal(false)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
+                <h3 className="font-bold text-slate-900">
+                  Edit Workspace Member
+                </h3>
+                <button
+                  onClick={() => setShowEditModal(false)}
+                  className="text-slate-400 hover:text-slate-600"
+                >
+                  <X className="w-5 h-5" />
+                </button>
               </div>
               <div className="p-6 space-y-5">
-                 <div className="p-3 bg-slate-50 rounded-lg border border-slate-100 flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-full bg-purple-100 flex items-center justify-center text-purple-700 font-bold">
-                        {selectedMember.fullName.charAt(0)}
-                    </div>
-                    <div>
-                        <p className="text-sm font-bold text-slate-900">{selectedMember.fullName}</p>
-                        <p className="text-xs text-slate-500">{selectedMember.email}</p>
-                    </div>
-                 </div>
+                <div className="p-3 bg-slate-50 rounded-lg border border-slate-100 flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-full bg-purple-100 flex items-center justify-center text-purple-700 font-bold">
+                    {selectedMember.fullName.charAt(0)}
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-slate-900">
+                      {selectedMember.fullName}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      {selectedMember.email}
+                    </p>
+                  </div>
+                </div>
 
-                 <div className="space-y-1.5">
-                    <label className="text-sm font-semibold text-slate-900 block">Role</label>
-                    <div className="relative">
-                        <select 
-                            value={newRole} 
-                            onChange={(e) => setNewRole(e.target.value)}
-                            className="w-full pl-3 pr-8 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-500 bg-white appearance-none"
-                        >
-                            <option value="">{selectedMember.roleName || "No Change"}</option>
-                            <option value="WORKSPACE_MEMBER">Member</option>
-                            <option value="WORKSPACE_ADMIN">Administrator</option>
-                        </select>
-                        <ShieldAlert className="w-4 h-4 text-slate-400 absolute right-3 top-3 pointer-events-none" />
-                    </div>
-                 </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-semibold text-slate-900 block">
+                    Role
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={newRole}
+                      onChange={(e) => setNewRole(e.target.value)}
+                      className="w-full pl-3 pr-8 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-500 bg-white appearance-none"
+                    >
+                      <option value="">
+                        {selectedMember.roleName || "No Change"}
+                      </option>
+                      <option value="WORKSPACE_MEMBER">Member</option>
+                      <option value="WORKSPACE_ADMIN">Administrator</option>
+                    </select>
+                    <ShieldAlert className="w-4 h-4 text-slate-400 absolute right-3 top-3 pointer-events-none" />
+                  </div>
+                </div>
 
-                 <div className="space-y-1.5">
-                    <label className="text-sm font-semibold text-slate-900 block">Status</label>
-                    <div className="relative">
-                        <select 
-                            value={newStatus} 
-                            onChange={(e) => setNewStatus(e.target.value)}
-                            className="w-full pl-3 pr-8 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-500 bg-white appearance-none"
-                        >
-                            <option value="">{selectedMember.status || "No Change"}</option>
-                            <option value="ACTIVE">Active</option>
-                            <option value="SUSPENDED">Suspended</option>
-                        </select>
-                        <CheckCircle className="w-4 h-4 text-slate-400 absolute right-3 top-3 pointer-events-none" />
-                    </div>
-                 </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-semibold text-slate-900 block">
+                    Status
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={newStatus}
+                      onChange={(e) => setNewStatus(e.target.value)}
+                      className="w-full pl-3 pr-8 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-500 bg-white appearance-none"
+                    >
+                      <option value="">
+                        {selectedMember.status || "No Change"}
+                      </option>
+                      <option value="ACTIVE">ACTIVE</option>
+                      <option value="SUSPENDED">Suspended</option>
+                    </select>
+                    <CheckCircle className="w-4 h-4 text-slate-400 absolute right-3 top-3 pointer-events-none" />
+                  </div>
+                </div>
               </div>
               <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
-                 <Button variant="outline" onClick={() => setShowEditModal(false)}>Cancel</Button>
-                 <Button onClick={handleUpdateMember} disabled={isUpdating} className="bg-blue-600 hover:bg-blue-700 text-white">
-                    {isUpdating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
-                    Save Changes
-                 </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowEditModal(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleUpdateMember}
+                  disabled={isUpdating}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  {isUpdating ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Save className="w-4 h-4 mr-2" />
+                  )}
+                  Save Changes
+                </Button>
               </div>
             </div>
           </div>
         )}
-
       </div>
     </div>
   );

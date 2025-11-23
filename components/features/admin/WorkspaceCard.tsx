@@ -1,4 +1,5 @@
 "use client";
+
 import {
   Building,
   Trash2,
@@ -9,6 +10,23 @@ import {
   Layout,
   RotateCcw
 } from "lucide-react";
+import { useState } from "react";
+
+// --- HELPER XỬ LÝ ẢNH ---
+const getFullImageUrl = (path: string | null | undefined) => {
+  if (!path) return null;
+  // Nếu là ảnh preview blob hoặc link online thì giữ nguyên
+  if (path.startsWith("blob:") || path.startsWith("http")) return path;
+  
+  // Lấy domain backend
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8082";
+  
+  // Chuẩn hóa đường dẫn
+  let cleanPath = path.startsWith("/") ? path.slice(1) : path;
+  if (!cleanPath.startsWith("uploads/")) cleanPath = `uploads/${cleanPath}`;
+  
+  return `${API_URL}/${cleanPath}`;
+};
 
 const statusStyles: Record<string, string> = {
   ACTIVE: "bg-green-50 text-green-700 border-green-200",
@@ -30,6 +48,9 @@ export default function WorkspaceCard({
   viewMode = "grid",
 }: any) {
   
+  // State để xử lý khi ảnh lỗi
+  const [imageError, setImageError] = useState(false);
+
   const formatDate = (dateString: string) => {
     if (!dateString) return "--";
     try {
@@ -39,6 +60,10 @@ export default function WorkspaceCard({
     }
   };
 
+  // Lấy URL ảnh chuẩn
+  const coverUrl = getFullImageUrl(workspace.coverImage);
+  const hasValidImage = coverUrl && !imageError;
+
   // ============================================================
   // 🟦 LIST VIEW
   // ============================================================
@@ -47,9 +72,14 @@ export default function WorkspaceCard({
       <div className="group flex items-center gap-4 p-4 bg-white border border-slate-200 rounded-lg hover:border-blue-400 hover:shadow-md transition-all duration-200">
 
         {/* Thumbnail */}
-        <div className="w-16 h-16 shrink-0 rounded-lg overflow-hidden bg-slate-100 border border-slate-200 flex items-center justify-center">
-          {workspace.coverImage ? (
-            <img src={workspace.coverImage} alt="cover" className="w-full h-full object-cover" />
+        <div className="w-16 h-16 shrink-0 rounded-lg overflow-hidden bg-slate-100 border border-slate-200 flex items-center justify-center relative">
+          {hasValidImage ? (
+            <img 
+              src={coverUrl} 
+              alt="cover" 
+              className="w-full h-full object-cover" 
+              onError={() => setImageError(true)}
+            />
           ) : (
             <div
               className="w-full h-full flex items-center justify-center"
@@ -136,8 +166,13 @@ export default function WorkspaceCard({
 
       {/* Thumbnail */}
       <div className="h-28 w-full bg-slate-100 relative overflow-hidden border-b border-slate-100">
-        {workspace.coverImage ? (
-          <img src={workspace.coverImage} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+        {hasValidImage ? (
+          <img 
+            src={coverUrl} 
+            alt="" 
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
+            onError={() => setImageError(true)}
+          />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-slate-50">
             <Layout className="w-10 h-10 text-slate-300" />

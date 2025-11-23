@@ -26,7 +26,7 @@ import { Button } from "@/components/ui/button";
 // API Services
 import {
   getProjects,
-  searchProjects, // ✅ Import thêm hàm search
+  searchProjects,
   deleteProject,
   updateProjectStatus,
   Project,
@@ -64,7 +64,6 @@ type ProjectSearchParams = {
   sortBy: string;
   sortDir: string;
   status?: string;
-  // Search keys
   name?: string;
   code?: string;
   manager?: string;
@@ -77,9 +76,11 @@ type ProjectSearchParams = {
 export default function ProjectPage() {
   const router = useRouter();
   const params = useParams();
-  const workspaceId = Number(params.workspaceId);
-  const { showToast } = useToast();
   
+  // ✅ Lấy workspaceId chuẩn từ URL và ép kiểu số
+  const workspaceId = Number(params.workspaceId);
+  
+  const { showToast } = useToast();
   const { activeCompany, isLoading: isAuthLoading } = useAuth();
   const companyId = activeCompany?.companyId;
 
@@ -120,17 +121,14 @@ export default function ProjectPage() {
   });
 
   // ===============================================================
-  // 4️⃣ FETCH DATA LOGIC (Đã sửa logic gọi Search vs List)
+  // 4️⃣ FETCH DATA LOGIC
   // ===============================================================
   const fetchProjects = useCallback(async (params: ProjectSearchParams) => {
     if (!workspaceId || !companyId) return;
     setLoading(true);
 
     try {
-      // Tách các trường search ra để kiểm tra
       const { name, code, manager, ...otherParams } = params;
-      
-      // Kiểm tra xem có đang search không (có ít nhất 1 trường có giá trị)
       const isSearching = (name && name.trim() !== "") || 
                           (code && code.trim() !== "") || 
                           (manager && manager.trim() !== "");
@@ -138,12 +136,10 @@ export default function ProjectPage() {
       let data: PageResponse<Project>;
 
       if (isSearching) {
-        // ✅ Gọi API Search (nếu đang tìm kiếm)
-        // Lưu ý: searchProjects nhận params đầy đủ để có cả phân trang/sort
+        // Gọi API Search
         data = await searchProjects(companyId, workspaceId, params);
       } else {
-        // ✅ Gọi API List thường (nếu không tìm kiếm)
-        // Chỉ gửi otherParams (page, size, status...)
+        // Gọi API List thường
         data = await getProjects(companyId, workspaceId, otherParams);
       }
 
@@ -158,8 +154,7 @@ export default function ProjectPage() {
       });
 
     } catch (err: any) {
-      // Xóa log lỗi để console sạch hơn (hoặc giữ lại nếu cần debug)
-      // console.error("Fetch error:", err); 
+      console.error("Fetch error:", err);
       showToast(err.message || "Failed to load projects", "error");
       setProjects([]);
     } finally {
@@ -167,10 +162,9 @@ export default function ProjectPage() {
     }
   }, [companyId, workspaceId, showToast]);
 
-  // Auto reload (Debounce)
+  // Auto reload
   useEffect(() => {
     if (!workspaceId || !companyId) return;
-    
     const t = setTimeout(() => fetchProjects(searchParams), 300);
     return () => clearTimeout(t);
   }, [searchParams, workspaceId, companyId, fetchProjects]);
@@ -195,16 +189,13 @@ export default function ProjectPage() {
 
   const handleSearchChange = (text: string) => {
     setSearchValue(text);
-    
     setSearchParams((prev) => {
         const newParams = { ...prev };
-        // Xóa sạch key cũ để tránh conflict
         delete newParams.name;
         delete newParams.code;
         delete newParams.manager;
         
         newParams.page = 0;
-
         if (text.trim() !== "") {
             newParams[searchBy] = text.trim();
         }
@@ -272,6 +263,7 @@ export default function ProjectPage() {
     }
   };
 
+  // Navigate to Board
   const goToProjectBoard = (projectId: number) => {
     router.push(`/core/workspace/${workspaceId}/project/${projectId}/board`);
   };
@@ -376,7 +368,7 @@ export default function ProjectPage() {
           </div>
         </div>
 
-        {/* CONTENT */}
+        {/* LIST CONTENT */}
         {loading ? (
             <div className="flex justify-center py-20"><Loader2 className="w-10 h-10 text-blue-600 animate-spin" /></div>
         ) : projects.length === 0 ? (
@@ -388,12 +380,14 @@ export default function ProjectPage() {
             <p className="text-sm text-slate-500 mt-1">Try adjusting your search or filters.</p>
           </div>
         ) : (
-          <div className={viewMode === "grid" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6" : "flex flex-col gap-3"}>
+          <div className={viewMode === "grid" ? "grid grid-cols-1 md:grid-cols-3 gap-6" : "flex flex-col gap-3"}>
             {projects.map((p) => (
               <ProjectCard
                 key={p.id}
                 p={p}
                 viewMode={viewMode}
+                // ✅ QUAN TRỌNG: Truyền workspaceId xuống ProjectCard để fix lỗi link Settings
+                workspaceId={workspaceId} 
                 isTrash={p.status === "DELETED"}
                 onDelete={handleDeleteClick}
                 onRestore={handleRestore}

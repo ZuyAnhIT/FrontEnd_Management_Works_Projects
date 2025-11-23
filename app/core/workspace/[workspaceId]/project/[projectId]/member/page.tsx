@@ -1,314 +1,509 @@
 "use client";
 
-import { useEffect, useState } from "react";
+// =================================================================
+// 1️⃣ IMPORTS
+// =================================================================
+import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import {
   Search,
-  Sparkles,
   Users,
-  Shield,
-  Crown,
   Loader2,
+  Crown,
+  Shield,
   CheckCircle,
   Clock,
-  XCircle,
+  Filter,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  Edit,
+  ShieldAlert,
+  X,
+  Save,
+  Trash2,
+  UserPlus
 } from "lucide-react";
 
-import { useToast } from "@/components/ui/ToastProvider";
 import { useAuth } from "@/context/AuthContext";
+import { useToast } from "@/components/ui/ToastProvider";
+import { Button } from "@/components/ui/button";
 
-// UI Components
-import MemberTable from "@/components/ui/MemberTable";
-import MemberDetailModalBase from "@/components/ui/MemberDetailModalBase";
-
-// API
+// API Services
 import {
   getProjectMembers,
+  searchProjectMembers, // ✅ Import thêm hàm tìm kiếm
   updateProjectMemberRole,
+  ProjectMember,
+  PageResponse
 } from "@/services/apiProject";
 
+// Components UI Tái sử dụng
+import MemberTable from "@/components/ui/MemberTable";
+import MemberDetailModalBase from "@/components/ui/MemberDetailModalBase";
+import ConfirmationModal from "@/components/ui/ConfirmationModal";
+import InviteMemberModal from "@/components/ui/InviteMemberModal"; 
+
+// =================================================================
+// 2️⃣ CONSTANTS & TYPES
+// =================================================================
+
+const DEFAULT_PAGE_SIZE = 10;
+const DEFAULT_SORT_BY = "joinedAt";
+const DEFAULT_SORT_DIR = "desc";
+
+const SEARCH_FIELDS = [
+  { value: "name", label: "Name" },
+  { value: "email", label: "Email" },
+  { value: "role", label: "Role" },
+  { value: "phone", label: "Phone" },
+];
+
+// Định nghĩa kiểu dữ liệu params tìm kiếm
+interface MemberSearchParams {
+  page: number;
+  size: number;
+  sortBy: string;
+  sortDir: "asc" | "desc";
+  name?: string;
+  email?: string;
+  role?: string;
+  phone?: string;
+  [key: string]: any;
+}
+
+// =================================================================
+// 3️⃣ COMPONENT CHÍNH
+// =================================================================
 export default function ProjectMembersPage() {
   const { showToast } = useToast();
   const params = useParams();
-
+  
   const workspaceId = Number(params.workspaceId);
   const projectId = Number(params.projectId);
 
-  const { user, isLoading: isAuthLoading } = useAuth();
-  const companyId = user?.company?.companyId || null;
+  const { activeCompany, isLoading: isAuthLoading, user } = useAuth();
+  const companyId = activeCompany?.companyId;
 
-  const [members, setMembers] = useState<any[]>([]);
-  const [searchTerm, setSearchTerm] = useState("");
+  // --- STATE DATA ---
+  const [members, setMembers] = useState<ProjectMember[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [showDetailModal, setShowDetailModal] = useState(false);
-  const [selectedMember, setSelectedMember] = useState<any | null>(null);
-
-  const [showRoleModal, setShowRoleModal] = useState(false);
-  const [roleMember, setRoleMember] = useState<any | null>(null);
-
-  // ===========================
-  // FORMAT DATE
-  // ===========================
-  const formatDateTime = (date?: string | null): string => {
-    if (!date) return "—";
-    try {
-      return new Date(date).toLocaleString("vi-VN", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-    } catch {
-      return "—";
-    }
-  };
+  // --- STATE SEARCH & FILTER ---
+  const [searchBy, setSearchBy] = useState("name");
+  const [searchValue, setSearchValue] = useState("");
   
-  // ===========================
-  // LOAD MEMBERS
-  // ===========================
-  const loadMembers = async () => {
-      try {
-        setLoading(true);
+  const [pagination, setPagination] = useState<Omit<PageResponse<ProjectMember>, 'content'>>({
+    pageNumber: 0,
+    pageSize: DEFAULT_PAGE_SIZE,
+    totalElements: 0,
+    totalPages: 0,
+    first: true,
+    last: true,
+  });
 
-        const data = await getProjectMembers(workspaceId, projectId); // ✔ FIXED
+  const [searchParams, setSearchParams] = useState<MemberSearchParams>({
+    page: 0,
+    size: DEFAULT_PAGE_SIZE,
+    sortBy: DEFAULT_SORT_BY,
+    sortDir: DEFAULT_SORT_DIR,
+  });
 
-      const mapped = data.content.map((m: any, i: number) => ({
-        ...m,
-        roleCode: m.roleCode || (m.roleName === "Project Admin" ? "PROJECT_ADMIN" : "PROJECT_MEMBER"), // ✅ thêm logic
-        status: m.status || (i % 2 === 0 ? "ACTIVE" : "PENDING"),
-      }));
+  // --- MODAL STATES ---
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRoleCode, setInviteRoleCode] = useState("PROJECT_MEMBER");
+
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedMember, setSelectedMember] = useState<ProjectMember | null>(null);
+  const [newRole, setNewRole] = useState("");
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [detailMember, setDetailMember] = useState<ProjectMember | null>(null);
+
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [memberToDelete, setMemberToDelete] = useState<ProjectMember | null>(null);
 
 
-        setMembers(mapped);
-      } catch (err: any) {
-        showToast(err.message || "Không thể tải danh sách thành viên.", "error");
-      } finally {
-        setLoading(false);
+  // ===============================================================
+  // 4️⃣ FETCH DATA LOGIC (Đã Cập Nhật Logic Search)
+  // ===============================================================
+  const fetchMembers = useCallback(async (params: MemberSearchParams) => {
+    if (!companyId || !workspaceId || !projectId) return;
+    
+    setLoading(true);
+
+    try {
+      // Tách các tham số tìm kiếm ra để kiểm tra
+      const { name, email, phone, role, ...pagingParams } = params;
+      
+      // Kiểm tra xem có đang tìm kiếm không (ít nhất 1 trường có giá trị)
+      const isSearching = (name && name.trim() !== "") || 
+                          (email && email.trim() !== "") || 
+                          (phone && phone.trim() !== "") || 
+                          (role && role.trim() !== "");
+
+      let data: PageResponse<ProjectMember>;
+
+      if (isSearching) {
+        // ✅ Gọi API Search nếu đang tìm kiếm
+        data = await searchProjectMembers(companyId, workspaceId, projectId, params);
+      } else {
+        // ✅ Gọi API List thường nếu không tìm kiếm
+        data = await getProjectMembers(companyId, workspaceId, projectId, pagingParams);
       }
-    };
 
-  useEffect(() => {
-    if (isAuthLoading) return;
-    if (!companyId || !workspaceId || !projectId) {
+      setMembers(data.content || []);
+      setPagination({
+        pageNumber: data.pageNumber,
+        pageSize: data.pageSize,
+        totalElements: data.totalElements,
+        totalPages: data.totalPages,
+        first: data.first,
+        last: data.last,
+      });
+
+    } catch (err: any) {
+      // console.error("Fetch error:", err); // Uncomment để debug
+      showToast(err.message || "Failed to load members", "error");
+      setMembers([]);
+    } finally {
       setLoading(false);
+    }
+  }, [companyId, workspaceId, projectId, showToast]);
+
+  // Auto reload (Debounce 300ms)
+  useEffect(() => {
+    if (!companyId || !workspaceId || !projectId || isAuthLoading) return;
+    
+    const t = setTimeout(() => fetchMembers(searchParams), 300);
+    return () => clearTimeout(t);
+  }, [searchParams, companyId, workspaceId, projectId, isAuthLoading, fetchMembers]);
+
+
+  // ===============================================================
+  // 5️⃣ HANDLERS (XỬ LÝ SỰ KIỆN)
+  // ===============================================================
+
+  // --- PAGINATION & SORT ---
+  const handlePageChange = (newPage: number) => {
+    setSearchParams((prev) => ({ ...prev, page: newPage }));
+  };
+
+  const handleSort = (field: string) => {
+    setSearchParams((prev) => ({
+      ...prev,
+      sortBy: field,
+      sortDir: prev.sortBy === field && prev.sortDir === "desc" ? "asc" : "desc",
+      page: 0,
+    }));
+  };
+
+  // --- SEARCH LOGIC ---
+  const handleSearchChange = (text: string) => {
+    setSearchValue(text);
+    setSearchParams((prev) => {
+        const newParams = { ...prev };
+        // Xóa sạch các key cũ để tránh conflict
+        delete newParams.name;
+        delete newParams.email;
+        delete newParams.phone;
+        delete newParams.role;
+        
+        newParams.page = 0;
+
+        // Gán key mới nếu text không rỗng
+        if (text.trim() !== "") {
+            newParams[searchBy] = text.trim();
+        }
+        return newParams;
+    });
+  };
+
+  const handleSearchByChange = (field: string) => {
+    setSearchBy(field);
+    setSearchValue(""); 
+    setSearchParams((prev) => {
+        const newParams = { ...prev };
+        delete newParams.name;
+        delete newParams.email;
+        delete newParams.phone;
+        delete newParams.role;
+        return { ...newParams, page: 0 };
+    });
+  };
+
+  // --- INVITE ---
+  const handleInvite = async () => {
+    if (!inviteEmail.trim()) {
+      showToast("Please enter an email", "warning");
       return;
     }
-    loadMembers();
-  }, [companyId, workspaceId, projectId, isAuthLoading]);
+    showToast("Feature coming soon (requires API)", "info");
+    setShowInviteModal(false);
+  };
 
-
-  // ===========================
-  // OPEN ROLE MODAL
-  // ===========================
-  const openRoleModal = (member: any) => {
-  setRoleMember({
-    ...member,
-    roleCode: member.roleCode || "PROJECT_MEMBER", // ✅ fallback
-  });
-  setShowRoleModal(true);
-};
-
-
-  // ===========================
-  // VIEW DETAIL
-  // ===========================
-  const handleViewDetail = (member: any) => {
+  // --- EDIT ROLE ---
+  const openEditModal = (member: ProjectMember) => {
     setSelectedMember(member);
+    const currentRole = member.roleName?.includes("Admin") ? "PROJECT_ADMIN" : "PROJECT_MEMBER";
+    setNewRole(currentRole); 
+    setShowEditModal(true);
+  };
+
+  const handleUpdateRole = async () => {
+    if (!companyId || !workspaceId || !projectId || !selectedMember) return;
+    
+    setIsUpdating(true);
+    try {
+      await updateProjectMemberRole(companyId, workspaceId, projectId, selectedMember.memberId, newRole);
+      showToast("Role updated successfully!", "success");
+      setShowEditModal(false);
+      fetchMembers(searchParams); // Refresh danh sách
+    } catch (err: any) {
+      showToast(err.message || "Update failed", "error");
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  // --- VIEW DETAIL ---
+  const handleViewDetail = (member: ProjectMember) => {
+    setDetailMember(member);
     setShowDetailModal(true);
   };
 
+  // --- DELETE ---
+  const openDeleteConfirmation = (member: ProjectMember) => {
+     if (member.userId === user?.id) {
+        showToast("Cannot remove yourself", "error");
+        return;
+     }
+     setMemberToDelete(member);
+     setIsDeleteModalOpen(true);
+  };
 
-  // ===========================
-  // STATUS BADGE
-  // ===========================
+
+  // ===============================================================
+  // 🎨 HELPERS RENDER
+  // ===============================================================
   const renderStatusBadge = (status: string) => {
     switch (status) {
       case "ACTIVE":
-        return (
-          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-green-50 text-green-700 border border-green-200">
-            <CheckCircle className="w-3.5 h-3.5" />
-            Hoạt động
-          </div>
-        );
+        return <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200"><CheckCircle className="w-3 h-3" /> Active</div>;
       case "PENDING":
-        return (
-          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-yellow-50 text-yellow-700 border border-yellow-200">
-            <Clock className="w-3.5 h-3.5" />
-            Chờ xác nhận
-          </div>
-        );
+        return <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200"><Clock className="w-3 h-3" /> Pending</div>;
       default:
-        return (
-          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gray-100 text-gray-600 border border-gray-200">
-            <XCircle className="w-3.5 h-3.5" />
-            Không hoạt động
-          </div>
-        );
+        return <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-50 text-slate-500 border border-slate-200">{status}</div>;
     }
   };
 
-  // FILTER
-  const filteredMembers = members.filter(
-    (m) =>
-      m.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      m.email?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const renderRoleBadge = (m: ProjectMember) => {
+    const isAdmin = m.roleName === "Project Admin" || m.roleName === "PROJECT_ADMIN";
+    const Icon = isAdmin ? Crown : Shield;
+    const style = isAdmin ? "bg-yellow-50 text-yellow-700 border-yellow-200" : "bg-blue-50 text-blue-700 border-blue-200";
 
-  if (isAuthLoading)
     return (
-      <div className="min-h-[80vh] flex items-center justify-center">
-        <Loader2 className="w-12 h-12 text-blue-500 animate-spin" />
+      <div className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${style}`}>
+        <Icon className="w-3 h-3" />
+        {m.roleName || "Member"}
       </div>
     );
+  };
+
+  const formatDateTime = (date?: string | null): string => {
+    if (!date) return "—";
+    return new Date(date).toLocaleDateString("en-US", { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+
+  // ===============================================================
+  // 🖥️ RENDER UI
+  // ===============================================================
+
+  if (isAuthLoading) {
+    return <div className="flex items-center justify-center h-screen bg-slate-50"><Loader2 className="w-10 h-10 text-blue-600 animate-spin" /></div>;
+  }
+
+  if (!companyId) return <div className="p-8 text-center">No Active Company</div>;
 
   return (
-    <div className="min-h-screen px-6 py-10 bg-gradient-to-b from-white via-blue-50/40 to-white">
-      {/* HEADER */}
-      <div className="bg-gradient-to-r from-blue-500 via-cyan-500 to-blue-600 p-8 rounded-3xl shadow-2xl text-white mb-8">
-        <div className="flex items-center gap-4">
-          <div className="w-16 h-16 rounded-2xl bg-white/20 flex items-center justify-center">
-            <Users className="w-8 h-8" />
-          </div>
+    <div className="min-h-screen bg-slate-50 px-6 py-8 font-sans text-slate-900">
+      <div className="max-w-[1600px] mx-auto space-y-6">
+
+        {/* HEADER */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold flex items-center gap-2">
-              Thành viên Dự án
-              <Sparkles className="text-yellow-300 animate-pulse w-5 h-5" />
+            <h1 className="text-2xl font-bold text-slate-900">
+               Project Members <span className="text-slate-400 text-lg ml-2">({pagination.totalElements})</span>
             </h1>
-            <p className="text-white/80 mt-1">
-              Quản lý vai trò và thông tin thành viên trong dự án.
-            </p>
+            <p className="text-sm text-slate-500 mt-1">Manage team members within this project.</p>
+          </div>
+          
+          {/* Invite Button */}
+          <Button
+            onClick={() => setShowInviteModal(true)}
+            className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm font-bold h-10 px-5 rounded-[3px] flex items-center gap-2"
+          >
+            <UserPlus className="w-4 h-4" /> Add Member
+          </Button>
+        </div>
+
+        {/* TOOLBAR */}
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-3 items-center">
+          
+          {/* Select Field */}
+          <div className="relative w-full md:w-40">
+            <select
+              value={searchBy}
+              onChange={(e) => handleSearchByChange(e.target.value)}
+              className="w-full h-10 pl-3 pr-8 border border-slate-300 rounded-lg text-sm bg-slate-50 focus:ring-2 focus:ring-blue-100 focus:border-blue-500 cursor-pointer"
+            >
+              {SEARCH_FIELDS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
+            </select>
+            <Filter className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
+
+          {/* Input Search */}
+          <div className="relative w-full md:w-96 group">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
+            <input
+              type="text"
+              value={searchValue}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              placeholder={`Search by ${searchBy}...`}
+              className="w-full pl-9 pr-4 h-10 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition-all"
+            />
           </div>
         </div>
-      </div>
 
-      {/* SEARCH */}
-      <div className="mb-6 flex gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Tìm theo tên hoặc email..."
-            className="w-full pl-12 pr-4 py-3 border-2 rounded-xl"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-      </div>
-
-      {/* TABLE */}
-      {loading ? (
-        <div className="text-center py-20 bg-white rounded-2xl shadow">
-          <Loader2 className="w-10 h-10 mx-auto animate-spin" />
-          <p className="text-gray-500 mt-2">Đang tải...</p>
-        </div>
-      ) : (
-        <div className="bg-white rounded-2xl shadow overflow-hidden">
-          <MemberTable
-            members={filteredMembers}
-            renderStatus={renderStatusBadge}
-            renderRole={(m) => (
-              <div
-                className={`inline-flex items-center gap-1 px-3 py-1 rounded-full border ${
-                  m.roleCode === "PROJECT_ADMIN"
-                    ? "bg-yellow-50 text-yellow-700 border-yellow-200"
-                    : "bg-blue-50 text-blue-700 border-blue-200"
-                }`}
-              >
-                {m.roleCode === "PROJECT_ADMIN" ? (
-                  <Crown className="w-3.5 h-3.5" />
-                ) : (
-                  <Shield className="w-3.5 h-3.5" />
-                )}
-                {m.roleName}
-              </div>
-            )}
-            onViewDetail={handleViewDetail}
-            onEdit={openRoleModal}
-            onDelete={undefined}
-            disableDelete={() => true}
-            formatDateTime={formatDateTime} // ✔ REQUIRED
-          />
-        </div>
-      )}
-
-      {/* DETAIL MODAL */}
-      <MemberDetailModalBase
-        isOpen={showDetailModal}
-        onClose={() => setShowDetailModal(false)}
-        member={selectedMember}
-        loading={false}
-        title="Chi tiết thành viên dự án"
-        fields={[
-          { label: "ID thành viên", key: "memberId" },
-          { label: "User ID", key: "userId" },
-          { label: "Vai trò", key: "roleName" },
-          { label: "Email", key: "email" },
-          { label: "Ngày tham gia", key: "joinedAt" },
-        ]}
-      />
-
-{/* ROLE MODAL */}
-      {showRoleModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-lg p-6 w-[400px]">
-            <h2 className="text-xl font-bold mb-4">Đổi vai trò thành viên</h2>
-            <p className="mb-4 text-gray-600">
-              Thành viên: <strong>{roleMember?.fullName}</strong>
-            </p>
-
-            <select
-              className="w-full border rounded-lg p-3 mb-4"
-              value={roleMember?.roleCode || "PROJECT_MEMBER"} // ✅ fallback
-              onChange={(e) =>
-                setRoleMember({ ...roleMember, roleCode: e.target.value })
-              }
-            >
-              <option value="PROJECT_ADMIN">Quản trị dự án</option>
-              <option value="PROJECT_MEMBER">Thành viên dự án</option>
-            </select>
-
-
-            <div className="flex justify-end gap-3">
-              <button
-                className="px-4 py-2 rounded-lg bg-gray-200"
-                onClick={() => setShowRoleModal(false)}
-              >
-                Hủy
-              </button>
-              <button
-                className="px-4 py-2 rounded-lg bg-blue-600 text-white"
-                onClick={async () => {
-                  try {
-                    await updateProjectMemberRole(
-                      workspaceId,
-                      projectId,
-                      roleMember.memberId,
-                      roleMember.roleCode || "PROJECT_MEMBER" // ✅ fallback
-                    );
-                    showToast("Cập nhật vai trò thành công!", "success");
-                    await loadMembers(); // ✅ refresh danh sách
-                    setMembers((prev) =>
-                      prev.map((m) =>
-                        m.memberId === roleMember.memberId
-                          ? { ...m, roleCode: roleMember.roleCode }
-                          : m
-                      )
-                    );
-
-                    setShowRoleModal(false);
-                  } catch (err: any) {
-                    showToast(err.message || "Lỗi cập nhật vai trò", "error");
-                  }
-                }}
-              >
-                Lưu
-              </button>
+        {/* TABLE */}
+        {loading ? (
+          <div className="flex justify-center py-20 bg-white rounded-xl border border-slate-200 shadow-sm">
+            <Loader2 className="w-10 h-10 text-blue-600 animate-spin" />
+          </div>
+        ) : members.length > 0 ? (
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden animate-fadeInUp">
+            <MemberTable
+              members={members}
+              renderStatus={renderStatusBadge}
+              renderRole={renderRoleBadge}
+              formatDateTime={formatDateTime}
+              onViewDetail={(m) => handleViewDetail(m)}
+              onEdit={openEditModal}
+              onDelete={openDeleteConfirmation}
+              onSort={handleSort}
+              currentSortBy={searchParams.sortBy}
+              currentSortDir={searchParams.sortDir}
+              disableEdit={(m) => m.userId === user?.id}
+              disableDelete={(m) => m.userId === user?.id} 
+            />
+            
+            {/* PAGINATION */}
+            <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100">
+               <p className="text-sm text-slate-500">
+                  Page {pagination.pageNumber + 1} of {pagination.totalPages || 1}
+               </p>
+               <div className="flex gap-1">
+                  <Button onClick={() => handlePageChange(0)} disabled={pagination.first} variant="outline" size="icon" className="h-8 w-8"><ChevronsLeft className="w-4 h-4"/></Button>
+                  <Button onClick={() => handlePageChange(pagination.pageNumber - 1)} disabled={pagination.first} variant="outline" size="icon" className="h-8 w-8"><ChevronLeft className="w-4 h-4"/></Button>
+                  <Button onClick={() => handlePageChange(pagination.pageNumber + 1)} disabled={pagination.last} variant="outline" size="icon" className="h-8 w-8"><ChevronRight className="w-4 h-4"/></Button>
+                  <Button onClick={() => handlePageChange(pagination.totalPages - 1)} disabled={pagination.last} variant="outline" size="icon" className="h-8 w-8"><ChevronsRight className="w-4 h-4"/></Button>
+               </div>
             </div>
           </div>
-        </div>
-      )}
+        ) : (
+          <div className="flex flex-col items-center justify-center py-20 bg-white rounded-xl border-2 border-dashed border-slate-200">
+            <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
+              <Users className="w-8 h-8 text-slate-300" />
+            </div>
+            <h3 className="text-lg font-bold text-slate-900">No members found</h3>
+            <p className="text-sm text-slate-500 mt-1">Try adjusting your search or add a new member.</p>
+          </div>
+        )}
+
+        {/* --- MODALS --- */}
+        
+        {/* Invite Modal */}
+        <InviteMemberModal
+          isOpen={showInviteModal}
+          onClose={() => setShowInviteModal(false)}
+          onInvite={handleInvite}
+          isLoading={false}
+          email={inviteEmail}
+          setEmail={setInviteEmail}
+          roleCode={inviteRoleCode}
+          setRoleCode={setInviteRoleCode}
+          title="Add Member to Project"
+          description="Add an existing workspace member to this project."
+          contextType="project" 
+        />
+
+        {/* Detail Modal */}
+        <MemberDetailModalBase
+          isOpen={showDetailModal}
+          onClose={() => setShowDetailModal(false)}
+          member={detailMember}
+          loading={false}
+          title="Project Member Details"
+          fields={[
+             { label: "Full Name", key: "fullName" },
+             { label: "Email", key: "email" },
+             { label: "Role", key: "roleName" },
+             { label: "Joined At", key: "joinedAt" },
+             { label: "Phone", key: "phoneNumber" },
+          ]}
+        />
+
+        {/* Delete Confirmation */}
+        <ConfirmationModal
+          isOpen={isDeleteModalOpen}
+          onClose={() => setIsDeleteModalOpen(false)}
+          onConfirm={() => { showToast("Feature coming soon", "info"); setIsDeleteModalOpen(false); }}
+          isLoading={false}
+          title="Remove Member?"
+          description={`Are you sure you want to remove ${memberToDelete?.fullName} from this project?`}
+          confirmText="Remove"
+          cancelText="Cancel"
+          modalVariant="danger"
+        />
+
+        {/* Edit Role Modal */}
+        {showEditModal && selectedMember && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in">
+            <div className="w-full max-w-sm bg-white rounded-xl shadow-2xl overflow-hidden animate-in zoom-in-95">
+              <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                <h3 className="font-bold text-slate-900">Change Project Role</h3>
+                <button onClick={() => setShowEditModal(false)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
+              </div>
+              <div className="p-6 space-y-5">
+                 <p className="text-sm text-slate-600">Select a new role for <span className="font-bold text-slate-900">{selectedMember.fullName}</span>.</p>
+                 <div className="relative">
+                    <select 
+                        value={newRole} 
+                        onChange={(e) => setNewRole(e.target.value)}
+                        className="w-full pl-3 pr-8 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-500 bg-white appearance-none"
+                    >
+                        <option value="PROJECT_MEMBER">Project Member</option>
+                        <option value="PROJECT_ADMIN">Project Admin</option>
+                    </select>
+                    <ShieldAlert className="w-4 h-4 text-slate-400 absolute right-3 top-3 pointer-events-none" />
+                 </div>
+              </div>
+              <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+                 <Button variant="outline" onClick={() => setShowEditModal(false)}>Cancel</Button>
+                 <Button onClick={handleUpdateRole} disabled={isUpdating} className="bg-blue-600 hover:bg-blue-700 text-white">
+                    {isUpdating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+                    Save
+                 </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+      </div>
     </div>
   );
 }

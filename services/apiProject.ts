@@ -71,6 +71,23 @@ export interface BacklogTask {
   sortOrder: number;
 }
 
+// Interface payload cho update
+export interface UpdateProjectPayload {
+  name?: string;
+  projectCode?: string;
+  description?: string;
+  goal?: string;
+  coverImageUrl?: string; // URL cũ nếu có
+  priority?: string;
+  startDate?: string;
+  dueDate?: string;
+  projectTypeId?: number;
+  managerId?: number;
+  boardConfig?: object;
+  file?: File | null; // ✨ Thêm file ảnh mới
+}
+
+
 /* ============================================
    🛠️ 2. HELPER: LÀM SẠCH PARAMS
    (Loại bỏ null/undefined/rỗng trước khi gửi)
@@ -185,16 +202,49 @@ export const getProjectDetail = async (
   return res.data.data;
 };
 
-// --- 3.7 UPDATE PROJECT ---
+/* ============================================
+   6️⃣ UPDATE PROJECT (Multipart/Form-data) 🛠️
+============================================ */
 export const updateProject = async (
   companyId: number,
   workspaceId: number,
   projectId: number,
-  payload: any
+  payload: UpdateProjectPayload
 ): Promise<Project> => {
+  const formData = new FormData();
+
+  // 1. Đóng gói JSON (Key: "data")
+  const jsonPart = {
+    name: payload.name,
+    projectCode: payload.projectCode,
+    description: payload.description,
+    goal: payload.goal,
+    priority: payload.priority,
+    startDate: payload.startDate,
+    dueDate: payload.dueDate,
+    projectTypeId: payload.projectTypeId || 0,
+    managerId: payload.managerId || 0,
+    boardConfig: JSON.stringify(payload.boardConfig || {}),
+    // coverImageUrl không cần gửi ở đây nếu backend tự xử lý file
+  };
+
+  const jsonBlob = new Blob([JSON.stringify(jsonPart)], {
+    type: "application/json",
+  });
+  formData.append("data", jsonBlob);
+
+  // 2. Đóng gói File (Key: "file")
+  if (payload.file) {
+    formData.append("file", payload.file);
+  }
+
+  // 3. Gửi Request
   const res = await apiClient.put(
     `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}`,
-    payload
+    formData,
+    {
+      headers: { "Content-Type": "multipart/form-data" },
+    }
   );
 
   if (!res.data.success) throw new Error(res.data.message);
@@ -217,16 +267,68 @@ export const updateProjectStatus = async (
   return res.data.data;
 };
 
-// --- 3.9 GET PROJECT MEMBERS ---
+/* ============================================
+   8️⃣ GET PROJECT MEMBERS (LIST THƯỜNG)
+============================================ */
 export const getProjectMembers = async (
   companyId: number,
   workspaceId: number,
   projectId: number,
-  params: any = {}
+  params: {
+    page?: number;
+    size?: number;
+    sortBy?: string;
+    sortDir?: string;
+  } = {}
 ): Promise<PageResponse<ProjectMember>> => {
+  
+  const defaultParams = {
+    page: 0,
+    size: 10,
+    sortBy: "joinedAt",
+    sortDir: "desc",
+    ...params
+  };
+
   const res = await apiClient.get(
     `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/members`,
-    { params: cleanParams(params) }
+    { params: cleanParams(defaultParams) }
+  );
+
+  if (!res.data.success) throw new Error(res.data.message);
+  return res.data.data;
+};
+/* ============================================
+   🌟 8.1 SEARCH PROJECT MEMBERS (TÌM KIẾM)
+   URL: .../members/search?name=...
+============================================ */
+export const searchProjectMembers = async (
+  companyId: number,
+  workspaceId: number,
+  projectId: number,
+  params: {
+    name?: string;
+    email?: string;
+    role?: string;
+    phone?: string;
+    page?: number;
+    size?: number;
+    sortBy?: string;
+    sortDir?: string;
+  }
+): Promise<PageResponse<ProjectMember>> => {
+
+  const defaultParams = {
+    page: 0,
+    size: 10,
+    sortBy: "joinedAt",
+    sortDir: "desc",
+    ...params
+  };
+
+  const res = await apiClient.get(
+    `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/members/search`,
+    { params: cleanParams(defaultParams) }
   );
 
   if (!res.data.success) throw new Error(res.data.message);
