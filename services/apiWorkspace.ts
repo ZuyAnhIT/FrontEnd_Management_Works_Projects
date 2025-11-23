@@ -55,7 +55,7 @@ export const getWorkspaceDetail = async (
 };
 
 /* ============================================================
-   2️⃣ Update Workspace
+   2️⃣ Update Workspace (Multipart/Form-data)
 ============================================================ */
 export const updateWorkspace = async (
   companyId: number,
@@ -63,13 +63,40 @@ export const updateWorkspace = async (
   payload: {
     name?: string;
     description?: string;
-    coverImage?: string;
+    coverImage?: string; // URL cũ (nếu có)
     color?: string;
+    file?: File | null; // ✨ File ảnh mới từ máy
   }
 ): Promise<Workspace> => {
+  const formData = new FormData();
+
+  // 1. Đóng gói dữ liệu JSON (Key: "data")
+  const jsonPart = {
+    name: payload.name,
+    description: payload.description,
+    color: payload.color,
+    // Lưu ý: coverImage dạng string có thể không cần gửi ở đây nếu backend tự xử lý file
+    // Nhưng nếu backend cần giữ url cũ khi không có file mới, thì có thể gửi.
+    // Ở đây ta gửi các trường text cơ bản.
+  };
+
+  const jsonBlob = new Blob([JSON.stringify(jsonPart)], {
+    type: "application/json",
+  });
+  formData.append("data", jsonBlob);
+
+  // 2. Đóng gói File Ảnh (Key: "file")
+  if (payload.file) {
+    formData.append("file", payload.file);
+  }
+
+  // 3. Gửi Request
   const res = await apiClient.put(
     `/companies/${companyId}/workspaces/${workspaceId}`,
-    payload
+    formData,
+    {
+      headers: { "Content-Type": "multipart/form-data" },
+    }
   );
 
   if (!res.data.success) throw new Error(res.data.message);

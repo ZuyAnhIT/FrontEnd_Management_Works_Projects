@@ -1,34 +1,39 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   Settings,
-  Sparkles,
   Loader2,
   Save,
-  Palette,
-  FileText,
   Trash2,
   AlertTriangle,
-  Image as ImageIcon,
-  Target,
   Hash,
-  Calendar,
-  Flag,
+  Image as ImageIcon,
+  Camera,
+  UploadCloud
 } from "lucide-react";
 
 import {
   getProjectDetail,
   updateProject,
-  updateProjectStatus,
+  deleteProject,
 } from "@/services/apiProject";
-import { deleteProject } from "@/services/apiProject"; // Nếu bạn có API xóa
 
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/components/ui/ToastProvider";
 import LoadingButton from "@/components/ui/LoadingButton";
 import ConfirmationModal from "@/components/ui/ConfirmationModal";
+
+// Helper URL ảnh
+const getFullImageUrl = (path: string | null | undefined) => {
+  if (!path) return null;
+  if (path.startsWith("blob:") || path.startsWith("http")) return path;
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8082";
+  let cleanPath = path.startsWith("/") ? path.slice(1) : path;
+  if (!cleanPath.startsWith("uploads/")) cleanPath = `uploads/${cleanPath}`;
+  return `${API_URL}/${cleanPath}`;
+};
 
 export default function ProjectSettingsPage() {
   const { showToast } = useToast();
@@ -38,13 +43,17 @@ export default function ProjectSettingsPage() {
   const workspaceId = Number(params.workspaceId);
   const projectId = Number(params.projectId);
 
-  const { user, isLoading: isAuthLoading } = useAuth();
-  const companyId = user?.company?.companyId || null;
+  const { activeCompany, isLoading: isAuthLoading } = useAuth();
+  const companyId = activeCompany?.companyId;
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  
+  // File State
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [coverPreview, setCoverPreview] = useState<string | null>(null);
 
-  // Modal Delete Project
   const [deleting, setDeleting] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
@@ -53,17 +62,15 @@ export default function ProjectSettingsPage() {
     projectCode: "",
     description: "",
     goal: "",
-    coverImageUrl: "",
     priority: "MEDIUM",
     startDate: "",
     dueDate: "",
   });
 
-  // Load project detail
+  // 1. Load Detail
   useEffect(() => {
     if (isAuthLoading) return;
-    if (!companyId) {
-      showToast("Không tìm thấy thông tin công ty!", "error");
+    if (!companyId || !workspaceId || !projectId) {
       setLoading(false);
       return;
     }
@@ -71,78 +78,96 @@ export default function ProjectSettingsPage() {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const data = await getProjectDetail(workspaceId, projectId);
+        const data = await getProjectDetail(companyId, workspaceId, projectId);
 
         setForm({
           name: data.name || "",
           projectCode: data.projectCode || "",
           description: data.description || "",
           goal: data.goal || "",
-          coverImageUrl: data.coverImageUrl || "",
           priority: data.priority || "MEDIUM",
-          startDate: data.startDate?.split("T")[0] || "",
-          dueDate: data.dueDate?.split("T")[0] || "",
+          startDate: data.startDate ? data.startDate.split("T")[0] : "",
+          dueDate: data.dueDate ? data.dueDate.split("T")[0] : "",
         });
+        // Set preview ảnh từ server
+        setCoverPreview(getFullImageUrl(data.coverImageUrl));
       } catch (err: any) {
-        showToast(err.message || "Không thể tải thông tin dự án!", "error");
+        showToast(err.message || "Failed to load details", "error");
       } finally {
         setLoading(false);
       }
     };
     fetchData();
-  }, [companyId, projectId, workspaceId, isAuthLoading, showToast]);
+  }, [companyId, workspaceId, projectId, isAuthLoading, showToast]);
 
+  // Cleanup URL blob
+  useEffect(() => {
+    return () => {
+      if (coverPreview && coverPreview.startsWith("blob:")) {
+        URL.revokeObjectURL(coverPreview);
+      }
+    };
+  }, [coverPreview]);
+
+  // 2. Handlers
   const handleChange = (field: string, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
 
-  // Update project
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!form.name.trim()) {
-      showToast("Tên dự án không được để trống!", "warning");
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      showToast("File size must be < 5MB", "error");
+      return;
+    }
+    if (!file.type.startsWith("image/")) {
+      showToast("Please select an image file", "error");
       return;
     }
 
+    const objectUrl = URL.createObjectURL(file);
+    setCoverPreview(objectUrl);
+    setSelectedFile(file);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.name.trim()) {
+      showToast("Project name is required", "warning");
+      return;
+    }
+    if (!companyId) return;
+
     setSaving(true);
     try {
-      await updateProject(workspaceId, projectId, {
-        name: form.name,
-        projectCode: form.projectCode,
-        description: form.description,
-        goal: form.goal,
-        coverImageUrl: form.coverImageUrl,
-        priority: form.priority,
-        startDate: form.startDate,
-        dueDate: form.dueDate,
+      await updateProject(companyId, workspaceId, projectId, {
+        ...form,
+        file: selectedFile, // Gửi file mới
       });
 
-      showToast("Cập nhật dự án thành công!", "success");
+      showToast("Project updated successfully!", "success");
+      // Reset input file
+      setSelectedFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
     } catch (err: any) {
-      showToast(err.message || "Cập nhật thất bại!", "error");
+      showToast(err.message || "Update failed", "error");
     } finally {
       setSaving(false);
     }
   };
 
-  // Open delete modal
-  const openDeleteModal = () => {
-    if (!form.name) return;
-    setIsDeleteModalOpen(true);
-  };
-
-  // Confirm delete project
   const handleConfirmDelete = async () => {
     if (!companyId) return;
-
     setDeleting(true);
     try {
-      await deleteProject(workspaceId, projectId);
-      showToast("Xóa dự án thành công!", "success");
+      await deleteProject(companyId, workspaceId, projectId);
+      showToast("Project deleted successfully!", "success");
       setIsDeleteModalOpen(false);
-      router.push(`/core/${workspaceId}`);
+      router.push(`/core/workspace/${workspaceId}/project`); 
     } catch (err: any) {
-      showToast(err.message || "Xóa thất bại!", "error");
+      showToast(err.message || "Delete failed", "error");
       setDeleting(false);
     }
   };
@@ -154,201 +179,195 @@ export default function ProjectSettingsPage() {
       </div>
     );
 
+  if (!companyId) return <div className="p-8 text-center">No Active Company</div>;
+
   return (
     <div className="max-w-4xl mx-auto py-8 space-y-8 px-4">
-      {/* Card Settings */}
+      
+      {/* Settings Card */}
       <div className="bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden animate-fadeInUp">
-        <div className="p-6 border-b border-gray-200 flex items-center gap-4">
-          <div className="w-12 h-12 bg-blue-100 flex items-center justify-center rounded-lg">
+        <div className="p-6 border-b border-gray-200 flex items-center gap-4 bg-slate-50">
+          <div className="w-12 h-12 bg-blue-100 flex items-center justify-center rounded-lg border border-blue-200">
             <Settings className="w-6 h-6 text-blue-600" />
           </div>
           <div>
-            <h1 className="text-xl font-semibold text-gray-900">
-              Cài đặt Dự án
-            </h1>
-            <p className="text-sm text-gray-500">
-              Chỉnh sửa thông tin chi tiết dự án.
-            </p>
+            <h1 className="text-xl font-bold text-gray-900">Project Settings</h1>
+            <p className="text-sm text-gray-500">Manage general information.</p>
           </div>
         </div>
 
         <form onSubmit={handleSubmit}>
           <div className="p-6 space-y-5">
-            {/* Project Name */}
+            
+            {/* Cover Image Upload */}
+            <div className="flex flex-col sm:flex-row gap-6 items-start sm:items-center p-4 bg-slate-50 rounded-lg border border-dashed border-slate-200">
+                <div 
+                    className="relative group cursor-pointer shrink-0 w-full sm:w-48 h-28 bg-white border-2 border-white shadow-sm rounded-lg overflow-hidden"
+                    onClick={() => fileInputRef.current?.click()}
+                >
+                    {coverPreview ? (
+                        <img src={coverPreview} alt="Cover" className="w-full h-full object-cover" />
+                    ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-slate-100 text-slate-400">
+                            <ImageIcon className="w-8 h-8" />
+                        </div>
+                    )}
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center">
+                        <Camera className="w-8 h-8 text-white" />
+                    </div>
+                    <div className="absolute bottom-2 right-2 bg-blue-600 text-white p-1.5 rounded-full shadow-md">
+                        <UploadCloud className="w-3.5 h-3.5" />
+                    </div>
+                </div>
+                <div className="space-y-1">
+                    <h3 className="font-semibold text-slate-900">Project Cover</h3>
+                    <p className="text-xs text-slate-500 max-w-xs">Click image to upload. Max 5MB.</p>
+                    <input 
+                        type="file" 
+                        ref={fileInputRef} 
+                        className="hidden" 
+                        accept="image/png, image/jpeg, image/jpg"
+                        onChange={handleFileChange}
+                    />
+                </div>
+            </div>
+
+            {/* Name */}
             <div>
-              <label className="font-medium text-gray-700 text-sm mb-1 block">
-                Tên dự án *
-              </label>
+              <label className="font-semibold text-gray-700 text-sm mb-1.5 block">Project Name *</label>
               <input
                 type="text"
                 value={form.name}
                 onChange={(e) => handleChange("name", e.target.value)}
-                className="w-full border-2 rounded-xl px-4 py-3 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all"
                 required
               />
             </div>
 
-            {/* Project Code */}
+            {/* Code */}
             <div>
-              <label className="font-medium text-gray-700 text-sm mb-1 block">
-                Mã dự án
-              </label>
+              <label className="font-semibold text-gray-700 text-sm mb-1.5 block">Project Code</label>
               <div className="relative">
                 <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input
                   type="text"
                   value={form.projectCode}
                   onChange={(e) => handleChange("projectCode", e.target.value)}
-                  className="w-full border-2 rounded-xl px-4 pl-10 py-3 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  className="w-full border border-gray-300 rounded-xl px-4 pl-10 py-3 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 uppercase"
                 />
               </div>
             </div>
 
             {/* Description */}
             <div>
-              <label className="font-medium text-gray-700 text-sm mb-1 block">
-                Mô tả
-              </label>
+              <label className="font-semibold text-gray-700 text-sm mb-1.5 block">Description</label>
               <textarea
                 rows={3}
                 value={form.description}
                 onChange={(e) => handleChange("description", e.target.value)}
-                className="w-full border-2 rounded-xl px-4 py-3 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 resize-none"
+                className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 resize-none"
               />
             </div>
 
             {/* Goal */}
             <div>
-              <label className="font-medium text-gray-700 text-sm mb-1 block">
-                Mục tiêu dự án
-              </label>
+              <label className="font-semibold text-gray-700 text-sm mb-1.5 block">Goal</label>
               <textarea
-                rows={3}
+                rows={2}
                 value={form.goal}
                 onChange={(e) => handleChange("goal", e.target.value)}
-                className="w-full border-2 rounded-xl px-4 py-3 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 resize-none"
+                className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 resize-none"
               />
             </div>
 
-            {/* Cover Image */}
-            <div>
-              <label className="font-medium text-gray-700 text-sm mb-1 block">
-                Ảnh bìa (URL)
-              </label>
-              <div className="relative">
-                <ImageIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input
-                  type="text"
-                  value={form.coverImageUrl}
-                  onChange={(e) =>
-                    handleChange("coverImageUrl", e.target.value)
-                  }
-                  className="w-full border-2 rounded-xl px-4 pl-10 py-3 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                />
-              </div>
+            {/* Other Fields */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+               <div>
+                  <label className="font-semibold text-gray-700 text-sm mb-1.5 block">Priority</label>
+                  <select
+                    value={form.priority}
+                    onChange={(e) => handleChange("priority", e.target.value)}
+                    className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500 bg-white"
+                  >
+                    <option value="LOW">Low</option>
+                    <option value="MEDIUM">Medium</option>
+                    <option value="HIGH">High</option>
+                  </select>
+               </div>
+               <div>
+                  <label className="font-semibold text-gray-700 text-sm mb-1.5 block">Start Date</label>
+                  <input
+                    type="date"
+                    value={form.startDate}
+                    onChange={(e) => handleChange("startDate", e.target.value)}
+                    className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500"
+                  />
+               </div>
+               <div>
+                  <label className="font-semibold text-gray-700 text-sm mb-1.5 block">Due Date</label>
+                  <input
+                    type="date"
+                    value={form.dueDate}
+                    onChange={(e) => handleChange("dueDate", e.target.value)}
+                    className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500"
+                  />
+               </div>
             </div>
 
-            {/* Priority */}
-            <div>
-              <label className="font-medium text-gray-700 text-sm mb-1 block">
-                Mức độ ưu tiên
-              </label>
-              <select
-                value={form.priority}
-                onChange={(e) => handleChange("priority", e.target.value)}
-                className="w-full border-2 rounded-xl px-4 py-3 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-              >
-                <option value="LOW">Thấp</option>
-                <option value="MEDIUM">Trung bình</option>
-                <option value="HIGH">Cao</option>
-              </select>
-            </div>
-
-            {/* Dates */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <div>
-                <label className="text-sm font-medium mb-1 block">
-                  Ngày bắt đầu
-                </label>
-                <input
-                  type="date"
-                  value={form.startDate}
-                  onChange={(e) => handleChange("startDate", e.target.value)}
-                  className="w-full border-2 rounded-xl px-4 py-3"
-                />
-              </div>
-
-              <div>
-                <label className="text-sm font-medium mb-1 block">
-                  Ngày kết thúc
-                </label>
-                <input
-                  type="date"
-                  value={form.dueDate}
-                  onChange={(e) => handleChange("dueDate", e.target.value)}
-                  className="w-full border-2 rounded-xl px-4 py-3"
-                />
-              </div>
-            </div>
           </div>
 
-          {/* Save Button */}
-          <div className="bg-gray-50 px-6 py-4 border-t border-gray-200 rounded-b-xl">
-            <LoadingButton
-              type="submit"
-              isLoading={saving}
-              text="Lưu thay đổi"
-              loadingText="Đang lưu..."
-              className="px-6 py-3"
-              icon={<Save className="w-4 h-4 mr-2" />}
-            />
+          {/* Footer */}
+          <div className="bg-gray-50 px-6 py-4 border-t border-gray-200 flex justify-end rounded-b-xl">
+             <LoadingButton
+                type="submit"
+                isLoading={saving}
+                text="Save Changes"
+                loadingText="Saving..."
+                className="bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-sm px-8 py-2.5 rounded-lg"
+                icon={<Save className="w-4 h-4 mr-2" />}
+             />
           </div>
         </form>
       </div>
 
       {/* Danger Zone */}
-      <div className="bg-white rounded-xl shadow-xl border border-red-200 overflow-hidden animate-fadeInUp">
-        <div className="p-6 border-b border-red-200 flex items-center gap-4">
-          <div className="w-12 h-12 bg-red-100 flex items-center justify-center rounded-lg">
+      <div className="bg-white rounded-xl shadow-xl border border-red-200 overflow-hidden animate-fadeInUp delay-100">
+        <div className="p-6 border-b border-red-200 flex items-center gap-4 bg-red-50">
+          <div className="w-12 h-12 bg-red-100 flex items-center justify-center rounded-lg border border-red-200">
             <AlertTriangle className="w-6 h-6 text-red-600" />
           </div>
           <div>
-            <h1 className="text-xl font-semibold text-gray-900">
-              Khu vực nguy hiểm
-            </h1>
-            <p className="text-sm text-gray-500">
-              Các hành động này không thể hoàn tác.
-            </p>
+            <h1 className="text-xl font-bold text-red-900">Danger Zone</h1>
+            <p className="text-sm text-red-700">Irreversible actions.</p>
           </div>
         </div>
-
-        <div className="p-6">
-          <h3 className="font-semibold text-gray-900">Xóa dự án</h3>
-          <p className="text-sm text-gray-600 mt-1">
-            Xóa dự án sẽ xóa toàn bộ sprint, task, dữ liệu liên quan.
-          </p>
-
+        <div className="p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div>
+             <h3 className="font-bold text-gray-900">Delete Project</h3>
+             <p className="text-sm text-gray-600 mt-1">This action will move the project to trash.</p>
+          </div>
           <LoadingButton
             type="button"
-            onClick={openDeleteModal}
+            onClick={() => { if (form.name) setIsDeleteModalOpen(true); }}
             isLoading={deleting}
-            text="Xóa Dự án"
-            loadingText="Đang xóa..."
-            className="bg-red-600 hover:bg-red-700 mt-4"
+            text="Delete Project"
+            className="bg-white border-2 border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 font-bold px-6 py-2.5 rounded-lg shadow-sm"
             icon={<Trash2 className="w-4 h-4 mr-2" />}
           />
         </div>
       </div>
 
-      {/* Delete Modal */}
+      {/* Modal Delete */}
       <ConfirmationModal
         isOpen={isDeleteModalOpen}
         onClose={() => setIsDeleteModalOpen(false)}
         onConfirm={handleConfirmDelete}
         isLoading={deleting}
-        title="Xác nhận xóa dự án"
-        description={`Bạn có chắc chắn muốn xóa dự án "${form.name}"? Tất cả dữ liệu liên quan sẽ bị xóa vĩnh viễn.`}
-        confirmText="Vẫn Xóa"
+        title="Delete Project?"
+        description={`Are you sure you want to delete "${form.name}"?`}
+        confirmText="Delete Project"
+        cancelText="Cancel"
+        modalVariant="danger"
       />
     </div>
   );
