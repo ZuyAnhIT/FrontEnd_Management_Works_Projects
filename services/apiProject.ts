@@ -3,7 +3,7 @@
 import apiClient from "@/lib/apiClient";
 
 /* ============================================
-   📌 1. INTERFACES (Khớp với Backend)
+   📌 1. INTERFACES CHUNG (Project, Member)
 ============================================ */
 
 export interface PageResponse<T> {
@@ -50,47 +50,87 @@ export interface ProjectMember {
   status: string;
 }
 
-export interface BacklogTask {
-  id: number;
-  taskCode: string;
-  title: string;
-  taskType: string;
-  statusId: number;
-  statusName: string;
-  statusColor: string;
-  priority: string;
-  sprintId: number;
-  assigneeId: number;
-  assigneeName: string;
-  assigneeAvatarUrl: string;
-  epicId: number;
-  epicName: string;
-  epicColor: string;
-  storyPoints: number;
-  dueDate: string;
-  sortOrder: number;
-}
-
-// Interface payload cho update
+// Interface payload cho update Project
 export interface UpdateProjectPayload {
   name?: string;
   projectCode?: string;
   description?: string;
   goal?: string;
-  coverImageUrl?: string; // URL cũ nếu có
+  coverImageUrl?: string;
   priority?: string;
   startDate?: string;
   dueDate?: string;
   projectTypeId?: number;
   managerId?: number;
   boardConfig?: object;
-  file?: File | null; // ✨ Thêm file ảnh mới
+  file?: File | null;
 }
 
+/* ============================================
+   📌 2. INTERFACES CHO BACKLOG & SPRINT
+============================================ */
+
+// 1. Task trong Sprint/Backlog
+export interface TaskSummary {
+  id: number;
+  taskCode: string;
+  title: string;
+  taskType: string; // 'STORY' | 'TASK' | 'BUG'
+  statusId: number;
+  statusName: string;
+  statusColor: string;
+  priority: string; // 'URGENT', 'HIGH', 'MEDIUM', 'LOW'
+  sprintId?: number;
+  assigneeId?: number;
+  assigneeName?: string;
+  assigneeAvatarUrl?: string;
+  epicId?: number;
+  epicName?: string;
+  epicColor?: string;
+  storyPoints?: number;
+  dueDate?: string;
+  sortOrder: number;
+}
+
+// 2. Sprint Detail
+export interface SprintDetail {
+  id: number;
+  name: string;
+  goal?: string;
+  status: string; // 'IN_PROGRESS' | 'NOT_STARTED'
+  startDate?: string;
+  endDate?: string;
+  projectId: number;
+  totalStoryPoints: number;
+  taskCount: number;
+  tasks: TaskSummary[]; // Danh sách task con trong sprint
+}
+
+// 3. Response tổng của API /backlog
+export interface ProjectBacklogResponse {
+  activeSprints: SprintDetail[]; // CHỈ chứa Sprint đang chạy hoặc chưa chạy
+  backlogTasks: TaskSummary[];   // Các task chưa vào sprint
+  
+  backlogPageNumber: number;
+  backlogPageSize: number;
+  backlogTotalElements: number;
+  backlogTotalPages: number;
+}
+
+// 4. Param Filter
+export interface BacklogQueryParams {
+  keyword?: string;
+  priority?: string;
+  taskType?: string;
+  assigneeId?: number;
+  page?: number;
+  size?: number;
+  sortBy?: string;
+  sortDir?: 'asc' | 'desc';
+}
 
 /* ============================================
-   🛠️ 2. HELPER: LÀM SẠCH PARAMS
-   (Loại bỏ null/undefined/rỗng trước khi gửi)
+   🛠️ 3. HELPER: LÀM SẠCH PARAMS
 ============================================ */
 const cleanParams = (params: any) => {
   if (!params) return {};
@@ -100,10 +140,10 @@ const cleanParams = (params: any) => {
 };
 
 /* ============================================
-   3️⃣ API METHODS
+   4️⃣ API METHODS
 ============================================ */
 
-// --- 3.1 GET PROJECT LIST (Lấy danh sách thường, lọc status) ---
+// --- 4.1 GET PROJECT LIST ---
 export const getProjects = async (
   companyId: number,
   workspaceId: number,
@@ -118,7 +158,7 @@ export const getProjects = async (
   return res.data.data;
 };
 
-// --- 3.2 SEARCH PROJECTS (Tìm kiếm nâng cao: name, code, manager) ---
+// --- 4.2 SEARCH PROJECTS ---
 export const searchProjects = async (
   companyId: number,
   workspaceId: number,
@@ -133,12 +173,11 @@ export const searchProjects = async (
   return res.data.data;
 };
 
-// --- 3.3 GET TRASHED PROJECTS ---
+// --- 4.3 GET TRASHED PROJECTS ---
 export const getTrashedProjects = async (
   companyId: number,
   workspaceId: number
 ): Promise<Project[]> => {
-  // Tái sử dụng getProjects với status DELETED
   const data = await getProjects(companyId, workspaceId, {
     page: 0,
     size: 200,
@@ -147,34 +186,21 @@ export const getTrashedProjects = async (
   return data.content;
 };
 
-// --- 3.4 CREATE PROJECT ---
+// --- 4.4 CREATE PROJECT ---
 export const createProject = async (
   companyId: number,
   workspaceId: number,
-  payload: {
-    name: string;
-    projectCode: string;
-    description?: string;
-    goal?: string;
-    coverImageUrl?: string;
-    priority?: string;
-    startDate?: string;
-    dueDate?: string;
-    projectTypeId?: number;
-    managerId?: number;
-    boardConfig?: object;
-  }
+  payload: any
 ): Promise<Project> => {
   const res = await apiClient.post(
     `/companies/${companyId}/workspaces/${workspaceId}/projects`,
     payload
   );
-
   if (!res.data.success) throw new Error(res.data.message);
   return res.data.data;
 };
 
-// --- 3.5 DELETE PROJECT (Soft Delete) ---
+// --- 4.5 DELETE PROJECT ---
 export const deleteProject = async (
   companyId: number,
   workspaceId: number,
@@ -183,12 +209,11 @@ export const deleteProject = async (
   const res = await apiClient.delete(
     `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}`
   );
-
   if (!res.data.success) throw new Error(res.data.message);
   return res.data;
 };
 
-// --- 3.6 GET PROJECT DETAIL ---
+// --- 4.6 GET PROJECT DETAIL ---
 export const getProjectDetail = async (
   companyId: number,
   workspaceId: number,
@@ -197,14 +222,11 @@ export const getProjectDetail = async (
   const res = await apiClient.get(
     `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}`
   );
-
   if (!res.data.success) throw new Error(res.data.message);
   return res.data.data;
 };
 
-/* ============================================
-   6️⃣ UPDATE PROJECT (Multipart/Form-data) 🛠️
-============================================ */
+// --- 4.7 UPDATE PROJECT (Multipart) ---
 export const updateProject = async (
   companyId: number,
   workspaceId: number,
@@ -213,7 +235,6 @@ export const updateProject = async (
 ): Promise<Project> => {
   const formData = new FormData();
 
-  // 1. Đóng gói JSON (Key: "data")
   const jsonPart = {
     name: payload.name,
     projectCode: payload.projectCode,
@@ -225,33 +246,26 @@ export const updateProject = async (
     projectTypeId: payload.projectTypeId || 0,
     managerId: payload.managerId || 0,
     boardConfig: JSON.stringify(payload.boardConfig || {}),
-    // coverImageUrl không cần gửi ở đây nếu backend tự xử lý file
   };
 
-  const jsonBlob = new Blob([JSON.stringify(jsonPart)], {
-    type: "application/json",
-  });
+  const jsonBlob = new Blob([JSON.stringify(jsonPart)], { type: "application/json" });
   formData.append("data", jsonBlob);
 
-  // 2. Đóng gói File (Key: "file")
   if (payload.file) {
     formData.append("file", payload.file);
   }
 
-  // 3. Gửi Request
   const res = await apiClient.put(
     `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}`,
     formData,
-    {
-      headers: { "Content-Type": "multipart/form-data" },
-    }
+    { headers: { "Content-Type": "multipart/form-data" } }
   );
 
   if (!res.data.success) throw new Error(res.data.message);
   return res.data.data;
 };
 
-// --- 3.8 UPDATE PROJECT STATUS (Restore/Archive) ---
+// --- 4.8 UPDATE PROJECT STATUS ---
 export const updateProjectStatus = async (
   companyId: number,
   workspaceId: number,
@@ -262,14 +276,11 @@ export const updateProjectStatus = async (
     `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/status`,
     { newStatus }
   );
-
   if (!res.data.success) throw new Error(res.data.message);
   return res.data.data;
 };
 
-/* ============================================
-   8️⃣ GET PROJECT MEMBERS (LIST THƯỜNG)
-============================================ */
+// --- 4.9 GET PROJECT MEMBERS ---
 export const getProjectMembers = async (
   companyId: number,
   workspaceId: number,
@@ -281,61 +292,32 @@ export const getProjectMembers = async (
     sortDir?: string;
   } = {}
 ): Promise<PageResponse<ProjectMember>> => {
-  
-  const defaultParams = {
-    page: 0,
-    size: 10,
-    sortBy: "joinedAt",
-    sortDir: "desc",
-    ...params
-  };
-
+  const defaultParams = { page: 0, size: 10, sortBy: "joinedAt", sortDir: "desc", ...params };
   const res = await apiClient.get(
     `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/members`,
     { params: cleanParams(defaultParams) }
   );
-
   if (!res.data.success) throw new Error(res.data.message);
   return res.data.data;
 };
-/* ============================================
-   🌟 8.1 SEARCH PROJECT MEMBERS (TÌM KIẾM)
-   URL: .../members/search?name=...
-============================================ */
+
+// --- 4.10 SEARCH PROJECT MEMBERS ---
 export const searchProjectMembers = async (
   companyId: number,
   workspaceId: number,
   projectId: number,
-  params: {
-    name?: string;
-    email?: string;
-    role?: string;
-    phone?: string;
-    page?: number;
-    size?: number;
-    sortBy?: string;
-    sortDir?: string;
-  }
+  params: any
 ): Promise<PageResponse<ProjectMember>> => {
-
-  const defaultParams = {
-    page: 0,
-    size: 10,
-    sortBy: "joinedAt",
-    sortDir: "desc",
-    ...params
-  };
-
+  const defaultParams = { page: 0, size: 10, sortBy: "joinedAt", sortDir: "desc", ...params };
   const res = await apiClient.get(
     `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/members/search`,
     { params: cleanParams(defaultParams) }
   );
-
   if (!res.data.success) throw new Error(res.data.message);
   return res.data.data;
 };
 
-// --- 3.10 UPDATE PROJECT MEMBER ROLE ---
+// --- 4.11 UPDATE MEMBER ROLE ---
 export const updateProjectMemberRole = async (
   companyId: number,
   workspaceId: number,
@@ -347,26 +329,37 @@ export const updateProjectMemberRole = async (
     `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/members/${memberId}/role`,
     { roleCode }
   );
-
   if (!res.data.success) throw new Error(res.data.message);
   return res.data.data;
 };
 
-// --- 3.11 GET BACKLOG ---
+/* ============================================
+   🔥 4.12 GET BACKLOG (UPDATED) 🔥
+============================================ */
 export const getProjectBacklog = async (
   companyId: number,
   workspaceId: number,
-  projectId: number
-): Promise<BacklogTask[]> => {
+  projectId: number,
+  queryParams?: BacklogQueryParams
+): Promise<ProjectBacklogResponse> => {
+  
+  // Clean params (xóa null/undefined/rỗng)
+  const params = queryParams ? Object.fromEntries(
+    Object.entries(queryParams).filter(([_, v]) => v != null && v !== "")
+  ) : {};
+
   const res = await apiClient.get(
-    `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/backlog`
+    `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/backlog`,
+    { params }
   );
 
   if (!res.data.success) throw new Error(res.data.message);
-  return res.data.data;
+  
+  // Trả về đúng cục data to (gồm activeSprints + backlogTasks)
+  return res.data.data; 
 };
 
-// --- 3.12 CREATE TASK ---
+// --- 4.13 CREATE TASK ---
 export const createProjectTask = async (
   companyId: number,
   workspaceId: number,
@@ -377,7 +370,6 @@ export const createProjectTask = async (
     `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/tasks`,
     payload
   );
-
   if (!res.data.success) throw new Error(res.data.message);
   return res.data.data;
 };

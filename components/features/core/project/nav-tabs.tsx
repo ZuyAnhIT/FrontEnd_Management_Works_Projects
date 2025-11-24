@@ -39,13 +39,13 @@ export default function ProjectNavTabs({
     {
       id: 'sprints',
       icon: GitBranch,
-      label: 'Backlog',
+      label: 'Sprint',
       path: `/core/workspace/${workspaceId}/project/${projectId}/sprints`,
     },
     {
       id: 'backlog',
       icon: MenuIcon,
-      label: 'List',
+      label: 'Backlog',
       path: `/core/workspace/${workspaceId}/project/${projectId}/backlog`,
     },
   
