@@ -1,13 +1,60 @@
+// services/apiTask.ts
 "use client";
-
 
 import apiClient from "@/lib/apiClient";
 
+// ------------------------------------------------
+// 1. INTERFACES
+// ------------------------------------------------
 
-// =============================
-// 🧩 SPRINT ASSIGNMENT
-// =============================
+export interface TaskDetail {
+  id: number;
+  taskCode: string;
+  title: string;
+  description: string | null;
+  
+  // Status
+  statusId: number;
+  statusName: string;
+  statusColor: string;
 
+  taskType: string; // 'TASK', 'BUG', 'STORY'
+  priority: string; // 'HIGH', 'MEDIUM', 'LOW', 'URGENT'
+  
+  storyPoints: number | null;
+  startDate: string | null;
+  dueDate: string | null;
+  
+  // People
+  assigneeId: number | null;
+  assigneeName: string | null;
+  assigneeAvatar: string | null; // Lưu ý: API trả về assigneeAvatar, không phải assigneeAvatarUrl
+
+  projectId: number;
+  sprintId: number | null;
+  
+  // Tracking (Optional based on response)
+  createdByName?: string;
+  createdAt?: string;
+}
+
+// ------------------------------------------------
+// 2. API METHODS
+// ------------------------------------------------
+
+// 🔹 Lấy chi tiết Task
+export const getTaskDetails = async (taskId: number): Promise<TaskDetail> => {
+  const res = await apiClient.get(`/tasks/${taskId}`);
+  if (!res.data.success) throw new Error(res.data.message);
+  return res.data.data; 
+};
+
+// 🔹 Cập nhật Task (Dùng cho Bước 4 sau này)
+export const updateTask = async (taskId: number, payload: Partial<TaskDetail>) => {
+  const res = await apiClient.put(`/tasks/${taskId}`, payload);
+  if (!res.data.success) throw new Error(res.data.message);
+  return res.data.data;
+};
 
 // 🔹 Gán task vào sprint
 export const assignTaskToSprint = async (taskId: number, sprintId: number) => {
