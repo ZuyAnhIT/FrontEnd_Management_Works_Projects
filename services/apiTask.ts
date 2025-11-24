@@ -37,6 +37,20 @@ export interface TaskDetail {
   createdByName?: string;
   createdAt?: string;
 }
+export interface UpdateTaskData {
+  title?: string;
+  description?: string;
+  taskType?: 'STORY' | 'TASK' | 'BUG' | 'EPIC' | 'SUBTASK';
+  priority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+  statusId?: number;
+  sprintId?: number | null;
+  epicId?: number | null;
+  assigneeId?: number | null;
+  storyPoints?: number;
+  estimatedHours?: number;
+  startDate?: string; // ISO String
+  dueDate?: string;   // ISO String
+}
 
 // ------------------------------------------------
 // 2. API METHODS
@@ -49,11 +63,10 @@ export const getTaskDetails = async (taskId: number): Promise<TaskDetail> => {
   return res.data.data; 
 };
 
-// 🔹 Cập nhật Task (Dùng cho Bước 4 sau này)
-export const updateTask = async (taskId: number, payload: Partial<TaskDetail>) => {
-  const res = await apiClient.put(`/tasks/${taskId}`, payload);
-  if (!res.data.success) throw new Error(res.data.message);
-  return res.data.data;
+// Hàm cập nhật
+export const updateTask = async (taskId: number, data: UpdateTaskData) => {
+  const res = await apiClient.put(`/tasks/${taskId}`, data);
+  return res.data; 
 };
 
 // 🔹 Gán task vào sprint
