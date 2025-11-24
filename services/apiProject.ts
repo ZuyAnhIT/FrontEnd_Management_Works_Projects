@@ -359,17 +359,3 @@ export const getProjectBacklog = async (
   return res.data.data; 
 };
 
-// --- 4.13 CREATE TASK ---
-export const createProjectTask = async (
-  companyId: number,
-  workspaceId: number,
-  projectId: number,
-  payload: any
-) => {
-  const res = await apiClient.post(
-    `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/tasks`,
-    payload
-  );
-  if (!res.data.success) throw new Error(res.data.message);
-  return res.data.data;
-};
