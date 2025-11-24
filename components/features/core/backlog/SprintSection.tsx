@@ -9,7 +9,12 @@ import { Button } from "@/components/ui/button";
 // Helper format date
 const formatDate = (d?: string) => d ? new Date(d).toLocaleDateString('en-US', { day: 'numeric', month: 'short' }) : '...';
 
-export default function SprintSection({ sprints }: { sprints: SprintDetail[] }) {
+interface SprintSectionProps {
+  sprints: SprintDetail[];
+  onTaskClick: (taskId: number) => void; // ✅ Prop mới
+}
+
+export default function SprintSection({ sprints, onTaskClick }: SprintSectionProps) {
   // Mặc định mở tất cả
   const [expanded, setExpanded] = useState<Record<number, boolean>>(
     sprints.reduce((acc, s) => ({ ...acc, [s.id]: true }), {})
@@ -45,7 +50,7 @@ export default function SprintSection({ sprints }: { sprints: SprintDetail[] }) 
                   </button>
                   
                   <div>
-                     <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2">
                         <h3 className="text-sm font-bold text-slate-900">
                            {sprint.name}
                         </h3>
@@ -60,10 +65,10 @@ export default function SprintSection({ sprints }: { sprints: SprintDetail[] }) 
                               Planned
                            </span>
                         )}
-                     </div>
+                      </div>
 
-                     {/* Meta Info */}
-                     <div className="text-xs text-slate-500 mt-1 flex items-center gap-3">
+                      {/* Meta Info */}
+                      <div className="text-xs text-slate-500 mt-1 flex items-center gap-3">
                         {sprint.startDate && sprint.endDate && (
                            <div className="flex items-center gap-1">
                               <Calendar className="w-3 h-3" />
@@ -78,7 +83,7 @@ export default function SprintSection({ sprints }: { sprints: SprintDetail[] }) 
                               Goal: {sprint.goal}
                            </span>
                         )}
-                     </div>
+                      </div>
                   </div>
                </div>
 
@@ -107,7 +112,12 @@ export default function SprintSection({ sprints }: { sprints: SprintDetail[] }) 
                <div className="p-2 space-y-2 min-h-[50px]">
                   {sprint.tasks.length > 0 ? (
                      sprint.tasks.map(task => (
-                        <BacklogTaskItem key={task.id} task={task} onClick={() => {}} />
+                        <BacklogTaskItem 
+                            key={task.id} 
+                            task={task} 
+                            // ✅ GỌI HÀM ON CLICK KHI BẤM VÀO TASK
+                            onClick={() => onTaskClick(task.id)} 
+                        />
                      ))
                   ) : (
                      <div className="flex flex-col items-center justify-center py-6 text-slate-400 border-2 border-dashed border-slate-200 rounded-lg m-1 bg-white/50">
