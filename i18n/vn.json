@@ -1,0 +1,145 @@
+{
+  "features": {
+    "heading": "Các Tính Năng Nổi Bật",
+    "teamCollabTitle": "Hợp Tác Nhóm",
+    "teamCollabDesc": "Làm việc cùng nhau hiệu quả và nhanh chóng.",
+    "smartAutoTitle": "Tự Động Thông Minh",
+    "smartAutoDesc": "Giảm thao tác thủ công và tiết kiệm thời gian.",
+    "securityTitle": "Bảo Mật Hàng Đầu",
+    "securityDesc": "Dữ liệu của bạn được mã hoá và bảo vệ tuyệt đối."
+  },
+   "hero": {
+    "socialProof": "Hơn 10.000+ đội nhóm đang sử dụng WorkNet",
+    "headlinePart1": "Quản lý dự án",
+    "headlinePart2": "trở nên đơn giản & thông minh",
+    "description": "WorkNet giúp bạn tổ chức công việc, theo dõi tiến độ và cộng tác hiệu quả — tất cả trên một nền tảng.",
+    "ctaStart": "Bắt đầu dùng thử 14 ngày",
+    "ctaDemo": "Xem demo"
+  },
+  "footer": {
+    "copyright": "© {{year}} WorkNet. Tạo bởi ❤️ 3S_TC_CANDYHZ, Duc Smile"
+  },
+  "header": {
+    "nav": {
+      "features": "Tính năng",
+      "pricing": "Bảng giá",
+      "about": "Giới thiệu"
+    },
+    "login": "Đăng nhập",
+    "register": "Bắt đầu ngay",
+    "menuOpen": "Mở menu",
+    "menuClose": "Đóng menu"
+  },
+  "pricing": {
+    "heading": "Giá cả minh bạch và đơn giản",
+    "subheading": "Chọn gói phù hợp với đội nhóm của bạn. Không chi phí ẩn.",
+
+    "plans": {
+      "free": {
+        "name": "Miễn phí",
+        "desc": "Tuyệt vời để bắt đầu",
+        "features": [
+          "Tối đa 5 thành viên",
+          "3 dự án",
+          "1 GB lưu trữ",
+          "Hỗ trợ cơ bản"
+        ]
+      },
+
+      "pro": {
+        "name": "Pro",
+        "desc": "Dành cho đội nhóm chuyên nghiệp",
+        "features": [
+          "Không giới hạn thành viên",
+          "Không giới hạn dự án",
+          "100 GB lưu trữ",
+          "Hỗ trợ ưu tiên 24/7"
+        ],
+        "popularBadge": "Phổ biến nhất"
+      },
+
+      "enterprise": {
+        "name": "Doanh nghiệp",
+        "desc": "Dành cho tổ chức lớn",
+        "features": [
+          "Tùy chỉnh toàn diện",
+          "Bảo mật nâng cao",
+          "Lưu trữ không giới hạn",
+          "Hỗ trợ riêng"
+        ]
+      }
+    },
+
+    "ctaTrial": "Dùng thử miễn phí",
+    "ctaContact": "Liên hệ tư vấn"
+  },
+   "testimonial": {
+    "heading": "Vì sao chọn WorkNet?",
+    "description": "WorkNet không chỉ là một công cụ quản lý — nó là một <strong>nền tảng kết nối đội nhóm</strong> giúp bạn tập trung vào điều quan trọng nhất: hiệu suất công việc.",
+    "quote": "“Nhờ WorkNet, đội nhóm của tôi tiết kiệm 30% thời gian họp và cải thiện đáng kể tiến độ dự án.”",
+    "role": "Giám đốc điều hành",
+    "company": "TechCorp",
+    "initial": "C"
+  },
+  "landing": {
+    "toastRegister": "Bắt đầu hành trình của bạn ngay hôm nay!"
+  },
+   "invite": {
+    "errors": {
+      "invalidToken": "Mã lời mời không hợp lệ hoặc bị thiếu.",
+      "expired": "Lời mời không hợp lệ hoặc đã hết hạn."
+    },
+
+    "loading": {
+      "validating": "Đang kiểm tra lời mời..."
+    },
+
+    "common": {
+      "emailLabel": "Email lời mời",
+      "fullName": "Họ tên",
+      "createPassword": "Tạo mật khẩu",
+      "confirmPassword": "Xác nhận mật khẩu",
+      "minCharacters": "Tối thiểu 6 ký tự",
+      "reenterPassword": "Nhập lại mật khẩu"
+    },
+
+    "newUser": {
+      "title": "Bạn đã được mời!",
+      "subtitle": "Tham gia <strong>{{company}}</strong> trên WorkNet.<br/>Tạo tài khoản để bắt đầu.",
+      "createAccount": "Tạo tài khoản & Tham gia",
+      "passwordNotMatch": "Mật khẩu không khớp!",
+      "welcomeToast": "Chào mừng bạn!"
+    },
+
+    "existing": {
+      "welcomeBack": "Chào mừng quay lại!",
+      "loginToJoin": "Đăng nhập vào <strong>{{email}}</strong> để tham gia <strong>{{company}}</strong>.",
+      "acceptTitle": "Chấp nhận lời mời",
+      "acceptSubtitle": "Bạn đang đăng nhập dưới tài khoản <strong>{{email}}</strong>.<br/>Tham gia <strong>{{company}}</strong>?",
+      "acceptButton": "Chấp nhận & Tham gia workspace",
+      "notYou": "Không phải bạn? Đăng xuất",
+
+      "wrongAccountTitle": "Sai tài khoản",
+      "wrongAccountFor": "Lời mời dành cho:",
+      "wrongAccountCurrent": "Đang đăng nhập:",
+      "logoutAndLogin": "Đăng xuất & đăng nhập lại đúng tài khoản",
+
+      "acceptedToast": "Chấp nhận lời mời thành công!"
+    },
+
+    "errorPage": {
+      "title": "Lỗi lời mời",
+      "backHome": "Về trang chủ"
+    },
+    "forgot": {
+    "email": "Email",
+    "emailPlaceholder": "user@gmail.com",
+
+    "errorInvalidEmail": "Vui lòng nhập email hợp lệ.",
+    "successMessage": "Liên kết đặt lại mật khẩu đã được gửi. Vui lòng kiểm tra email (bao gồm cả Spam).",
+    "failedMessage": "Gửi email thất bại. Vui lòng thử lại sau.",
+
+    "sendButton": "Gửi liên kết đặt lại mật khẩu"
+  }
+  }
+}

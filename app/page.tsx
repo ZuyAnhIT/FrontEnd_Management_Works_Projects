@@ -3,8 +3,9 @@
 import { useState } from "react";
 import AuthModal from "@/components/features/auth/AuthModal";
 import { useToast } from "@/components/ui/ToastProvider";
+import { useTranslation } from "react-i18next";
 
-// 1. Import các section đã được tách ra
+// Sections
 import LandingHeader from "@/components/features/landing/LandingHeader";
 import HeroSection from "@/components/features/landing/HeroSection";
 import FeaturesSection from "@/components/features/landing/FeaturesSection";
@@ -15,10 +16,11 @@ import LandingFooter from "@/components/features/landing/LandingFooter";
 export default function LandingPage() {
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const { showToast } = useToast();
+  const { t } = useTranslation();
 
   const handleRegisterClick = () => {
     setIsAuthOpen(true);
-    showToast("Start your journey today!", "info"); // Thông báo tiếng Anh
+    showToast(t("landing.toastRegister"), "info");
   };
 
   const handleLoginClick = () => {
@@ -26,15 +28,20 @@ export default function LandingPage() {
   };
 
   return (
-    // Thêm scroll-smooth để các link anchor (a href="#...") cuộn mượt
-    <div className="min-h-screen bg-gradient-to-b from-white via-blue-50/40 to-white scroll-smooth">
-      {/* Lắp ráp các component con */}
+    <div
+      className="
+    min-h-screen 
+    scroll-smooth
+    bg-gradient-to-b from-white via-blue-50/40 to-white
+    dark:bg-gradient-to-b dark:from-slate-900 dark:via-slate-950 dark:to-slate-900
+  "
+    >
+
       <LandingHeader
         onLoginClick={handleLoginClick}
         onRegisterClick={handleRegisterClick}
       />
 
-      {/* Bọc các section trong <main> để đúng ngữ nghĩa HTML */}
       <main>
         <HeroSection onRegisterClick={handleRegisterClick} />
         <FeaturesSection />
@@ -44,8 +51,10 @@ export default function LandingPage() {
 
       <LandingFooter />
 
-      {/* Modal được kiểm soát ở trang cao nhất */}
-      <AuthModal isOpen={isAuthOpen} onClose={() => setIsAuthOpen(false)} />
+      <AuthModal
+        isOpen={isAuthOpen}
+        onClose={() => setIsAuthOpen(false)}
+      />
     </div>
   );
 }

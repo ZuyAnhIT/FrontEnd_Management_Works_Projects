@@ -1,14 +1,15 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
+
 import InputField from "./InputField";
 import { Mail } from "lucide-react";
 import LoadingButton from "@/components/ui/LoadingButton";
-// ⛔️ Sửa đường dẫn nếu cần
 import { forgotPassword } from "@/services/apiAuth";
 
 interface AuthFormForgotProps {
-  form: { email: string }; // Chỉ cần email
+  form: { email: string };
   handleChange: (
     field: "email"
   ) => (e: React.ChangeEvent<HTMLInputElement>) => void;
@@ -22,16 +23,14 @@ export default function AuthFormForgot({
   isLoading,
   setTab,
 }: AuthFormForgotProps) {
+  const { t } = useTranslation();
+
   const [message, setMessage] = useState<string | null>(null);
   const [isError, setIsError] = useState(false);
 
-  // ❌ Xóa state loading riêng, dùng isLoading từ AuthModal
-  // const [loading, setLoading] = useState(false);
-  // ❌ Xóa state 'step'
-
   const handleSendEmail = async () => {
     if (!form.email.trim()) {
-      setMessage("Please enter a valid email.");
+      setMessage(t("forgot.errorInvalidEmail"));
       setIsError(true);
       return;
     }
@@ -39,57 +38,39 @@ export default function AuthFormForgot({
     try {
       setMessage(null);
       setIsError(false);
-      // setLoading(true); // Tạm thời dùng prop isLoading từ cha
-      // (Tuy nhiên, logic submit này nên ở AuthModal,
-      // nhưng ta tạm giữ ở đây cho nhanh)
 
       const res = await forgotPassword(form.email);
+
       setMessage(
-        res?.message || "Link sent. Please check your email (including Spam)."
+        res?.message || t("forgot.successMessage")
       );
       setIsError(false);
-
-      // ❌ Không chuyển sang Step 2 nữa
-      // setStep(2);
     } catch (error: any) {
-      setMessage(error.message || "Failed to send email. Please try again later.");
+      setMessage(error.message || t("forgot.failedMessage"));
       setIsError(true);
-    } finally {
-      // setLoading(false);
     }
   };
 
   return (
     <div>
-      {/* 🧩 Chỉ còn Step 1: Nhập email */}
       <InputField
-        label="Email"
+        label={t("forgot.email")}
         icon={<Mail className="w-4 h-4 text-gray-400" />}
         type="email"
         value={form.email}
         onChange={handleChange("email")}
-        placeholder="user@gmail.com"
+        placeholder={t("forgot.emailPlaceholder")}
         required
       />
 
-      {/* ⛔️ Lưu ý:
-        Để chuyên nghiệp, `isLoading` nên được truyền từ AuthModal.
-        Bạn nên di chuyển logic `handleSendEmail` lên AuthModal
-        giống như `handleSubmit` của Login/Register.
-        
-        Nhưng để "demo gấp" và giữ logic của bạn, chúng ta
-        tạm thời gọi 1 hàm riêng ở đây.
-        Chúng ta sẽ dùng `isLoading` của cha cho nút này.
-      */}
       <LoadingButton
         type="button"
-        isLoading={isLoading} // Dùng isLoading của cha
+        isLoading={isLoading}
         onClick={handleSendEmail}
         className="w-full mt-4"
-        text="Send reset link"
+        text={t("forgot.sendButton")}
       />
 
-      {/* 🎨 Hiển thị thông báo */}
       {message && (
         <div
           className={`mt-3 text-sm text-center p-3 rounded-lg ${

@@ -1,11 +1,9 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { ToastProvider } from "@/components/ui/ToastProvider";
-import { AuthProvider } from "@/context/AuthContext";
-import { GoogleOAuthProvider } from "@react-oauth/google";
 
-// Cấu hình font chữ
+import ClientProviders from "./ClientProviders"; // ⭐ Dùng client provider
+
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -21,27 +19,13 @@ export const metadata: Metadata = {
   description: "Manage projects, tasks, and teams efficiently.",
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="vi">
       <body
-        // Thêm bg-slate-50 text-slate-900 để thiết lập style mặc định toàn app (Minimalist Jira)
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-slate-50 text-slate-900`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100`}
       >
-        <GoogleOAuthProvider
-          clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!}
-        >
-          {/* ToastProvider bọc ngoài cùng để thông báo luôn hiển thị trên mọi lớp */}
-          <ToastProvider>
-            <AuthProvider>
-              {children}
-            </AuthProvider>
-          </ToastProvider>
-        </GoogleOAuthProvider>
+        <ClientProviders>{children}</ClientProviders>
       </body>
     </html>
   );

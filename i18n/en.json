@@ -1,0 +1,149 @@
+{
+  "features": {
+    "heading": "Key Features",
+    "teamCollabTitle": "Team Collaboration",
+    "teamCollabDesc": "Work together efficiently and quickly.",
+    "smartAutoTitle": "Smart Automation",
+    "smartAutoDesc": "Reduce manual tasks and save time.",
+    "securityTitle": "Top-tier Security",
+    "securityDesc": "Your data is encrypted and fully protected."
+  }, 
+  "hero": {
+    "socialProof": "10,000+ teams using WorkNet",
+    "headlinePart1": "Project management",
+    "headlinePart2": "made simple & smart",
+    "description": "WorkNet helps you organize work, track progress, and collaborate effectively — all on one platform.",
+    "ctaStart": "Start 14-day free trial",
+    "ctaDemo": "View demo"
+  },
+    "footer": {
+    "copyright": "© {{year}} WorkNet. Made by ❤️ 3S_TC_CANDYHZ, Duc Smile"
+  },
+    "header": {
+    "nav": {
+      "features": "Features",
+      "pricing": "Pricing",
+      "about": "About"
+    },
+    "login": "Log in",
+    "register": "Get Started",
+    "menuOpen": "Open menu",
+    "menuClose": "Close menu"
+  },
+   "pricing": {
+    "heading": "Simple, transparent pricing",
+    "subheading": "Choose the plan that's right for your team. No hidden fees.",
+
+    "plans": {
+      "free": {
+        "name": "Free",
+        "desc": "Perfect to get started",
+        "features": [
+          "Up to 5 members",
+          "3 projects",
+          "1 GB storage",
+          "Basic support"
+        ]
+      },
+
+      "pro": {
+        "name": "Pro",
+        "desc": "For professional teams",
+        "features": [
+          "Unlimited members",
+          "Unlimited projects",
+          "100 GB storage",
+          "24/7 Priority support"
+        ],
+        "popularBadge": "Most Popular"
+      },
+
+      "enterprise": {
+        "name": "Enterprise",
+        "desc": "For large organizations",
+        "features": [
+          "Fully customizable",
+          "Advanced security",
+          "Unlimited storage",
+          "Dedicated support"
+        ]
+      }
+    },
+
+    "ctaTrial": "Start free trial",
+    "ctaContact": "Contact Sales"
+  },
+   "testimonial": {
+    "heading": "Why choose WorkNet?",
+    "description": "WorkNet is not just a management tool — it is a <strong>team connection platform</strong> that helps you focus on what matters most: work efficiency.",
+    "quote": "“Thanks to WorkNet, my team saved 30% of meeting time and significantly improved project progress.”",
+    "role": "CEO",
+    "company": "TechCorp",
+    "initial": "C"
+  },
+  "landing": {
+    "toastRegister": "Start your journey today!"
+  },
+   "invite": {
+    "errors": {
+      "invalidToken": "Invalid or missing invitation token.",
+      "expired": "Invitation invalid or expired."
+    },
+
+    "loading": {
+      "validating": "Validating invitation..."
+    },
+
+    "common": {
+      "emailLabel": "Invitation Email",
+      "fullName": "Full Name",
+      "createPassword": "Create Password",
+      "confirmPassword": "Confirm Password",
+      "minCharacters": "Min 6 characters",
+      "reenterPassword": "Re-enter password"
+    },
+
+    "newUser": {
+      "title": "You've been invited!",
+      "subtitle": "Join <strong>{{company}}</strong> on WorkNet.<br/>Setup your account to get started.",
+      "createAccount": "Create Account & Join",
+      "passwordNotMatch": "Passwords do not match!",
+      "welcomeToast": "Welcome aboard!"
+    },
+
+    "existing": {
+      "welcomeBack": "Welcome Back!",
+      "loginToJoin": "Login to <strong>{{email}}</strong> to join <strong>{{company}}</strong>.",
+      "acceptTitle": "Accept Invitation",
+      "acceptSubtitle": "You are logged in as <strong>{{email}}</strong>.<br/>Join <strong>{{company}}</strong> now?",
+      "acceptButton": "Accept & Join Workspace",
+      "notYou": "Not you? Sign out",
+
+      "wrongAccountTitle": "Wrong Account",
+      "wrongAccountFor": "Invitation for:",
+      "wrongAccountCurrent": "Currently logged in:",
+      "logoutAndLogin": "Sign out & Login correctly",
+
+      "acceptedToast": "Invitation accepted!"
+    },
+
+    "errorPage": {
+      "title": "Invitation Error",
+      "backHome": "Go to Homepage"
+    },
+     "forgot": {
+    "email": "Email",
+    "emailPlaceholder": "user@gmail.com",
+
+    "errorInvalidEmail": "Please enter a valid email.",
+    "successMessage": "Link sent. Please check your email (including Spam).",
+    "failedMessage": "Failed to send email. Please try again later.",
+
+    "sendButton": "Send reset link"
+  }
+  }
+}
+
+
+
+
