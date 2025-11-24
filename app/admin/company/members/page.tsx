@@ -327,7 +327,11 @@ export default function MembersPage() {
     // Logic xác định Admin dựa vào roleName (hoặc roleCode nếu có trong object)
     const isAdmin = m.roleName?.toUpperCase().includes("ADMIN");
     const Icon = isAdmin ? Crown : Shield;
-    const style = isAdmin ? "bg-purple-50 text-purple-700 border-purple-200" : "bg-blue-50 text-blue-700 border-blue-200";
+    const style = isAdmin
+        ? "bg-amber-50 text-amber-800 border-2 border-amber-500"
+        : "bg-blue-50 text-blue-700 border border-blue-300";
+
+
 
     return (
       <div className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${style}`}>
