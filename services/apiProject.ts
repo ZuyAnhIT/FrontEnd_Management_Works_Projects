@@ -67,19 +67,53 @@ export interface UpdateProjectPayload {
 }
 
 /* ============================================
-   📌 2. INTERFACES CHO BACKLOG & SPRINT
+   📌 2. INTERFACES CHO TASK, BACKLOG & SPRINT
 ============================================ */
+
+// --- ENUMS CHO TASK ---
+export enum TaskType {
+  STORY = 'STORY',
+  TASK = 'TASK',
+  BUG = 'BUG',
+  EPIC = 'EPIC',
+  SUBTASK = 'SUBTASK'
+}
+
+export enum TaskPriority {
+  LOW = 'LOW',
+  MEDIUM = 'MEDIUM',
+  HIGH = 'HIGH',
+  URGENT = 'URGENT'
+}
+
+// --- PAYLOAD TẠO TASK ---
+export interface CreateTaskPayload {
+  // Bắt buộc
+  title: string; 
+
+  // Tùy chọn
+  description?: string;
+  taskType?: TaskType;      // Mặc định: TASK
+  priority?: TaskPriority;  // Mặc định: MEDIUM
+  
+  sprintId?: number | null; // 0 hoặc null -> Backlog
+  epicId?: number | null;
+  assigneeId?: number | null;
+  
+  storyPoints?: number;
+  dueDate?: string; // ISO String (YYYY-MM-DDTHH:mm:ss.sssZ)
+}
 
 // 1. Task trong Sprint/Backlog
 export interface TaskSummary {
   id: number;
   taskCode: string;
   title: string;
-  taskType: string; // 'STORY' | 'TASK' | 'BUG'
+  taskType: string; 
   statusId: number;
   statusName: string;
   statusColor: string;
-  priority: string; // 'URGENT', 'HIGH', 'MEDIUM', 'LOW'
+  priority: string;
   sprintId?: number;
   assigneeId?: number;
   assigneeName?: string;
@@ -333,9 +367,7 @@ export const updateProjectMemberRole = async (
   return res.data.data;
 };
 
-/* ============================================
-   🔥 4.12 GET BACKLOG (UPDATED) 🔥
-============================================ */
+// --- 4.12 GET BACKLOG ---
 export const getProjectBacklog = async (
   companyId: number,
   workspaceId: number,
@@ -343,7 +375,6 @@ export const getProjectBacklog = async (
   queryParams?: BacklogQueryParams
 ): Promise<ProjectBacklogResponse> => {
   
-  // Clean params (xóa null/undefined/rỗng)
   const params = queryParams ? Object.fromEntries(
     Object.entries(queryParams).filter(([_, v]) => v != null && v !== "")
   ) : {};
@@ -354,8 +385,41 @@ export const getProjectBacklog = async (
   );
 
   if (!res.data.success) throw new Error(res.data.message);
-  
-  // Trả về đúng cục data to (gồm activeSprints + backlogTasks)
   return res.data.data; 
 };
 
+// --- 4.13 CREATE TASK (NEW) ---
+export const createProjectTask = async (
+  companyId: number,
+  workspaceId: number,
+  projectId: number,
+  payload: CreateTaskPayload
+) => {
+  // 1. Tạo object cơ bản bắt buộc
+  const cleanPayload: any = {
+    title: payload.title,
+    taskType: payload.taskType || "TASK",    
+    priority: payload.priority || "MEDIUM",   
+    description: payload.description || ""
+  };
+
+  // 2. Chỉ append các trường ID nếu có giá trị (truthy)
+  // Loại bỏ hoàn toàn việc gửi số 0 nếu user dặn là backend sẽ lỗi
+  if (payload.sprintId) {
+    cleanPayload.sprintId = payload.sprintId;
+  }
+
+  // Tạm thời comment lại hoặc chỉ gửi nếu bạn thực sự cần sau này
+  if (payload.assigneeId) cleanPayload.assigneeId = payload.assigneeId;
+  if (payload.epicId) cleanPayload.epicId = payload.epicId;
+  if (payload.storyPoints) cleanPayload.storyPoints = payload.storyPoints;
+  if (payload.dueDate) cleanPayload.dueDate = payload.dueDate;
+
+  const res = await apiClient.post(
+    `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/tasks`,
+    cleanPayload
+  );
+  
+  if (!res.data.success) throw new Error(res.data.message || "Lỗi khi tạo công việc");
+  return res.data.data; 
+};

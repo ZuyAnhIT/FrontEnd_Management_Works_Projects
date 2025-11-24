@@ -6,16 +6,26 @@ import { SprintDetail } from "@/services/apiProject";
 import BacklogTaskItem from "./BacklogTaskItem";
 import { Button } from "@/components/ui/button";
 
+// Import hooks và QuickTaskCreate
+import { useParams } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
+import QuickTaskCreate from "@/components/features/core/task/QuickTaskCreate";
+
 // Helper format date
 const formatDate = (d?: string) => d ? new Date(d).toLocaleDateString('en-US', { day: 'numeric', month: 'short' }) : '...';
 
 interface SprintSectionProps {
   sprints: SprintDetail[];
-  onTaskClick: (taskId: number) => void; // ✅ Prop mới
+  onTaskClick: (taskId: number) => void; 
+  onTaskCreated?: () => void; // ✅ Callback khi tạo task xong
 }
 
-export default function SprintSection({ sprints, onTaskClick }: SprintSectionProps) {
-  // Mặc định mở tất cả
+export default function SprintSection({ sprints, onTaskClick, onTaskCreated }: SprintSectionProps) {
+  // Lấy context params & auth để truyền vào QuickCreate
+  const params = useParams();
+  const { activeCompany } = useAuth();
+  
+  // Mặc định mở tất cả sprint
   const [expanded, setExpanded] = useState<Record<number, boolean>>(
     sprints.reduce((acc, s) => ({ ...acc, [s.id]: true }), {})
   );
@@ -44,12 +54,12 @@ export default function SprintSection({ sprints, onTaskClick }: SprintSectionPro
             <div className={`flex items-center justify-between px-4 py-3 border-b 
                 ${isActive ? 'bg-blue-50/50 border-blue-100' : 'bg-white border-slate-200'}
             `}>
-               <div className="flex items-center gap-3 cursor-pointer select-none" onClick={() => toggleSprint(sprint.id)}>
-                  <button className="text-slate-400 hover:text-slate-600 transition-transform">
-                     {expanded[sprint.id] ? <ChevronDown className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
-                  </button>
-                  
-                  <div>
+                <div className="flex items-center gap-3 cursor-pointer select-none" onClick={() => toggleSprint(sprint.id)}>
+                   <button className="text-slate-400 hover:text-slate-600 transition-transform">
+                      {expanded[sprint.id] ? <ChevronDown className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
+                   </button>
+                   
+                   <div>
                       <div className="flex items-center gap-2">
                         <h3 className="text-sm font-bold text-slate-900">
                            {sprint.name}
@@ -85,47 +95,61 @@ export default function SprintSection({ sprints, onTaskClick }: SprintSectionPro
                         )}
                       </div>
                   </div>
-               </div>
+                </div>
 
-               <div className="flex items-center gap-2">
-                  {/* Chỉ hiện nút Complete nếu Sprint đang chạy */}
-                  {isActive && (
-                    <Button size="sm" className="h-8 bg-blue-100 text-blue-700 hover:bg-blue-200 border border-blue-200 font-semibold shadow-none">
-                       Complete Sprint
-                    </Button>
-                  )}
-                  {/* Chỉ hiện nút Start nếu Sprint chưa chạy */}
-                  {isFuture && (
-                    <Button size="sm" className="h-8 bg-white text-slate-700 hover:bg-slate-50 border border-slate-300 shadow-sm">
-                       Start Sprint
-                    </Button>
-                  )}
-                  
-                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-slate-500">
-                     <MoreHorizontal className="w-4 h-4" />
-                  </Button>
-               </div>
+                <div className="flex items-center gap-2">
+                   {/* Chỉ hiện nút Complete nếu Sprint đang chạy */}
+                   {isActive && (
+                     <Button size="sm" className="h-8 bg-blue-100 text-blue-700 hover:bg-blue-200 border border-blue-200 font-semibold shadow-none">
+                        Complete Sprint
+                     </Button>
+                   )}
+                   {/* Chỉ hiện nút Start nếu Sprint chưa chạy */}
+                   {isFuture && (
+                     <Button size="sm" className="h-8 bg-white text-slate-700 hover:bg-slate-50 border border-slate-300 shadow-sm">
+                        Start Sprint
+                     </Button>
+                   )}
+                   
+                   <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-slate-500">
+                      <MoreHorizontal className="w-4 h-4" />
+                   </Button>
+                </div>
             </div>
 
-            {/* --- SPRINT TASKS --- */}
+            {/* --- SPRINT TASKS + QUICK CREATE --- */}
             {expanded[sprint.id] && (
-               <div className="p-2 space-y-2 min-h-[50px]">
-                  {sprint.tasks.length > 0 ? (
-                     sprint.tasks.map(task => (
-                        <BacklogTaskItem 
-                            key={task.id} 
-                            task={task} 
-                            // ✅ GỌI HÀM ON CLICK KHI BẤM VÀO TASK
-                            onClick={() => onTaskClick(task.id)} 
-                        />
-                     ))
-                  ) : (
-                     <div className="flex flex-col items-center justify-center py-6 text-slate-400 border-2 border-dashed border-slate-200 rounded-lg m-1 bg-white/50">
-                        <Rocket className="w-8 h-8 mb-2 opacity-40" />
-                        <p className="text-xs font-medium">Plan your sprint</p>
-                        <p className="text-[10px]">Drag issues here</p>
-                     </div>
-                  )}
+               <div className="p-2 min-h-[50px]">
+                  
+                  {/* List Tasks */}
+                  <div className="space-y-2 mb-2">
+                      {sprint.tasks && sprint.tasks.length > 0 ? (
+                         sprint.tasks.map(task => (
+                            <BacklogTaskItem 
+                               key={task.id} 
+                               task={task} 
+                               onClick={() => onTaskClick(task.id)} 
+                            />
+                         ))
+                      ) : (
+                         <div className="flex flex-col items-center justify-center py-6 text-slate-400 border-2 border-dashed border-slate-200 rounded-lg m-1 bg-white/50">
+                            <Rocket className="w-8 h-8 mb-2 opacity-40" />
+                            <p className="text-xs font-medium">Plan your sprint</p>
+                            <p className="text-[10px]">Drag issues here or create new one</p>
+                         </div>
+                      )}
+                  </div>
+
+                  {/* 🔥 QUICK CREATE CHO SPRINT NÀY */}
+                  <div className="px-1">
+                      <QuickTaskCreate 
+                          companyId={activeCompany?.companyId!}
+                          workspaceId={Number(params.workspaceId)}
+                          projectId={Number(params.projectId)}
+                          sprintId={sprint.id} // ✅ Truyền đúng ID Sprint
+                          onSuccess={() => onTaskCreated && onTaskCreated()} // Callback reload
+                      />
+                  </div>
                </div>
             )}
           </div>
