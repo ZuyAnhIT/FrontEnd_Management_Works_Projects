@@ -42,8 +42,8 @@ export default function ProjectSidebar({
   const navItems = [
     { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard', path: `/core/workspace/project/${projectId}` },
     { id: 'board', icon: ListTodo, label: 'Board', path: `/core/workspace/project/${projectId}/board` },
-    { id: 'backlog', icon: Menu, label: 'Backlog', path: `/core/workspace/project/${projectId}/backlog` },
-    { id: 'sprints', icon: GitBranch, label: 'Sprints', path: `/core/workspace/project/${projectId}/sprints` },
+    { id: 'backlog', icon: Menu, label: 'List', path: `/core/workspace/project/${projectId}/backlog` },
+    { id: 'sprints', icon: GitBranch, label: 'Backlog', path: `/core/workspace/project/${projectId}/sprints` },
     { id: 'timeline', icon: Calendar, label: 'Timeline', path: `/core/workspace/project/${projectId}/timeline` },
     { id: 'summary', icon: BarChart3, label: 'Summary', path: `/core/workspace/project/${projectId}/summary` },
   ]

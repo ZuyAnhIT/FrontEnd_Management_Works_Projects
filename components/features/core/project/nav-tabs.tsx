@@ -37,17 +37,18 @@ export default function ProjectNavTabs({
       path: `/core/workspace/${workspaceId}/project/${projectId}/board`,
     },
     {
-      id: 'backlog',
-      icon: MenuIcon,
-      label: 'Backlog',
-      path: `/core/workspace/${workspaceId}/project/${projectId}/backlog`,
-    },
-    {
       id: 'sprints',
       icon: GitBranch,
-      label: 'Sprints',
+      label: 'Backlog',
       path: `/core/workspace/${workspaceId}/project/${projectId}/sprints`,
     },
+    {
+      id: 'backlog',
+      icon: MenuIcon,
+      label: 'List',
+      path: `/core/workspace/${workspaceId}/project/${projectId}/backlog`,
+    },
+  
     {
       id: 'timeline',
       icon: Calendar,
