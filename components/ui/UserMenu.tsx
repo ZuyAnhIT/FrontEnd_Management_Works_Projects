@@ -1,7 +1,12 @@
 "use client";
+
 import { useRouter } from "next/navigation";
-import { User, Shield, LogOut, Moon, Sun, Globe, Check } from "lucide-react";
-import { useEffect, useState } from "react";
+import { User, Shield, LogOut, Moon, Sun, Globe } from "lucide-react";
+import { useEffect } from "react";
+import { useTranslation } from "react-i18next";
+
+import { useLanguage } from "@/context/LanguageContext";
+import { useTheme } from "@/context/ThemeContext";
 
 interface UserMenuProps {
   user: {
@@ -14,8 +19,11 @@ interface UserMenuProps {
 
 export default function UserMenu({ user, onClose, onLogout }: UserMenuProps) {
   const router = useRouter();
-  const [theme, setTheme] = useState<"light" | "dark">("light");
-  const [language, setLanguage] = useState<"vn" | "en">("vn");
+  const { t } = useTranslation();
+
+  // ⬇ LẤY TỪ CONTEXT
+  const { language, setLanguage } = useLanguage();
+  const { theme, toggleTheme } = useTheme();
 
   const handleNavigate = (path: string) => {
     onClose();
@@ -29,112 +37,138 @@ export default function UserMenu({ user, onClose, onLogout }: UserMenuProps) {
     return () => document.removeEventListener("click", handleClickOutside);
   }, [onClose]);
 
-  const toggleTheme = (e: React.MouseEvent) => {
+  // Đổi ngôn ngữ
+  const handleToggleLanguage = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setTheme(prev => prev === "light" ? "dark" : "light");
+    setLanguage(language === "vn" ? "en" : "vn");
   };
 
-  const toggleLanguage = (e: React.MouseEvent) => {
+  // Đổi giao diện sáng/tối
+  const handleToggleTheme = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setLanguage(prev => prev === "vn" ? "en" : "vn");
+    toggleTheme();
   };
 
   return (
     <div
       onClick={(e) => e.stopPropagation()}
-      className="absolute right-0 mt-2 w-72 bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden z-50 animate-in fade-in zoom-in-95 duration-100 origin-top-right"
+      className="absolute right-0 mt-2 w-72 bg-white dark:bg-slate-800 
+                 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 
+                 overflow-hidden z-50 animate-in fade-in zoom-in-95 duration-100 origin-top-right"
     >
-      {/* 1. User Profile Header (Minimalist) */}
-      <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/50">
+      {/* User Header */}
+      <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30">
         <div className="flex items-center gap-3">
-          {/* Avatar */}
           <div className="relative shrink-0">
             <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-sm">
               {user?.name?.charAt(0)?.toUpperCase() || "U"}
             </div>
-            {/* Online status dot */}
             <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-white rounded-full"></div>
           </div>
 
-          {/* User Info */}
           <div className="flex-1 min-w-0">
-            <h3 className="font-bold text-slate-900 text-sm truncate">{user?.name}</h3>
-            <p className="text-xs text-slate-500 truncate">{user?.email}</p>
+            <h3 className="font-bold text-slate-900 dark:text-white text-sm truncate">
+              {user?.name}
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-300 truncate">{user?.email}</p>
           </div>
         </div>
       </div>
 
-      {/* 2. Menu Items */}
+      {/* Menu items */}
       <div className="p-2">
-        
-        {/* Section: Account */}
         <div className="mb-2">
-            <button
+          <button
             onClick={() => handleNavigate("/settings/profile")}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-md hover:bg-slate-100 transition-colors text-left group"
-            >
-            <User className="w-4 h-4 text-slate-500 group-hover:text-slate-800" />
-            <span className="flex-1 text-sm font-medium text-slate-700 group-hover:text-slate-900">Profile</span>
-            </button>
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-md 
+                       hover:bg-slate-100 dark:hover:bg-slate-700 
+                       transition-colors text-left group"
+          >
+            <User className="w-4 h-4 text-slate-500 dark:text-slate-300 group-hover:text-slate-800 dark:group-hover:text-white" />
+            <span className="flex-1 text-sm font-medium text-slate-700 dark:text-slate-200 group-hover:text-slate-900 dark:group-hover:text-white">
+              {t("profile")}
+            </span>
+          </button>
 
-            <button
+          <button
             onClick={() => handleNavigate("/settings/account")}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-md hover:bg-slate-100 transition-colors text-left group"
-            >
-            <Shield className="w-4 h-4 text-slate-500 group-hover:text-slate-800" />
-            <span className="flex-1 text-sm font-medium text-slate-700 group-hover:text-slate-900">Security</span>
-            </button>
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-md 
+                       hover:bg-slate-100 dark:hover:bg-slate-700 
+                       transition-colors text-left group"
+          >
+            <Shield className="w-4 h-4 text-slate-500 dark:text-slate-300 group-hover:text-slate-800 dark:group-hover:text-white" />
+            <span className="flex-1 text-sm font-medium text-slate-700 dark:text-slate-200 group-hover:text-slate-900 dark:group-hover:text-white">
+              {t("security")}
+            </span>
+          </button>
         </div>
 
-        <div className="h-px bg-slate-100 my-1 mx-2"></div>
+        <div className="h-px bg-slate-100 dark:bg-slate-700 my-2 mx-2"></div>
 
-        {/* Section: Preferences */}
+        {/* Preferences */}
         <div className="mb-2">
-            {/* Theme Toggle */}
-            <button
-                onClick={toggleTheme}
-                className="w-full flex items-center justify-between px-3 py-2 rounded-md hover:bg-slate-100 transition-colors text-left group"
-            >
-                <div className="flex items-center gap-3">
-                    {theme === "light" ? <Sun className="w-4 h-4 text-slate-500" /> : <Moon className="w-4 h-4 text-slate-500" />}
-                    <span className="text-sm font-medium text-slate-700">Theme</span>
-                </div>
-                <span className="text-xs font-semibold text-slate-500 bg-slate-200 px-2 py-0.5 rounded capitalize">
-                    {theme}
-                </span>
-            </button>
 
-            {/* Language Toggle */}
-            <button
-                onClick={toggleLanguage}
-                className="w-full flex items-center justify-between px-3 py-2 rounded-md hover:bg-slate-100 transition-colors text-left group"
-            >
-                <div className="flex items-center gap-3">
-                    <Globe className="w-4 h-4 text-slate-500" />
-                    <span className="text-sm font-medium text-slate-700">Language</span>
-                </div>
-                <span className="text-xs font-semibold text-slate-500 bg-slate-200 px-2 py-0.5 rounded">
-                    {language === 'vn' ? 'Tiếng Việt' : 'English'}
-                </span>
-            </button>
+          {/* Theme */}
+          <button
+            onClick={handleToggleTheme}
+            className="w-full flex items-center justify-between px-3 py-2 rounded-md 
+                       hover:bg-slate-100 dark:hover:bg-slate-700 
+                       transition-colors text-left group"
+          >
+            <div className="flex items-center gap-3">
+              {theme === "light" ? (
+                <Sun className="w-4 h-4 text-slate-500 dark:text-slate-300" />
+              ) : (
+                <Moon className="w-4 h-4 text-slate-500 dark:text-slate-300" />
+              )}
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                {t("theme")}
+              </span>
+            </div>
+            <span className="text-xs font-semibold text-slate-600 dark:text-slate-200 
+                             bg-slate-200 dark:bg-slate-600 px-2 py-0.5 rounded capitalize">
+              {theme}
+            </span>
+          </button>
+
+          {/* Language */}
+          <button
+            onClick={handleToggleLanguage}
+            className="w-full flex items-center justify-between px-3 py-2 rounded-md 
+                       hover:bg-slate-100 dark:hover:bg-slate-700 
+                       transition-colors text-left group"
+          >
+            <div className="flex items-center gap-3">
+              <Globe className="w-4 h-4 text-slate-500 dark:text-slate-300" />
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                {t("language")}
+              </span>
+            </div>
+            <span className="text-xs font-semibold text-slate-600 dark:text-slate-200 
+                             bg-slate-200 dark:bg-slate-600 px-2 py-0.5 rounded">
+              {language === "vn" ? "Tiếng Việt" : "English"}
+            </span>
+          </button>
         </div>
 
-        <div className="h-px bg-slate-100 my-1 mx-2"></div>
+        <div className="h-px bg-slate-100 dark:bg-slate-700 my-2 mx-2"></div>
 
         {/* Logout */}
         <button
           onClick={onLogout}
-          className="w-full flex items-center gap-3 px-3 py-2 rounded-md hover:bg-red-50 transition-colors text-left group mt-1"
+          className="w-full flex items-center gap-3 px-3 py-2 rounded-md 
+                     hover:bg-red-50 dark:hover:bg-red-900/20 
+                     transition-colors text-left group"
         >
-          <LogOut className="w-4 h-4 text-red-500 group-hover:text-red-600" />
-          <span className="flex-1 text-sm font-medium text-red-600 group-hover:text-red-700">Log out</span>
+          <LogOut className="w-4 h-4 text-red-500 dark:text-red-300 group-hover:text-red-600" />
+          <span className="flex-1 text-sm font-medium text-red-600 dark:text-red-300 group-hover:text-red-700">
+            {t("logout")}
+          </span>
         </button>
-
       </div>
-      
-      {/* Footer Info (Optional) */}
-      <div className="px-5 py-2 bg-slate-50 border-t border-slate-100 text-[10px] text-center text-slate-400">
-         ProjectHub v1.0.0
+
+      <div className="px-5 py-2 bg-slate-50 dark:bg-slate-800 border-t border-slate-100 dark:border-slate-700 text-[10px] text-center text-slate-400">
+        ProjectHub v1.0.0
       </div>
     </div>
   );

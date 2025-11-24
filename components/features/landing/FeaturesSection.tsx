@@ -1,57 +1,80 @@
-"use client"; // Cần 'use client' vì Framer Motion dùng hook
+"use client"; // cần 'use client' vì dùng hook + framer motion
 
 import { Users, Zap, Shield } from "lucide-react";
-import { motion } from "framer-motion"; // 1. Import motion
-
-const features = [
-  {
-    icon: Users,
-    title: "Team Collaboration",
-    desc: "Work together efficiently and quickly.",
-  },
-  {
-    icon: Zap,
-    title: "Smart Automation",
-    desc: "Reduce manual tasks and save time.",
-  },
-  {
-    icon: Shield,
-    title: "Top-tier Security",
-    desc: "Your data is encrypted and fully protected.",
-  },
-];
+import { motion } from "framer-motion";
+import { useTranslation } from "react-i18next";
+import { useTheme } from "@/context/ThemeContext";
 
 export default function FeaturesSection() {
+  const { t } = useTranslation();
+  const { theme } = useTheme(); // lấy theme global (light/dark)
+
+  const features = [
+    {
+      icon: Users,
+      title: t("features.teamCollabTitle"),
+      desc: t("features.teamCollabDesc"),
+    },
+    {
+      icon: Zap,
+      title: t("features.smartAutoTitle"),
+      desc: t("features.smartAutoDesc"),
+    },
+    {
+      icon: Shield,
+      title: t("features.securityTitle"),
+      desc: t("features.securityDesc"),
+    },
+  ];
+
   return (
-    // 2. Bọc section bằng motion.section
     <motion.section
       id="features"
-      className="py-24 px-6 bg-white text-center scroll-mt-24"
-      // 3. Định nghĩa hiệu ứng cho section
-      initial={{ opacity: 0, y: 50 }} // Trạng thái ban đầu (ẩn, ở dưới)
-      whileInView={{ opacity: 1, y: 0 }} // Trạng thái khi lọt vào màn hình (hiện, ở vị trí 0)
+      className="py-24 px-6 text-center scroll-mt-24 
+                 bg-white dark:bg-slate-900 transition-colors duration-300"
+      initial={{ opacity: 0, y: 50 }}
+      whileInView={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, ease: "easeInOut" }}
-      viewport={{ once: true, amount: 0.3 }} // Chạy 1 lần, khi 30% section lọt vào
+      viewport={{ once: true, amount: 0.3 }}
     >
-      <h2 className="text-3xl font-bold text-gray-900 mb-10">
-        Key Features
+      <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-10">
+        {t("features.heading")}
       </h2>
+
       <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
         {features.map(({ icon: Icon, title, desc }, i) => (
-          // 4. Thêm hiệu ứng so le cho từng thẻ
           <motion.div
             key={i}
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: i * 0.1 }} // <-- Delay so le
+            transition={{ duration: 0.5, delay: i * 0.1 }}
             viewport={{ once: true, amount: 0.5 }}
-            className="p-6 bg-gradient-to-b from-white to-blue-50 rounded-2xl border border-gray-100 hover:border-blue-300 hover:shadow-lg transition-all duration-300 ease-in-out hover:-translate-y-1"
+            className="
+              p-6 rounded-2xl border transition-all duration-300 ease-in-out 
+              bg-gradient-to-b from-white to-blue-50 
+              dark:bg-gradient-to-b dark:from-slate-800 dark:to-slate-900
+              border-gray-100 dark:border-slate-700
+              hover:border-blue-300 dark:hover:border-blue-500
+              hover:shadow-lg hover:-translate-y-1
+            "
           >
-            <Icon className="w-10 h-10 text-blue-500 mx-auto mb-3" />
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+            <Icon
+              className="
+                w-10 h-10 mx-auto mb-3 
+                text-blue-500 dark:text-blue-400
+              "
+            />
+            <h3
+              className="
+                text-lg font-semibold mb-2 
+                text-gray-900 dark:text-white
+              "
+            >
               {title}
             </h3>
-            <p className="text-gray-600 text-sm">{desc}</p>
+            <p className="text-gray-600 dark:text-gray-300 text-sm">
+              {desc}
+            </p>
           </motion.div>
         ))}
       </div>
