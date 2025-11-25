@@ -17,7 +17,7 @@ import {
   moveTaskToStatus,
   BoardFilterParams 
 } from "@/services/apiBoard";
-import { getProjectMembers, ProjectMember } from "@/services/apiProject"; // ✅ Import API lấy member
+import { getProjectMembers, ProjectMember } from "@/services/apiProject"; 
 
 // Components
 import BoardHeader from "@/components/features/core/board/BoardHeader";
@@ -37,7 +37,7 @@ export default function BoardPage() {
 
   // --- STATE ---
   const [columns, setColumns] = useState<BoardColumnResponse[]>([]);
-  const [members, setMembers] = useState<ProjectMember[]>([]); // ✅ State Members
+  const [members, setMembers] = useState<ProjectMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
@@ -104,17 +104,13 @@ export default function BoardPage() {
     setError(null);
 
     try {
-      // Gọi song song 3 API: Board + Status + Members
       const [rawBoardData, rawStatusList, membersRes] = await Promise.all([
         getProjectBoardData(companyId, workspaceId, projectId, filters),
         getProjectStatuses(projectId),
-        getProjectMembers(companyId, workspaceId, projectId, { size: 100 }) // ✅ Lấy members
+        getProjectMembers(companyId, workspaceId, projectId, { size: 100 })
       ]);
 
-      // Cập nhật Members
       setMembers(membersRes.content || []);
-
-      // Cập nhật Board Columns
       const normalizedColumns = normalizeData(rawBoardData, rawStatusList);
       setColumns(normalizedColumns);
 
@@ -135,14 +131,30 @@ export default function BoardPage() {
     return () => clearTimeout(t);
   }, [fetchBoardData, isAuthLoading, companyId]);
 
-  // --- 3. DRAG & DROP HANDLER ---
+  // --- 3. LOGIC MỚI: XỬ LÝ KHI TẠO CỘT THÀNH CÔNG ---
+  const handleColumnCreated = (newStatusData: any) => {
+    // Mapping dữ liệu từ API trả về thành format của BoardColumnResponse
+    const newColumn: BoardColumnResponse = {
+        id: newStatusData.id,
+        name: newStatusData.name,
+        color: newStatusData.color,
+        position: newStatusData.sortOrder,
+        isCompletedStatus: newStatusData.isCompletedStatus,
+        tasks: [] // Cột mới chưa có task
+    };
+
+    // Cập nhật state để hiển thị ngay lập tức
+    setColumns(prev => [...prev, newColumn]);
+    showToast("Đã tạo cột mới thành công", "success");
+  };
+
+  // --- 4. DRAG & DROP HANDLER ---
   const onDragEnd = async (result: DropResult) => {
     const { source, destination, draggableId } = result;
 
     if (!destination) return;
     if (source.droppableId === destination.droppableId && source.index === destination.index) return;
 
-    // Optimistic Update
     const newColumns = columns.map(col => ({ ...col, tasks: [...col.tasks] }));
     const sourceColIndex = newColumns.findIndex(c => c.id.toString() === source.droppableId);
     const destColIndex = newColumns.findIndex(c => c.id.toString() === destination.droppableId);
@@ -175,11 +187,10 @@ export default function BoardPage() {
   return (
     <div className="h-[calc(100vh-64px)] flex flex-col bg-white overflow-hidden">
         
-        {/* HEADER: Truyền members xuống */}
         <BoardHeader 
             filters={filters} 
             setFilters={setFilters}
-            members={members} // ✅ Truyền members
+            members={members}
             totalTasks={columns.reduce((acc, col) => acc + (col.tasks?.length || 0), 0)}
         />
 
@@ -209,7 +220,11 @@ export default function BoardPage() {
                             />
                         ))}
 
-                        <CreateColumnButton onClick={() => {}} />
+                        {/* ✅ ĐÃ CẬP NHẬT: Truyền props cho nút tạo cột */}
+                        <CreateColumnButton 
+                            projectId={projectId} 
+                            onSuccess={handleColumnCreated} 
+                        />
                         
                     </div>
                 </DragDropContext>
