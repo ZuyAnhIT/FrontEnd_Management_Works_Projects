@@ -1,7 +1,11 @@
-// 'use client'
+"use client"
 
-// import { Sprints } from '@/components/features/core/project/sprints'
+import TaskListPage from "@/components/features/core/sprint/task-list-page"
 
-// export default function SprintsPage() {
-//   return <Sprints />
-// }
+export default function Page() {
+  return (
+    <div>
+      <TaskListPage />
+    </div>
+  )
+}
