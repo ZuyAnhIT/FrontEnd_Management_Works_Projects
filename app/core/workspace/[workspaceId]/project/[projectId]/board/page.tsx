@@ -4,20 +4,20 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/components/ui/ToastProvider";
-import { DragDropContext, DropResult } from "@hello-pangea/dnd"; 
+import { DragDropContext, DropResult } from "@hello-pangea/dnd";
 import { Loader2, AlertCircle } from "lucide-react";
 
 // API
-import { 
-  getProjectBoardData, 
-  getProjectStatuses, 
-  BoardColumnResponse, 
-  RawBoardColumn, 
+import {
+  getProjectBoardData,
+  getProjectStatuses,
+  BoardColumnResponse,
+  RawBoardColumn,
   RawStatusColumn,
   moveTaskToStatus,
-  BoardFilterParams 
+  BoardFilterParams
 } from "@/services/apiBoard";
-import { getProjectMembers, ProjectMember } from "@/services/apiProject"; 
+import { getProjectMembers, ProjectMember } from "@/services/apiProject";
 
 // Components
 import BoardHeader from "@/components/features/core/board/BoardHeader";
@@ -40,10 +40,10 @@ export default function BoardPage() {
   const [members, setMembers] = useState<ProjectMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   const [filters, setFilters] = useState<BoardFilterParams>({
     keyword: "",
-    sprintId: null, 
+    sprintId: null,
     assigneeId: undefined,
     priority: undefined,
     taskType: undefined
@@ -51,42 +51,42 @@ export default function BoardPage() {
 
   // --- HELPER: CHUẨN HÓA DỮ LIỆU ---
   const normalizeData = (
-    boardData: RawBoardColumn[], 
+    boardData: RawBoardColumn[],
     statusList: RawStatusColumn[]
   ): BoardColumnResponse[] => {
     const columnMap = new Map<number, BoardColumnResponse>();
 
     // Init columns from status list
     if (Array.isArray(statusList)) {
-        statusList.forEach(st => {
-            columnMap.set(st.id, {
-                id: st.id,
-                name: st.name,
-                color: st.color,
-                position: st.sortOrder,
-                isCompletedStatus: st.isCompletedStatus,
-                tasks: [] 
-            });
+      statusList.forEach(st => {
+        columnMap.set(st.id, {
+          id: st.id,
+          name: st.name,
+          color: st.color,
+          position: st.sortOrder,
+          isCompletedStatus: st.isCompletedStatus,
+          tasks: []
         });
+      });
     }
 
     // Fill tasks from board data
     if (Array.isArray(boardData)) {
-        boardData.forEach(bd => {
-            const existingCol = columnMap.get(bd.statusId);
-            if (existingCol) {
-                existingCol.tasks = bd.tasks || [];
-            } else {
-                columnMap.set(bd.statusId, {
-                    id: bd.statusId,
-                    name: bd.statusName,
-                    color: bd.color || "#000000",
-                    position: bd.order || 0,
-                    isCompletedStatus: bd.isCompleted || false,
-                    tasks: bd.tasks || []
-                });
-            }
-        });
+      boardData.forEach(bd => {
+        const existingCol = columnMap.get(bd.statusId);
+        if (existingCol) {
+          existingCol.tasks = bd.tasks || [];
+        } else {
+          columnMap.set(bd.statusId, {
+            id: bd.statusId,
+            name: bd.statusName,
+            color: bd.color || "#000000",
+            position: bd.order || 0,
+            isCompletedStatus: bd.isCompleted || false,
+            tasks: bd.tasks || []
+          });
+        }
+      });
     }
 
     return Array.from(columnMap.values()).sort((a, b) => a.position - b.position);
@@ -97,7 +97,7 @@ export default function BoardPage() {
     if (isAuthLoading) return;
 
     if (!companyId || !workspaceId || !projectId) {
-        return;
+      return;
     }
 
     setLoading(true);
@@ -126,7 +126,7 @@ export default function BoardPage() {
   // Debounce Search & Filter Change
   useEffect(() => {
     const t = setTimeout(() => {
-        if (!isAuthLoading && companyId) fetchBoardData();
+      if (!isAuthLoading && companyId) fetchBoardData();
     }, 300);
     return () => clearTimeout(t);
   }, [fetchBoardData, isAuthLoading, companyId]);
@@ -135,12 +135,12 @@ export default function BoardPage() {
   const handleColumnCreated = (newStatusData: any) => {
     // Mapping dữ liệu từ API trả về thành format của BoardColumnResponse
     const newColumn: BoardColumnResponse = {
-        id: newStatusData.id,
-        name: newStatusData.name,
-        color: newStatusData.color,
-        position: newStatusData.sortOrder,
-        isCompletedStatus: newStatusData.isCompletedStatus,
-        tasks: [] // Cột mới chưa có task
+      id: newStatusData.id,
+      name: newStatusData.name,
+      color: newStatusData.color,
+      position: newStatusData.sortOrder,
+      isCompletedStatus: newStatusData.isCompletedStatus,
+      tasks: [] // Cột mới chưa có task
     };
 
     // Cập nhật state để hiển thị ngay lập tức
@@ -148,7 +148,13 @@ export default function BoardPage() {
     showToast("Đã tạo cột mới thành công", "success");
   };
 
-  // --- 4. DRAG & DROP HANDLER ---
+  // --- ✅ 4. LOGIC MỚI: XỬ LÝ KHI XÓA CỘT THÀNH CÔNG ---
+  const handleColumnDeleted = (columnId: string) => {
+    // API đã gọi thành công trong component con, ở đây chỉ cần update State
+    setColumns(prev => prev.filter(col => String(col.id) !== columnId));
+    // Không cần hiện Toast ở đây vì component con đã hiện rồi
+  };
+  // --- 5. DRAG & DROP HANDLER ---
   const onDragEnd = async (result: DropResult) => {
     const { source, destination, draggableId } = result;
 
@@ -163,73 +169,77 @@ export default function BoardPage() {
 
     const sourceCol = newColumns[sourceColIndex];
     const destCol = newColumns[destColIndex];
-    
+
     const [movedTask] = sourceCol.tasks.splice(source.index, 1);
     destCol.tasks.splice(destination.index, 0, movedTask);
 
-    setColumns(newColumns); 
+    setColumns(newColumns);
 
     try {
-        await moveTaskToStatus(Number(draggableId), {
-            newStatusId: Number(destCol.id),
-            newSortOrder: destination.index
-        });
+      await moveTaskToStatus(Number(draggableId), {
+        newStatusId: Number(destCol.id),
+        newSortOrder: destination.index
+      });
     } catch (error) {
-        console.error("Move failed:", error);
-        showToast("Move failed. Reverting...", "error");
-        fetchBoardData(); 
+      console.error("Move failed:", error);
+      showToast("Move failed. Reverting...", "error");
+      fetchBoardData();
     }
   };
 
   // --- RENDER ---
-  if (isAuthLoading) return <div className="h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-blue-600"/></div>;
+  if (isAuthLoading) return <div className="h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-blue-600" /></div>;
 
   return (
     <div className="h-[calc(100vh-64px)] flex flex-col bg-white overflow-hidden">
-        
-        <BoardHeader 
-            filters={filters} 
-            setFilters={setFilters}
-            members={members}
-            totalTasks={columns.reduce((acc, col) => acc + (col.tasks?.length || 0), 0)}
-        />
 
-        <div className="flex-1 overflow-x-auto overflow-y-hidden bg-white">
-            {loading && columns.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center gap-3">
-                    <Loader2 className="w-10 h-10 animate-spin text-blue-600"/>
-                    <p className="text-sm text-slate-500 font-medium">Loading board...</p>
-                </div>
-            ) : error ? (
-                <div className="h-full flex flex-col items-center justify-center text-red-500 gap-3">
-                    <AlertCircle className="w-10 h-10 opacity-80"/>
-                    <p className="font-medium">{error}</p>
-                    <button onClick={fetchBoardData} className="px-4 py-2 bg-white border border-red-200 text-red-600 rounded-md shadow-sm hover:bg-red-50 font-semibold text-sm">
-                        Try Again
-                    </button>
-                </div>
-            ) : (
-                <DragDropContext onDragEnd={onDragEnd}>
-                    <div className="h-full flex px-6 pt-6 pb-4 gap-4 items-start min-w-max">
-                        
-                        {columns.map((col, index) => (
-                            <BoardColumn 
-                                key={col.id} 
-                                column={col} 
-                                index={index}
-                            />
-                        ))}
+      <BoardHeader
+        filters={filters}
+        setFilters={setFilters}
+        members={members}
+        totalTasks={columns.reduce((acc, col) => acc + (col.tasks?.length || 0), 0)}
+      />
 
-                        {/* ✅ ĐÃ CẬP NHẬT: Truyền props cho nút tạo cột */}
-                        <CreateColumnButton 
-                            projectId={projectId} 
-                            onSuccess={handleColumnCreated} 
-                        />
-                        
-                    </div>
-                </DragDropContext>
-            )}
-        </div>
+      <div className="flex-1 overflow-x-auto overflow-y-hidden bg-white">
+        {loading && columns.length === 0 ? (
+          <div className="h-full flex flex-col items-center justify-center gap-3">
+            <Loader2 className="w-10 h-10 animate-spin text-blue-600" />
+            <p className="text-sm text-slate-500 font-medium">Loading board...</p>
+          </div>
+        ) : error ? (
+          <div className="h-full flex flex-col items-center justify-center text-red-500 gap-3">
+            <AlertCircle className="w-10 h-10 opacity-80" />
+            <p className="font-medium">{error}</p>
+            <button onClick={fetchBoardData} className="px-4 py-2 bg-white border border-red-200 text-red-600 rounded-md shadow-sm hover:bg-red-50 font-semibold text-sm">
+              Try Again
+            </button>
+          </div>
+        ) : (
+          <DragDropContext onDragEnd={onDragEnd}>
+            <div className="h-full flex px-6 pt-6 pb-4 gap-4 items-start min-w-max">
+
+              {columns.map((col, index) => (
+                <BoardColumn
+                  key={col.id}
+                  column={col}
+                  index={index}
+                  // ✅ 6. TRUYỀN PROPS QUAN TRỌNG
+                  projectId={projectId}
+                  onDeleteColumn={handleColumnDeleted}
+
+                />
+              ))}
+
+              {/* ✅ ĐÃ CẬP NHẬT: Truyền props cho nút tạo cột */}
+              <CreateColumnButton
+                projectId={projectId}
+                onSuccess={handleColumnCreated}
+              />
+
+            </div>
+          </DragDropContext>
+        )}
+      </div>
     </div>
   );
 }

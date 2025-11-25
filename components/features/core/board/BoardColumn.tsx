@@ -1,26 +1,29 @@
 "use client";
 
 import { Droppable } from "@hello-pangea/dnd";
-import { MoreHorizontal, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { BoardColumnResponse } from "@/services/apiBoard";
 import BoardTaskCard from "./BoardTaskCard";
+import { ColumnContextMenu } from "./ColumnContextMenu";
+import { useToast } from "@/components/ui/ToastProvider";
 
 interface BoardColumnProps {
   column: BoardColumnResponse;
   index: number;
+  projectId: number; // ✅ Bắt buộc có để truyền cho Menu
+  onDeleteColumn?: (columnId: string) => void; // Hàm này từ BoardPage truyền xuống để update State
 }
 
-export default function BoardColumn({ column }: BoardColumnProps) {
-  const columnBg = "bg-[#F4F5F7]"; 
+export default function BoardColumn({ column, projectId, onDeleteColumn }: BoardColumnProps) {
+  const columnBg = "bg-[#F4F5F7]";
+  const { showToast } = useToast(); 
 
   // 🛡️ PHÒNG VỆ: Kiểm tra dữ liệu đầu vào
   if (!column || (column.id === undefined && (column as any).statusId === undefined)) {
-    console.error("❌ BoardColumn Error: Invalid column data", column);
     return null; 
   }
 
-  // Xử lý ID an toàn (đề phòng backend trả về số 0 hoặc null)
-  // Ưu tiên 'id', fallback sang 'statusId' nếu có (tùy API thực tế), cuối cùng fallback string rỗng
+  // Xử lý ID an toàn
   const rawId = column.id ?? (column as any).statusId;
   const dropId = rawId !== undefined && rawId !== null ? String(rawId) : `col-${Math.random()}`;
 
@@ -47,14 +50,30 @@ export default function BoardColumn({ column }: BoardColumnProps) {
                 <button className="p-1.5 hover:bg-slate-200 rounded text-slate-500">
                     <Plus className="w-4 h-4"/>
                 </button>
-                <button className="p-1.5 hover:bg-slate-200 rounded text-slate-500">
-                    <MoreHorizontal className="w-4 h-4"/>
-                </button>
+                
+                {/* 👇 SỬA LẠI CHỖ NÀY CHO KHỚP LOGIC */}
+                <ColumnContextMenu 
+                    projectId={projectId}
+                    columnId={dropId}
+                    columnLabel={displayName}
+                    
+                    // Nếu bên trong Menu bạn đặt tên prop là onDeleted thì map như sau:
+                    onDeleted={onDeleteColumn} 
+                    
+                    // Nếu bên trong Menu bạn vẫn để tên là onDeleteColumn thì giữ nguyên:
+                    // onDeleteColumn={onDeleteColumn}
+
+                    onMoveColumn={() => {
+                        showToast("Tính năng di chuyển cột đang phát triển", "info");
+                    }}
+                    onSetColumnLimit={() => {
+                        showToast("Tính năng giới hạn task đang phát triển", "info");
+                    }}
+                />
             </div>
         </div>
 
         {/* --- TASK LIST (DROPPABLE AREA) --- */}
-        {/* ✅ Sử dụng dropId đã xử lý an toàn */}
         <Droppable droppableId={dropId} type="TASK">
             {(provided, snapshot) => (
                 <div
@@ -67,7 +86,6 @@ export default function BoardColumn({ column }: BoardColumnProps) {
                 >
                     {tasks.map((task, index) => (
                         <BoardTaskCard 
-                            // Fallback key nếu task.id lỗi
                             key={task.id || `task-${index}`} 
                             task={task} 
                             index={index} 
@@ -75,7 +93,6 @@ export default function BoardColumn({ column }: BoardColumnProps) {
                     ))}
                     {provided.placeholder}
                     
-                    {/* Nút tạo nhanh task cuối cột */}
                     <button className="w-full py-1.5 mt-1 flex items-center gap-2 text-slate-500 hover:bg-slate-200/60 hover:text-slate-700 rounded transition-colors px-2 text-[13px]">
                         <Plus className="w-4 h-4" /> 
                         <span>Create issue</span>
