@@ -13,21 +13,41 @@ import {
   Code,
   ChevronDown // Thêm icon cho select
 } from "lucide-react";
-import { createProject } from "@/services/apiProject";
+import { createProject, ProjectRequest } from "@/services/apiProject";
 import { useToast } from "@/components/ui/ToastProvider";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button"; // Giả sử bạn có component Button
 import { Input } from "@/components/ui/input";   // Giả sử bạn có component Input
 import { Textarea } from "@/components/ui/textarea"; // Giả sử bạn có component Textarea
+import { useParams } from "next/navigation";
+
+
+export const toNumberId = (maybeId: unknown): number => {
+  if (typeof maybeId === 'number') return maybeId;
+  if (typeof maybeId === 'string') return Number(maybeId);
+  if (typeof maybeId === 'object' && maybeId && (maybeId as any).id != null) {
+    return Number((maybeId as any).id);
+  }
+  return NaN;
+};
+
 
 export default function CreateProjectModal({
   isOpen,
   onClose,
+  companyId,
   workspaceId,
   onSuccess,
-}: any) {
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  companyId: number;                        // ✅ truyền từ parent
+  workspaceId: number | { id: number };    // ✅ truyền từ parent
+  onSuccess: (project: any) => void;
+}) {
   const { showToast } = useToast();
   const [loading, setLoading] = useState(false);
+
   const [form, setForm] = useState({
     name: "",
     projectCode: "",
@@ -52,25 +72,47 @@ export default function CreateProjectModal({
     });
   };
 
-  const handleCreate = async (e: React.FormEvent) => {
+const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
+
     if (!form.name.trim() || !form.projectCode.trim()) {
       showToast("Vui lòng nhập đầy đủ tên và mã dự án!", "warning");
       return;
     }
+
+    
+    const wsId = toNumberId(workspaceId);
+    if (Number.isNaN(companyId) || Number.isNaN(wsId)) { /* guard */ }
+
+
     setLoading(true);
     try {
-      const newProject = await createProject(workspaceId, form);
+      const payload: ProjectRequest = {
+        name: form.name,
+        projectCode: form.projectCode,
+        description: form.description || null,
+        goal: form.goal || null,
+        priority: form.priority as "LOW" | "MEDIUM" | "HIGH",
+        startDate: form.startDate || null,
+        dueDate: form.dueDate || null,
+        coverImageUrl: form.coverImageUrl || null, // nếu sau này có upload file, đặt null và truyền file
+      };
+
+      const newProject = await createProject(companyId, wsId, payload /*, file */);
       onSuccess(newProject);
       resetForm();
+      showToast("Tạo dự án thành công!", "success");
+      onClose?.();
     } catch (err: any) {
-      showToast(err.message || "Không thể tạo dự án!", "error");
+      console.error("CreateProject error:", err?.response?.data || err);
+      showToast(err?.message || "Không thể tạo dự án!", "error");
     } finally {
       setLoading(false);
     }
   };
 
   if (!isOpen) return null;
+
 
   const priorityOptions = [
     { value: "LOW", label: "Low", color: "bg-slate-100 text-slate-700 border-slate-200" },
