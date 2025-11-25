@@ -3,7 +3,7 @@
 import apiClient from "@/lib/apiClient";
 
 /* ============================================
-   📌 1. INTERFACES CHUNG (Project, Member)
+   📌 1. INTERFACES CHUNG (Project, Member, Paging)
 ============================================ */
 
 export interface PageResponse<T> {
@@ -29,7 +29,6 @@ export interface ProjectRequest {
   projectTypeId?: number | null;
   boardConfig?: any;         // object -> sẽ stringify ở backend
 }
-
 
 export interface Project {
   id: number;
@@ -65,7 +64,6 @@ export interface ProjectMember {
   status: string;
 }
 
-// Interface payload cho update Project
 export interface UpdateProjectPayload {
   name?: string;
   projectCode?: string;
@@ -85,7 +83,7 @@ export interface UpdateProjectPayload {
    📌 2. INTERFACES CHO TASK, BACKLOG & SPRINT
 ============================================ */
 
-// --- ENUMS CHO TASK ---
+// --- ENUMS ---
 export enum TaskType {
   STORY = 'STORY',
   TASK = 'TASK',
@@ -103,23 +101,56 @@ export enum TaskPriority {
 
 // --- PAYLOAD TẠO TASK ---
 export interface CreateTaskPayload {
-  // Bắt buộc
   title: string; 
-
-  // Tùy chọn
   description?: string;
-  taskType?: TaskType;      // Mặc định: TASK
-  priority?: TaskPriority;  // Mặc định: MEDIUM
-  
-  sprintId?: number | null; // 0 hoặc null -> Backlog
+  taskType?: TaskType;      
+  priority?: TaskPriority;  
+  sprintId?: number | null; 
   epicId?: number | null;
   assigneeId?: number | null;
-  
   storyPoints?: number;
-  dueDate?: string; // ISO String (YYYY-MM-DDTHH:mm:ss.sssZ)
+  dueDate?: string; 
 }
 
-// 1. Task trong Sprint/Backlog
+// --- DTO TASK DETAIL (Dùng cho List View) ---
+export interface TaskResponse {
+  id: number;
+  taskCode: string;
+  title: string;
+  statusId: number;
+  statusName: string;
+  statusColor: string;
+  priority: TaskPriority;
+  taskType: TaskType;
+  storyPoints: number;
+  dueDate?: string; 
+  assigneeId?: number;
+  assigneeName?: string;
+  assigneeAvatarUrl?: string;
+  reporterName?: string;
+  // ... thêm các trường khác nếu cần
+}
+
+// --- GROUPED RESPONSE ---
+export interface TasksGroupedResponse extends Record<string, TaskResponse[]> {}
+
+// --- FILTER PARAMS (List View) ---
+export interface ProjectTaskFilterParams {
+  sprintId?: number | 0 | null; 
+  search?: string;              
+  assigneeId?: number;
+  priority?: TaskPriority;      
+  statusIds?: number[];         
+  taskType?: TaskType;          
+  
+  // Pagination
+  page?: number;
+  size?: number;
+  sortBy?: string;
+  sortDir?: 'asc' | 'desc';
+}
+
+// --- BACKLOG & SPRINT DTOs ---
 export interface TaskSummary {
   id: number;
   taskCode: string;
@@ -141,32 +172,28 @@ export interface TaskSummary {
   sortOrder: number;
 }
 
-// 2. Sprint Detail
 export interface SprintDetail {
   id: number;
   name: string;
   goal?: string;
-  status: string; // 'IN_PROGRESS' | 'NOT_STARTED'
+  status: string;
   startDate?: string;
   endDate?: string;
   projectId: number;
   totalStoryPoints: number;
   taskCount: number;
-  tasks: TaskSummary[]; // Danh sách task con trong sprint
+  tasks: TaskSummary[]; 
 }
 
-// 3. Response tổng của API /backlog
 export interface ProjectBacklogResponse {
-  activeSprints: SprintDetail[]; // CHỈ chứa Sprint đang chạy hoặc chưa chạy
-  backlogTasks: TaskSummary[];   // Các task chưa vào sprint
-  
+  activeSprints: SprintDetail[]; 
+  backlogTasks: TaskSummary[];   
   backlogPageNumber: number;
   backlogPageSize: number;
   backlogTotalElements: number;
   backlogTotalPages: number;
 }
 
-// 4. Param Filter
 export interface BacklogQueryParams {
   keyword?: string;
   priority?: string;
@@ -202,7 +229,6 @@ export const getProjects = async (
     `/companies/${companyId}/workspaces/${workspaceId}/projects`,
     { params: cleanParams(params) }
   );
-
   if (!res.data.success) throw new Error(res.data.message);
   return res.data.data;
 };
@@ -217,7 +243,6 @@ export const searchProjects = async (
     `/companies/${companyId}/workspaces/${workspaceId}/projects/search`,
     { params: cleanParams(params) }
   );
-
   if (!res.data.success) throw new Error(res.data.message);
   return res.data.data;
 };
@@ -236,7 +261,6 @@ export const getTrashedProjects = async (
 };
 
 // --- 4.4 CREATE PROJECT ---
-
 export const createProject = async (
   companyId: number,
   workspaceId: number,
@@ -244,30 +268,17 @@ export const createProject = async (
   file?: File | null
 ): Promise<Project> => {
   const formData = new FormData();
-
-  // backend yêu cầu @RequestPart("data") là JSON string
-  formData.append(
-    "data",
-    new Blob([JSON.stringify(payload)], { type: "application/json" })
-  );
-
-  if (file) {
-    formData.append("file", file);
-  }
+  formData.append("data", new Blob([JSON.stringify(payload)], { type: "application/json" }));
+  if (file) formData.append("file", file);
 
   const res = await apiClient.post(
     `/companies/${Number(companyId)}/workspaces/${Number(workspaceId)}/projects`,
     formData,
-    {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
-    }
+    { headers: { "Content-Type": "multipart/form-data" } }
   );
 
   if (!res.data?.success) throw new Error(res.data?.message || "Tạo dự án thất bại");
   return res.data.data as Project;
-
 };
 
 // --- 4.5 DELETE PROJECT ---
@@ -296,7 +307,7 @@ export const getProjectDetail = async (
   return res.data.data;
 };
 
-// --- 4.7 UPDATE PROJECT (Multipart) ---
+// --- 4.7 UPDATE PROJECT ---
 export const updateProject = async (
   companyId: number,
   workspaceId: number,
@@ -304,7 +315,6 @@ export const updateProject = async (
   payload: UpdateProjectPayload
 ): Promise<Project> => {
   const formData = new FormData();
-
   const jsonPart = {
     name: payload.name,
     projectCode: payload.projectCode,
@@ -320,10 +330,7 @@ export const updateProject = async (
 
   const jsonBlob = new Blob([JSON.stringify(jsonPart)], { type: "application/json" });
   formData.append("data", jsonBlob);
-
-  if (payload.file) {
-    formData.append("file", payload.file);
-  }
+  if (payload.file) formData.append("file", payload.file);
 
   const res = await apiClient.put(
     `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}`,
@@ -355,12 +362,7 @@ export const getProjectMembers = async (
   companyId: number,
   workspaceId: number,
   projectId: number,
-  params: {
-    page?: number;
-    size?: number;
-    sortBy?: string;
-    sortDir?: string;
-  } = {}
+  params: { page?: number; size?: number; sortBy?: string; sortDir?: string } = {}
 ): Promise<PageResponse<ProjectMember>> => {
   const defaultParams = { page: 0, size: 10, sortBy: "joinedAt", sortDir: "desc", ...params };
   const res = await apiClient.get(
@@ -410,28 +412,22 @@ export const getProjectBacklog = async (
   projectId: number,
   queryParams?: BacklogQueryParams
 ): Promise<ProjectBacklogResponse> => {
-  
-  const params = queryParams ? Object.fromEntries(
-    Object.entries(queryParams).filter(([_, v]) => v != null && v !== "")
-  ) : {};
-
+  const params = cleanParams(queryParams);
   const res = await apiClient.get(
     `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/backlog`,
     { params }
   );
-
   if (!res.data.success) throw new Error(res.data.message);
   return res.data.data; 
 };
 
-// --- 4.13 CREATE TASK (NEW) ---
+// --- 4.13 CREATE TASK ---
 export const createProjectTask = async (
   companyId: number,
   workspaceId: number,
   projectId: number,
   payload: CreateTaskPayload
 ) => {
-  // 1. Tạo object cơ bản bắt buộc
   const cleanPayload: any = {
     title: payload.title,
     taskType: payload.taskType || "TASK",    
@@ -439,13 +435,7 @@ export const createProjectTask = async (
     description: payload.description || ""
   };
 
-  // 2. Chỉ append các trường ID nếu có giá trị (truthy)
-  // Loại bỏ hoàn toàn việc gửi số 0 nếu user dặn là backend sẽ lỗi
-  if (payload.sprintId) {
-    cleanPayload.sprintId = payload.sprintId;
-  }
-
-  // Tạm thời comment lại hoặc chỉ gửi nếu bạn thực sự cần sau này
+  if (payload.sprintId) cleanPayload.sprintId = payload.sprintId;
   if (payload.assigneeId) cleanPayload.assigneeId = payload.assigneeId;
   if (payload.epicId) cleanPayload.epicId = payload.epicId;
   if (payload.storyPoints) cleanPayload.storyPoints = payload.storyPoints;
@@ -458,4 +448,42 @@ export const createProjectTask = async (
   
   if (!res.data.success) throw new Error(res.data.message || "Lỗi khi tạo công việc");
   return res.data.data; 
+};
+
+/* ========================================================================
+   🔥 4.14 CHỨC NĂNG MỚI: TASK LIST VIEW & GROUP VIEW
+   ======================================================================== */
+
+// --- 1. LẤY DANH SÁCH TASK (LIST VIEW) ---
+export const getProjectTasks = async (
+  companyId: number,
+  workspaceId: number,
+  projectId: number,
+  params: ProjectTaskFilterParams
+): Promise<PageResponse<TaskResponse>> => {
+  const res = await apiClient.get(
+    `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/tasks`, 
+    { params: cleanParams(params) }
+  );
+  if (!res.data.success) throw new Error(res.data.message);
+  return res.data.data;
+};
+
+// --- 2. LẤY TASK THEO NHÓM (GROUPING VIEW) ---
+export const getTasksGrouped = async (
+  companyId: number,
+  workspaceId: number,
+  projectId: number,
+  groupBy: string,
+  sprintId?: number | 0 | null,
+  search?: string
+): Promise<TasksGroupedResponse> => {
+  const res = await apiClient.get(
+    `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/tasks/grouped`, 
+    {
+        params: cleanParams({ groupBy, sprintId, search })
+    }
+  );
+  if (!res.data.success) throw new Error(res.data.message);
+  return res.data.data;
 };
