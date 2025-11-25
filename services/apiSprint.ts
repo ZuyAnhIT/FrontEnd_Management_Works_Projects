@@ -111,7 +111,7 @@ export const updateSprint = async (
     }
 };
 
-// 4️⃣ GET – Xem chi tiết Sprint (MỚI)
+// 4️⃣ GET – Xem chi tiết Sprint 
 // URL: /api/projects/{projectId}/sprints/{sprintId}
 export const getSprintDetails = async (
   projectId: number,
@@ -130,43 +130,22 @@ export const getSprintDetails = async (
 };
 
 // 5️⃣ POST – Start Sprint
-// URL: /api/projects/{projectId}/sprints/{sprintId}/start
-export const startSprint = async (
-  projectId: number, 
-  sprintId: number
-): Promise<Sprint> => {
-  const res = await apiClient.post(
-    `/projects/${projectId}/sprints/${sprintId}/start`
-  );
-  
+export const startSprint = async (projectId: number, sprintId: number) => {
+  const res = await apiClient.post(`/projects/${projectId}/sprints/${sprintId}/start`);
   if (!res.data.success) throw new Error(res.data.message);
   return res.data.data;
 };
 
 // 6️⃣ POST – Complete Sprint
-// URL: /api/projects/{projectId}/sprints/{sprintId}/complete
-export const completeSprint = async (
-    projectId: number, 
-    sprintId: number
-): Promise<Sprint> => {
-    const res = await apiClient.post(
-      `/projects/${projectId}/sprints/${sprintId}/complete`
-    );
-    
+export const completeSprint = async (projectId: number, sprintId: number) => {
+    const res = await apiClient.post(`/projects/${projectId}/sprints/${sprintId}/complete`);
     if (!res.data.success) throw new Error(res.data.message);
     return res.data.data;
 };
 
-// 7️⃣ DELETE – Xóa Sprint
-// URL: /api/projects/{projectId}/sprints/{sprintId}
-export const deleteSprint = async (
-    projectId: number, 
-    sprintId: number
-) => {
-    const res = await apiClient.delete(
-      `/projects/${projectId}/sprints/${sprintId}`
-    );
-    
+// 7️⃣ DELETE – Xóa/Hủy Sprint
+export const deleteSprint = async (projectId: number, sprintId: number) => {
+    const res = await apiClient.delete(`/projects/${projectId}/sprints/${sprintId}`);
     if (!res.data.success) throw new Error(res.data.message);
-    return res.data;
+    return res.data; // thường là null
 };

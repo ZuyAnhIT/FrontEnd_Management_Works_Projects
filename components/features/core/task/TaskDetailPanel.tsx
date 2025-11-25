@@ -150,13 +150,16 @@ export default function TaskDetailPanel({ taskId, onClose, onUpdate, members = [
 
   return (
     // Overlay nền tối
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-sm transition-opacity" onClick={onClose}>
+    <div 
+    className="fixed inset-0 z-50 flex justify-end bg-transparent" 
+    onClick={onClose}
+  >
       
       {/* Panel Container */}
       <div 
-        className="w-full max-w-[900px] bg-white h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-300"
-        onClick={e => e.stopPropagation()}
-      >
+      className="w-full md:w-[600px] bg-white h-full shadow-2xl border-l border-slate-200 flex flex-col animate-in slide-in-from-right duration-200"
+      onClick={(e) => e.stopPropagation()}
+    >
         
         {/* --- HEADER --- */}
         <div className="h-14 border-b border-slate-100 flex items-center justify-between px-6 bg-white shrink-0">
