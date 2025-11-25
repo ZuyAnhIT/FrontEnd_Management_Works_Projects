@@ -39,7 +39,7 @@ export default function ProjectNavTabs({
     {
       id: 'sprints',
       icon: GitBranch,
-      label: 'Sprint',
+      label: 'List',
       path: `/core/workspace/${workspaceId}/project/${projectId}/sprints`,
     },
     {

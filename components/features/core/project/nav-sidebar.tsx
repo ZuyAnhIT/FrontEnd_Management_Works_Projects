@@ -61,7 +61,7 @@ export default function ProjectSidebar({
     {
       id: "sprints",
       icon: GitBranch,
-      label: "Sprint",
+      label: "List",
       path: `/core/workspace/project/${projectId}/sprints`,
     },
     {
