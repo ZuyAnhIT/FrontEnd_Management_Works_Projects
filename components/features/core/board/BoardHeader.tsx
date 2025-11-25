@@ -34,6 +34,7 @@ export default function BoardHeader({
     }
   };
 
+  // ✅ ĐÃ SỬA: Ép kiểu val thành BoardFilterParams['priority']
   const handlePriorityChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const val = e.target.value;
     if (!val) {
@@ -41,10 +42,14 @@ export default function BoardHeader({
         delete newFilters.priority;
         setFilters(newFilters);
     } else {
-        setFilters({ ...filters, priority: val });
+        setFilters({ 
+            ...filters, 
+            priority: val as BoardFilterParams['priority'] // Fix lỗi Type 'string'
+        });
     }
   };
 
+  // ✅ ĐÃ SỬA: Ép kiểu val thành BoardFilterParams['taskType']
   const handleTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const val = e.target.value;
     if (!val) {
@@ -52,18 +57,23 @@ export default function BoardHeader({
         delete newFilters.taskType;
         setFilters(newFilters);
     } else {
-        setFilters({ ...filters, taskType: val });
+        setFilters({ 
+            ...filters, 
+            taskType: val as BoardFilterParams['taskType'] // Fix lỗi Type 'string'
+        });
     }
   };
 
   const clearFilters = () => {
     setFilters({ 
         keyword: "", 
-        sprintId: filters.sprintId // Giữ lại sprint context nếu cần
+        sprintId: filters.sprintId,
+        assigneeId: undefined,
+        priority: undefined,
+        taskType: undefined
     });
   };
 
-  // Kiểm tra xem có filter nào đang active không (trừ sprintId)
   const hasActiveFilters = !!filters.keyword || !!filters.assigneeId || !!filters.priority || !!filters.taskType;
 
   return (
@@ -100,15 +110,17 @@ export default function BoardHeader({
                 )}
             </div>
 
-            {/* 2. MEMBER FILTER (AVATAR GROUP) */}
+            {/* 2. MEMBER FILTER */}
             <div className="flex items-center -space-x-2 mr-1">
                 {members.slice(0, 5).map((member) => {
-                    const isActive = filters.assigneeId === (member.userId || member.memberId);
                     const idToUse = member.userId || member.memberId;
+                    // Fix lỗi logic isActive (nếu id undefined thì không active)
+                    const isActive = filters.assigneeId !== undefined && filters.assigneeId === idToUse;
+                    
                     return (
                         <div 
-                            key={idToUse}
-                            onClick={() => toggleAssignee(idToUse)}
+                            key={idToUse || Math.random()}
+                            onClick={() => idToUse && toggleAssignee(idToUse)}
                             className={`
                                 relative w-8 h-8 rounded-full border-2 cursor-pointer transition-all hover:z-10 hover:scale-105
                                 ${isActive ? 'border-blue-500 z-10 ring-2 ring-blue-200' : 'border-white'}
