@@ -24,7 +24,7 @@ interface BacklogProps {
 }
 
 export function Backlog({ workspaceId, projectId }: BacklogProps) {
-  const { showToast } = useToast(); 
+  const { showToast } = useToast();
   const [tasks, setTasks] = useState<BacklogTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [openCreate, setOpenCreate] = useState(false);
@@ -84,18 +84,18 @@ export function Backlog({ workspaceId, projectId }: BacklogProps) {
           <div className="flex items-center gap-3">
             <div className="relative hidden md:block">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input 
-                type="text" 
-                placeholder="Search tasks..." 
+              <input
+                type="text"
+                placeholder="Search tasks..."
                 className="pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-md text-sm outline-none focus:border-blue-500 focus:bg-white transition-all w-64"
               />
             </div>
-            
+
             <Button variant="outline" className="border-slate-200 text-slate-700 hover:bg-slate-50 h-10">
               <Filter className="w-4 h-4 mr-2" /> Filter
             </Button>
 
-            <Button 
+            <Button
               onClick={() => setOpenCreate(true)}
               className="bg-slate-900 hover:bg-slate-800 text-white shadow-sm h-10 font-medium"
             >
@@ -119,9 +119,9 @@ export function Backlog({ workspaceId, projectId }: BacklogProps) {
                       {task.taskCode}
                     </span>
                     {task.epicName && (
-                      <span 
+                      <span
                         className="text-[10px] font-bold px-2 py-0.5 rounded border uppercase tracking-wide"
-                        style={{ 
+                        style={{
                           borderColor: task.epicColor ? `${task.epicColor}40` : '#e2e8f0',
                           color: task.epicColor || '#64748b',
                           backgroundColor: task.epicColor ? `${task.epicColor}10` : '#f8fafc'
@@ -154,12 +154,12 @@ export function Backlog({ workspaceId, projectId }: BacklogProps) {
                         <span className="text-xs font-medium text-slate-600">{task.storyPoints}</span>
                       </div>
                     )}
-                    
+
                     {task.dueDate && (
                       <div className="flex items-center gap-1.5 hidden sm:flex" title={`Due: ${new Date(task.dueDate).toLocaleDateString()}`}>
                         <Calendar className="w-3.5 h-3.5" />
                         <span className="text-xs font-medium text-slate-600">
-                          {new Date(task.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric'})}
+                          {new Date(task.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                         </span>
                       </div>
                     )}

@@ -13,7 +13,7 @@ function ScrollArea({
   return (
     <ScrollAreaPrimitive.Root
       data-slot="scroll-area"
-      className={cn('relative', className)}
+      className={cn('relative overflow-hidden', className)} // Thêm overflow-hidden để tránh lỗi layout
       {...props}
     >
       <ScrollAreaPrimitive.Viewport
@@ -22,7 +22,13 @@ function ScrollArea({
       >
         {children}
       </ScrollAreaPrimitive.Viewport>
+      
+      {/* Thanh cuộn dọc */}
       <ScrollBar />
+      
+      {/* THÊM MỚI: Thanh cuộn ngang */}
+      <ScrollBar orientation="horizontal" />
+      
       <ScrollAreaPrimitive.Corner />
     </ScrollAreaPrimitive.Root>
   )
