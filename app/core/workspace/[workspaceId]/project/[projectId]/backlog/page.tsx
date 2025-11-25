@@ -66,12 +66,11 @@ export default function BacklogPage() {
   });
 
   // ===============================================================
-  // 1. FETCH MEMBERS (Logic đơn giản hóa để đảm bảo load assignee)
+  // 1. FETCH MEMBERS
   // ===============================================================
   useEffect(() => {
     if (!companyId || !workspaceId || !projectId) return;
     
-    // Gọi API lấy member ngay khi component mount
     getProjectMembers(companyId, workspaceId, projectId, { size: 100 })
         .then(res => setMembers(res.content))
         .catch(() => console.error("Failed to load members"));
@@ -105,14 +104,11 @@ export default function BacklogPage() {
     }
   }, [companyId, workspaceId, projectId, filters, showToast]);
 
-  // ✅ FIX LỖI LỌC: Sử dụng logic debounce chặt chẽ hơn
+  // Auto reload logic (Debounce + Reset page)
   useEffect(() => {
     if (isAuthLoading) return;
 
     const t = setTimeout(() => {
-       // Luôn fetch nếu page = 0 (Load đầu hoặc Reset filter)
-       // Hoặc nếu đang ở page > 0 mà người dùng gõ phím -> BacklogToolbar nên reset page về 0
-       // Ở đây ta check: Nếu filters thay đổi, gọi fetchData
        if (filters.page === 0) {
            fetchData(false);
        }
@@ -121,11 +117,11 @@ export default function BacklogPage() {
     return () => clearTimeout(t);
   }, [filters, isAuthLoading, fetchData]); 
 
-  // Pagination Load More riêng biệt (chỉ chạy khi page tăng)
+  // Pagination Load More
   useEffect(() => {
       if (isAuthLoading) return;
       if ((filters.page || 0) > 0) fetchData(true);
-  }, [filters.page, isAuthLoading]); // Bỏ fetchData khỏi deps ở đây để tránh double call
+  }, [filters.page, isAuthLoading]); 
 
 
   // ===============================================================
@@ -134,7 +130,6 @@ export default function BacklogPage() {
   const onDragEnd = async (result: DropResult) => {
     const { source, destination, draggableId } = result;
 
-    // Nếu thả ra ngoài hoặc vị trí không đổi -> Thoát
     if (!destination) return;
     if (
       source.droppableId === destination.droppableId &&
@@ -144,12 +139,12 @@ export default function BacklogPage() {
     const sourceId = source.droppableId;
     const destId = destination.droppableId;
 
-    // --- Optimistic Update UI (Cập nhật ngay lập tức) ---
+    // --- Optimistic UI Update ---
     const newBacklogTasks = [...backlogTasks];
     const newSprints = data?.activeSprints ? [...data.activeSprints] : [];
     let movedTask: TaskSummary | undefined;
 
-    // A. XÓA KHỎI NGUỒN
+    // A. Remove from Source
     if (sourceId === 'backlog') {
         [movedTask] = newBacklogTasks.splice(source.index, 1);
         setBacklogTasks(newBacklogTasks);
@@ -166,7 +161,7 @@ export default function BacklogPage() {
 
     if (!movedTask) return;
 
-    // B. THÊM VÀO ĐÍCH
+    // B. Add to Destination
     if (destId === 'backlog') {
         newBacklogTasks.splice(destination.index, 0, movedTask);
         setBacklogTasks(newBacklogTasks);
@@ -181,14 +176,14 @@ export default function BacklogPage() {
         }
     }
 
-    // C. GỌI API BACKEND
+    // C. Call API
     try {
         const taskId = Number(draggableId);
         const targetSprintId = destId === 'backlog' ? null : Number(destId.split('-')[1]);
         await moveTaskToSprint(taskId, targetSprintId, destination.index);
     } catch (error) {
         showToast("Failed to move task. Reverting...", "error");
-        handleRefresh(); // Rollback dữ liệu nếu lỗi
+        handleRefresh(); // Rollback
     }
   };
 
@@ -216,9 +211,8 @@ export default function BacklogPage() {
        <DragDropContext onDragEnd={onDragEnd}>
            <div className="flex flex-1 overflow-hidden relative">
               <div className="flex-1 overflow-y-auto custom-scrollbar p-4 sm:p-6 transition-all duration-300">
-                 <div className={`mx-auto pb-20 ${selectedTaskId ? 'max-w-full' : 'max-w-[1200px]'}`}>
+                 <div className={`mx-auto pb-20 ${selectedTaskId ? 'max-w-full' : 'max-w-[1800px]'}`}>
                     
-                    {/* ✅ TOOLBAR FILTER (Đảm bảo setFilters hoạt động đúng) */}
                     <BacklogToolbar 
                        filters={filters}
                        setFilters={setFilters}
@@ -240,6 +234,7 @@ export default function BacklogPage() {
                                     onTaskClick={(id) => setSelectedTaskId(id)} 
                                     onTaskCreated={handleRefresh} 
                                     onSprintSettingsClick={(id) => setSelectedSprintId(id)}
+                                    onRefresh={handleRefresh} // ✅ Quan trọng: Truyền hàm refresh xuống để Start/Complete sprint hoạt động
                                 />
                              </div>
                           )}

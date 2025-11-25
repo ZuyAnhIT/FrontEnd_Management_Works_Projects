@@ -1,7 +1,8 @@
 "use client";
 
-import { X, AlertTriangle, Loader2, Trash2 } from "lucide-react";
-import { Button } from "@/components/ui/button"; // Giả sử bạn có component Button chuẩn
+import { useEffect, useRef } from "react";
+import { X, AlertTriangle, Loader2, Trash2, Info, AlertCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface ConfirmationModalProps {
   isOpen: boolean;
@@ -12,12 +13,11 @@ interface ConfirmationModalProps {
   description: string;
   confirmText?: string;
   cancelText?: string;
-  modalVariant?: "danger" | "warning" | "info"; // ✔ THÊM DÒNG NÀY
+  // Giữ nguyên prop này để tương thích ngược
+  modalVariant?: "danger" | "warning" | "info"; 
 }
 
-
 export default function ConfirmationModal({
-  
   isOpen,
   onClose,
   onConfirm,
@@ -26,67 +26,88 @@ export default function ConfirmationModal({
   description,
   confirmText = "Delete",
   cancelText = "Cancel",
-   modalVariant = "danger",
+  modalVariant = "danger",
 }: ConfirmationModalProps) {
   
+  // Prevent scroll body khi modal mở
+  useEffect(() => {
+    if (isOpen) document.body.style.overflow = 'hidden';
+    else document.body.style.overflow = 'unset';
+    return () => { document.body.style.overflow = 'unset'; };
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
+  // --- CẤU HÌNH MÀU SẮC & ICON ---
+  const VARIANTS = {
+    danger: {
+      icon: <Trash2 className="w-5 h-5 text-red-600" />,
+      bgIcon: "bg-red-50 border-red-100",
+      btnConfirm: "bg-red-600 hover:bg-red-700 text-white ring-red-200",
+      titleColor: "text-red-600" // Hoặc giữ text-slate-900 nếu thích đơn giản
+    },
+    warning: {
+      icon: <AlertTriangle className="w-5 h-5 text-amber-600" />,
+      bgIcon: "bg-amber-50 border-amber-100",
+      btnConfirm: "bg-amber-600 hover:bg-amber-700 text-white ring-amber-200",
+      titleColor: "text-amber-700"
+    },
+    info: {
+      icon: <Info className="w-5 h-5 text-blue-600" />,
+      bgIcon: "bg-blue-50 border-blue-100",
+      btnConfirm: "bg-blue-600 hover:bg-blue-700 text-white ring-blue-200",
+      titleColor: "text-blue-700"
+    }
+  };
+
+  const currentVariant = VARIANTS[modalVariant] || VARIANTS.danger;
+
   return (
-    // Backdrop: Đen mờ nhẹ, blur background
+    // 1. BACKDROP: Cực nhẹ (bg-black/10), không blur nhiều, tạo cảm giác "thoáng"
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[2px] p-4 animate-in fade-in duration-200"
+      className="fixed inset-0 z-[999] flex items-center justify-center bg-black/10 p-4 animate-in fade-in duration-200"
       onClick={onClose}
     >
-      {/* Modal Container: Phẳng, Shadow lớn, Viền xám */}
+      {/* 2. CONTAINER: Shadow cực lớn, Bo góc mềm mại, Border tinh tế */}
       <div
         onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-md bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-200"
+        className="relative w-full max-w-[420px] bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-200 ring-1 ring-slate-900/5"
       >
-        {/* Nút đóng nhanh góc phải */}
+        {/* Nút đóng nhanh */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 rounded-md transition-colors"
+          className="absolute top-3 right-3 p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-full transition-colors z-10"
         >
-          <X className="w-5 h-5" />
+          <X className="w-4 h-4" />
         </button>
 
-        <div className="p-6 flex gap-4">
-          {/* Icon cảnh báo bên trái */}
-          <div className="flex-shrink-0">
-            <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center border border-red-100">
-              <AlertTriangle
-  className={
-    "w-5 h-5 " +
-    (modalVariant === "danger"
-      ? "text-red-600"
-      : modalVariant === "warning"
-      ? "text-amber-600"
-      : "text-blue-600")
-  }
-/>
-
-
+        <div className="p-6">
+          <div className="flex flex-col gap-4 text-center sm:text-left sm:flex-row">
+            
+            {/* Icon Wrapper */}
+            <div className={`mx-auto sm:mx-0 w-12 h-12 flex items-center justify-center rounded-full border ${currentVariant.bgIcon} shrink-0`}>
+              {currentVariant.icon}
             </div>
-          </div>
 
-          {/* Nội dung chính */}
-          <div className="flex-1 pt-0.5">
-            <h2 className="text-lg font-bold text-slate-900 mb-2">
-              {title}
-            </h2>
-            <p className="text-sm text-slate-500 leading-relaxed">
-              {description}
-            </p>
+            {/* Content */}
+            <div className="flex-1 space-y-2">
+              <h3 className="text-lg font-bold text-slate-900 leading-tight">
+                {title}
+              </h3>
+              <p className="text-sm text-slate-500 leading-relaxed">
+                {description}
+              </p>
+            </div>
           </div>
         </div>
 
-        {/* Footer Actions: Nền xám nhẹ tách biệt */}
-        <div className="bg-slate-50 px-6 py-4 flex justify-end gap-3 border-t border-slate-100">
+        {/* 3. FOOTER: Liền mạch (không nền xám), nút to rõ */}
+        <div className="px-6 pb-6 pt-2 flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
           <Button
             onClick={onClose}
             disabled={isLoading}
-            variant="outline"
-            className="bg-white border-slate-300 text-slate-700 hover:bg-white hover:text-slate-900 font-medium h-10 px-4"
+            variant="ghost"
+            className="w-full sm:w-auto text-slate-600 font-medium hover:bg-slate-50 hover:text-slate-900"
           >
             {cancelText}
           </Button>
@@ -94,18 +115,15 @@ export default function ConfirmationModal({
           <Button
             onClick={onConfirm}
             disabled={isLoading}
-            className="bg-red-600 hover:bg-red-700 text-white font-bold h-10 px-4 shadow-sm transition-colors flex items-center gap-2"
+            className={`w-full sm:w-auto font-bold shadow-sm transition-all active:scale-95 focus:ring-4 focus:ring-opacity-50 ${currentVariant.btnConfirm}`}
           >
             {isLoading ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Processing...</span>
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                Processing...
               </>
             ) : (
-              <>
-                <Trash2 className="w-4 h-4" />
-                <span>{confirmText}</span>
-              </>
+              confirmText
             )}
           </Button>
         </div>
