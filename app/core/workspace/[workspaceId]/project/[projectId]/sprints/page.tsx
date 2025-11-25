@@ -1,7 +1,7 @@
-'use client'
+// 'use client'
 
-import { Sprints } from '@/components/features/core/project/sprints'
+// import { Sprints } from '@/components/features/core/project/sprints'
 
-export default function SprintsPage() {
-  return <Sprints />
-}
+// export default function SprintsPage() {
+//   return <Sprints />
+// }
