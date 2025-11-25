@@ -1,13 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, ChevronRight, MoreHorizontal, Rocket, Calendar } from "lucide-react";
-import { SprintDetail } from "@/services/apiProject"; // Hoặc import từ apiSprint tuỳ cấu trúc
-import BacklogTaskItem from "./BacklogTaskItem";
-import { Button } from "@/components/ui/button";
-
-// Import hooks và QuickTaskCreate
 import { useParams } from "next/navigation";
+import { Droppable } from "@hello-pangea/dnd"; // ✅ Import Droppable
+import { ChevronDown, ChevronRight, MoreHorizontal, Rocket, Calendar } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { SprintDetail } from "@/services/apiProject";
+
+import BacklogTaskItem from "./BacklogTaskItem";
 import QuickTaskCreate from "@/components/features/core/task/QuickTaskCreate";
 
 // Helper format date
@@ -17,7 +17,6 @@ interface SprintSectionProps {
   sprints: SprintDetail[];
   onTaskClick: (taskId: number) => void; 
   onTaskCreated?: () => void; 
-  // ✅ Callback khi bấm nút "More" (...) để mở chi tiết/sửa Sprint
   onSprintSettingsClick: (sprintId: number) => void; 
 }
 
@@ -63,6 +62,7 @@ export default function SprintSection({
                 `}
                 onClick={() => toggleSprint(sprint.id)}
             >
+                {/* LEFT: Info */}
                 <div className="flex items-center gap-3">
                    <button className="text-slate-400 hover:text-slate-600 transition-transform">
                       {expanded[sprint.id] ? <ChevronDown className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
@@ -106,36 +106,33 @@ export default function SprintSection({
                   </div>
                 </div>
 
-                {/* ACTIONS RIGHT */}
+                {/* RIGHT: Actions */}
                 <div className="flex items-center gap-2">
-                   {/* Chỉ hiện nút Complete nếu Sprint đang chạy */}
                    {isActive && (
                      <Button 
                         size="sm" 
-                        onClick={(e) => e.stopPropagation()} // Chặn click lan ra header
+                        onClick={(e) => e.stopPropagation()} 
                         className="h-8 bg-blue-100 text-blue-700 hover:bg-blue-200 border border-blue-200 font-semibold shadow-none"
                      >
                         Complete Sprint
                      </Button>
                    )}
-                   {/* Chỉ hiện nút Start nếu Sprint chưa chạy */}
                    {isFuture && (
                      <Button 
                         size="sm" 
-                        onClick={(e) => e.stopPropagation()} // Chặn click lan ra header
+                        onClick={(e) => e.stopPropagation()} 
                         className="h-8 bg-white text-slate-700 hover:bg-slate-50 border border-slate-300 shadow-sm"
                      >
                         Start Sprint
                      </Button>
                    )}
                    
-                   {/* ✅ NÚT MORE: Mở Sprint Detail */}
                    <Button 
                       variant="ghost" 
                       size="sm" 
                       className="h-8 w-8 p-0 text-slate-500 hover:text-blue-600 hover:bg-blue-50"
                       onClick={(e) => {
-                          e.stopPropagation(); // Quan trọng: Chặn click để không đóng mở accordion
+                          e.stopPropagation(); 
                           onSprintSettingsClick(sprint.id); 
                       }}
                    >
@@ -144,38 +141,52 @@ export default function SprintSection({
                 </div>
             </div>
 
-            {/* --- SPRINT TASKS + QUICK CREATE --- */}
+            {/* --- SPRINT TASKS (DROPPABLE AREA) --- */}
             {expanded[sprint.id] && (
-               <div className="p-2 min-h-[50px]">
-                  
-                  {/* List Tasks */}
-                  <div className="space-y-2 mb-2">
-                      {sprint.tasks && sprint.tasks.length > 0 ? (
-                         sprint.tasks.map(task => (
-                            <BacklogTaskItem 
-                               key={task.id} 
-                               task={task} 
-                               onClick={() => onTaskClick(task.id)} 
-                            />
-                         ))
-                      ) : (
-                         <div className="flex flex-col items-center justify-center py-6 text-slate-400 border-2 border-dashed border-slate-200 rounded-lg m-1 bg-white/50">
-                            <Rocket className="w-8 h-8 mb-2 opacity-40" />
-                            <p className="text-xs font-medium">Plan your sprint</p>
-                            <p className="text-[10px]">Drag issues here or create new one</p>
-                         </div>
-                      )}
-                  </div>
+               <Droppable droppableId={`sprint-${sprint.id}`} type="TASK">
+                 {(provided, snapshot) => (
+                    <div 
+                       ref={provided.innerRef} 
+                       {...provided.droppableProps}
+                       className={`p-2 min-h-[50px] transition-colors duration-200
+                          ${snapshot.isDraggingOver ? 'bg-blue-50/80' : ''} 
+                       `}
+                    >
+                        
+                        {/* List Tasks */}
+                        <div className="space-y-2 mb-2">
+                            {sprint.tasks && sprint.tasks.length > 0 ? (
+                               sprint.tasks.map((task, index) => (
+                                  <BacklogTaskItem 
+                                     key={task.id} 
+                                     task={task} 
+                                     index={index} // ✅ Quan trọng: Index cho DragDrop
+                                     onClick={() => onTaskClick(task.id)} 
+                                  />
+                               ))
+                            ) : (
+                               !snapshot.isDraggingOver && (
+                                 <div className="flex flex-col items-center justify-center py-6 text-slate-400 border-2 border-dashed border-slate-200 rounded-lg m-1 bg-white/50">
+                                    <Rocket className="w-8 h-8 mb-2 opacity-40" />
+                                    <p className="text-xs font-medium">Plan your sprint</p>
+                                    <p className="text-[10px]">Drag issues here</p>
+                                 </div>
+                               )
+                            )}
+                            {provided.placeholder} {/* ✅ Placeholder giữ chỗ khi kéo */}
+                        </div>
 
-                  {/* 🔥 QUICK CREATE CHO SPRINT NÀY */}
-                  <div className="px-1">
-                      <QuickTaskCreate 
-                          projectId={projectId}
-                          sprintId={sprint.id} // ✅ Truyền đúng ID Sprint
-                          onSuccess={() => onTaskCreated && onTaskCreated()} 
-                      />
-                  </div>
-               </div>
+                        {/* Quick Create */}
+                        <div className="px-1">
+                            <QuickTaskCreate 
+                                projectId={projectId}
+                                sprintId={sprint.id} 
+                                onSuccess={() => onTaskCreated && onTaskCreated()} 
+                            />
+                        </div>
+                    </div>
+                 )}
+               </Droppable>
             )}
           </div>
         );

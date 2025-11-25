@@ -52,6 +52,12 @@ export interface UpdateTaskData {
   dueDate?: string;   // ISO String
 }
 
+// Payload
+export interface MoveTaskPayload {
+  sprintId: number | null; // null = Backlog
+  newSortOrder?: number;   // Index mới trong danh sách
+}
+
 // ------------------------------------------------
 // 2. API METHODS
 // ------------------------------------------------
@@ -69,12 +75,24 @@ export const updateTask = async (taskId: number, data: UpdateTaskData) => {
   return res.data; 
 };
 
-// 🔹 Gán task vào sprint
-export const assignTaskToSprint = async (taskId: number, sprintId: number) => {
-  const res = await apiClient.put(`/tasks/${taskId}/sprint`, {
+// API gán task
+export const moveTaskToSprint = async (
+  taskId: number,
+  sprintId: number | null,
+  newSortOrder?: number
+) => {
+  const payload: MoveTaskPayload = {
     sprintId,
-  });
-  return res.data; // { success, message, data }
+    newSortOrder
+  };
+
+  const res = await apiClient.put(`/tasks/${taskId}/sprint`, payload);
+
+  if (!res.data.success) {
+    throw new Error(res.data.message || "Không thể di chuyển công việc.");
+  }
+  
+  return res.data.data;
 };
 
 
