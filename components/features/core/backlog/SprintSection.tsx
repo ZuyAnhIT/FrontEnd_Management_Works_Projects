@@ -2,13 +2,12 @@
 
 import { useState } from "react";
 import { ChevronDown, ChevronRight, MoreHorizontal, Rocket, Calendar } from "lucide-react";
-import { SprintDetail } from "@/services/apiProject";
+import { SprintDetail } from "@/services/apiProject"; // Hoặc import từ apiSprint tuỳ cấu trúc
 import BacklogTaskItem from "./BacklogTaskItem";
 import { Button } from "@/components/ui/button";
 
 // Import hooks và QuickTaskCreate
 import { useParams } from "next/navigation";
-import { useAuth } from "@/context/AuthContext";
 import QuickTaskCreate from "@/components/features/core/task/QuickTaskCreate";
 
 // Helper format date
@@ -17,13 +16,20 @@ const formatDate = (d?: string) => d ? new Date(d).toLocaleDateString('en-US', {
 interface SprintSectionProps {
   sprints: SprintDetail[];
   onTaskClick: (taskId: number) => void; 
-  onTaskCreated?: () => void; // ✅ Callback khi tạo task xong
+  onTaskCreated?: () => void; 
+  // ✅ Callback khi bấm nút "More" (...) để mở chi tiết/sửa Sprint
+  onSprintSettingsClick: (sprintId: number) => void; 
 }
 
-export default function SprintSection({ sprints, onTaskClick, onTaskCreated }: SprintSectionProps) {
-  // Lấy context params & auth để truyền vào QuickCreate
+export default function SprintSection({ 
+  sprints, 
+  onTaskClick, 
+  onTaskCreated, 
+  onSprintSettingsClick 
+}: SprintSectionProps) {
+  
   const params = useParams();
-  const { activeCompany } = useAuth();
+  const projectId = Number(params.projectId);
   
   // Mặc định mở tất cả sprint
   const [expanded, setExpanded] = useState<Record<number, boolean>>(
@@ -51,10 +57,13 @@ export default function SprintSection({ sprints, onTaskClick, onTaskCreated }: S
             `}
           >
             {/* --- SPRINT HEADER --- */}
-            <div className={`flex items-center justify-between px-4 py-3 border-b 
+            <div 
+                className={`flex items-center justify-between px-4 py-3 border-b cursor-pointer select-none
                 ${isActive ? 'bg-blue-50/50 border-blue-100' : 'bg-white border-slate-200'}
-            `}>
-                <div className="flex items-center gap-3 cursor-pointer select-none" onClick={() => toggleSprint(sprint.id)}>
+                `}
+                onClick={() => toggleSprint(sprint.id)}
+            >
+                <div className="flex items-center gap-3">
                    <button className="text-slate-400 hover:text-slate-600 transition-transform">
                       {expanded[sprint.id] ? <ChevronDown className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
                    </button>
@@ -97,21 +106,39 @@ export default function SprintSection({ sprints, onTaskClick, onTaskCreated }: S
                   </div>
                 </div>
 
+                {/* ACTIONS RIGHT */}
                 <div className="flex items-center gap-2">
                    {/* Chỉ hiện nút Complete nếu Sprint đang chạy */}
                    {isActive && (
-                     <Button size="sm" className="h-8 bg-blue-100 text-blue-700 hover:bg-blue-200 border border-blue-200 font-semibold shadow-none">
+                     <Button 
+                        size="sm" 
+                        onClick={(e) => e.stopPropagation()} // Chặn click lan ra header
+                        className="h-8 bg-blue-100 text-blue-700 hover:bg-blue-200 border border-blue-200 font-semibold shadow-none"
+                     >
                         Complete Sprint
                      </Button>
                    )}
                    {/* Chỉ hiện nút Start nếu Sprint chưa chạy */}
                    {isFuture && (
-                     <Button size="sm" className="h-8 bg-white text-slate-700 hover:bg-slate-50 border border-slate-300 shadow-sm">
+                     <Button 
+                        size="sm" 
+                        onClick={(e) => e.stopPropagation()} // Chặn click lan ra header
+                        className="h-8 bg-white text-slate-700 hover:bg-slate-50 border border-slate-300 shadow-sm"
+                     >
                         Start Sprint
                      </Button>
                    )}
                    
-                   <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-slate-500">
+                   {/* ✅ NÚT MORE: Mở Sprint Detail */}
+                   <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-8 w-8 p-0 text-slate-500 hover:text-blue-600 hover:bg-blue-50"
+                      onClick={(e) => {
+                          e.stopPropagation(); // Quan trọng: Chặn click để không đóng mở accordion
+                          onSprintSettingsClick(sprint.id); 
+                      }}
+                   >
                       <MoreHorizontal className="w-4 h-4" />
                    </Button>
                 </div>
@@ -143,11 +170,9 @@ export default function SprintSection({ sprints, onTaskClick, onTaskCreated }: S
                   {/* 🔥 QUICK CREATE CHO SPRINT NÀY */}
                   <div className="px-1">
                       <QuickTaskCreate 
-                          companyId={activeCompany?.companyId!}
-                          workspaceId={Number(params.workspaceId)}
-                          projectId={Number(params.projectId)}
+                          projectId={projectId}
                           sprintId={sprint.id} // ✅ Truyền đúng ID Sprint
-                          onSuccess={() => onTaskCreated && onTaskCreated()} // Callback reload
+                          onSuccess={() => onTaskCreated && onTaskCreated()} 
                       />
                   </div>
                </div>

@@ -24,10 +24,11 @@ import SprintSection from "@/components/features/core/backlog/SprintSection";
 import BacklogTaskItem from "@/components/features/core/backlog/BacklogTaskItem";
 import TaskDetailPanel from "@/components/features/core/task/TaskDetailPanel";
 
-// Components Logic (Create)
+// Components Logic (Create & Edit)
 import QuickTaskCreate from "@/components/features/core/task/QuickTaskCreate";
 import CreateTaskModal from "@/components/features/core/task/CreateTaskModal";
-import QuickSprintButton from "@/components/features/core/sprint/QuickSprintButton"; // ✅ Component Nút tạo Sprint nhanh
+import QuickSprintButton from "@/components/features/core/sprint/QuickSprintButton";
+import SprintDetailModal from "@/components/features/core/sprint/SprintDetailModal"; // ✅ Import Modal Chi tiết Sprint
 
 export default function BacklogPage() {
   const params = useParams();
@@ -48,6 +49,7 @@ export default function BacklogPage() {
 
   // --- STATE UI ---
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
+  const [selectedSprintId, setSelectedSprintId] = useState<number | null>(null); // ✅ State chọn Sprint để xem chi tiết
   const [isCreateTaskModalOpen, setIsCreateTaskModalOpen] = useState(false);
 
   // --- FILTER STATE ---
@@ -128,15 +130,25 @@ export default function BacklogPage() {
     setFilters(prev => ({ ...prev, page: (prev.page || 0) + 1 }));
   };
 
+  // Task Handlers
   const handleOpenTaskDetail = (taskId: number) => {
     setSelectedTaskId(taskId);
   };
 
-  const handleCloseDetail = () => {
+  const handleCloseTaskDetail = () => {
     setSelectedTaskId(null);
   };
 
-  // ✅ GLOBAL REFRESH: Gọi lại khi có bất kỳ thay đổi nào
+  // Sprint Handlers
+  const handleOpenSprintDetail = (sprintId: number) => {
+    setSelectedSprintId(sprintId); // ✅ Mở Modal Sprint
+  };
+
+  const handleCloseSprintDetail = () => {
+    setSelectedSprintId(null);
+  };
+
+  // ✅ GLOBAL REFRESH
   const handleRefresh = () => {
     fetchData(false);
   };
@@ -150,11 +162,11 @@ export default function BacklogPage() {
   return (
     <div className="flex flex-col h-[calc(100vh-64px)] bg-slate-50 overflow-hidden">
        
-       {/* HEADER: Chứa nút Tạo Sprint Chi Tiết & Tạo Task */}
+       {/* HEADER */}
        <BacklogHeader 
           totalTasks={data?.backlogTotalElements || 0} 
           onCreateClick={() => setIsCreateTaskModalOpen(true)}
-          onRefresh={handleRefresh} // Reload khi tạo Sprint từ Header
+          onRefresh={handleRefresh} 
        />
 
        {/* BODY CONTAINER */}
@@ -184,16 +196,17 @@ export default function BacklogPage() {
                             <SprintSection 
                                 sprints={data.activeSprints} 
                                 onTaskClick={handleOpenTaskDetail} 
-                                onTaskCreated={handleRefresh} // Reload khi tạo task trong Sprint
+                                onTaskCreated={handleRefresh} 
+                                onSprintSettingsClick={handleOpenSprintDetail} // ✅ Truyền handler mở chi tiết Sprint
                             />
                          </div>
                       )}
 
-                      {/* ✅ B. QUICK SPRINT BUTTON (Nằm giữa Active Sprint & Backlog) */}
+                      {/* B. QUICK SPRINT BUTTON */}
                       <div className="mb-6">
                           <QuickSprintButton 
-                              projectId={projectId} // ✅ Chỉ cần projectId
-                              onSuccess={handleRefresh} // Reload khi tạo Sprint Nhanh
+                              projectId={projectId} 
+                              onSuccess={handleRefresh} 
                           />
                       </div>
 
@@ -227,7 +240,7 @@ export default function BacklogPage() {
                                </div>
                             )}
 
-                            {/* ✅ QUICK TASK CREATE CHO BACKLOG (sprintId = null) */}
+                            {/* Quick Task Create (Backlog) */}
                             <div className="px-1">
                                 <QuickTaskCreate 
                                     companyId={companyId}
@@ -259,11 +272,11 @@ export default function BacklogPage() {
              </div>
           </div>
 
-          {/* RIGHT: DETAIL PANEL */}
+          {/* RIGHT: TASK DETAIL PANEL */}
           {selectedTaskId && (
               <TaskDetailPanel 
                  taskId={selectedTaskId} 
-                 onClose={handleCloseDetail}
+                 onClose={handleCloseTaskDetail}
                  onUpdate={handleRefresh}
                  members={members}
                  sprints={data?.activeSprints}
@@ -271,7 +284,17 @@ export default function BacklogPage() {
           )}
        </div>
 
-       {/* ✅ GLOBAL CREATE TASK MODAL (Ẩn) */}
+       {/* ✅ GLOBAL SPRINT DETAIL MODAL (Hiển thị khi chọn Sprint) */}
+       {selectedSprintId && (
+          <SprintDetailModal 
+             projectId={projectId}
+             sprintId={selectedSprintId}
+             onClose={handleCloseSprintDetail}
+             onUpdate={handleRefresh}
+          />
+       )}
+
+       {/* ✅ GLOBAL CREATE TASK MODAL */}
        <CreateTaskModal 
           isOpen={isCreateTaskModalOpen}
           onClose={() => setIsCreateTaskModalOpen(false)}
