@@ -16,6 +16,21 @@ export interface PageResponse<T> {
   first: boolean;
 }
 
+export interface ProjectRequest {
+  name: string;
+  projectCode: string;
+  description?: string | null;
+  goal?: string | null;
+  coverImageUrl?: string | null;
+  priority?: "LOW" | "MEDIUM" | "HIGH";
+  startDate?: string | null; // YYYY-MM-DD
+  dueDate?: string | null;   // YYYY-MM-DD
+  managerId?: number | null;
+  projectTypeId?: number | null;
+  boardConfig?: any;         // object -> sẽ stringify ở backend
+}
+
+
 export interface Project {
   id: number;
   workspaceId: number;
@@ -221,17 +236,38 @@ export const getTrashedProjects = async (
 };
 
 // --- 4.4 CREATE PROJECT ---
+
 export const createProject = async (
   companyId: number,
   workspaceId: number,
-  payload: any
+  payload: ProjectRequest,
+  file?: File | null
 ): Promise<Project> => {
-  const res = await apiClient.post(
-    `/companies/${companyId}/workspaces/${workspaceId}/projects`,
-    payload
+  const formData = new FormData();
+
+  // backend yêu cầu @RequestPart("data") là JSON string
+  formData.append(
+    "data",
+    new Blob([JSON.stringify(payload)], { type: "application/json" })
   );
-  if (!res.data.success) throw new Error(res.data.message);
-  return res.data.data;
+
+  if (file) {
+    formData.append("file", file);
+  }
+
+  const res = await apiClient.post(
+    `/companies/${Number(companyId)}/workspaces/${Number(workspaceId)}/projects`,
+    formData,
+    {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    }
+  );
+
+  if (!res.data?.success) throw new Error(res.data?.message || "Tạo dự án thất bại");
+  return res.data.data as Project;
+
 };
 
 // --- 4.5 DELETE PROJECT ---
