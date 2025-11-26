@@ -1,7 +1,10 @@
 "use client";
 
-import { Droppable } from "@hello-pangea/dnd";
+import { useSortable, SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { useDroppable } from "@dnd-kit/core";
+import { CSS } from "@dnd-kit/utilities";
 import { Plus } from "lucide-react";
+import { useMemo } from "react";
 import { BoardColumnResponse } from "@/services/apiBoard";
 import BoardTaskCard from "./BoardTaskCard";
 import { ColumnContextMenu } from "./ColumnContextMenu";
@@ -9,97 +12,136 @@ import { useToast } from "@/components/ui/ToastProvider";
 
 interface BoardColumnProps {
   column: BoardColumnResponse;
-  index: number;
-  projectId: number; // ✅ Bắt buộc có để truyền cho Menu
-  onDeleteColumn?: (columnId: string) => void; // Hàm này từ BoardPage truyền xuống để update State
+  index: number; // Keep index prop if used by parent, though dnd-kit uses IDs
+  projectId: number;
+  onDeleteColumn?: (columnId: string) => void;
 }
 
 export default function BoardColumn({ column, projectId, onDeleteColumn }: BoardColumnProps) {
-  const columnBg = "bg-[#F4F5F7]";
-  const { showToast } = useToast(); 
+  const { showToast } = useToast();
 
-  // 🛡️ PHÒNG VỆ: Kiểm tra dữ liệu đầu vào
+  // 🛡️ Guard Clause
   if (!column || (column.id === undefined && (column as any).statusId === undefined)) {
-    return null; 
+    return null;
   }
 
-  // Xử lý ID an toàn
+  // Safe ID handling
   const rawId = column.id ?? (column as any).statusId;
-  const dropId = rawId !== undefined && rawId !== null ? String(rawId) : `col-${Math.random()}`;
-
-  // Tên hiển thị an toàn
+  const columnId = rawId !== undefined && rawId !== null ? String(rawId) : `col-${Math.random()}`;
   const displayName = column.name || "Untitled Column";
   const tasks = Array.isArray(column.tasks) ? column.tasks : [];
 
-  return (
-    <div className={`w-[272px] flex flex-col max-h-full rounded-xl ${columnBg} shrink-0 select-none`}>
-        
-        {/* --- COLUMN HEADER --- */}
-        <div className="p-3 pr-2 flex items-center justify-between shrink-0 cursor-grab active:cursor-grabbing group">
-            <div className="flex items-center gap-2 overflow-hidden">
-                <h3 className="text-[13px] font-bold text-[#5E6C84] uppercase truncate pl-1" title={displayName}>
-                    {displayName}
-                </h3>
-                {tasks.length > 0 && (
-                    <span className="text-xs font-medium text-slate-600 bg-slate-200/50 px-1.5 rounded">
-                        {tasks.length}
-                    </span>
-                )}
-            </div>
-            <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button className="p-1.5 hover:bg-slate-200 rounded text-slate-500">
-                    <Plus className="w-4 h-4"/>
-                </button>
-                
-                {/* 👇 SỬA LẠI CHỖ NÀY CHO KHỚP LOGIC */}
-                <ColumnContextMenu 
-                    projectId={projectId}
-                    columnId={dropId}
-                    columnLabel={displayName}
-                    
-                    // Nếu bên trong Menu bạn đặt tên prop là onDeleted thì map như sau:
-                    onDeleted={onDeleteColumn} 
-                    
-                    // Nếu bên trong Menu bạn vẫn để tên là onDeleteColumn thì giữ nguyên:
-                    // onDeleteColumn={onDeleteColumn}
+  // Memoize task IDs for SortableContext
+  const taskIds = useMemo(() => tasks.map((t) => t.id.toString()), [tasks]);
 
-                    onMoveColumn={() => {
-                        showToast("Tính năng di chuyển cột đang phát triển", "info");
-                    }}
-                    onSetColumnLimit={() => {
-                        showToast("Tính năng giới hạn task đang phát triển", "info");
-                    }}
-                />
-            </div>
+  // 1. Make the Column Sortable (Horizontal reordering)
+  const {
+    attributes,
+    listeners,
+    setNodeRef: setColumnRef,
+    transform,
+    transition,
+    isDragging: isColumnDragging,
+  } = useSortable({
+    id: columnId,
+    data: {
+      type: "Column",
+      column,
+    },
+  });
+
+  const columnStyle = {
+    transform: CSS.Translate.toString(transform),
+    transition,
+    opacity: isColumnDragging ? 0.5 : 1,
+  };
+
+  // 2. Make the Task List Droppable (for dragging tasks INTO this column)
+  const { setNodeRef: setTaskListRef, isOver } = useDroppable({
+    id: columnId, // The droppable ID is the column ID
+    data: {
+      type: "Column", // Identifying this drop zone as a Column
+      column,
+    }
+  });
+
+  const columnBg = "bg-[#F4F5F7]";
+  const activeBg = "bg-[#E3F2FD] ring-2 ring-[#2684FF] ring-inset";
+
+  return (
+    <div
+      ref={setColumnRef}
+      style={columnStyle}
+      className={`
+        w-[272px] flex flex-col shrink-0 select-none h-full max-h-full
+        ml-3 first:ml-0 rounded-xl transition-all duration-200
+        ${isColumnDragging ? "z-50 shadow-2xl" : ""}
+      `}
+    >
+      <div
+        className={`
+          flex flex-col h-full rounded-xl transition-colors duration-200
+          ${isOver ? activeBg : columnBg}
+        `}
+      >
+        {/* --- COLUMN HEADER --- */}
+        {/* Drag handle is applied here via listeners/attributes */}
+        <div
+          {...attributes}
+          {...listeners}
+          className="p-3 pr-2 flex items-center justify-between shrink-0 cursor-grab active:cursor-grabbing group/header"
+        >
+          <div className="flex items-center gap-2 overflow-hidden">
+            <h3 className="text-[13px] font-bold text-[#5E6C84] uppercase truncate pl-1" title={displayName}>
+              {displayName}
+            </h3>
+            {tasks.length > 0 && (
+              <span className="text-xs font-medium text-[#172B4D] bg-[#DFE1E6] px-2 py-0.5 rounded-full">
+                {tasks.length}
+              </span>
+            )}
+          </div>
+          <div className="flex gap-0.5 opacity-0 group-hover/header:opacity-100 transition-opacity">
+            <button className="p-1 hover:bg-[#091E4214] rounded text-[#42526E]">
+              <Plus className="w-4 h-4" />
+            </button>
+
+            <ColumnContextMenu
+              projectId={projectId}
+              columnId={columnId}
+              columnLabel={displayName}
+              onDeleted={onDeleteColumn}
+              onMoveColumn={() => showToast("Feature in development", "info")}
+              onSetColumnLimit={() => showToast("Feature in development", "info")}
+            />
+          </div>
         </div>
 
-        {/* --- TASK LIST (DROPPABLE AREA) --- */}
-        <Droppable droppableId={dropId} type="TASK">
-            {(provided, snapshot) => (
-                <div
-                    ref={provided.innerRef}
-                    {...provided.droppableProps}
-                    className={`
-                        flex-1 overflow-y-auto custom-scrollbar px-2 pb-2 min-h-[10px] mx-1 mb-1 rounded-b-lg transition-colors
-                        ${snapshot.isDraggingOver ? 'bg-blue-100/50' : ''}
-                    `}
-                >
-                    {tasks.map((task, index) => (
-                        <BoardTaskCard 
-                            key={task.id || `task-${index}`} 
-                            task={task} 
-                            index={index} 
-                        />
-                    ))}
-                    {provided.placeholder}
-                    
-                    <button className="w-full py-1.5 mt-1 flex items-center gap-2 text-slate-500 hover:bg-slate-200/60 hover:text-slate-700 rounded transition-colors px-2 text-[13px]">
-                        <Plus className="w-4 h-4" /> 
-                        <span>Create issue</span>
-                    </button>
-                </div>
-            )}
-        </Droppable>
+        {/* --- TASK LIST CONTAINER --- */}
+        {/* This div is the Droppable area for tasks */}
+        <div
+          ref={setTaskListRef}
+          className="flex-1 overflow-y-auto custom-scrollbar px-2 pb-2 min-h-[150px]"
+        >
+          <SortableContext items={taskIds} strategy={verticalListSortingStrategy}>
+            {tasks.map((task, idx) => (
+              <BoardTaskCard
+                key={task.id || `task-${idx}`}
+                task={task}
+                index={idx}
+              />
+            ))}
+          </SortableContext>
+
+          {/* Create Issue Button - hide when dragging over to reduce visual noise */}
+          {!isOver && (
+            <button className="w-full py-2 mt-1 flex items-center gap-1.5 text-[#5E6C84] hover:bg-[#091E4214] hover:text-[#172B4D] rounded-[3px] transition-colors px-2">
+              <Plus className="w-4 h-4" />
+              <span className="text-[13px] font-medium">Create issue</span>
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
