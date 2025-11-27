@@ -16,14 +16,12 @@ import {
   KeyboardSensor,
   DragStartEvent,
   DragEndEvent,
-  // Add new imports for custom collision detection
   pointerWithin,
   rectIntersection,
-  getFirstCollision,
-  closestCorners, 
+  closestCorners,
   defaultDropAnimationSideEffects,
   DropAnimation,
-  CollisionDetection, // Import type
+  CollisionDetection,
 } from "@dnd-kit/core";
 import {
   SortableContext,
@@ -40,6 +38,7 @@ import {
   RawStatusColumn,
   moveTaskToStatus,
   BoardFilterParams,
+  reorderProjectStatuses, // ✅ 1. Import Reorder API
 } from "@/services/apiBoard";
 import { getProjectMembers, ProjectMember, TaskSummary } from "@/services/apiProject";
 
@@ -50,7 +49,6 @@ import CreateColumnButton from "@/components/features/core/board/CreateColumnBut
 import BoardTaskCard from "@/components/features/core/board/BoardTaskCard";
 
 export default function BoardPage() {
-  // ... (State and API logic remain unchanged) ...
   const params = useParams();
   const { showToast } = useToast();
   const { activeCompany, isLoading: isAuthLoading } = useAuth();
@@ -77,20 +75,16 @@ export default function BoardPage() {
   });
 
   const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: { distance: 10 },
-    }),
+    useSensor(PointerSensor, { activationConstraint: { distance: 10 } }),
     useSensor(KeyboardSensor)
   );
 
-  // ... (normalizeData and fetchBoardData remain unchanged) ...
+  // ... (normalizeData không đổi) ...
   const normalizeData = (boardData: RawBoardColumn[], statusList: RawStatusColumn[]): BoardColumnResponse[] => {
     const columnMap = new Map<number, BoardColumnResponse>();
     if (Array.isArray(statusList)) {
       statusList.forEach((st) => {
-        columnMap.set(st.id, {
-          id: st.id, name: st.name, color: st.color, position: st.sortOrder, isCompletedStatus: st.isCompletedStatus, tasks: [],
-        });
+        columnMap.set(st.id, { id: st.id, name: st.name, color: st.color, position: st.sortOrder, isCompletedStatus: st.isCompletedStatus, tasks: [], });
       });
     }
     if (Array.isArray(boardData)) {
@@ -98,9 +92,7 @@ export default function BoardPage() {
         const existingCol = columnMap.get(bd.statusId);
         if (existingCol) { existingCol.tasks = bd.tasks || []; } 
         else {
-          columnMap.set(bd.statusId, {
-            id: bd.statusId, name: bd.statusName, color: bd.color || "#000000", position: bd.order || 0, isCompletedStatus: bd.isCompleted || false, tasks: bd.tasks || [],
-          });
+          columnMap.set(bd.statusId, { id: bd.statusId, name: bd.statusName, color: bd.color || "#000000", position: bd.order || 0, isCompletedStatus: bd.isCompleted || false, tasks: bd.tasks || [], });
         }
       });
     }
@@ -121,7 +113,7 @@ export default function BoardPage() {
       const normalizedColumns = normalizeData(rawBoardData, rawStatusList);
       setColumns(normalizedColumns);
     } catch (err: any) {
-      console.error("❌ [API ERROR]:", err); setError(err.message || "Failed to load board data"); showToast("Failed to load board data", "error");
+      console.error("API ERROR:", err); setError(err.message); showToast("Load data failed", "error");
     } finally { setLoading(false); }
   }, [companyId, workspaceId, projectId, filters, showToast, isAuthLoading]);
 
@@ -132,46 +124,50 @@ export default function BoardPage() {
 
   const handleColumnCreated = (newStatusData: any) => {
     const newColumn: BoardColumnResponse = { id: newStatusData.id, name: newStatusData.name, color: newStatusData.color, position: newStatusData.sortOrder, isCompletedStatus: newStatusData.isCompletedStatus, tasks: [], };
-    setColumns((prev) => [...prev, newColumn]); showToast("Đã tạo cột mới thành công", "success");
+    setColumns((prev) => [...prev, newColumn]); showToast("Created column successfully", "success");
   };
   const handleColumnDeleted = (columnId: string) => { setColumns((prev) => prev.filter((col) => String(col.id) !== columnId)); };
 
-  // --- 🔥 CUSTOM COLLISION DETECTION STRATEGY ---
   const customCollisionDetection: CollisionDetection = useCallback((args) => {
-    // First, try to detect collisions based on pointer location
-    // This is more accurate for dragging tasks between columns
     const pointerCollisions = pointerWithin(args);
-
-    if (pointerCollisions.length > 0) {
-      return pointerCollisions;
-    }
-
-    // If no pointer collisions, fallback to rect intersection
-    // This handles cases where the pointer might be slightly outside but the item overlaps
+    if (pointerCollisions.length > 0) return pointerCollisions;
     return rectIntersection(args);
   }, []);
 
-  // ... (onDragStart remains unchanged) ...
   const onDragStart = (event: DragStartEvent) => {
     if (event.active.data.current?.type === "Column") { setActiveColumn(event.active.data.current.column); return; }
     if (event.active.data.current?.type === "Task") { setActiveTask(event.active.data.current.task); return; }
   };
 
-  // ... (onDragEnd remains largely unchanged, logic preserved) ...
   const onDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveColumn(null); setActiveTask(null);
     if (!over) return;
 
+    // 🅰️ COLUMN DRAG (With API Call)
     if (active.data.current?.type === "Column") {
       if (active.id === over.id) return;
+
       const oldIndex = columns.findIndex((col) => col.id.toString() === active.id);
       const newIndex = columns.findIndex((col) => col.id.toString() === over.id);
+
+      // 1. Optimistic Update
       const newColumns = arrayMove(columns, oldIndex, newIndex);
       setColumns(newColumns);
+
+      // 2. Call Reorder API
+      try {
+        const orderedStatusIds = newColumns.map(col => Number(col.id));
+        await reorderProjectStatuses(projectId, orderedStatusIds);
+      } catch (error) {
+        console.error("Reorder column failed:", error);
+        showToast("Column reorder failed. Reverting...", "error");
+        setColumns(columns); // 3. Rollback on error
+      }
       return;
     }
 
+    // 🅱️ TASK DRAG (Logic preserved)
     if (active.data.current?.type === "Task") {
       const activeId = active.id; const overId = over.id;
       const sourceCol = columns.find((col) => col.tasks.some((t) => t.id.toString() === activeId));
@@ -204,7 +200,7 @@ export default function BoardPage() {
       try {
         await moveTaskToStatus(Number(activeId), { newStatusId: Number(newDestCol.id), newSortOrder: newIndex, });
       } catch (error) {
-        console.error("Move failed:", error); showToast("Move failed. Reverting...", "error"); fetchBoardData();
+        console.error("Move task failed:", error); showToast("Move failed. Reverting...", "error"); fetchBoardData();
       }
     }
   };
@@ -214,7 +210,6 @@ export default function BoardPage() {
   };
   const columnIds = useMemo(() => columns.map((col) => col.id.toString()), [columns]);
 
-  // --- RENDER ---
   if (isAuthLoading) return <div className="h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-blue-600" /></div>;
 
   return (
@@ -227,13 +222,7 @@ export default function BoardPage() {
         ) : error ? (
           <div className="h-full flex flex-col items-center justify-center text-red-500 gap-3"><AlertCircle className="w-10 h-10 opacity-80" /><p className="font-medium">{error}</p><button onClick={fetchBoardData} className="px-4 py-2 bg-white border border-red-200 text-red-600 rounded-md shadow-sm hover:bg-red-50 font-semibold text-sm">Try Again</button></div>
         ) : (
-          <DndContext
-            sensors={sensors}
-            // Use the custom collision detection strategy
-            collisionDetection={customCollisionDetection} 
-            onDragStart={onDragStart}
-            onDragEnd={onDragEnd}
-          >
+          <DndContext sensors={sensors} collisionDetection={customCollisionDetection} onDragStart={onDragStart} onDragEnd={onDragEnd}>
             <div className="h-full flex px-6 pt-6 pb-4 gap-4 items-start min-w-max">
               <SortableContext items={columnIds} strategy={horizontalListSortingStrategy}>
                 {columns.map((col, index) => (
@@ -242,10 +231,19 @@ export default function BoardPage() {
               </SortableContext>
               <CreateColumnButton projectId={projectId} onSuccess={handleColumnCreated} />
             </div>
-
+            
+            {/* 👇 SỬA LẠI ĐOẠN NÀY ĐỂ MƯỢT HƠN */}
             <DragOverlay dropAnimation={dropAnimation}>
-              {activeColumn && (<div className="opacity-80 rotate-2 cursor-grabbing"><BoardColumn column={activeColumn} index={0} projectId={projectId} /></div>)}
-              {activeTask && (<BoardTaskCard task={activeTask} index={0} />)}
+              {activeColumn && (
+                 <div className="h-full cursor-grabbing opacity-90 scale-[1.02] shadow-2xl rounded-xl bg-transparent">
+                   <div className="h-full bg-[#F4F5F7] rounded-xl border-2 border-blue-500">
+                     <BoardColumn column={activeColumn} index={0} projectId={projectId} />
+                   </div>
+                 </div>
+              )}
+              {activeTask && (
+                 <BoardTaskCard task={activeTask} index={0} />
+              )}
             </DragOverlay>
           </DndContext>
         )}
