@@ -73,14 +73,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const handleSelectCompany = useCallback((companyId: number, userData: UserProfile) => {
     // Tìm xem user có thuộc công ty này không
     const selected = userData.companyMemberships?.find(c => c.companyId === companyId);
-    
+
     if (selected) {
       console.log(`🏢 [AuthContext] Switched context to: ${selected.companyName}`);
-      
+
       // Cập nhật State Active
       setActiveCompany(selected);
       setRole(selected.roleCode as AppRole);
-      
+
       // Lưu ID công ty vào LocalStorage (để F5 không bị mất)
       localStorage.setItem("lastActiveCompanyId", companyId.toString());
 
@@ -106,39 +106,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const userData = await getCurrentUser();
 
       if (userData) {
-        // 🛡️ Safety Check: Đảm bảo luôn là mảng
+        // Đảm bảo là mảng
         if (!Array.isArray(userData.companyMemberships)) {
-            userData.companyMemberships = [];
+          userData.companyMemberships = [];
         }
 
         setUser(userData);
 
-        // 🔄 Khôi phục ngữ cảnh nếu F5
+        // Restore company context
         const lastCompanyId = localStorage.getItem("lastActiveCompanyId");
         const memberships = userData.companyMemberships;
 
         if (lastCompanyId && memberships.length > 0) {
           const targetId = parseInt(lastCompanyId);
           const targetCompany = memberships.find(c => c.companyId === targetId);
-          
+
           if (targetCompany) {
             setActiveCompany(targetCompany);
             setRole(targetCompany.roleCode as AppRole);
           } else {
-             // Nếu công ty cũ không còn hiệu lực -> Reset cache
-             localStorage.removeItem("lastActiveCompanyId");
+            localStorage.removeItem("lastActiveCompanyId");
           }
         }
-
-        return { user: userData };
       }
     } catch (e) {
       console.error("❌ [AuthContext] Fetch user failed:", e);
       localStorage.clear();
       setUser(null);
     }
-    return null;
   }, []);
+
 
   // ============================================================
   // 5️⃣ EFFECT: CHẠY KHI LOAD TRANG (CHECK TOKEN)
@@ -158,44 +155,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // 6️⃣ LOGIC: XỬ LÝ ĐIỀU HƯỚNG SAU KHI LOGIN (QUAN TRỌNG)
   // ============================================================
   const processLoginSuccess = async () => {
-    const result = await fetchAndSetUser();
-    
-    if (!result || !result.user) {
-        return;
+    await fetchAndSetUser();
+
+    const userData = user;
+    if (!userData) {
+      showToast("Cannot load user data.", "error");
+      return;
     }
 
-    const userData = result.user;
     const memberships = userData.companyMemberships || [];
 
-    console.log(`📊 [AuthContext] Memberships found: ${memberships.length}`);
+    showToast(`Memberships found: ${memberships.length}`, "info");
 
-    // CASE 1: Chưa có công ty nào (Newbie)
+    // CASE 1: User chưa thuộc công ty nào
     if (memberships.length === 0) {
-      console.log("🚀 Newbie -> Redirect to Admin Hub (/admin)");
+      showToast("Welcome! Please set up your company to continue.", "info");
       setRole("USER");
       router.push("/admin");
       return;
     }
 
-    // CASE 2: Có đúng 1 công ty -> Tự động chọn và vào luôn Dashboard
+    // CASE 2: User thuộc đúng 1 công ty
     if (memberships.length === 1) {
-      console.log("🚀 Single company -> Auto select");
+      showToast(`Switched to company: ${memberships[0].companyName}`, "success");
       handleSelectCompany(memberships[0].companyId, userData);
       return;
     }
 
-    // CASE 3: Có nhiều công ty -> Chuyển sang Admin Hub để chọn
+    // CASE 3: User thuộc nhiều công ty
     if (memberships.length > 1) {
-      console.log("🚀 Multiple companies -> Redirect to Admin Hub (/admin)");
-      router.push("/admin"); 
+      showToast("Select a company to continue.", "info");
+      router.push("/admin");
       return;
     }
   };
 
+
   // ============================================================
   // 7️⃣ CÁC HÀM ACTIONS (LOGIN, LOGOUT...)
   // ============================================================
-  
+
   const login = async (email: string, password: string) => {
     setIsLoading(true);
     try {
@@ -213,37 +212,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loginWithTokens = async (accessToken: string, refreshToken: string) => {
     setIsLoading(true);
     try {
-        localStorage.setItem("accessToken", accessToken);
-        localStorage.setItem("refreshToken", refreshToken);
-        showToast("Login successful!", "success");
-        await processLoginSuccess();
+      localStorage.setItem("accessToken", accessToken);
+      localStorage.setItem("refreshToken", refreshToken);
+      showToast("Login successful!", "success");
+      await processLoginSuccess();
     } catch (error) {
-        console.error(error);
+      console.error(error);
     } finally {
-        // ✅ FIX: Luôn tắt loading
-        setIsLoading(false);
+      // ✅ FIX: Luôn tắt loading
+      setIsLoading(false);
     }
   };
 
   const logout = async () => {
     setIsLoading(true);
     try {
-        await logoutUser();
-    } catch(err) {
-        // Ignore logout api error
+      await logoutUser();
+    } catch (err) {
+      // Ignore logout api error
     } finally {
-        setUser(null);
-        setActiveCompany(null);
-        setRole(null);
-        localStorage.clear();
-        showToast("Logged out", "success");
-        router.push("/");
-        setIsLoading(false);
+      setUser(null);
+      setActiveCompany(null);
+      setRole(null);
+      localStorage.clear();
+      showToast("Logged out", "success");
+      router.push("/");
+      setIsLoading(false);
     }
   };
 
   const selectCompany = (companyId: number) => {
-    if(user) handleSelectCompany(companyId, user);
+    if (user) handleSelectCompany(companyId, user);
   };
 
   const hasPermission = (permission: string) => {
@@ -260,7 +259,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const isPublicPage = PUBLIC_PAGES.some((p) => pathname.startsWith(p));
     const isAuthPage = pathname.startsWith("/(auth)") || pathname === "/";
-    
+
     // --- A. CHƯA LOGIN ---
     if (!user) {
       if (!isPublicPage && !isAuthPage) {
@@ -276,29 +275,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // 1. Nếu đang ở trang Login/Register/Home (Auth Pages)
     // -> Phải điều hướng vào trong ứng dụng
     if (isAuthPage) {
-        if (memberships.length === 0) {
-            // Chưa có công ty -> Vào Admin Hub để tạo
-            router.push("/admin");
-        }
-        else if (memberships.length === 1) {
-            // 1 công ty -> Auto vào Dashboard
-            handleSelectCompany(memberships[0].companyId, user);
-        }
-        else {
-            // >1 công ty -> Vào Admin Hub để chọn
-            router.push("/admin");
-        }
-        return;
+      if (memberships.length === 0) {
+        // Chưa có công ty -> Vào Admin Hub để tạo
+        router.push("/admin");
+      }
+      else if (memberships.length === 1) {
+        // 1 công ty -> Auto vào Dashboard
+        handleSelectCompany(memberships[0].companyId, user);
+      }
+      else {
+        // >1 công ty -> Vào Admin Hub để chọn
+        router.push("/admin");
+      }
+      return;
     }
 
     // 2. Bảo vệ các trang Admin sâu (Ví dụ: /admin/company/billing...)
     // Trang "/admin" (Hub) thì ai login rồi cũng được vào.
     // Chỉ chặn các trang con "/admin/..."
     if (pathname.startsWith("/admin/") && pathname !== "/admin") {
-        if (role !== "COMPANY_ADMIN") {
-            showToast("Access denied. Company Admin only.", "error");
-            router.push("/core/dashboard");
-        }
+      if (role !== "COMPANY_ADMIN") {
+        showToast("Access denied. Company Admin only.", "error");
+        router.push("/core/dashboard");
+      }
     }
 
   }, [user, role, pathname, isLoading, router, showToast, handleSelectCompany]);

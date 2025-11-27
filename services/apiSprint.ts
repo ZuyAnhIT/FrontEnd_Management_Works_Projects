@@ -35,6 +35,8 @@ export interface TaskSummary {
   priority: string;
   assigneeAvatarUrl?: string;
   storyPoints?: number;
+  sortOrder: number; 
+  
   // Các trường khác nếu cần
 }
 
@@ -48,6 +50,7 @@ export interface Sprint {
   endDate?: string;
   projectId: number;
   taskCount?: number;
+  tasks: TaskSummary[];
 }
 
 // Object Sprint Chi Tiết (cho Panel/Modal) - Bao gồm thống kê và list Task
