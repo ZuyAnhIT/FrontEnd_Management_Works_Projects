@@ -4,15 +4,15 @@ import { useSortable, SortableContext, verticalListSortingStrategy } from "@dnd-
 import { useDroppable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { Plus } from "lucide-react";
-import { useMemo } from "react";
-import { BoardColumnResponse } from "@/services/apiBoard";
+import { useMemo, useState } from "react";
+import { BoardColumnResponse, updateProjectStatus } from "@/services/apiBoard"; // Import API update
 import BoardTaskCard from "./BoardTaskCard";
 import { ColumnContextMenu } from "./ColumnContextMenu";
 import { useToast } from "@/components/ui/ToastProvider";
 
 interface BoardColumnProps {
   column: BoardColumnResponse;
-  index: number; // Keep index prop if used by parent, though dnd-kit uses IDs
+  index: number;
   projectId: number;
   onDeleteColumn?: (columnId: string) => void;
 }
@@ -20,7 +20,12 @@ interface BoardColumnProps {
 export default function BoardColumn({ column, projectId, onDeleteColumn }: BoardColumnProps) {
   const { showToast } = useToast();
 
-  // 🛡️ Guard Clause
+  // --- STATE QUẢN LÝ SỬA TÊN ---
+  const [isEditing, setIsEditing] = useState(false);
+  const [title, setTitle] = useState(column.name);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Guard Clause
   if (!column || (column.id === undefined && (column as any).statusId === undefined)) {
     return null;
   }
@@ -28,13 +33,12 @@ export default function BoardColumn({ column, projectId, onDeleteColumn }: Board
   // Safe ID handling
   const rawId = column.id ?? (column as any).statusId;
   const columnId = rawId !== undefined && rawId !== null ? String(rawId) : `col-${Math.random()}`;
-  const displayName = column.name || "Untitled Column";
+  const displayName = column.name || "Untitled Column"; // Dùng để hiển thị mặc định hoặc fallback
   const tasks = Array.isArray(column.tasks) ? column.tasks : [];
 
-  // Memoize task IDs for SortableContext
   const taskIds = useMemo(() => tasks.map((t) => t.id.toString()), [tasks]);
 
-  // 1. Make the Column Sortable (Horizontal reordering)
+  // 1. Make the Column Sortable
   const {
     attributes,
     listeners,
@@ -48,6 +52,7 @@ export default function BoardColumn({ column, projectId, onDeleteColumn }: Board
       type: "Column",
       column,
     },
+    disabled: isEditing, // 🛑 QUAN TRỌNG: Tắt kéo thả cột khi đang sửa tên
   });
 
   const columnStyle = {
@@ -56,14 +61,46 @@ export default function BoardColumn({ column, projectId, onDeleteColumn }: Board
     opacity: isColumnDragging ? 0.5 : 1,
   };
 
-  // 2. Make the Task List Droppable (for dragging tasks INTO this column)
+  // 2. Make the Task List Droppable
   const { setNodeRef: setTaskListRef, isOver } = useDroppable({
-    id: columnId, // The droppable ID is the column ID
+    id: columnId,
     data: {
-      type: "Column", // Identifying this drop zone as a Column
+      type: "Column",
       column,
     }
   });
+
+  // --- LOGIC HANDLE EDIT NAME ---
+  const handleSaveTitle = async () => {
+    // Nếu tên rỗng hoặc không đổi thì thoát chế độ edit
+    if (!title.trim() || title === column.name) {
+      setTitle(column.name);
+      setIsEditing(false);
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      // Gọi API cập nhật
+      await updateProjectStatus(projectId, Number(rawId), { name: title });
+      showToast("Cập nhật tên cột thành công", "success");
+      setIsEditing(false);
+    } catch (error) {
+      showToast("Lỗi khi cập nhật tên cột", "error");
+      setTitle(column.name); // Revert về tên cũ
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      handleSaveTitle();
+    } else if (e.key === "Escape") {
+      setTitle(column.name); // Hủy bỏ
+      setIsEditing(false);
+    }
+  };
 
   const columnBg = "bg-[#F4F5F7]";
   const activeBg = "bg-[#E3F2FD] ring-2 ring-[#2684FF] ring-inset";
@@ -85,22 +122,44 @@ export default function BoardColumn({ column, projectId, onDeleteColumn }: Board
         `}
       >
         {/* --- COLUMN HEADER --- */}
-        {/* Drag handle is applied here via listeners/attributes */}
         <div
           {...attributes}
           {...listeners}
           className="p-3 pr-2 flex items-center justify-between shrink-0 cursor-grab active:cursor-grabbing group/header"
         >
-          <div className="flex items-center gap-2 overflow-hidden">
-            <h3 className="text-[13px] font-bold text-[#5E6C84] uppercase truncate pl-1" title={displayName}>
-              {displayName}
-            </h3>
-            {tasks.length > 0 && (
+          <div className="flex items-center gap-2 overflow-hidden flex-1">
+            
+            {/* --- LOGIC HIỂN THỊ INPUT / TEXT --- */}
+            {isEditing ? (
+              <input 
+                autoFocus
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                onBlur={handleSaveTitle}
+                onKeyDown={handleKeyDown}
+                disabled={isSaving}
+                // 🛑 Chặn sự kiện chuột để không kích hoạt drag từ cha
+                onPointerDown={(e) => e.stopPropagation()} 
+                className="w-full text-[13px] font-bold text-[#172B4D] uppercase bg-white border border-blue-500 rounded px-1 py-0.5 outline-none"
+              />
+            ) : (
+              <h3 
+                className="text-[13px] font-bold text-[#5E6C84] uppercase truncate pl-1 cursor-text border border-transparent hover:border-gray-300 rounded px-1 transition-colors" 
+                title="Nhấn để đổi tên"
+                onClick={() => setIsEditing(true)}
+              >
+                {title}
+              </h3>
+            )}
+
+            {/* Chỉ hiện số lượng task khi không edit để đỡ rối */}
+            {!isEditing && tasks.length > 0 && (
               <span className="text-xs font-medium text-[#172B4D] bg-[#DFE1E6] px-2 py-0.5 rounded-full">
                 {tasks.length}
               </span>
             )}
           </div>
+
           <div className="flex gap-0.5 opacity-0 group-hover/header:opacity-100 transition-opacity">
             <button className="p-1 hover:bg-[#091E4214] rounded text-[#42526E]">
               <Plus className="w-4 h-4" />
@@ -109,7 +168,7 @@ export default function BoardColumn({ column, projectId, onDeleteColumn }: Board
             <ColumnContextMenu
               projectId={projectId}
               columnId={columnId}
-              columnLabel={displayName}
+              columnLabel={title}
               onDeleted={onDeleteColumn}
               onMoveColumn={() => showToast("Feature in development", "info")}
               onSetColumnLimit={() => showToast("Feature in development", "info")}
@@ -118,7 +177,6 @@ export default function BoardColumn({ column, projectId, onDeleteColumn }: Board
         </div>
 
         {/* --- TASK LIST CONTAINER --- */}
-        {/* This div is the Droppable area for tasks */}
         <div
           ref={setTaskListRef}
           className="flex-1 overflow-y-auto custom-scrollbar px-2 pb-2 min-h-[150px]"
@@ -133,7 +191,7 @@ export default function BoardColumn({ column, projectId, onDeleteColumn }: Board
             ))}
           </SortableContext>
 
-          {/* Create Issue Button - hide when dragging over to reduce visual noise */}
+          {/* Create Issue Button */}
           {!isOver && (
             <button className="w-full py-2 mt-1 flex items-center gap-1.5 text-[#5E6C84] hover:bg-[#091E4214] hover:text-[#172B4D] rounded-[3px] transition-colors px-2">
               <Plus className="w-4 h-4" />
