@@ -58,9 +58,19 @@ export default function MemberSidebar({
     const fetchUser = async () => {
       try {
         const user = await getCurrentUser();
-        setCompanyId(user.company?.companyId || null);
+
+        // 1. Kiểm tra user có tồn tại không (Fix lỗi possibly null)
+        if (user) {
+          // 2. Truy cập vào mảng companyMemberships thay vì user.company
+          // Lấy companyId đầu tiên nếu có, hoặc null
+          const firstCompanyId = user.companyMemberships.length > 0 
+            ? user.companyMemberships[0].companyId 
+            : null;
+
+          setCompanyId(firstCompanyId);
+        }
       } catch (err: any) {
-        // Silent fail
+        console.error("Lỗi fetch user:", err);
       }
     };
     fetchUser();
