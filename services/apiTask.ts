@@ -1,45 +1,62 @@
-// services/apiTask.ts
 "use client";
 
 import apiClient from "@/lib/apiClient";
 
+// ✅ 1. IMPORT TYPES TỪ API PROJECT ĐỂ ĐỒNG BỘ
+import { TaskType, TaskPriority } from "./apiProject"; 
+
 // ------------------------------------------------
 // 1. INTERFACES
 // ------------------------------------------------
+
+export interface ProjectTaskFilterParams {
+  search?: string;
+  keyword?: string;
+  page?: number;
+  size?: number;
+  assigneeId?: number;
+  sprintId?: number | null;
+  
+  // ✅ 2. SỬA TỪ 'string' THÀNH TYPE CHUẨN
+  priority?: TaskPriority; 
+  taskType?: TaskType;
+  
+  sortBy?: string;
+  sortDir?: "asc" | "desc";
+}
 
 export interface TaskDetail {
   id: number;
   taskCode: string;
   title: string;
   description: string | null;
-  
-  // Status
+
   statusId: number;
   statusName: string;
   statusColor: string;
 
-  taskType: string; // 'TASK', 'BUG', 'STORY'
-  priority: string; // 'HIGH', 'MEDIUM', 'LOW', 'URGENT'
-  
+  taskType: string; 
+  priority: string; 
+
   storyPoints: number | null;
   startDate: string | null;
   dueDate: string | null;
-  
-  // People
+
   assigneeId: number | null;
   assigneeName: string | null;
-  assigneeAvatar: string | null; // Lưu ý: API trả về assigneeAvatar, không phải assigneeAvatarUrl
+  assigneeAvatar: string | null;
 
   projectId: number;
   sprintId: number | null;
-  
-  // Tracking (Optional based on response)
+
   createdByName?: string;
   createdAt?: string;
 }
+
 export interface UpdateTaskData {
   title?: string;
   description?: string;
+  // ✅ Dùng string literal hoặc import type đều được, nhưng nên thống nhất
   taskType?: 'STORY' | 'TASK' | 'BUG' | 'EPIC' | 'SUBTASK';
   priority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
   statusId?: number;
@@ -48,34 +65,30 @@ export interface UpdateTaskData {
   assigneeId?: number | null;
   storyPoints?: number;
   estimatedHours?: number;
-  startDate?: string; // ISO String
-  dueDate?: string;   // ISO String
+  startDate?: string; 
+  dueDate?: string;   
 }
 
-// Payload
 export interface MoveTaskPayload {
-  sprintId: number | null; // null = Backlog
-  newSortOrder?: number;   // Index mới trong danh sách
+  sprintId: number | null; 
+  newSortOrder?: number;   
 }
 
 // ------------------------------------------------
 // 2. API METHODS
 // ------------------------------------------------
 
-// 🔹 Lấy chi tiết Task
 export const getTaskDetails = async (taskId: number): Promise<TaskDetail> => {
   const res = await apiClient.get(`/tasks/${taskId}`);
   if (!res.data.success) throw new Error(res.data.message);
-  return res.data.data; 
+  return res.data.data;
 };
 
-// Hàm cập nhật
 export const updateTask = async (taskId: number, data: UpdateTaskData) => {
   const res = await apiClient.put(`/tasks/${taskId}`, data);
-  return res.data; 
+  return res.data;
 };
 
-// API gán task
 export const moveTaskToSprint = async (
   taskId: number,
   sprintId: number | null,
@@ -91,49 +104,38 @@ export const moveTaskToSprint = async (
   if (!res.data.success) {
     throw new Error(res.data.message || "Không thể di chuyển công việc.");
   }
-  
+
   return res.data.data;
 };
-
 
 // =============================
 // 🧩 COMMENTS
 // =============================
 
-
-// 🔹 Lấy danh sách comment theo task
 export const getTaskComments = async (taskId: number) => {
   const res = await apiClient.get(`/tasks/${taskId}/comments`);
-  return res.data; // { success, message, data: [...] }
+  return res.data; 
 };
 
-
-// 🔹 Thêm comment cho task
 export const addTaskComment = async (taskId: number, content: string) => {
   const res = await apiClient.post(`/tasks/${taskId}/comments`, {
     content,
   });
-  return res.data; // { success, message, data }
+  return res.data; 
 };
-
 
 // =============================
 // 🧩 ATTACHMENTS
 // =============================
 
-
-// 🔹 Lấy danh sách file đính kèm theo task
 export const getTaskAttachments = async (taskId: number) => {
   const res = await apiClient.get(`/tasks/${taskId}/attachments`);
-  return res.data; // { success, message, data: [...] }
+  return res.data; 
 };
 
-
-// 🔹 Upload file đính kèm cho task
 export const uploadTaskAttachment = async (taskId: number, file: File) => {
   const formData = new FormData();
   formData.append("file", file);
-
 
   const res = await apiClient.post(
     `/tasks/${taskId}/attachments`,
@@ -143,21 +145,14 @@ export const uploadTaskAttachment = async (taskId: number, file: File) => {
     }
   );
 
-
-  return res.data; // { success, message, data }
+  return res.data; 
 };
 
-
-  // 🔹 Chuyển task sang status khác
-    // PUT /api/tasks/{taskId}/move
-    export const moveTaskToStatus = async (
-      taskId: number,
-      newStatusId: number
-    ) => {
-      const res = await apiClient.put(`/tasks/${taskId}/move`, {
-        newStatusId,
-      });
-
-
-      return res.data; // { success, message, data: {} }
-    };
+// 🔹 Chuyển task sang status khác (Kéo thả cột Board)
+export const moveTaskToStatus = async (
+  taskId: number,
+  payload: { newStatusId: number; newSortOrder?: number }
+) => {
+  const res = await apiClient.put(`/tasks/${taskId}/move`, payload);
+  return res.data; 
+};
