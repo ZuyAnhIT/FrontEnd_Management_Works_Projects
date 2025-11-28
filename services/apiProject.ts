@@ -106,6 +106,7 @@ export interface CreateTaskPayload {
   taskType?: TaskType;      
   priority?: TaskPriority;  
   sprintId?: number | null; 
+  statusId?: number | null;
   epicId?: number | null;
   assigneeId?: number | null;
   storyPoints?: number;
