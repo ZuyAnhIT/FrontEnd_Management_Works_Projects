@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, Loader2, X } from "lucide-react";
 import { createProjectTask, TaskType, TaskPriority } from "@/services/apiProject";
 import { useToast } from "@/components/ui/ToastProvider";
@@ -11,61 +11,82 @@ interface QuickTaskCreateProps {
   workspaceId: number;
   projectId: number;
   
-  // Context: Đang tạo ở đâu? (Sprint nào hay Backlog)
-  sprintId?: number | null; 
-  
-  // Loại task mặc định (thường là TASK)
+  // Context
+  sprintId?: number | null;
+  statusId?: number;
   defaultType?: TaskType;
   
-  // Callback khi tạo thành công (để cha reload list)
+  // ✅ 1. Thêm các props mới để fix lỗi TypeScript
+  initialMode?: 'button' | 'form'; // 'button': hiện nút cộng trước, 'form': hiện input luôn
+  onCancel?: () => void;           // Callback khi user hủy/đóng form
+  
+  // Callback khi tạo thành công
   onSuccess: (newTask: any) => void;
 }
 
 export default function QuickTaskCreate({
   companyId, workspaceId, projectId,
-  sprintId, // Nhận vào có thể là ID sprint hoặc null/undefined
+  sprintId,
+  statusId,
   defaultType = TaskType.TASK,
+  // ✅ 2. Nhận props và set default
+  initialMode = 'button',
+  onCancel,
   onSuccess
 }: QuickTaskCreateProps) {
-  const [isEditing, setIsEditing] = useState(false);
+  const { showToast } = useToast();
+  
+  // ✅ 3. Khởi tạo state dựa trên initialMode
+  const [isEditing, setIsEditing] = useState(initialMode === 'form');
   const [title, setTitle] = useState("");
   const [loading, setLoading] = useState(false);
-  const { showToast } = useToast();
+
+  // Sync state nếu props thay đổi (trường hợp cha re-render)
+  useEffect(() => {
+    if (initialMode === 'form') {
+      setIsEditing(true);
+    }
+  }, [initialMode]);
+
+  // ✅ 4. Hàm xử lý hủy chung
+  const handleCancel = () => {
+    setIsEditing(false);
+    setTitle("");
+    if (onCancel) onCancel(); // Gọi ngược về cha để cha biết mà tắt state
+  };
 
   const handleCreate = async () => {
-    // 1. Validate cơ bản
     if (!title.trim()) {
-        setIsEditing(false);
+        handleCancel();
         return;
     }
 
     try {
       setLoading(true);
 
-      // 2. Cấu trúc Payload tối giản (Clean Payload)
-      // Chỉ gửi những gì API thực sự cần cho việc tạo nhanh
       const payload: any = {
         title: title.trim(),
         taskType: defaultType,
-        priority: TaskPriority.MEDIUM, // Mặc định Medium
+        priority: TaskPriority.MEDIUM,
         description: "",
       };
 
-      // 3. Logic xử lý Dynamic Sprint ID
-      // Chỉ append sprintId nếu nó tồn tại (truthy number)
-      // Nếu sprintId là null, undefined hoặc 0 -> KHÔNG GỬI để API tự hiểu là vào Backlog
       if (sprintId) {
         payload.sprintId = sprintId;
       }
+      if (statusId) {
+        payload.statusId = statusId;
+      }
 
-      // 4. Gọi API
       const newTask = await createProjectTask(companyId, workspaceId, projectId, payload);
       
-      // 5. Success Flow
-      onSuccess(newTask); 
-      setTitle(""); // Clear input để nhập task tiếp theo luôn (Jira style)
-      // Lưu ý: Không đóng form (setIsEditing(false)) để user nhập liên tục
+      onSuccess(newTask);
+      setTitle(""); 
       
+      // Nếu là chế độ button (Backlog), tạo xong thì vẫn giữ form để nhập tiếp (Jira style)
+      // Nếu là chế độ form (Board), tùy logic cha mà có thể đóng hoặc không.
+      // Ở đây ta giữ nguyên form để nhập tiếp, user muốn đóng thì bấm Cancel/ESC.
+     
     } catch (error) {
       console.error(error);
       showToast("Failed to create issue", "error");
@@ -76,23 +97,23 @@ export default function QuickTaskCreate({
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
-        e.preventDefault(); // Tránh xuống dòng
+        e.preventDefault();
         handleCreate();
     }
     if (e.key === 'Escape') {
-        setIsEditing(false);
-        setTitle("");
+        handleCancel(); // Gọi hàm cancel chuẩn
     }
   };
 
   // --- RENDER: TRẠNG THÁI NÚT BẤM (IDLE) ---
-  if (!isEditing) {
+  // Chỉ hiện nút khi không phải mode 'form' và không đang edit
+  if (!isEditing && initialMode === 'button') {
     return (
-      <button 
+      <button
         onClick={() => setIsEditing(true)}
         className="group flex items-center gap-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 w-full p-2 rounded-md transition-all text-sm font-medium mt-1"
       >
-        <Plus className="w-4 h-4 text-slate-400 group-hover:text-slate-600" /> 
+        <Plus className="w-4 h-4 text-slate-400 group-hover:text-slate-600" />
         <span className="text-slate-500 group-hover:text-slate-700">Create issue</span>
       </button>
     );
@@ -111,32 +132,27 @@ export default function QuickTaskCreate({
             onChange={(e) => setTitle(e.target.value)}
             onKeyDown={handleKeyDown}
             disabled={loading}
-            onBlur={() => {
-                // Tùy chọn: Nếu click ra ngoài mà không có text thì đóng form
-                if(!title.trim()) setIsEditing(false);
-            }}
+            // Bỏ onBlur tự đóng để tránh UX khó chịu khi click nhầm ra ngoài
          />
          
          {loading ? (
             <Loader2 className="w-4 h-4 text-blue-500 animate-spin absolute right-0 top-0" />
          ) : (
-            // Nút X nhỏ để cancel nhanh nếu muốn
-            <X 
-                className="w-4 h-4 text-slate-300 hover:text-red-500 cursor-pointer absolute right-0 top-0" 
-                onClick={() => setIsEditing(false)}
+            <X
+                className="w-4 h-4 text-slate-300 hover:text-red-500 cursor-pointer absolute right-0 top-0"
+                onClick={handleCancel} // ✅ Gọi handleCancel
             />
          )}
       </div>
-      
-      {/* Helper text giống Jira */}
+     
       <div className="flex justify-between items-center mt-2 pt-2 border-t border-slate-100">
           <div className="text-[10px] text-slate-400">
              Press <span className="font-bold bg-slate-100 px-1 rounded border border-slate-200">Enter</span> to create
           </div>
           <div className="flex gap-2">
-             <button 
+             <button
                 className="text-[11px] font-bold text-slate-500 hover:bg-slate-100 px-2 py-1 rounded"
-                onClick={() => setIsEditing(false)}
+                onClick={handleCancel} // ✅ Gọi handleCancel
              >
                 Cancel
              </button>

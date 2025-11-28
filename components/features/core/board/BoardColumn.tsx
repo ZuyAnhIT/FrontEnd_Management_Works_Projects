@@ -5,10 +5,14 @@ import { useDroppable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { Plus } from "lucide-react";
 import { useMemo, useState } from "react";
-import { BoardColumnResponse, updateProjectStatus } from "@/services/apiBoard"; // Import API update
+import { useRouter, useParams } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
+
+import { BoardColumnResponse, updateProjectStatus } from "@/services/apiBoard";
 import BoardTaskCard from "./BoardTaskCard";
 import { ColumnContextMenu } from "./ColumnContextMenu";
 import { useToast } from "@/components/ui/ToastProvider";
+import QuickTaskCreate from "@/components/features/core/task/QuickTaskCreate";
 
 interface BoardColumnProps {
   column: BoardColumnResponse;
@@ -19,11 +23,19 @@ interface BoardColumnProps {
 
 export default function BoardColumn({ column, projectId, onDeleteColumn }: BoardColumnProps) {
   const { showToast } = useToast();
+  const router = useRouter();
+  const params = useParams();
+  const { activeCompany } = useAuth();
 
-  // --- STATE QUẢN LÝ SỬA TÊN ---
+  const workspaceId = Number(params.workspaceId);
+
+  // --- STATE ---
   const [isEditing, setIsEditing] = useState(false);
   const [title, setTitle] = useState(column.name);
   const [isSaving, setIsSaving] = useState(false);
+  
+  // ✅ State cho tạo task nhanh
+  const [isCreating, setIsCreating] = useState(false);
 
   // Guard Clause
   if (!column || (column.id === undefined && (column as any).statusId === undefined)) {
@@ -33,12 +45,12 @@ export default function BoardColumn({ column, projectId, onDeleteColumn }: Board
   // Safe ID handling
   const rawId = column.id ?? (column as any).statusId;
   const columnId = rawId !== undefined && rawId !== null ? String(rawId) : `col-${Math.random()}`;
-  const displayName = column.name || "Untitled Column"; // Dùng để hiển thị mặc định hoặc fallback
+  const displayName = title || "Untitled Column"; 
   const tasks = Array.isArray(column.tasks) ? column.tasks : [];
 
   const taskIds = useMemo(() => tasks.map((t) => t.id.toString()), [tasks]);
 
-  // 1. Make the Column Sortable
+  // 1. DND Sortable (Column)
   const {
     attributes,
     listeners,
@@ -48,11 +60,8 @@ export default function BoardColumn({ column, projectId, onDeleteColumn }: Board
     isDragging: isColumnDragging,
   } = useSortable({
     id: columnId,
-    data: {
-      type: "Column",
-      column,
-    },
-    disabled: isEditing, // 🛑 QUAN TRỌNG: Tắt kéo thả cột khi đang sửa tên
+    data: { type: "Column", column },
+    disabled: isEditing || isCreating, // ✅ Tắt drag khi đang sửa tên hoặc tạo task
   });
 
   const columnStyle = {
@@ -61,43 +70,36 @@ export default function BoardColumn({ column, projectId, onDeleteColumn }: Board
     opacity: isColumnDragging ? 0.5 : 1,
   };
 
-  // 2. Make the Task List Droppable
+  // 2. DND Droppable (Task List)
   const { setNodeRef: setTaskListRef, isOver } = useDroppable({
     id: columnId,
-    data: {
-      type: "Column",
-      column,
-    }
+    data: { type: "Column", column }
   });
 
-  // --- LOGIC HANDLE EDIT NAME ---
+  // --- HANDLERS ---
   const handleSaveTitle = async () => {
-    // Nếu tên rỗng hoặc không đổi thì thoát chế độ edit
     if (!title.trim() || title === column.name) {
       setTitle(column.name);
       setIsEditing(false);
       return;
     }
-
     setIsSaving(true);
     try {
-      // Gọi API cập nhật
       await updateProjectStatus(projectId, Number(rawId), { name: title });
       showToast("Cập nhật tên cột thành công", "success");
       setIsEditing(false);
     } catch (error) {
       showToast("Lỗi khi cập nhật tên cột", "error");
-      setTitle(column.name); // Revert về tên cũ
+      setTitle(column.name);
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      handleSaveTitle();
-    } else if (e.key === "Escape") {
-      setTitle(column.name); // Hủy bỏ
+    if (e.key === "Enter") handleSaveTitle();
+    else if (e.key === "Escape") {
+      setTitle(column.name);
       setIsEditing(false);
     }
   };
@@ -121,15 +123,13 @@ export default function BoardColumn({ column, projectId, onDeleteColumn }: Board
           ${isOver ? activeBg : columnBg}
         `}
       >
-        {/* --- COLUMN HEADER --- */}
+        {/* HEADER */}
         <div
           {...attributes}
           {...listeners}
           className="p-3 pr-2 flex items-center justify-between shrink-0 cursor-grab active:cursor-grabbing group/header"
         >
           <div className="flex items-center gap-2 overflow-hidden flex-1">
-            
-            {/* --- LOGIC HIỂN THỊ INPUT / TEXT --- */}
             {isEditing ? (
               <input 
                 autoFocus
@@ -138,33 +138,28 @@ export default function BoardColumn({ column, projectId, onDeleteColumn }: Board
                 onBlur={handleSaveTitle}
                 onKeyDown={handleKeyDown}
                 disabled={isSaving}
-                // 🛑 Chặn sự kiện chuột để không kích hoạt drag từ cha
                 onPointerDown={(e) => e.stopPropagation()} 
                 className="w-full text-[13px] font-bold text-[#172B4D] uppercase bg-white border border-blue-500 rounded px-1 py-0.5 outline-none"
               />
             ) : (
               <h3 
                 className="text-[13px] font-bold text-[#5E6C84] uppercase truncate pl-1 cursor-text border border-transparent hover:border-gray-300 rounded px-1 transition-colors" 
-                title="Nhấn để đổi tên"
+                title="Click to edit name"
                 onClick={() => setIsEditing(true)}
               >
-                {title}
+                {displayName}
               </h3>
             )}
-
-            {/* Chỉ hiện số lượng task khi không edit để đỡ rối */}
             {!isEditing && tasks.length > 0 && (
               <span className="text-xs font-medium text-[#172B4D] bg-[#DFE1E6] px-2 py-0.5 rounded-full">
                 {tasks.length}
               </span>
             )}
           </div>
-
           <div className="flex gap-0.5 opacity-0 group-hover/header:opacity-100 transition-opacity">
             <button className="p-1 hover:bg-[#091E4214] rounded text-[#42526E]">
               <Plus className="w-4 h-4" />
             </button>
-
             <ColumnContextMenu
               projectId={projectId}
               columnId={columnId}
@@ -176,7 +171,7 @@ export default function BoardColumn({ column, projectId, onDeleteColumn }: Board
           </div>
         </div>
 
-        {/* --- TASK LIST CONTAINER --- */}
+        {/* TASK LIST */}
         <div
           ref={setTaskListRef}
           className="flex-1 overflow-y-auto custom-scrollbar px-2 pb-2 min-h-[150px]"
@@ -191,12 +186,31 @@ export default function BoardColumn({ column, projectId, onDeleteColumn }: Board
             ))}
           </SortableContext>
 
-          {/* Create Issue Button */}
-          {!isOver && (
-            <button className="w-full py-2 mt-1 flex items-center gap-1.5 text-[#5E6C84] hover:bg-[#091E4214] hover:text-[#172B4D] rounded-[3px] transition-colors px-2">
-              <Plus className="w-4 h-4" />
-              <span className="text-[13px] font-medium">Create issue</span>
-            </button>
+          {/* ✅ KHU VỰC TẠO TASK NHANH */}
+          {isCreating ? (
+             <div className="mt-1 px-2 pb-2">
+                <QuickTaskCreate
+                   initialMode="form"
+                   companyId={activeCompany?.companyId || 0}
+                   workspaceId={workspaceId}
+                   projectId={projectId}
+                   statusId={Number(rawId)}
+                   onCancel={() => setIsCreating(false)} // ✅ Đã truyền đúng prop
+                   onSuccess={() => {
+                      router.refresh(); 
+                   }}
+                />
+             </div>
+          ) : (
+             !isOver && (
+                <button 
+                   onClick={() => setIsCreating(true)}
+                   className="w-full py-2 mt-1 flex items-center gap-1.5 text-[#5E6C84] hover:bg-[#091E4214] hover:text-[#172B4D] rounded-[3px] transition-colors px-2"
+                >
+                   <Plus className="w-4 h-4" />
+                   <span className="text-[13px] font-medium">Create issue</span>
+                </button>
+             )
           )}
         </div>
       </div>
