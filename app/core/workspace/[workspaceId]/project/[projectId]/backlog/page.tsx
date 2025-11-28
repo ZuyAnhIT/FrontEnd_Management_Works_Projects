@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/components/ui/ToastProvider";
-import { Loader2, LayoutList } from "lucide-react";
+import { Loader2, LayoutList, Plus, CalendarPlus } from "lucide-react"; // Thêm icon cho nút tạo
 
-// ✅ Import Drag & Drop from dnd-kit
+// --- DND KIT IMPORTS ---
 import {
   DndContext,
   DragOverlay,
@@ -23,9 +23,7 @@ import {
 import {
   SortableContext,
   verticalListSortingStrategy,
-  arrayMove,
 } from "@dnd-kit/sortable";
-// Helper hook for droppable areas
 import { useDroppable } from "@dnd-kit/core";
 
 // API & Types
@@ -41,8 +39,8 @@ import { moveTaskToSprint } from "@/services/apiTask";
 
 // Components UI
 import { Button } from "@/components/ui/button";
-import BacklogHeader from "@/components/features/core/backlog/BacklogHeader";
-import BacklogToolbar from "@/components/features/core/backlog/BacklogToolbar";
+import BacklogHeader from "@/components/features/core/backlog/BacklogHeader"; 
+// Lưu ý: Không cần BacklogToolbar nữa vì filter đã lên Header
 import SprintSection from "@/components/features/core/backlog/SprintSection";
 import BacklogTaskItem from "@/components/features/core/backlog/BacklogTaskItem";
 import TaskDetailPanel from "@/components/features/core/task/TaskDetailPanel";
@@ -50,10 +48,11 @@ import TaskDetailPanel from "@/components/features/core/task/TaskDetailPanel";
 // Components Logic
 import QuickTaskCreate from "@/components/features/core/task/QuickTaskCreate";
 import CreateTaskModal from "@/components/features/core/task/CreateTaskModal";
-import QuickSprintButton from "@/components/features/core/sprint/QuickSprintButton";
+import QuickSprintButton from "@/components/features/core/sprint/QuickSprintButton"; // Có thể bỏ nếu dùng nút trên Header
 import SprintDetailModal from "@/components/features/core/sprint/SprintDetailModal";
+import CreateSprintModal from "@/components/features/core/sprint/CreateSprintModal"; // ✅ Import Modal tạo Sprint
 
-// --- Helper Component: Droppable Area for Backlog ---
+// --- Helper Component: Droppable Area ---
 function BacklogDroppableArea({ children, id }: { children: React.ReactNode, id: string }) {
   const { setNodeRef, isOver } = useDroppable({
     id,
@@ -80,6 +79,7 @@ function normalizeSprint(raw: any) {
 
 export default function BacklogPage() {
   const params = useParams();
+  const router = useRouter();
   const { showToast } = useToast();
   const { activeCompany, isLoading: isAuthLoading } = useAuth();
 
@@ -98,9 +98,12 @@ export default function BacklogPage() {
   // --- STATE UI ---
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
   const [selectedSprintId, setSelectedSprintId] = useState<number | null>(null);
+  
+  // Modal States
   const [isCreateTaskModalOpen, setIsCreateTaskModalOpen] = useState(false);
+  const [isSprintModalOpen, setIsSprintModalOpen] = useState(false); // ✅ State cho Sprint Modal
 
-  // State for Drag Overlay
+  // DND Active State
   const [activeTask, setActiveTask] = useState<TaskSummary | null>(null);
 
   // --- FILTER STATE ---
@@ -112,40 +115,32 @@ export default function BacklogPage() {
     sortDir: "desc",
   });
 
-  // --- SENSORS CONFIG ---
+  // --- SENSORS ---
   const sensors = useSensors(
     useSensor(PointerSensor, {
-      activationConstraint: { distance: 5 }, // Drag 5px to start
+      activationConstraint: { distance: 5 },
     }),
     useSensor(KeyboardSensor)
   );
 
   // ===============================================================
-  // 1. FETCH MEMBERS
+  // 1. FETCH DATA
   // ===============================================================
   useEffect(() => {
     if (!companyId || !workspaceId || !projectId) return;
-
     getProjectMembers(companyId, workspaceId, projectId, { size: 100 })
       .then(res => setMembers(res.content))
       .catch(() => console.error("Failed to load members"));
   }, [companyId, workspaceId, projectId]);
 
-
-  // ===============================================================
-  // 2. FETCH BACKLOG DATA
-  // ===============================================================
   const fetchData = useCallback(async (isLoadMore = false) => {
     if (!companyId) return;
-
     if (!isLoadMore) setLoading(true);
     else setLoadingMore(true);
 
     try {
       const res = await getProjectBacklog(companyId, workspaceId, projectId, filters);
-
       setData(res);
-
       if (isLoadMore) {
         setBacklogTasks(prev => [...prev, ...res.backlogTasks]);
       } else {
@@ -159,30 +154,23 @@ export default function BacklogPage() {
     }
   }, [companyId, workspaceId, projectId, filters, showToast]);
 
-  // Auto reload logic (Debounce + Reset page)
+  // Debounce & Pagination Logic
   useEffect(() => {
     if (isAuthLoading) return;
-
     const t = setTimeout(() => {
-      if (filters.page === 0) {
-        fetchData(false);
-      }
+      if (filters.page === 0) fetchData(false);
     }, 300);
-
     return () => clearTimeout(t);
   }, [filters, isAuthLoading, fetchData]);
 
-  // Pagination Load More
   useEffect(() => {
     if (isAuthLoading) return;
     if ((filters.page || 0) > 0) fetchData(true);
   }, [filters.page, isAuthLoading]);
 
-
   // ===============================================================
-  // 3. DRAG & DROP LOGIC (Converted to DND-KIT)
+  // 2. DRAG & DROP LOGIC
   // ===============================================================
-
   const onDragStart = (event: DragStartEvent) => {
     if (event.active.data.current?.type === "Task") {
       setActiveTask(event.active.data.current.task);
@@ -198,7 +186,7 @@ export default function BacklogPage() {
     const activeId = active.id.toString();
     const overId = over.id.toString();
 
-    // Helper to find Container ID of any Task
+    // Helper find container
     const findContainerId = (itemId: string) => {
       if (backlogTasks.some(t => t.id.toString() === itemId)) return 'backlog';
       if (data?.activeSprints) {
@@ -209,28 +197,23 @@ export default function BacklogPage() {
       return null;
     };
 
-    // Determine Source
     const sourceId = findContainerId(activeId);
-
-    // Determine Destination
-    let destId = overId;
     
-    // If dropped on another Task, find that task's container
+    let destId = overId;
     if (activeId !== overId && !overId.startsWith('backlog') && !overId.startsWith('sprint-')) {
       destId = findContainerId(overId) || overId;
     }
-    // If dropped on container placeholder/area
     if (over.data.current?.type === 'Backlog') destId = 'backlog';
     if (over.data.current?.type === 'Sprint') destId = over.id.toString();
 
     if (!sourceId || !destId || sourceId === destId) return;
 
-    // --- OPTIMISTIC UPDATE LOGIC (Same as before) ---
+    // --- Optimistic Update ---
     const newBacklogTasks = [...backlogTasks];
     const newSprints = data?.activeSprints ? [...data.activeSprints] : [];
     let movedTask: TaskSummary | undefined;
 
-    // A. Remove from Source
+    // Remove from Source
     if (sourceId === 'backlog') {
       const idx = newBacklogTasks.findIndex(t => t.id.toString() === activeId);
       if (idx !== -1) {
@@ -253,7 +236,7 @@ export default function BacklogPage() {
 
     if (!movedTask) return;
 
-    // Calculate Destination Index
+    // Calculate Dest Index
     let destinationIndex = 0;
     if (destId === 'backlog') {
       if (over.data.current?.sortable?.index !== undefined) {
@@ -262,13 +245,12 @@ export default function BacklogPage() {
         destinationIndex = newBacklogTasks.length;
       }
     } else {
-      // Simplified logic for Sprint: append to end if dropped on empty area
       const sprintId = Number(destId.split('-')[1]);
       const sprint = newSprints.find(s => s.id === sprintId);
       destinationIndex = sprint ? sprint.tasks.length : 0;
     }
 
-    // B. Add to Destination
+    // Add to Destination
     if (destId === 'backlog') {
       newBacklogTasks.splice(destinationIndex, 0, movedTask);
       setBacklogTasks(newBacklogTasks);
@@ -283,45 +265,70 @@ export default function BacklogPage() {
       }
     }
 
-    // C. Call API
+    // Call API
     try {
       const taskId = Number(activeId);
       const targetSprintId = destId === 'backlog' ? null : Number(destId.split('-')[1]);
       await moveTaskToSprint(taskId, targetSprintId, destinationIndex);
     } catch (error) {
       showToast("Failed to move task. Reverting...", "error");
-      handleRefresh(); // Rollback
+      handleRefresh();
     }
   };
 
   const dropAnimation: DropAnimation = {
     sideEffects: defaultDropAnimationSideEffects({ styles: { active: { opacity: "0.5" } } }),
   };
-
-  // Memoize task IDs for SortableContext
   const backlogTaskIds = useMemo(() => backlogTasks.map(t => t.id.toString()), [backlogTasks]);
 
   // ===============================================================
-  // 4. HANDLERS
+  // 3. HANDLERS
   // ===============================================================
   const handleRefresh = () => fetchData(false);
   const handleLoadMore = () => setFilters(prev => ({ ...prev, page: (prev.page || 0) + 1 }));
 
-  // ===============================================================
-  // 5. RENDER
-  // ===============================================================
   if (isAuthLoading) return <div className="h-screen flex items-center justify-center"><Loader2 className="animate-spin text-blue-600" /></div>;
   if (!companyId) return <div className="p-8 text-center">No Active Company</div>;
 
   return (
     <div className="flex flex-col h-[calc(100vh-64px)] bg-slate-50 overflow-hidden">
 
+      {/* ✅ 1. HEADER: Tiêu đề & Bộ lọc (Góc phải) */}
       <BacklogHeader
         totalTasks={data?.backlogTotalElements || 0}
-        onCreateClick={() => setIsCreateTaskModalOpen(true)}
-        onRefresh={handleRefresh}
+        projectId={projectId}
+        filters={filters}
+        setFilters={setFilters}
+        members={members}
+        onCreateClick={() => setIsCreateTaskModalOpen(true)} // (Prop thừa nhưng cứ để tránh lỗi type nếu chưa sửa Header)
+        onRefresh={handleRefresh} // (Prop thừa)
       />
 
+      {/* ✅ 2. ACTION BAR: 2 Nút tạo nằm dưới Header, căn phải */}
+      <div className="flex items-center justify-end gap-3 px-6 py-3 bg-white border-b border-slate-200 shrink-0">
+          {/* Create Sprint */}
+          <Button
+             variant="outline"
+             size="sm"
+             onClick={() => setIsSprintModalOpen(true)}
+             className="h-8 bg-white text-slate-700 border-slate-300 hover:bg-slate-50 hover:text-blue-600 font-medium shadow-sm"
+          >
+             <CalendarPlus className="w-4 h-4 mr-2" />
+             Create Sprint
+          </Button>
+
+          {/* Create Issue */}
+          <Button
+            size="sm"
+            onClick={() => setIsCreateTaskModalOpen(true)}
+            className="h-8 bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-sm flex items-center gap-2"
+          >
+            <Plus className="w-4 h-4" /> 
+            Create Issue
+          </Button>
+      </div>
+
+      {/* ✅ 3. MAIN CONTENT (Scrollable) */}
       <DndContext
         sensors={sensors}
         collisionDetection={closestCorners}
@@ -329,26 +336,19 @@ export default function BacklogPage() {
         onDragEnd={onDragEnd}
       >
         <div className="flex flex-1 overflow-hidden relative">
-          <div className="flex-1 overflow-y-auto custom-scrollbar p-4 sm:p-6 transition-all duration-300">
+          <div className="flex-1 overflow-y-auto custom-scrollbar px-6 pb-6 transition-all duration-300 pt-4">
             <div className={`mx-auto pb-20 ${selectedTaskId ? 'max-w-full' : 'max-w-[1800px]'}`}>
-
-              <BacklogToolbar
-                filters={filters}
-                setFilters={setFilters}
-                members={members}
-              />
 
               {loading && (!filters.page || filters.page === 0) ? (
                 <div className="py-20 flex justify-center"><Loader2 className="w-8 h-8 text-blue-600 animate-spin" /></div>
               ) : (
                 <>
-                  {/* ACTIVE SPRINTS */}
+                  {/* A. ACTIVE SPRINTS */}
                   {data?.activeSprints && (
                     <div className="animate-fadeInUp mb-6">
                       <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 ml-1">
                         Active Sprints ({data.activeSprints.length})
                       </h2>
-                      {/* Note: SprintSection needs to support dnd-kit Droppable/Sortable */}
                       <SprintSection
                         sprints={data.activeSprints.map(normalizeSprint)}
                         onTaskClick={(id) => setSelectedTaskId(id)}
@@ -359,15 +359,7 @@ export default function BacklogPage() {
                     </div>
                   )}
 
-                  {/* QUICK SPRINT BUTTON */}
-                  <div className="mb-6">
-                    <QuickSprintButton
-                      projectId={projectId}
-                      onSuccess={handleRefresh}
-                    />
-                  </div>
-
-                  {/* BACKLOG SECTION */}
+                  {/* B. BACKLOG SECTION */}
                   <div className="animate-fadeInUp delay-100">
                     <div className="flex items-center justify-between mb-3 px-1">
                       <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
@@ -377,7 +369,7 @@ export default function BacklogPage() {
                     </div>
 
                     <div className="bg-slate-100/50 p-1.5 rounded-xl border border-slate-200/60 min-h-[100px]">
-                      {/* Backlog Area using SortableContext */}
+                      {/* Droppable Area */}
                       <BacklogDroppableArea id="backlog">
                         <SortableContext items={backlogTaskIds} strategy={verticalListSortingStrategy}>
                           {backlogTasks.length > 0 ? (
@@ -400,6 +392,7 @@ export default function BacklogPage() {
                         </SortableContext>
                       </BacklogDroppableArea>
 
+                      {/* Quick Create IN Backlog */}
                       <div className="px-1">
                         <QuickTaskCreate
                           companyId={companyId!}
@@ -411,6 +404,7 @@ export default function BacklogPage() {
                       </div>
                     </div>
 
+                    {/* Pagination */}
                     {data && data.backlogPageNumber + 1 < data.backlogTotalPages && (
                       <div className="mt-4 text-center">
                         <Button variant="ghost" onClick={handleLoadMore} disabled={loadingMore} className="text-slate-500">
@@ -445,7 +439,9 @@ export default function BacklogPage() {
 
       </DndContext>
 
-      {/* Modals */}
+      {/* --- MODALS --- */}
+      
+      {/* Modal: Sprint Details/Edit */}
       {selectedSprintId && (
         <SprintDetailModal
           projectId={projectId}
@@ -455,6 +451,15 @@ export default function BacklogPage() {
         />
       )}
 
+      {/* Modal: Create Sprint (New) */}
+      <CreateSprintModal
+         isOpen={isSprintModalOpen}
+         onClose={() => setIsSprintModalOpen(false)}
+         onSuccess={handleRefresh}
+         projectId={projectId}
+      />
+
+      {/* Modal: Create Task */}
       <CreateTaskModal
         isOpen={isCreateTaskModalOpen}
         onClose={() => setIsCreateTaskModalOpen(false)}
