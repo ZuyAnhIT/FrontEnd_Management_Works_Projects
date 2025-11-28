@@ -2,7 +2,10 @@
 
 import { useState } from "react";
 import { useParams } from "next/navigation";
-import { Droppable } from "@hello-pangea/dnd";
+// ✅ Import dnd-kit hooks
+import { useDroppable } from "@dnd-kit/core";
+import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
+
 import {
    ChevronDown, ChevronRight, MoreHorizontal, Rocket,
    Calendar, Play, CheckCircle, Trash2, Edit
@@ -13,7 +16,7 @@ import { useAuth } from "@/context/AuthContext";
 
 // API & Services
 import {
-   Sprint, // Sử dụng Interface Sprint thay vì SprintDetail nếu đã đồng bộ
+   Sprint, 
    startSprint,
    completeSprint,
    deleteSprint
@@ -22,16 +25,35 @@ import {
 // Components
 import BacklogTaskItem from "./BacklogTaskItem";
 import QuickTaskCreate from "@/components/features/core/task/QuickTaskCreate";
-import SprintActionModals from "@/components/features/core/sprint/SprintActionModals"; // ✅ Component Modal
+import SprintActionModals from "@/components/features/core/sprint/SprintActionModals"; 
 
 const formatDate = (d?: string) => d ? new Date(d).toLocaleDateString('en-US', { day: 'numeric', month: 'short' }) : '...';
 
+// Helper Component for Sprint Droppable Area
+function SprintDroppable({ id, children, isExpanded }: { id: string; children: React.ReactNode, isExpanded: boolean }) {
+  const { setNodeRef, isOver } = useDroppable({
+    id,
+    data: { type: "Sprint", id } // Tag data for collision detection
+  });
+
+  if (!isExpanded) return null;
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={`p-2 min-h-[50px] transition-colors duration-200 ${isOver ? 'bg-blue-50/80' : ''}`}
+    >
+      {children}
+    </div>
+  );
+}
+
 interface SprintSectionProps {
-   sprints: Sprint[]; // Lưu ý: Dùng type Sprint từ apiSprint
+   sprints: Sprint[];
    onTaskClick: (taskId: number) => void;
    onTaskCreated?: () => void;
    onSprintSettingsClick: (sprintId: number) => void;
-   onRefresh: () => void; // ✅ Callback reload list
+   onRefresh: () => void;
 }
 
 export default function SprintSection({
@@ -48,34 +70,28 @@ export default function SprintSection({
    const { showToast } = useToast();
 
    if (!activeCompany) return null;
+
    // --- STATE ---
-   // 1. Collapse/Expand Sprints
    const [expanded, setExpanded] = useState<Record<number, boolean>>(
       sprints.reduce((acc, s) => ({ ...acc, [s.id]: true }), {})
    );
 
-   // 2. Dropdown Menu (Lưu ID của sprint đang mở menu)
    const [menuOpenId, setMenuOpenId] = useState<number | null>(null);
-
-   // 3. Action Modals Control
    const [modalType, setModalType] = useState<'START' | 'COMPLETE' | 'DELETE' | null>(null);
    const [selectedSprint, setSelectedSprint] = useState<Sprint | null>(null);
    const [isProcessing, setIsProcessing] = useState(false);
 
    // --- HANDLERS ---
-
    const toggleSprint = (id: number) => {
       setExpanded(prev => ({ ...prev, [id]: !prev[id] }));
    };
 
-   // Mở Modal xác nhận hành động
    const promptAction = (type: 'START' | 'COMPLETE' | 'DELETE', sprint: Sprint) => {
       setSelectedSprint(sprint);
       setModalType(type);
-      setMenuOpenId(null); // Đóng menu dropdown nếu đang mở
+      setMenuOpenId(null);
    };
 
-   // Thực hiện gọi API khi người dùng bấm Confirm trên Modal
    const handleConfirmAction = async () => {
       if (!selectedSprint || !modalType) return;
 
@@ -88,7 +104,7 @@ export default function SprintSection({
          }
          else if (modalType === 'COMPLETE') {
             await completeSprint(projectId, selectedSprint.id);
-            showToast(`Sprint completed. Incomplete tasks moved to Backlog.`, "success");
+            showToast(`Sprint completed.`, "success");
          }
          else if (modalType === 'DELETE') {
             await deleteSprint(projectId, selectedSprint.id);
@@ -96,10 +112,7 @@ export default function SprintSection({
             showToast(`Sprint ${actionName} successfully`, "success");
          }
 
-         // Reload dữ liệu
          onRefresh();
-
-         // Reset state
          setModalType(null);
          setSelectedSprint(null);
 
@@ -114,25 +127,26 @@ export default function SprintSection({
 
    return (
       <>
-         {/* Wrapper onClick để đóng menu khi click ra ngoài */}
          <div className="space-y-6 mb-8" onClick={() => setMenuOpenId(null)}>
-
             {sprints.map((sprint) => {
                const isActive = sprint.status === "IN_PROGRESS";
                const isFuture = sprint.status === "NOT_STARTED";
+               const sprintTasks = sprint.tasks || [];
+               // Create list of task IDs for SortableContext
+               const taskIds = sprintTasks.map(t => t.id.toString());
 
                return (
                   <div
                      key={sprint.id}
                      className={`rounded-xl border overflow-visible transition-all relative
-                ${isActive ? 'bg-blue-50/30 border-blue-200 shadow-sm' : 'bg-slate-50 border-slate-200'}
-              `}
+                        ${isActive ? 'bg-blue-50/30 border-blue-200 shadow-sm' : 'bg-slate-50 border-slate-200'}
+                     `}
                   >
                      {/* --- SPRINT HEADER --- */}
                      <div
                         className={`flex items-center justify-between px-4 py-3 border-b cursor-pointer select-none
-                  ${isActive ? 'bg-blue-50/50 border-blue-100' : 'bg-white border-slate-200'}
-                  `}
+                           ${isActive ? 'bg-blue-50/50 border-blue-100' : 'bg-white border-slate-200'}
+                        `}
                         onClick={(e) => { e.stopPropagation(); toggleSprint(sprint.id); }}
                      >
                         {/* LEFT: Info */}
@@ -143,20 +157,9 @@ export default function SprintSection({
 
                            <div>
                               <div className="flex items-center gap-2">
-                                 <h3 className="text-sm font-bold text-slate-900">
-                                    {sprint.name}
-                                 </h3>
-                                 {/* Badge */}
-                                 {isActive && (
-                                    <span className="px-2 py-0.5 bg-green-100 text-green-700 text-[10px] rounded-full font-extrabold uppercase tracking-wide border border-green-200">
-                                       Active
-                                    </span>
-                                 )}
-                                 {isFuture && (
-                                    <span className="px-2 py-0.5 bg-slate-100 text-slate-600 text-[10px] rounded-full font-bold uppercase tracking-wide border border-slate-200">
-                                       Planned
-                                    </span>
-                                 )}
+                                 <h3 className="text-sm font-bold text-slate-900">{sprint.name}</h3>
+                                 {isActive && <span className="px-2 py-0.5 bg-green-100 text-green-700 text-[10px] rounded-full font-extrabold uppercase border border-green-200">Active</span>}
+                                 {isFuture && <span className="px-2 py-0.5 bg-slate-100 text-slate-600 text-[10px] rounded-full font-bold uppercase border border-slate-200">Planned</span>}
                               </div>
 
                               <div className="text-xs text-slate-500 mt-1 flex items-center gap-3">
@@ -170,9 +173,7 @@ export default function SprintSection({
                                     <span className="font-medium text-slate-700">({sprint.taskCount || 0} issues)</span>
                                  </div>
                                  {sprint.goal && (
-                                    <span className="text-slate-400 italic max-w-[300px] truncate hidden sm:block">
-                                       Goal: {sprint.goal}
-                                    </span>
+                                    <span className="text-slate-400 italic max-w-[300px] truncate hidden sm:block">Goal: {sprint.goal}</span>
                                  )}
                               </div>
                            </div>
@@ -180,8 +181,6 @@ export default function SprintSection({
 
                         {/* RIGHT: Actions */}
                         <div className="flex items-center gap-2 relative">
-
-                           {/* 1. Complete Button (Active Only) */}
                            {isActive && (
                               <Button
                                  size="sm"
@@ -191,8 +190,6 @@ export default function SprintSection({
                                  Complete Sprint
                               </Button>
                            )}
-
-                           {/* 2. Start Button (Future Only) */}
                            {isFuture && (
                               <Button
                                  size="sm"
@@ -202,8 +199,6 @@ export default function SprintSection({
                                  Start Sprint
                               </Button>
                            )}
-
-                           {/* 3. More Button + Dropdown */}
                            <div className="relative">
                               <Button
                                  variant="ghost" size="sm" className="h-8 w-8 p-0 text-slate-500 hover:text-blue-600 hover:bg-blue-50"
@@ -214,8 +209,6 @@ export default function SprintSection({
                               >
                                  <MoreHorizontal className="w-4 h-4" />
                               </Button>
-
-                              {/* DROPDOWN MENU */}
                               {menuOpenId === sprint.id && (
                                  <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-slate-200 rounded-lg shadow-xl z-50 py-1 animate-in fade-in zoom-in-95 origin-top-right">
                                     <button
@@ -244,58 +237,46 @@ export default function SprintSection({
                         </div>
                      </div>
 
-                     {/* --- SPRINT TASKS (Droppable Area) --- */}
-                     {expanded[sprint.id] && (
-                        <Droppable droppableId={`sprint-${sprint.id}`} type="TASK">
-                           {(provided, snapshot) => (
-                              <div
-                                 ref={provided.innerRef}
-                                 {...provided.droppableProps}
-                                 className={`p-2 min-h-[50px] transition-colors duration-200
-                            ${snapshot.isDraggingOver ? 'bg-blue-50/80' : ''} 
-                         `}
-                              >
-                                 <div className="space-y-2 mb-2">
-                                    {sprint.tasks && sprint.tasks.length > 0 ? (
-                                       sprint.tasks.map((task, index) => (
-                                          <BacklogTaskItem
-                                             key={task.id}
-                                             task={task}
-                                             index={index}
-                                             onClick={() => onTaskClick(task.id)}
-                                          />
-                                       ))
-                                    ) : (
-                                       !snapshot.isDraggingOver && (
-                                          <div className="flex flex-col items-center justify-center py-6 text-slate-400 border-2 border-dashed border-slate-200 rounded-lg m-1 bg-white/50">
-                                             <Rocket className="w-8 h-8 mb-2 opacity-40" />
-                                             <p className="text-xs font-medium">Plan your sprint</p>
-                                             <p className="text-[10px]">Drag issues here</p>
-                                          </div>
-                                       )
-                                    )}
-                                    {provided.placeholder}
-                                 </div>
-
-                                 <div className="px-1">
-                                    <QuickTaskCreate
-                                       companyId={activeCompany.companyId}     // từ Auth
-                                       workspaceId={workspaceId}              // từ URL
-                                       projectId={projectId}
-                                       sprintId={sprint.id}
-                                       onSuccess={() => onTaskCreated && onTaskCreated()}
+                     {/* --- SPRINT TASKS (Droppable & Sortable Area) --- */}
+                     {/* Replace Droppable with helper component and SortableContext */}
+                     <SprintDroppable id={`sprint-${sprint.id}`} isExpanded={expanded[sprint.id]}>
+                        <SortableContext items={taskIds} strategy={verticalListSortingStrategy}>
+                           <div className="space-y-2 mb-2">
+                              {sprintTasks.length > 0 ? (
+                                 sprintTasks.map((task, index) => (
+                                    <BacklogTaskItem
+                                       key={task.id}
+                                       task={task}
+                                       index={index}
+                                       onClick={() => onTaskClick(task.id)}
                                     />
+                                 ))
+                              ) : (
+                                 // Empty State Placeholder
+                                 <div className="flex flex-col items-center justify-center py-6 text-slate-400 border-2 border-dashed border-slate-200 rounded-lg m-1 bg-white/50">
+                                    <Rocket className="w-8 h-8 mb-2 opacity-40" />
+                                    <p className="text-xs font-medium">Plan your sprint</p>
+                                    <p className="text-[10px]">Drag issues here</p>
                                  </div>
-                              </div>
-                           )}
-                        </Droppable>
-                     )}
+                              )}
+                           </div>
+                        </SortableContext>
+
+                        <div className="px-1">
+                           <QuickTaskCreate
+                              companyId={activeCompany.companyId}
+                              workspaceId={workspaceId}
+                              projectId={projectId}
+                              sprintId={sprint.id}
+                              onSuccess={() => onTaskCreated && onTaskCreated()}
+                           />
+                        </div>
+                     </SprintDroppable>
                   </div>
                );
             })}
          </div>
 
-         {/* ✅ GLOBAL ACTION MODAL */}
          <SprintActionModals
             isOpen={!!modalType}
             type={modalType}
