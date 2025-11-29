@@ -271,15 +271,22 @@ export default function BoardPage() {
         )}
       </div>
 
-      {/* ✅ RENDER MODAL CHI TIẾT */}
-      {/* Truyền các props cần thiết: taskId, members, statuses (để select status) */}
+     {/* ✅ RENDER MODAL CHI TIẾT */}
       <TaskDetailModalFloating 
         taskId={selectedTaskId} 
         isOpen={isModalOpen} 
         onClose={() => setIsModalOpen(false)}
-        onUpdate={handleTaskUpdate} // Callback refresh data
-        members={members}
-        statuses={columns.map(c => ({ id: c.id, name: c.name }))} // Map statuses từ columns
+        onUpdate={handleTaskUpdate} // Callback refresh board khi task thay đổi
+        
+        members={members} // Danh sách thành viên để assign
+        statuses={columns.map(c => ({ id: c.id, name: c.name }))} // Danh sách status
+        sprints={[]} // Truyền sprints thật nếu có state sprints ở BoardPage
+        epics={[]}   // Truyền epics thật nếu có
+
+        // 👇 QUAN TRỌNG: THÊM CÁC ID NÀY ĐỂ GỌI API SUBTASK & COMMENT
+        companyId={companyId!} 
+        workspaceId={workspaceId}
+        projectId={projectId}
       />
     </div>
   );
