@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation"; // Added useRouter
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/components/ui/ToastProvider";
 import { Loader2, AlertCircle } from "lucide-react";
@@ -47,9 +47,12 @@ import BoardHeader from "@/components/features/core/board/BoardHeader";
 import BoardColumn from "@/components/features/core/board/BoardColumn";
 import CreateColumnButton from "@/components/features/core/board/CreateColumnButton";
 import BoardTaskCard from "@/components/features/core/board/BoardTaskCard";
+// ✅ IMPORT MODAL CHI TIẾT TASK (Floating)
+import TaskDetailModalFloating from "@/components/features/core/task/TaskDetailModalFloating";
 
 export default function BoardPage() {
   const params = useParams();
+  const router = useRouter(); // Added router for refresh
   const { showToast } = useToast();
   const { activeCompany, isLoading: isAuthLoading } = useAuth();
 
@@ -65,6 +68,11 @@ export default function BoardPage() {
 
   const [activeColumn, setActiveColumn] = useState<BoardColumnResponse | null>(null);
   const [activeTask, setActiveTask] = useState<TaskSummary | null>(null);
+
+  // ✅ STATE CHO MODAL CHI TIẾT TASK
+  // Chỉ cần lưu ID của task đang chọn
+  const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const [filters, setFilters] = useState<BoardFilterParams>({
     keyword: "",
@@ -126,6 +134,18 @@ export default function BoardPage() {
     setColumns((prev) => [...prev, newColumn]); showToast("Created column successfully", "success");
   };
   const handleColumnDeleted = (columnId: string) => { setColumns((prev) => prev.filter((col) => String(col.id) !== columnId)); };
+
+  // ✅ HÀM XỬ LÝ KHI CLICK VÀO TASK CARD
+  const handleTaskClick = (taskData: TaskSummary) => {
+    // Chỉ cần set ID, Modal sẽ tự fetch chi tiết
+    setSelectedTaskId(Number(taskData.id));
+    setIsModalOpen(true);
+  };
+
+  // Callback khi update task xong -> Refresh board data
+  const handleTaskUpdate = () => {
+      fetchBoardData(); // Reload data board để cập nhật UI bên ngoài
+  };
 
   const customCollisionDetection: CollisionDetection = useCallback((args) => {
     const pointerCollisions = pointerWithin(args);
@@ -222,12 +242,13 @@ export default function BoardPage() {
               <SortableContext items={columnIds} strategy={horizontalListSortingStrategy}>
                 {columns.map((col, index) => (
                   <BoardColumn 
-                     key={col.id} 
-                     column={col} 
-                     index={index} 
-                     projectId={projectId} 
-                     members={members} // ✅ 1. TRUYỀN MEMBERS VÀO ĐÂY
-                     onDeleteColumn={handleColumnDeleted} 
+                      key={col.id} 
+                      column={col} 
+                      index={index} 
+                      projectId={projectId} 
+                      members={members} 
+                      onDeleteColumn={handleColumnDeleted} 
+                      onTaskClick={handleTaskClick} // ✅ TRUYỀN HÀM CLICK XUỐNG
                   />
                 ))}
               </SortableContext>
@@ -238,17 +259,28 @@ export default function BoardPage() {
               {activeColumn && (
                  <div className="h-full cursor-grabbing opacity-90 scale-[1.02] shadow-2xl rounded-xl bg-transparent">
                    <div className="h-full bg-[#F4F5F7] rounded-xl border-2 border-blue-500">
-                     <BoardColumn column={activeColumn} index={0} projectId={projectId} members={members} /> {/* ✅ Truyền cả vào đây cho chắc */}
+                     <BoardColumn column={activeColumn} index={0} projectId={projectId} members={members} /> 
                    </div>
                  </div>
               )}
               {activeTask && (
-                 <BoardTaskCard task={activeTask} index={0} users={members} /> // ✅ 2. TRUYỀN USERS VÀO ĐÂY ĐỂ HIỆN AVATAR KHI KÉO
+                 <BoardTaskCard task={activeTask} index={0} users={members} /> 
               )}
             </DragOverlay>
           </DndContext>
         )}
       </div>
+
+      {/* ✅ RENDER MODAL CHI TIẾT */}
+      {/* Truyền các props cần thiết: taskId, members, statuses (để select status) */}
+      <TaskDetailModalFloating 
+        taskId={selectedTaskId} 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)}
+        onUpdate={handleTaskUpdate} // Callback refresh data
+        members={members}
+        statuses={columns.map(c => ({ id: c.id, name: c.name }))} // Map statuses từ columns
+      />
     </div>
   );
 }

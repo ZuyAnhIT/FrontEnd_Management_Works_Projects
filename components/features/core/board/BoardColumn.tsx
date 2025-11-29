@@ -9,21 +9,29 @@ import { useRouter, useParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 
 import { BoardColumnResponse, updateProjectStatus } from "@/services/apiBoard";
+import { TaskSummary } from "@/services/apiProject"; // Import TaskSummary type
 import BoardTaskCard from "./BoardTaskCard";
 import { ColumnContextMenu } from "./ColumnContextMenu";
 import { useToast } from "@/components/ui/ToastProvider";
 import QuickTaskCreate from "@/components/features/core/task/QuickTaskCreate";
 
-// Updated Interface to be more specific if possible, otherwise any[] is temporary
+// Updated Interface
 interface BoardColumnProps {
   column: BoardColumnResponse;
   index: number;
   projectId: number;
-  members: any[]; // Recommend changing 'any[]' to your User/ProjectMember type
+  members: any[]; // Consider defining a User type
   onDeleteColumn?: (columnId: string) => void;
+  onTaskClick?: (task: TaskSummary) => void; // ✅ [NEW] Prop để handle click vào task
 }
 
-export default function BoardColumn({ column, projectId, onDeleteColumn, members }: BoardColumnProps) {
+export default function BoardColumn({ 
+  column, 
+  projectId, 
+  onDeleteColumn, 
+  members,
+  onTaskClick // ✅ [NEW] Destructure prop
+}: BoardColumnProps) {
   const { showToast } = useToast();
   const router = useRouter();
   const params = useParams();
@@ -184,7 +192,8 @@ export default function BoardColumn({ column, projectId, onDeleteColumn, members
                 key={task.id || `task-${idx}`}
                 task={task}
                 index={idx}
-                users={members} // ✅ UPDATED: Passing members as users prop
+                users={members}
+                onClick={onTaskClick} // ✅ [NEW] Truyền prop click xuống card
               />
             ))}
           </SortableContext>

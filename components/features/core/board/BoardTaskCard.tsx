@@ -3,11 +3,18 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { TaskSummary } from "@/services/apiProject";
-import { Bookmark, Bug, CheckCircle2, ArrowUp, ArrowDown, Minus, User as UserIcon, Check, Search } from "lucide-react";
+import { Bookmark, Bug, CheckCircle2, ArrowUp, ArrowDown, Minus, User as UserIcon, Check, Search, ChevronRight, Plus, Circle } from "lucide-react";
 import { useMemo, useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/ToastProvider";
 import { updateTask } from "@/services/apiTask";
+
+// --- MOCK SUBTASK INTERFACE ---
+interface Subtask {
+  id: string;
+  title: string;
+  completed: boolean;
+}
 
 // --- ICONS CONFIG ---
 const TypeIcon = ({ type }: { type: string }) => {
@@ -25,10 +32,12 @@ const PriorityIcon = ({ priority }: { priority: string }) => {
   return <Minus className="w-3.5 h-3.5 text-yellow-500 rotate-90" />;
 };
 
-// --- INTERFACES ---
-interface User {
-  id: number | string;
-  userId?: number;
+// --- INTERFACES ĐÃ SỬA ---
+// ✅ Update: Cho phép id tùy chọn, thêm memberId để khớp với ProjectMember
+export interface BoardUser {
+  id?: number | string;       
+  userId?: number | string;   
+  memberId?: number | string; // Thêm trường này
   name?: string;
   fullName?: string;
   email?: string;
@@ -37,9 +46,10 @@ interface User {
 }
 
 interface BoardTaskCardProps {
-  task: TaskSummary;
+  task: TaskSummary & { subtasks?: Subtask[] };
   index: number;
-  users?: User[];
+  users?: BoardUser[]; // Sử dụng BoardUser thay vì User cũ
+  onClick?: (task: TaskSummary) => void;
 }
 
 // --- JIRA-STYLE ASSIGNEE DROPDOWN ---
@@ -51,7 +61,7 @@ const AssigneeDropdown = ({
 }: { 
   taskId: number; 
   currentAssigneeId: number | null; 
-  users: User[]; 
+  users: BoardUser[]; 
   onUpdate: (id: number | null) => void 
 }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -59,10 +69,9 @@ const AssigneeDropdown = ({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Determine current user based on ID passed from parent (which is now local state)
-  const currentUser = users.find(u => (u.userId || u.id) === currentAssigneeId);
+  // ✅ Logic tìm user: Check cả userId, memberId và id
+  const currentUser = users.find(u => (u.userId || u.memberId || u.id) === currentAssigneeId);
 
-  // Filter users based on search
   const filteredUsers = users.filter(user => {
     const name = (user.fullName || user.name || "").toLowerCase();
     const email = (user.email || "").toLowerCase();
@@ -85,7 +94,7 @@ const AssigneeDropdown = ({
   }, [isOpen]);
 
   const handleSelect = (userId: number | null) => {
-    onUpdate(userId); // Trigger update immediately
+    onUpdate(userId);
     setIsOpen(false);
     setSearchTerm("");
   };
@@ -99,7 +108,6 @@ const AssigneeDropdown = ({
 
   return (
     <div className="relative" ref={dropdownRef} onPointerDown={(e) => e.stopPropagation()}>
-      {/* TRIGGER BUTTON (Avatar) */}
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={`
@@ -110,7 +118,7 @@ const AssigneeDropdown = ({
         title={currentUser ? `Assigned to ${currentUser.fullName || currentUser.name}` : "Assign user"}
       >
         {currentUser ? (
-          <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-[9px] font-bold ${getAvatarColor((currentUser.userId || currentUser.id) as number)}`}>
+          <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-[9px] font-bold ${getAvatarColor(Number(currentUser.userId || currentUser.memberId || currentUser.id))}`}>
             {currentUser.avatarUrl || currentUser.avatar ? (
                <img src={currentUser.avatarUrl || currentUser.avatar} alt="avatar" className="w-full h-full rounded-full object-cover"/>
             ) : (
@@ -122,12 +130,10 @@ const AssigneeDropdown = ({
         )}
       </button>
 
-      {/* DROPDOWN MENU */}
       {isOpen && (
         <div 
           className="absolute right-0 top-full mt-2 w-[260px] bg-white rounded-lg shadow-[0_4px_12px_-2px_rgba(0,0,0,0.16)] z-50 border border-slate-200 animate-in fade-in zoom-in-95 duration-100 origin-top-right flex flex-col overflow-hidden"
         >
-          {/* Search Header */}
           <div className="p-3 border-b border-slate-100">
              <div className="relative">
                 <Search className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-slate-400" />
@@ -142,9 +148,7 @@ const AssigneeDropdown = ({
              </div>
           </div>
           
-          {/* User List */}
           <div className="max-h-[220px] overflow-y-auto py-1">
-            {/* Unassigned Option */}
             <button
               onClick={() => handleSelect(null)}
               className="w-full text-left px-4 py-2 text-sm transition-colors hover:bg-slate-50 flex items-center gap-3 group"
@@ -162,7 +166,8 @@ const AssigneeDropdown = ({
                <div className="px-4 py-3 text-xs text-slate-500 text-center">No users found</div>
             ) : (
               filteredUsers.map((user) => {
-                 const userId = (user.userId || user.id) as number;
+                 // ✅ Lấy ID chuẩn xác từ 1 trong 3 trường
+                 const userId = (user.userId || user.memberId || user.id) as number;
                  const isSelected = currentAssigneeId === userId;
                  return (
                   <button
@@ -194,15 +199,13 @@ const AssigneeDropdown = ({
 };
 
 // --- MAIN COMPONENT ---
-export default function BoardTaskCard({ task, index, users = [] }: BoardTaskCardProps) {
+export default function BoardTaskCard({ task, index, users = [], onClick }: BoardTaskCardProps) {
   const { showToast } = useToast();
   const router = useRouter();
   const sortableId = useMemo(() => task.id.toString(), [task.id]);
 
-  // ✅ 1. OPTIMISTIC UI STATE: Initialize with prop data
   const [localAssigneeId, setLocalAssigneeId] = useState<number | null>((task as any).assigneeId || null);
 
-  // ✅ 2. SYNC STATE: Update local state if props change (e.g., after refresh)
   useEffect(() => {
     setLocalAssigneeId((task as any).assigneeId || null);
   }, [(task as any).assigneeId]);
@@ -225,23 +228,15 @@ export default function BoardTaskCard({ task, index, users = [] }: BoardTaskCard
     opacity: isDragging ? 0 : 1,
   };
 
-  // ✅ 3. HANDLE UPDATE WITH OPTIMISTIC UI
   const handleAssigneeUpdate = async (newAssigneeId: number | null) => {
-    // A. Optimistic Update: Update UI immediately
     setLocalAssigneeId(newAssigneeId);
-
     try {
-      // B. Background API Call
       await updateTask(task.id, { assigneeId: newAssigneeId });
       showToast("Assignee updated", "success");
-      
-      // C. Refresh Data: Ensure server state is consistent
       router.refresh(); 
     } catch (error) {
       console.error("Failed to update assignee", error);
       showToast("Failed to update assignee", "error");
-      
-      // D. Revert on Error: Rollback UI to previous state if API fails
       setLocalAssigneeId((task as any).assigneeId || null);
     }
   };
@@ -252,24 +247,22 @@ export default function BoardTaskCard({ task, index, users = [] }: BoardTaskCard
       style={style}
       {...attributes}
       {...listeners}
+      // Trigger modal open on click
+      onClick={() => onClick && onClick(task)}
       className={`
-        rounded-[3px] mb-2 transition-all duration-200 relative group
-        ${isDragging
-          ? "h-[100px] bg-slate-50 border border-dashed border-slate-300" 
-          : "bg-white p-3 shadow-[0px_1px_2px_0px_rgba(9,30,66,0.15)] hover:bg-[#ebecf0] cursor-grab active:cursor-grabbing border-l-[3px]" 
-        }
+        bg-white rounded-[3px] shadow-[0px_1px_2px_0px_rgba(9,30,66,0.15)] mb-2 group relative transition-all duration-200
+        hover:bg-[#ebecf0] cursor-grab active:cursor-grabbing border-l-[3px]
+        ${isDragging ? "opacity-0" : ""}
         ${task.taskType === 'BUG' ? 'border-l-red-500' : task.taskType === 'STORY' ? 'border-l-green-500' : 'border-l-blue-500'}
       `}
     >
-      <div className={isDragging ? "opacity-0" : "opacity-100"}>
-        {/* Title */}
+      <div className="p-3 pb-2">
         <div className="mb-3">
           <p className="text-[14px] text-[#172B4D] leading-snug hover:text-blue-600 hover:underline cursor-pointer font-medium line-clamp-2">
             {task.title}
           </p>
         </div>
 
-        {/* Footer Info */}
         <div className="flex items-center justify-between min-h-[24px]">
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1 text-slate-500" title={task.taskType}>
@@ -281,11 +274,14 @@ export default function BoardTaskCard({ task, index, users = [] }: BoardTaskCard
           </div>
 
           <div className="flex items-center gap-1.5">
-            <div className="w-6 h-6 flex items-center justify-center rounded hover:bg-slate-200/60 cursor-pointer transition-colors" title={`Priority: ${task.priority}`}>
+            <div 
+              className="w-6 h-6 flex items-center justify-center rounded hover:bg-slate-200/60 cursor-pointer transition-colors" 
+              title={`Priority: ${task.priority}`}
+              onPointerDown={(e) => e.stopPropagation()} 
+            >
               <PriorityIcon priority={task.priority} />
             </div>
 
-            {/* ✅ 4. USE LOCAL STATE for dropdown value */}
             <AssigneeDropdown 
               taskId={task.id}
               currentAssigneeId={localAssigneeId} 
