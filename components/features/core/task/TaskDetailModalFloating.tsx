@@ -4,7 +4,9 @@ import React, { useEffect, useState, useRef } from "react";
 import { 
   X, Lock, Eye, Share2, MoreHorizontal, Maximize2, 
   Link as LinkIcon, CheckSquare, ChevronDown, Plus, 
-  Loader2 
+  Loader2,
+  // ✅ Thêm các icons cho Toolbar Description
+  Bold, Italic, List, ListOrdered, Image as ImageIcon, AtSign, Smile, Code
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,7 +18,7 @@ import {
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "@/components/ui/tooltip"; // ✅ Import Tooltip
+} from "@/components/ui/tooltip"; 
 
 // API Services & Types
 import { getTaskDetails, updateTask, TaskDetail, UpdateTaskData } from "@/services/apiTask";
@@ -70,7 +72,6 @@ interface TaskDetailModalProps {
   epics?: any[]; 
   statuses?: any[];
 
-  // ID Context (Required for Subtasks)
   companyId: number;
   workspaceId: number;
   projectId: number;
@@ -102,6 +103,9 @@ export default function TaskDetailModalFloating({
   const [isAddingSubtask, setIsAddingSubtask] = useState(false);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
 
+  // --- DESCRIPTION STATE ---
+  const [isEditingDescription, setIsEditingDescription] = useState(false);
+
   // Floating Window State
   const [position, setPosition] = useState({ x: 100, y: 50 });
   const [size, setSize] = useState({ width: 1100, height: 700 });
@@ -115,7 +119,6 @@ export default function TaskDetailModalFloating({
     if (isOpen && taskId) {
       setLoading(true);
       
-      // Fetch Task Details
       getTaskDetails(taskId)
         .then(data => {
           setTask(data);
@@ -136,7 +139,6 @@ export default function TaskDetailModalFloating({
         .catch((err) => console.error(err))
         .finally(() => setLoading(false));
 
-      // Fetch Subtasks
       fetchSubtasks(taskId);
     }
   }, [isOpen, taskId]);
@@ -150,112 +152,14 @@ export default function TaskDetailModalFloating({
     }
   };
 
-  // --- 2. SUBTASK HANDLERS ---
+  // --- 2. HANDLERS ---
 
-  // Create
-  const handleCreateSubtask = async () => {
-    if (!newSubtaskTitle.trim() || !taskId) return;
-    try {
-      await createSubtask(companyId, workspaceId, projectId, taskId, {
-        title: newSubtaskTitle,
-      });
-      setNewSubtaskTitle("");
-      setIsAddingSubtask(false);
-      fetchSubtasks(taskId);
-      showToast("Subtask created", "success");
-    } catch (error) {
-      showToast("Failed to create subtask", "error");
-    }
-  };
-
-  // Update Status
-  const handleToggleSubtask = async (subtask: Subtask) => {
-    if (!taskId) return;
-    const oldStatus = subtask.status;
-    const newStatus = oldStatus === 'DONE' ? 'TO_DO' : 'DONE'; 
-    
-    setSubtasks(prev => prev.map(s => s.id === subtask.id ? { ...s, status: newStatus } : s));
-
-    try {
-      await updateSubtask(companyId, workspaceId, projectId, taskId, subtask.id, {
-        status: newStatus
-      });
-    } catch (error) {
-      showToast("Failed to update subtask", "error");
-      setSubtasks(prev => prev.map(s => s.id === subtask.id ? { ...s, status: oldStatus } : s));
-    }
-  };
-
-  // Update Assignee (Subtask)
-  const handleSubtaskAssigneeChange = async (subTaskId: number, userId: number | null) => {
-    if (!taskId) return;
-    
-    const selectedUser = members.find(m => (m.userId || m.id) === userId);
-    const oldSubtasks = [...subtasks];
-
-    setSubtasks(prev => prev.map(s => {
-        if (s.id === subTaskId) {
-            return {
-                ...s,
-                assigneeId: userId === 0 ? null : userId,
-                assigneeName: selectedUser ? (selectedUser.fullName || selectedUser.name) : null,
-                assigneeAvatar: selectedUser ? (selectedUser.avatarUrl || selectedUser.avatar) : null
-            };
-        }
-        return s;
-    }));
-
-    try {
-        const payloadValue = (userId === 0 || userId === null) ? null : userId;
-        await updateSubtask(companyId, workspaceId, projectId, taskId, subTaskId, {
-            assigneeId: payloadValue
-        });
-        showToast("Subtask assignee updated", "success");
-    } catch (error) {
-        showToast("Failed to update assignee", "error");
-        setSubtasks(oldSubtasks);
-    }
-  };
-
-  // Edit Content (Title)
-  const handleEditSubtask = async (subTaskId: number, data: { title: string }) => {
-    if (!taskId) return;
-
-    const oldSubtasks = [...subtasks];
-    setSubtasks(prev => prev.map(s => s.id === subTaskId ? { ...s, ...data } : s));
-
-    try {
-        await updateSubtask(companyId, workspaceId, projectId, taskId, subTaskId, data);
-        showToast("Subtask updated", "success");
-    } catch (error) {
-        console.error("Failed to update subtask", error);
-        showToast("Failed to update subtask", "error");
-        setSubtasks(oldSubtasks);
-    }
-  };
-
-  // Delete
-  const handleDeleteSubtask = async (subTaskId: number) => {
-    if (!taskId || !confirm("Delete this subtask?")) return;
-    
-    const oldSubtasks = [...subtasks];
-    setSubtasks(prev => prev.filter(s => s.id !== subTaskId));
-
-    try {
-      await deleteSubtask(companyId, workspaceId, projectId, taskId, subTaskId);
-      showToast("Subtask deleted", "success");
-    } catch (error) {
-      showToast("Failed to delete subtask", "error");
-      setSubtasks(oldSubtasks);
-    }
-  };
-
-
-  // --- 3. MAIN TASK UPDATE HANDLER ---
+  // Main Task Update
   const handleUpdate = async (field: keyof UpdateTaskData, value: any) => {
     if (!task || !taskId) return;
     setFormData(prev => ({ ...prev, [field]: value }));
     
+    // Optimistic UI for Assignee
     if (field === 'assigneeId') {
         const user = members.find(m => m.id === value || m.userId === value);
         if (user) setTask(prev => prev ? ({ ...prev, assigneeName: user.name || user.fullName, assigneeAvatar: user.avatar || user.avatarUrl }) : null);
@@ -278,10 +182,67 @@ export default function TaskDetailModalFloating({
     }
   };
 
-  const toInputDate = (iso?: string | null) => iso ? new Date(iso).toISOString().slice(0, 16) : "";
-  const getInitials = (name: string) => name ? name.split(" ").map((n) => n[0]).join("").toUpperCase().substring(0, 2) : "UN";
+  // Description Handlers
+  const handleSaveDescription = async () => {
+      if(!taskId) return;
+      await handleUpdate('description', formData.description);
+      setIsEditingDescription(false);
+  };
 
-  // --- 4. DRAG & RESIZE HANDLERS ---
+  const handleCancelDescription = () => {
+      setFormData(prev => ({ ...prev, description: task?.description || "" }));
+      setIsEditingDescription(false);
+  };
+
+  // Subtask Handlers
+  const handleCreateSubtask = async () => {
+    if (!newSubtaskTitle.trim() || !taskId) return;
+    try {
+      await createSubtask(companyId, workspaceId, projectId, taskId, { title: newSubtaskTitle });
+      setNewSubtaskTitle("");
+      setIsAddingSubtask(false);
+      fetchSubtasks(taskId);
+      showToast("Subtask created", "success");
+    } catch (error) { showToast("Failed to create subtask", "error"); }
+  };
+
+  const handleToggleSubtask = async (subtask: Subtask) => {
+    if (!taskId) return;
+    const oldStatus = subtask.status;
+    const newStatus = oldStatus === 'DONE' ? 'TO_DO' : 'DONE';
+    setSubtasks(prev => prev.map(s => s.id === subtask.id ? { ...s, status: newStatus } : s));
+    try { await updateSubtask(companyId, workspaceId, projectId, taskId, subtask.id, { status: newStatus }); } 
+    catch (error) { setSubtasks(prev => prev.map(s => s.id === subtask.id ? { ...s, status: oldStatus } : s)); }
+  };
+
+  const handleSubtaskAssigneeChange = async (subTaskId: number, userId: number | null) => {
+    if (!taskId) return;
+    const selectedUser = members.find(m => (m.userId || m.id) === userId);
+    const oldSubtasks = [...subtasks];
+    setSubtasks(prev => prev.map(s => s.id === subTaskId ? { ...s, assigneeId: userId === 0 ? null : userId, assigneeName: selectedUser?.name, assigneeAvatar: selectedUser?.avatar } : s));
+    try { await updateSubtask(companyId, workspaceId, projectId, taskId, subTaskId, { assigneeId: userId === 0 ? null : userId }); } 
+    catch (error) { setSubtasks(oldSubtasks); }
+  };
+
+  const handleEditSubtask = async (subTaskId: number, data: { title: string }) => {
+    if (!taskId) return;
+    const oldSubtasks = [...subtasks];
+    setSubtasks(prev => prev.map(s => s.id === subTaskId ? { ...s, ...data } : s));
+    try { await updateSubtask(companyId, workspaceId, projectId, taskId, subTaskId, data); } 
+    catch (error) { setSubtasks(oldSubtasks); }
+  };
+
+  const handleDeleteSubtask = async (subTaskId: number) => {
+    if (!taskId || !confirm("Delete this subtask?")) return;
+    const oldSubtasks = [...subtasks];
+    setSubtasks(prev => prev.filter(s => s.id !== subTaskId));
+    try { await deleteSubtask(companyId, workspaceId, projectId, taskId, subTaskId); } 
+    catch (error) { setSubtasks(oldSubtasks); }
+  };
+
+  const toInputDate = (iso?: string | null) => iso ? new Date(iso).toISOString().slice(0, 16) : "";
+
+  // --- DRAG & RESIZE HANDLERS ---
   const handleMouseDown = (e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest(".resize-handle")) return;
     if (!(e.target as HTMLElement).closest(".modal-header")) return;
@@ -292,22 +253,13 @@ export default function TaskDetailModalFloating({
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (isDragging) setPosition({ x: e.clientX - dragOffset.x, y: e.clientY - dragOffset.y });
-      if (isResizing) {
-        setSize({ 
-           width: Math.max(800, e.clientX - position.x), 
-           height: Math.max(500, e.clientY - position.y) 
-        });
-      }
+      if (isResizing) setSize({ width: Math.max(800, e.clientX - position.x), height: Math.max(500, e.clientY - position.y) });
     };
     const handleMouseUp = () => { setIsDragging(false); setIsResizing(false); };
-
     if (isDragging || isResizing) {
       window.addEventListener("mousemove", handleMouseMove);
       window.addEventListener("mouseup", handleMouseUp);
-      return () => {
-        window.removeEventListener("mousemove", handleMouseMove);
-        window.removeEventListener("mouseup", handleMouseUp);
-      };
+      return () => { window.removeEventListener("mousemove", handleMouseMove); window.removeEventListener("mouseup", handleMouseUp); };
     }
   }, [isDragging, isResizing, position, dragOffset]);
 
@@ -322,17 +274,10 @@ export default function TaskDetailModalFloating({
         className="fixed bg-white border border-slate-200 rounded-xl shadow-2xl z-50 overflow-hidden flex flex-col transition-shadow"
         style={{ left: `${position.x}px`, top: `${position.y}px`, width: `${size.width}px`, height: `${size.height}px` }}
       >
-        {/* --- HEADER (DRAGGABLE) --- */}
-        <div
-          className="modal-header bg-white border-b border-slate-100 px-6 py-3 flex items-center justify-between cursor-grab active:cursor-grabbing select-none shrink-0"
-          onMouseDown={handleMouseDown}
-        >
+        {/* --- HEADER --- */}
+        <div className="modal-header bg-white border-b border-slate-100 px-6 py-3 flex items-center justify-between cursor-grab active:cursor-grabbing select-none shrink-0" onMouseDown={handleMouseDown}>
           <div className="flex items-center gap-2 text-xs text-slate-500">
             <CheckSquare className="w-3.5 h-3.5 text-purple-600" />
-            <span className="hover:underline cursor-pointer">Task</span>
-            <span>/</span>
-            
-            {/* ✅ TOOLTIP CHO TASK NAME TRONG HEADER */}
             <TooltipProvider>
               <Tooltip delayDuration={200}>
                 <TooltipTrigger asChild>
@@ -346,32 +291,16 @@ export default function TaskDetailModalFloating({
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
-
             {isSaving && <span className="ml-2 flex items-center gap-1 text-blue-600"><Loader2 className="w-3 h-3 animate-spin"/> Saving...</span>}
           </div>
-
           <div className="flex items-center gap-1" onMouseDown={(e) => e.stopPropagation()}>
             <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:bg-slate-100 rounded-md"><Lock className="w-4 h-4" /></Button>
             <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:bg-slate-100 rounded-md"><Eye className="w-4 h-4" /></Button>
             <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:bg-slate-100 rounded-md"><Share2 className="w-4 h-4" /></Button>
             <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:bg-slate-100 rounded-md"><MoreHorizontal className="w-4 h-4" /></Button>
             <div className="w-px h-4 bg-slate-200 mx-1"></div>
-            {onSwitchToFloating && (
-               <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:bg-slate-100 rounded-md" onClick={onSwitchToFloating}>
-                  <Maximize2 className="w-3.5 h-3.5" />
-               </Button>
-            )}
-            <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-8 w-8 text-slate-500 hover:bg-red-50 hover:text-red-600 rounded-md" 
-                onClick={(e) => {
-                    e.stopPropagation();
-                    onClose();
-                }}
-            >
-              <X className="w-4 h-4" />
-            </Button>
+            {onSwitchToFloating && (<Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:bg-slate-100 rounded-md" onClick={onSwitchToFloating}><Maximize2 className="w-3.5 h-3.5" /></Button>)}
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:bg-red-50 hover:text-red-600 rounded-md" onClick={(e) => { e.stopPropagation(); onClose(); }}><X className="w-4 h-4" /></Button>
           </div>
         </div>
 
@@ -399,19 +328,52 @@ export default function TaskDetailModalFloating({
                          <Button variant="outline" className="h-8 bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100" onClick={() => setIsAddingSubtask(true)}><Plus className="w-3 h-3 mr-1.5"/> Add child</Button>
                       </div>
 
-                      {/* Description */}
+                      {/* ✅ DESCRIPTION SECTION (UPDATED) */}
                       <div className="space-y-2 group">
                          <h3 className="text-sm font-bold text-slate-900 group-focus-within:text-blue-600 transition-colors">Description</h3>
-                         <Textarea 
-                            placeholder="Add a description..." 
-                            className="min-h-[120px] resize-none border-transparent hover:border-slate-200 bg-transparent focus:bg-white focus:border-blue-500 transition-all text-sm px-2 py-1 leading-relaxed"
-                            value={formData.description || ''}
-                            onChange={e => setFormData({...formData, description: e.target.value})}
-                            onBlur={e => handleUpdate('description', e.target.value)}
-                         />
+                         
+                         {isEditingDescription ? (
+                             // ✏️ EDIT MODE
+                             <div className="border border-blue-500 rounded-md bg-white ring-1 ring-blue-100 transition-all">
+                                 {/* Toolbar */}
+                                 <div className="flex items-center gap-1 px-2 py-1.5 border-b border-slate-100 bg-slate-50/50 rounded-t-md">
+                                     <Button variant="ghost" size="icon" className="h-6 w-6 text-slate-500 hover:bg-slate-200 rounded"><Bold className="w-3.5 h-3.5"/></Button>
+                                     <Button variant="ghost" size="icon" className="h-6 w-6 text-slate-500 hover:bg-slate-200 rounded"><Italic className="w-3.5 h-3.5"/></Button>
+                                     <div className="w-px h-3 bg-slate-300 mx-1"></div>
+                                     <Button variant="ghost" size="icon" className="h-6 w-6 text-slate-500 hover:bg-slate-200 rounded"><List className="w-3.5 h-3.5"/></Button>
+                                     <Button variant="ghost" size="icon" className="h-6 w-6 text-slate-500 hover:bg-slate-200 rounded"><ListOrdered className="w-3.5 h-3.5"/></Button>
+                                     <Button variant="ghost" size="icon" className="h-6 w-6 text-slate-500 hover:bg-slate-200 rounded"><Code className="w-3.5 h-3.5"/></Button>
+                                 </div>
+
+                                 <Textarea 
+                                    placeholder="Add a description..." 
+                                    className="min-h-[150px] resize-none border-none bg-transparent focus:ring-0 text-sm px-3 py-2 leading-relaxed"
+                                    value={formData.description || ''}
+                                    onChange={e => setFormData({...formData, description: e.target.value})}
+                                    autoFocus
+                                 />
+
+                                 <div className="flex gap-2 justify-end p-2 border-t border-slate-100">
+                                     <Button size="sm" className="h-7 text-xs bg-blue-600 hover:bg-blue-700 text-white" onClick={handleSaveDescription}>Save</Button>
+                                     <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={handleCancelDescription}>Cancel</Button>
+                                 </div>
+                             </div>
+                         ) : (
+                             // 👀 VIEW MODE
+                             <div 
+                                className="min-h-[60px] text-sm text-slate-700 leading-relaxed px-2 py-2 -ml-2 rounded hover:bg-slate-100 cursor-text border border-transparent hover:border-slate-200 transition-all"
+                                onClick={() => setIsEditingDescription(true)}
+                             >
+                                {formData.description ? (
+                                    <div className="whitespace-pre-wrap">{formData.description}</div>
+                                ) : (
+                                    <span className="text-slate-400 italic">Add a description...</span>
+                                )}
+                             </div>
+                         )}
                       </div>
 
-                      {/* ✅ SUBTASKS SECTION (Updated with all handlers) */}
+                      {/* SUBTASKS SECTION */}
                       <TaskSubtasks 
                           subtasks={subtasks} 
                           members={members}
@@ -438,13 +400,13 @@ export default function TaskDetailModalFloating({
                           </div>
                       )}
 
-                      {/* ✅ COMMENT SECTION */}
+                      {/* COMMENT SECTION */}
                       {taskId && <TaskComment taskId={taskId} />}
 
                    </div>
                 </div>
 
-                {/* --- RIGHT PANEL (Details) --- */}
+                {/* --- RIGHT PANEL --- */}
                 <div className="w-[340px] border-l border-slate-200 flex flex-col overflow-y-auto custom-scrollbar bg-slate-50/30">
                    <div className="p-6 space-y-6">
                       {/* Status Selector */}
@@ -481,11 +443,7 @@ export default function TaskDetailModalFloating({
                                      </Avatar>
                                      <span className="text-blue-600 hover:underline font-medium truncate max-w-[150px]">{task.assigneeName || "Unassigned"}</span>
                                   </div>
-                                  <select 
-                                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                     value={formData.assigneeId || 0}
-                                     onChange={e => handleUpdate('assigneeId', Number(e.target.value))}
-                                  >
+                                  <select className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" value={formData.assigneeId || 0} onChange={e => handleUpdate('assigneeId', Number(e.target.value))}>
                                      <option value={0}>Unassigned</option>
                                      {members.map(m => (
                                         <option key={m.userId || m.id} value={m.userId || m.id}>{m.fullName || m.name}</option>
@@ -511,7 +469,22 @@ export default function TaskDetailModalFloating({
                                   </select>
                                </div>
                             </div>
-                            {/* Dates ... (giữ nguyên) */}
+                            {/* Dates & Points */}
+                            <div className="grid grid-cols-[100px_1fr] items-center gap-2">
+                               <span className="text-slate-500 font-medium">Start Date</span>
+                               <input type="datetime-local" className="bg-transparent border-b border-dashed border-slate-300 text-slate-700 outline-none focus:border-blue-500 text-[11px] w-full" value={toInputDate(formData.startDate)} onChange={e => handleUpdate('startDate', e.target.value)} />
+                            </div>
+                            <div className="grid grid-cols-[100px_1fr] items-center gap-2">
+                               <span className="text-slate-500 font-medium">Due Date</span>
+                               <div className="w-full relative">
+                                  <input type="datetime-local" className="bg-transparent border-b border-dashed border-slate-300 text-slate-700 outline-none focus:border-blue-500 text-[11px] w-full" value={toInputDate(formData.dueDate)} onChange={e => handleUpdate('dueDate', e.target.value)} />
+                                  {task.dueDate && new Date(task.dueDate) < new Date() && <span className="absolute right-0 top-0 text-[9px] text-red-500 font-bold">Overdue</span>}
+                               </div>
+                            </div>
+                            <div className="grid grid-cols-[100px_1fr] items-center gap-2">
+                               <span className="text-slate-500 font-medium">Story Points</span>
+                               <input type="number" min="0" className="bg-transparent border-b border-dashed border-slate-300 text-slate-700 outline-none focus:border-blue-500 text-[11px] w-12 text-center" value={formData.storyPoints || ''} onChange={e => setFormData({...formData, storyPoints: Number(e.target.value)})} onBlur={e => handleUpdate('storyPoints', Number(e.target.value))} />
+                            </div>
                          </div>
                       </div>
                       
