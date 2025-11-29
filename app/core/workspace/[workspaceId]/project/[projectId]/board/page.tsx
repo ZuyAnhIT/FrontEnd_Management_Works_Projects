@@ -38,7 +38,7 @@ import {
   RawStatusColumn,
   moveTaskToStatus,
   BoardFilterParams,
-  reorderProjectStatuses, // ✅ 1. Import Reorder API
+  reorderProjectStatuses,
 } from "@/services/apiBoard";
 import { getProjectMembers, ProjectMember, TaskSummary } from "@/services/apiProject";
 
@@ -79,7 +79,6 @@ export default function BoardPage() {
     useSensor(KeyboardSensor)
   );
 
-  // ... (normalizeData không đổi) ...
   const normalizeData = (boardData: RawBoardColumn[], statusList: RawStatusColumn[]): BoardColumnResponse[] => {
     const columnMap = new Map<number, BoardColumnResponse>();
     if (Array.isArray(statusList)) {
@@ -144,30 +143,26 @@ export default function BoardPage() {
     setActiveColumn(null); setActiveTask(null);
     if (!over) return;
 
-    // 🅰️ COLUMN DRAG (With API Call)
     if (active.data.current?.type === "Column") {
       if (active.id === over.id) return;
 
       const oldIndex = columns.findIndex((col) => col.id.toString() === active.id);
       const newIndex = columns.findIndex((col) => col.id.toString() === over.id);
 
-      // 1. Optimistic Update
       const newColumns = arrayMove(columns, oldIndex, newIndex);
       setColumns(newColumns);
 
-      // 2. Call Reorder API
       try {
         const orderedStatusIds = newColumns.map(col => Number(col.id));
         await reorderProjectStatuses(projectId, orderedStatusIds);
       } catch (error) {
         console.error("Reorder column failed:", error);
         showToast("Column reorder failed. Reverting...", "error");
-        setColumns(columns); // 3. Rollback on error
+        setColumns(columns);
       }
       return;
     }
 
-    // 🅱️ TASK DRAG (Logic preserved)
     if (active.data.current?.type === "Task") {
       const activeId = active.id; const overId = over.id;
       const sourceCol = columns.find((col) => col.tasks.some((t) => t.id.toString() === activeId));
@@ -226,23 +221,29 @@ export default function BoardPage() {
             <div className="h-full flex px-6 pt-6 pb-4 gap-4 items-start min-w-max">
               <SortableContext items={columnIds} strategy={horizontalListSortingStrategy}>
                 {columns.map((col, index) => (
-                  <BoardColumn key={col.id} column={col} index={index} projectId={projectId} onDeleteColumn={handleColumnDeleted} />
+                  <BoardColumn 
+                     key={col.id} 
+                     column={col} 
+                     index={index} 
+                     projectId={projectId} 
+                     members={members} // ✅ 1. TRUYỀN MEMBERS VÀO ĐÂY
+                     onDeleteColumn={handleColumnDeleted} 
+                  />
                 ))}
               </SortableContext>
               <CreateColumnButton projectId={projectId} onSuccess={handleColumnCreated} />
             </div>
             
-            {/* 👇 SỬA LẠI ĐOẠN NÀY ĐỂ MƯỢT HƠN */}
             <DragOverlay dropAnimation={dropAnimation}>
               {activeColumn && (
                  <div className="h-full cursor-grabbing opacity-90 scale-[1.02] shadow-2xl rounded-xl bg-transparent">
                    <div className="h-full bg-[#F4F5F7] rounded-xl border-2 border-blue-500">
-                     <BoardColumn column={activeColumn} index={0} projectId={projectId} />
+                     <BoardColumn column={activeColumn} index={0} projectId={projectId} members={members} /> {/* ✅ Truyền cả vào đây cho chắc */}
                    </div>
                  </div>
               )}
               {activeTask && (
-                 <BoardTaskCard task={activeTask} index={0} />
+                 <BoardTaskCard task={activeTask} index={0} users={members} /> // ✅ 2. TRUYỀN USERS VÀO ĐÂY ĐỂ HIỆN AVATAR KHI KÉO
               )}
             </DragOverlay>
           </DndContext>

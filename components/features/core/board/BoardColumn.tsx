@@ -14,14 +14,16 @@ import { ColumnContextMenu } from "./ColumnContextMenu";
 import { useToast } from "@/components/ui/ToastProvider";
 import QuickTaskCreate from "@/components/features/core/task/QuickTaskCreate";
 
+// Updated Interface to be more specific if possible, otherwise any[] is temporary
 interface BoardColumnProps {
   column: BoardColumnResponse;
   index: number;
   projectId: number;
+  members: any[]; // Recommend changing 'any[]' to your User/ProjectMember type
   onDeleteColumn?: (columnId: string) => void;
 }
 
-export default function BoardColumn({ column, projectId, onDeleteColumn }: BoardColumnProps) {
+export default function BoardColumn({ column, projectId, onDeleteColumn, members }: BoardColumnProps) {
   const { showToast } = useToast();
   const router = useRouter();
   const params = useParams();
@@ -34,7 +36,7 @@ export default function BoardColumn({ column, projectId, onDeleteColumn }: Board
   const [title, setTitle] = useState(column.name);
   const [isSaving, setIsSaving] = useState(false);
   
-  // ✅ State cho tạo task nhanh
+  // State for quick task creation
   const [isCreating, setIsCreating] = useState(false);
 
   // Guard Clause
@@ -61,7 +63,7 @@ export default function BoardColumn({ column, projectId, onDeleteColumn }: Board
   } = useSortable({
     id: columnId,
     data: { type: "Column", column },
-    disabled: isEditing || isCreating, // ✅ Tắt drag khi đang sửa tên hoặc tạo task
+    disabled: isEditing || isCreating, 
   });
 
   const columnStyle = {
@@ -182,11 +184,12 @@ export default function BoardColumn({ column, projectId, onDeleteColumn }: Board
                 key={task.id || `task-${idx}`}
                 task={task}
                 index={idx}
+                users={members} // ✅ UPDATED: Passing members as users prop
               />
             ))}
           </SortableContext>
 
-          {/* ✅ KHU VỰC TẠO TASK NHANH */}
+          {/* QUICK CREATE AREA */}
           {isCreating ? (
              <div className="mt-1 px-2 pb-2">
                 <QuickTaskCreate
@@ -195,7 +198,7 @@ export default function BoardColumn({ column, projectId, onDeleteColumn }: Board
                    workspaceId={workspaceId}
                    projectId={projectId}
                    statusId={Number(rawId)}
-                   onCancel={() => setIsCreating(false)} // ✅ Đã truyền đúng prop
+                   onCancel={() => setIsCreating(false)} 
                    onSuccess={() => {
                       router.refresh(); 
                    }}
