@@ -38,7 +38,7 @@ export interface UpdateSubtaskPayload {
 }
 
 // =================================================================
-// 🧩 Build URL
+// 🧩 Build URL Helper (SỬA LẠI URL DÀI CHUẨN BACKEND)
 // =================================================================
 
 const buildUrl = (
@@ -48,7 +48,9 @@ const buildUrl = (
   taskId: number,
   subTaskId?: number
 ) => {
-  const base = `/api/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/tasks/${taskId}/subtasks`;
+  // ⚠️ Lưu ý: Nếu apiClient của bạn đã có baseURL là '.../api' thì bỏ chữ '/api' ở đầu dòng dưới đi.
+  // Nếu vẫn lỗi 404, hãy thử thêm '/api' vào đầu: `/api/companies/...`
+  const base = `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/tasks/${taskId}/subtasks`;
   return subTaskId ? `${base}/${subTaskId}` : base;
 };
 
