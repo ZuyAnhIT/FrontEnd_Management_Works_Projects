@@ -11,18 +11,19 @@ import { useAuth } from "@/context/AuthContext";
 
 // API Services
 import {
-    getProjectMembers,
-    getProjectTasks,
-    getTasksGrouped,
-    ProjectMember,
-    TaskResponse,
-    TasksGroupedResponse,
-    ProjectTaskFilterParams
+  getProjectMembers,
+  getProjectTasks,
+  getTasksGrouped,
+  ProjectMember,
+  TaskResponse,
+  TasksGroupedResponse,
+  ProjectTaskFilterParams
 } from "@/services/apiProject";
 
 // Feature Components
 import TaskRow from "@/components/features/core/list/task-row";
-import TaskDetailWrapper from "@/components/features/core/sprint/task-detail-wrapper";
+// ✅ THAY ĐỔI: Import trực tiếp Panel thay vì Wrapper
+import TaskDetailPanel from "@/components/features/core/task/TaskDetailPanel";
 import CreateTaskModal from "@/components/features/core/task/CreateTaskModal";
 import ListHeader from "@/components/features/core/list/ListHeader";
 
@@ -45,12 +46,12 @@ export default function ProjectListPage() {
   // 3. State UI & Filters
   const [groupBy, setGroupBy] = useState<string>("none");
   const [filters, setFilters] = useState<ProjectTaskFilterParams>({
-      search: "",
-      page: 0,
-      size: 50,
-      assigneeId: undefined,
-      priority: undefined,
-      taskType: undefined
+    search: "",
+    page: 0,
+    size: 50,
+    assigneeId: undefined,
+    priority: undefined,
+    taskType: undefined
   });
 
   // Modal State
@@ -230,23 +231,23 @@ export default function ProjectListPage() {
          </div>
       </div>
 
-      {/* 3. DETAIL SLIDE OVER (FIXED) */}
+      {/* 3. DETAIL SLIDE OVER (FIXED) - ✅ DÙNG TRỰC TIẾP TASK DETAIL PANEL */}
       {isDetailOpen && selectedTask && (
-        <div className="fixed inset-0 z-[100] flex justify-end">
-            {/* Backdrop */}
-            <div 
-                className="absolute inset-0 bg-black/20 backdrop-blur-sm animate-in fade-in duration-200" 
-                onClick={() => setIsDetailOpen(false)}
-            />
-            {/* Panel */}
-            <div className="relative h-full w-full md:w-[600px] lg:w-[900px] shadow-2xl border-l border-slate-200 bg-white animate-in slide-in-from-right duration-300">
-                <TaskDetailWrapper
-                    task={selectedTask}
-                    isOpen={isDetailOpen}
-                    onClose={() => { setIsDetailOpen(false); setSelectedTask(null); }}
-                />
-            </div>
-        </div>
+        // Không cần bọc thêm div fixed vì TaskDetailPanel đã có fixed inset-0
+        <TaskDetailPanel
+            taskId={selectedTask.id}
+            onClose={() => { setIsDetailOpen(false); setSelectedTask(null); }}
+            onUpdate={handleRefresh}
+            // Context
+            companyId={companyId!}
+            workspaceId={workspaceId}
+            projectId={projectId}
+            // Data Lists (Truyền members đã fetch, các list khác tạm để rỗng hoặc cần fetch thêm nếu muốn hiển thị dropdown đầy đủ)
+            members={members}
+            sprints={[]} 
+            epics={[]}
+            statuses={[]}
+        />
       )}
 
       {/* 4. CREATE MODAL */}
