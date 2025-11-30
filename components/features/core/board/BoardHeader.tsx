@@ -77,7 +77,7 @@ export default function BoardHeader({
   const hasActiveFilters = !!filters.keyword || !!filters.assigneeId || !!filters.priority || !!filters.taskType;
 
   return (
-    <div className="h-16 px-6 border-b border-slate-200 bg-white flex items-center justify-between shrink-0 shadow-sm z-20 relative">
+    <div className="h-16 px-6 border-b border-slate-200 bg-white flex items-center justify-between shrink-0 shadow-sm  relative ">
         
         {/* --- LEFT: TITLE & STATS --- */}
         <div className="flex items-center gap-4">
