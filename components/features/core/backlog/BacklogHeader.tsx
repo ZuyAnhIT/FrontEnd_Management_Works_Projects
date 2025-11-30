@@ -75,7 +75,7 @@ export default function BacklogHeader({
   const hasActiveFilters = !!filters.keyword || !!filters.assigneeId || !!filters.priority || !!filters.taskType;
 
   return (
-    <div className="h-16 px-6 bg-white border-b border-slate-200 flex items-center justify-between shrink-0 sticky top-0 z-20 shadow-sm">
+    <div className="h-16 px-6 bg-white border-b border-slate-200 flex items-center justify-between shrink-0 sticky top-0  shadow-sm ">
        
         {/* --- LEFT: TITLE & STATS --- */}
         <div className="flex items-center gap-3">
