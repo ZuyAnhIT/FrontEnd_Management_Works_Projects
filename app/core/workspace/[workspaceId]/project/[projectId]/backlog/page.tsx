@@ -420,14 +420,18 @@ export default function BacklogPage() {
 
           {/* Panels */}
           {selectedTaskId && (
-            <TaskDetailPanel
-              taskId={selectedTaskId}
-              onClose={() => setSelectedTaskId(null)}
-              onUpdate={handleRefresh}
-              members={members}
-              sprints={data?.activeSprints}
-            />
-          )}
+    <TaskDetailPanel
+        taskId={selectedTaskId}
+        onClose={() => setSelectedTaskId(null)}
+        onUpdate={handleRefresh}
+        members={members}
+        sprints={data?.activeSprints}
+        companyId={companyId}       // 🔥 BẮT BUỘC
+        workspaceId={workspaceId}   // 🔥 BẮT BUỘC
+        projectId={projectId}       // 🔥 BẮT BUỘC
+    />
+)}
+
         </div>
 
         {/* Drag Overlay */}

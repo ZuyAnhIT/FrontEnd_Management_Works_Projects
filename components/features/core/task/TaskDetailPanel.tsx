@@ -11,9 +11,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { getTaskDetails, updateTask, TaskDetail, UpdateTaskData } from "@/services/apiTask";
+import {
+    getSubtaskList,
+    createSubtask,
+    updateSubtask,
+    deleteSubtask,
+    Subtask
+} from "@/services/apiSubTask";
 import { useToast } from "@/components/ui/ToastProvider";
 // Components Con
 import TaskComment from "@/components/features/core/task/TaskComment";
+import TaskSubtasks from "@/components/features/core/task/TaskSubtasks";
 
 // --- TYPES LOCAL ---
 // Interface này dùng để quản lý state form, nó mapping từ API data
@@ -56,6 +64,9 @@ interface Props {
   sprints?: any[]; 
   epics?: any[]; 
   statuses?: any[]; // Thêm danh sách status từ cha truyền vào
+   companyId: number;        // 🔥 BẮT BUỘC
+  workspaceId: number;      // 🔥 BẮT BUỘC
+  projectId: number;        // 🔥 BẮT BUỘC
 }
 
 export default function TaskDetailPanel({ 
@@ -65,7 +76,10 @@ export default function TaskDetailPanel({
   members = [], 
   sprints = [], 
   epics = [],
-  statuses = [] // Danh sách Status (To Do, In Progress...)
+  statuses = [], // Danh sách Status (To Do, In Progress...),
+  companyId,
+  workspaceId,
+  projectId
 }: Props) {
   const { showToast } = useToast();
   const [task, setTask] = useState<TaskDetail | null>(null);
@@ -73,6 +87,11 @@ export default function TaskDetailPanel({
   const [loading, setLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isEditingDescription, setIsEditingDescription] = useState(false);
+
+  // --- SUBTASK STATE ---
+      const [subtasks, setSubtasks] = useState<Subtask[]>([]);
+      const [isAddingSubtask, setIsAddingSubtask] = useState(false);
+      const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
 
   // Load Data
   useEffect(() => {
@@ -102,8 +121,20 @@ export default function TaskDetailPanel({
             showToast("Không thể tải thông tin công việc", "error");
         })
         .finally(() => setLoading(false));
+        fetchSubtasks(taskId);
     }
   }, [taskId]);
+
+  const fetchSubtasks = async (id: number) => {
+          try {
+              const data = await getSubtaskList(companyId, workspaceId, projectId, id);
+              setSubtasks(Array.isArray(data) ? data : []);
+          } catch (error) {
+              console.error(error);
+              showToast("Không thể tải thông tin subtask", "error");
+          }
+      };
+  
 
   // Description Handlers
     const handleSaveDescription = async () => {
@@ -116,6 +147,82 @@ export default function TaskDetailPanel({
         setFormData(prev => ({ ...prev, description: task?.description || "" }));
         setIsEditingDescription(false);
     };
+    // Subtask Handlers
+        const handleCreateSubtask = async () => {
+            if (!newSubtaskTitle.trim() || !taskId) return;
+            try {
+                await createSubtask(companyId, workspaceId, projectId, taskId, { title: newSubtaskTitle });
+                setNewSubtaskTitle("");
+                setIsAddingSubtask(false);
+                fetchSubtasks(taskId);
+                showToast("Subtask created", "success");
+            } catch (error) { showToast("Failed to create subtask", "error"); }
+        };
+    
+        const handleToggleSubtask = async (subtask: Subtask) => {
+            if (!taskId) return;
+            const oldStatus = subtask.status;
+            const newStatus = oldStatus === 'DONE' ? 'TO_DO' : 'DONE';
+            setSubtasks(prev => prev.map(s => s.id === subtask.id ? { ...s, status: newStatus } : s));
+            try { await updateSubtask(companyId, workspaceId, projectId, taskId, subtask.id, { status: newStatus }); }
+            catch (error) { setSubtasks(prev => prev.map(s => s.id === subtask.id ? { ...s, status: oldStatus } : s)); }
+        };
+    
+        // Update Assignee (Subtask)
+        const handleSubtaskAssigneeChange = async (subTaskId: number, userId: number | null) => {
+            if (!taskId) return;
+    
+            const selectedUser = members.find(m => (m.userId || m.id) === userId);
+            const oldSubtasks = [...subtasks];
+    
+            // 1. Optimistic Update (Cập nhật giao diện ngay)
+            setSubtasks(prev => prev.map(s => {
+                if (s.id === subTaskId) {
+                    return {
+                        ...s,
+                        assigneeId: userId === 0 ? null : userId,
+                        assigneeName: selectedUser ? (selectedUser.fullName || selectedUser.name) : null,
+                        assigneeAvatar: selectedUser ? (selectedUser.avatarUrl || selectedUser.avatar) : null
+                    };
+                }
+                return s;
+            }));
+    
+            try {
+                const payloadValue = (userId === 0 || userId === null) ? null : userId;
+    
+                // 2. Gọi API
+                await updateSubtask(companyId, workspaceId, projectId, taskId, subTaskId, {
+                    assigneeId: payloadValue
+                });
+    
+                showToast("Subtask assignee updated", "success");
+    
+                // ✅ 3. THÊM DÒNG NÀY: Reload lại danh sách subtask từ server
+                fetchSubtasks(taskId);
+    
+            } catch (error) {
+                showToast("Failed to update assignee", "error");
+                setSubtasks(oldSubtasks); // Revert nếu lỗi
+            }
+        };
+    
+        const handleEditSubtask = async (subTaskId: number, data: { title: string }) => {
+            if (!taskId) return;
+            const oldSubtasks = [...subtasks];
+            setSubtasks(prev => prev.map(s => s.id === subTaskId ? { ...s, ...data } : s));
+            try { await updateSubtask(companyId, workspaceId, projectId, taskId, subTaskId, data); }
+            catch (error) { setSubtasks(oldSubtasks); }
+        };
+    
+        const handleDeleteSubtask = async (subTaskId: number) => {
+            if (!taskId || !confirm("Delete this subtask?")) return;
+            const oldSubtasks = [...subtasks];
+            setSubtasks(prev => prev.filter(s => s.id !== subTaskId));
+            try { await deleteSubtask(companyId, workspaceId, projectId, taskId, subTaskId); }
+            catch (error) { setSubtasks(oldSubtasks); }
+        };
+    
 
   // Handle Updates
   const handleUpdate = async (field: keyof UpdateTaskData, value: any) => {
@@ -216,7 +323,7 @@ export default function TaskDetailPanel({
           {loading ? (
              <div className="h-full flex items-center justify-center"><Loader2 className="w-10 h-10 text-blue-500 animate-spin"/></div>
           ) : task ? (
-            <div className="flex flex-col md:flex-row min-h-full">
+            <div className="flex flex-col  min-h-full">
                 
                 {/* --- LEFT COLUMN: CONTENT (65%) --- */}
                 <div className="flex-1 p-8 border-r border-slate-100">
@@ -273,13 +380,40 @@ export default function TaskDetailPanel({
                                             </div>
                                         )}
                                     </div>
+                                    {/* SUBTASKS SECTION */}
+                                                                        <TaskSubtasks
+                                                                            subtasks={subtasks}
+                                                                            members={members}
+                                                                            onToggleStatus={handleToggleSubtask}
+                                                                            onDelete={(id) => handleDeleteSubtask(Number(id))}
+                                                                            onAddSubtask={() => setIsAddingSubtask(true)}
+                                                                            onAssigneeChange={handleSubtaskAssigneeChange}
+                                                                            onEditContent={handleEditSubtask}
+                                                                        />
+                                    
+                                                                        {/* Create Subtask Input Form */}
+                                                                        {isAddingSubtask && (
+                                                                            <div className="mt-2 flex items-center gap-2 animate-in slide-in-from-top-2 duration-200 px-1">
+                                                                                <Input
+                                                                                    placeholder="What needs to be done?"
+                                                                                    className="h-9 text-sm"
+                                                                                    autoFocus
+                                                                                    value={newSubtaskTitle}
+                                                                                    onChange={(e) => setNewSubtaskTitle(e.target.value)}
+                                                                                    onKeyDown={(e) => { if (e.key === 'Enter') handleCreateSubtask(); else if (e.key === 'Escape') setIsAddingSubtask(false); }}
+                                                                                />
+                                                                                <Button size="sm" className="h-9 bg-blue-600 hover:bg-blue-700 text-white" onClick={handleCreateSubtask}>Create</Button>
+                                                                                <Button size="sm" variant="ghost" className="h-9" onClick={() => setIsAddingSubtask(false)}>Cancel</Button>
+                                                                            </div>
+                                                                        )}
 
                     {/* COMMENT SECTION */}
                     {taskId && <TaskComment taskId={taskId} />}
                 </div>
 
                 {/* --- RIGHT COLUMN: PROPERTIES (35%) --- */}
-                <div className="w-full md:w-[300px] bg-slate-50/80 p-6 space-y-6 shrink-0">
+                <div className="w-full md:w-full bg-slate-50/80 p-6 space-y-6 shrink-0 mx-auto ">
+
                     
                     {/* Status Dropdown */}
                     <div className="space-y-3">
