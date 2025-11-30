@@ -3,10 +3,17 @@
 import { useEffect, useState } from "react";
 import { 
   X, Loader2, Flag, User, Clock, Layers, 
-  MoreHorizontal, Link as LinkIcon, History, Zap 
+  MoreHorizontal, Link as LinkIcon, History, Zap ,
+  // ✅ Thêm các icons cho Toolbar Description
+    Bold, Italic, List, ListOrdered, Image as ImageIcon, AtSign, Smile, Code
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { getTaskDetails, updateTask, TaskDetail, UpdateTaskData } from "@/services/apiTask";
 import { useToast } from "@/components/ui/ToastProvider";
+// Components Con
+import TaskComment from "@/components/features/core/task/TaskComment";
 
 // --- TYPES LOCAL ---
 // Interface này dùng để quản lý state form, nó mapping từ API data
@@ -65,6 +72,7 @@ export default function TaskDetailPanel({
   const [formData, setFormData] = useState<LocalFormData>({});
   const [loading, setLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isEditingDescription, setIsEditingDescription] = useState(false);
 
   // Load Data
   useEffect(() => {
@@ -96,6 +104,18 @@ export default function TaskDetailPanel({
         .finally(() => setLoading(false));
     }
   }, [taskId]);
+
+  // Description Handlers
+    const handleSaveDescription = async () => {
+        if (!taskId) return;
+        await handleUpdate('description', formData.description);
+        setIsEditingDescription(false);
+    };
+
+    const handleCancelDescription = () => {
+        setFormData(prev => ({ ...prev, description: task?.description || "" }));
+        setIsEditingDescription(false);
+    };
 
   // Handle Updates
   const handleUpdate = async (field: keyof UpdateTaskData, value: any) => {
@@ -209,30 +229,53 @@ export default function TaskDetailPanel({
                         placeholder="Task Title"
                     />
 
-                    {/* Description Textarea */}
-                    <div className="mb-8 group">
-                        <label className="text-xs font-bold text-slate-400 uppercase mb-2 block tracking-wider group-focus-within:text-blue-500 transition-colors">Description</label>
-                        <textarea 
-                            className="w-full min-h-[300px] text-sm text-slate-700 leading-relaxed p-4 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-50 transition-all outline-none resize-y"
-                            value={formData.description || ''}
-                            onChange={e => setFormData({...formData, description: e.target.value})}
-                            onBlur={e => handleUpdate('description', e.target.value)}
-                            placeholder="Add a more detailed description..."
-                        />
-                    </div>
+                    {/* ✅ DESCRIPTION SECTION (UPDATED) */}
+                                    <div className="space-y-2 group">
+                                        <h3 className="text-sm font-bold text-slate-900 group-focus-within:text-blue-600 transition-colors">Description</h3>
 
-                    {/* Activity Placeholder */}
-                    <div className="pt-6 border-t border-slate-100">
-                        <h3 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
-                            <History className="w-4 h-4 text-slate-500"/> Activity
-                        </h3>
-                        <div className="flex gap-3">
-                            <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold shrink-0">ME</div>
-                            <div className="flex-1">
-                                <input placeholder="Leave a comment..." className="w-full px-4 py-2 bg-white border border-slate-200 rounded-md text-sm focus:border-blue-500 outline-none focus:ring-2 focus:ring-blue-50 transition-all" />
-                            </div>
-                        </div>
-                    </div>
+                                        {isEditingDescription ? (
+                                            // ✏️ EDIT MODE
+                                            <div className="border border-blue-500 rounded-md bg-white ring-1 ring-blue-100 transition-all">
+                                                {/* Toolbar */}
+                                                <div className="flex items-center gap-1 px-2 py-1.5 border-b border-slate-100 bg-slate-50/50 rounded-t-md">
+                                                    <Button variant="ghost" size="icon" className="h-6 w-6 text-slate-500 hover:bg-slate-200 rounded"><Bold className="w-3.5 h-3.5" /></Button>
+                                                    <Button variant="ghost" size="icon" className="h-6 w-6 text-slate-500 hover:bg-slate-200 rounded"><Italic className="w-3.5 h-3.5" /></Button>
+                                                    <div className="w-px h-3 bg-slate-300 mx-1"></div>
+                                                    <Button variant="ghost" size="icon" className="h-6 w-6 text-slate-500 hover:bg-slate-200 rounded"><List className="w-3.5 h-3.5" /></Button>
+                                                    <Button variant="ghost" size="icon" className="h-6 w-6 text-slate-500 hover:bg-slate-200 rounded"><ListOrdered className="w-3.5 h-3.5" /></Button>
+                                                    <Button variant="ghost" size="icon" className="h-6 w-6 text-slate-500 hover:bg-slate-200 rounded"><Code className="w-3.5 h-3.5" /></Button>
+                                                </div>
+
+                                                <Textarea
+                                                    placeholder="Add a description..."
+                                                    className="min-h-[150px] resize-none border-none bg-transparent focus:ring-0 text-sm px-3 py-2 leading-relaxed"
+                                                    value={formData.description || ''}
+                                                    onChange={e => setFormData({ ...formData, description: e.target.value })}
+                                                    autoFocus
+                                                />
+
+                                                <div className="flex gap-2 justify-end p-2 border-t border-slate-100">
+                                                    <Button size="sm" className="h-7 text-xs bg-blue-600 hover:bg-blue-700 text-white" onClick={handleSaveDescription}>Save</Button>
+                                                    <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={handleCancelDescription}>Cancel</Button>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            // 👀 VIEW MODE
+                                            <div
+                                                className="min-h-[60px] text-sm text-slate-700 leading-relaxed px-2 py-2 -ml-2 rounded hover:bg-slate-100 cursor-text border border-transparent hover:border-slate-200 transition-all"
+                                                onClick={() => setIsEditingDescription(true)}
+                                            >
+                                                {formData.description ? (
+                                                    <div className="whitespace-pre-wrap">{formData.description}</div>
+                                                ) : (
+                                                    <span className="text-slate-400 italic">Add a description...</span>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+
+                    {/* COMMENT SECTION */}
+                    {taskId && <TaskComment taskId={taskId} />}
                 </div>
 
                 {/* --- RIGHT COLUMN: PROPERTIES (35%) --- */}
