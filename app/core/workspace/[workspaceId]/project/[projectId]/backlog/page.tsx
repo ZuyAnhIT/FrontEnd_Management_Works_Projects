@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/components/ui/ToastProvider";
-import { Loader2, LayoutList, Plus, CalendarPlus } from "lucide-react"; // Thêm icon cho nút tạo
+import { Loader2, LayoutList, Plus, CalendarPlus } from "lucide-react";
 
 // --- DND KIT IMPORTS ---
 import {
@@ -35,12 +35,15 @@ import {
   TaskSummary,
   ProjectMember
 } from "@/services/apiProject";
+
+// ✅ FIX: Import API Status từ apiBoard (theo yêu cầu của bạn)
+import { getProjectStatuses, RawStatusColumn } from "@/services/apiBoard"; 
+
 import { moveTaskToSprint } from "@/services/apiTask";
 
 // Components UI
 import { Button } from "@/components/ui/button";
 import BacklogHeader from "@/components/features/core/backlog/BacklogHeader"; 
-// Lưu ý: Không cần BacklogToolbar nữa vì filter đã lên Header
 import SprintSection from "@/components/features/core/backlog/SprintSection";
 import BacklogTaskItem from "@/components/features/core/backlog/BacklogTaskItem";
 import TaskDetailPanel from "@/components/features/core/task/TaskDetailPanel";
@@ -48,9 +51,8 @@ import TaskDetailPanel from "@/components/features/core/task/TaskDetailPanel";
 // Components Logic
 import QuickTaskCreate from "@/components/features/core/task/QuickTaskCreate";
 import CreateTaskModal from "@/components/features/core/task/CreateTaskModal";
-import QuickSprintButton from "@/components/features/core/sprint/QuickSprintButton"; // Có thể bỏ nếu dùng nút trên Header
 import SprintDetailModal from "@/components/features/core/sprint/SprintDetailModal";
-import CreateSprintModal from "@/components/features/core/sprint/CreateSprintModal"; // ✅ Import Modal tạo Sprint
+import CreateSprintModal from "@/components/features/core/sprint/CreateSprintModal";
 
 // --- Helper Component: Droppable Area ---
 function BacklogDroppableArea({ children, id }: { children: React.ReactNode, id: string }) {
@@ -94,6 +96,9 @@ export default function BacklogPage() {
   const [data, setData] = useState<ProjectBacklogResponse | null>(null);
   const [backlogTasks, setBacklogTasks] = useState<TaskSummary[]>([]);
   const [members, setMembers] = useState<ProjectMember[]>([]);
+  
+  // ✅ STATE: Lưu danh sách status lấy từ API
+  const [statuses, setStatuses] = useState<RawStatusColumn[]>([]);
 
   // --- STATE UI ---
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
@@ -101,7 +106,7 @@ export default function BacklogPage() {
   
   // Modal States
   const [isCreateTaskModalOpen, setIsCreateTaskModalOpen] = useState(false);
-  const [isSprintModalOpen, setIsSprintModalOpen] = useState(false); // ✅ State cho Sprint Modal
+  const [isSprintModalOpen, setIsSprintModalOpen] = useState(false); 
 
   // DND Active State
   const [activeTask, setActiveTask] = useState<TaskSummary | null>(null);
@@ -128,9 +133,27 @@ export default function BacklogPage() {
   // ===============================================================
   useEffect(() => {
     if (!companyId || !workspaceId || !projectId) return;
-    getProjectMembers(companyId, workspaceId, projectId, { size: 100 })
-      .then(res => setMembers(res.content))
-      .catch(() => console.error("Failed to load members"));
+
+    // ✅ Gọi API getProjectMembers và getProjectStatuses song song
+    const fetchMetadata = async () => {
+        try {
+            const [membersRes, statusRes] = await Promise.all([
+                getProjectMembers(companyId, workspaceId, projectId, { size: 100 }),
+                getProjectStatuses(projectId) // API từ apiBoard
+            ]);
+            
+            if (membersRes.content) setMembers(membersRes.content);
+            
+            // Lưu status vào state nếu có dữ liệu
+            if (Array.isArray(statusRes)) {
+                setStatuses(statusRes);
+            }
+        } catch (error) {
+            console.error("Failed to load metadata:", error);
+        }
+    };
+
+    fetchMetadata();
   }, [companyId, workspaceId, projectId]);
 
   const fetchData = useCallback(async (isLoadMore = false) => {
@@ -169,7 +192,7 @@ export default function BacklogPage() {
   }, [filters.page, isAuthLoading]);
 
   // ===============================================================
-  // 2. DRAG & DROP LOGIC
+  // 2. DRAG & DROP LOGIC (Giữ nguyên không đổi)
   // ===============================================================
   const onDragStart = (event: DragStartEvent) => {
     if (event.active.data.current?.type === "Task") {
@@ -293,20 +316,19 @@ export default function BacklogPage() {
   return (
     <div className="flex flex-col h-[calc(100vh-64px)] bg-slate-50 overflow-hidden">
 
-      {/* ✅ 1. HEADER: Tiêu đề & Bộ lọc (Góc phải) */}
+      {/* ✅ 1. HEADER */}
       <BacklogHeader
         totalTasks={data?.backlogTotalElements || 0}
         projectId={projectId}
         filters={filters}
         setFilters={setFilters}
         members={members}
-        onCreateClick={() => setIsCreateTaskModalOpen(true)} // (Prop thừa nhưng cứ để tránh lỗi type nếu chưa sửa Header)
-        onRefresh={handleRefresh} // (Prop thừa)
+        onCreateClick={() => setIsCreateTaskModalOpen(true)} 
+        onRefresh={handleRefresh} 
       />
 
-      {/* ✅ 2. ACTION BAR: 2 Nút tạo nằm dưới Header, căn phải */}
+      {/* ✅ 2. ACTION BAR */}
       <div className="flex items-center justify-end gap-3 px-6 py-3 bg-white border-b border-slate-200 shrink-0">
-          {/* Create Sprint */}
           <Button
              variant="outline"
              size="sm"
@@ -317,7 +339,6 @@ export default function BacklogPage() {
              Create Sprint
           </Button>
 
-          {/* Create Issue */}
           <Button
             size="sm"
             onClick={() => setIsCreateTaskModalOpen(true)}
@@ -328,7 +349,7 @@ export default function BacklogPage() {
           </Button>
       </div>
 
-      {/* ✅ 3. MAIN CONTENT (Scrollable) */}
+      {/* ✅ 3. MAIN CONTENT */}
       <DndContext
         sensors={sensors}
         collisionDetection={closestCorners}
@@ -369,6 +390,16 @@ export default function BacklogPage() {
                     </div>
 
                     <div className="bg-slate-100/50 p-1.5 rounded-xl border border-slate-200/60 min-h-[100px]">
+                      {/* Header Row */}
+                      {backlogTasks.length > 0 && (
+                        <div className="flex items-center px-4 py-2 mb-2 text-xs font-semibold text-slate-500 bg-white border border-slate-200 rounded-lg shadow-sm">
+                            <div className="flex-1 pl-8">Issue</div>
+                            <div className="w-32 text-center">Status</div>
+                            <div className="w-32 pl-2">Assignee</div>
+                            <div className="w-20 text-right pr-2">Priority</div>
+                        </div>
+                      )}
+
                       {/* Droppable Area */}
                       <BacklogDroppableArea id="backlog">
                         <SortableContext items={backlogTaskIds} strategy={verticalListSortingStrategy}>
@@ -392,7 +423,7 @@ export default function BacklogPage() {
                         </SortableContext>
                       </BacklogDroppableArea>
 
-                      {/* Quick Create IN Backlog */}
+                      {/* Quick Create */}
                       <div className="px-1">
                         <QuickTaskCreate
                           companyId={companyId!}
@@ -418,34 +449,33 @@ export default function BacklogPage() {
             </div>
           </div>
 
-          {/* Panels */}
+          {/* ✅ PANELS (Đã truyền statuses từ state xuống) */}
           {selectedTaskId && (
-    <TaskDetailPanel
-        taskId={selectedTaskId}
-        onClose={() => setSelectedTaskId(null)}
-        onUpdate={handleRefresh}
-        members={members}
-        sprints={data?.activeSprints}
-        companyId={companyId}       // 🔥 BẮT BUỘC
-        workspaceId={workspaceId}   // 🔥 BẮT BUỘC
-        projectId={projectId}       // 🔥 BẮT BUỘC
-    />
-)}
+            <TaskDetailPanel
+                taskId={selectedTaskId}
+                onClose={() => setSelectedTaskId(null)}
+                onUpdate={handleRefresh}
+                members={members}
+                sprints={data?.activeSprints}
+                statuses={statuses} // 🔥 TRUYỀN LIST STATUS VÀO ĐÂY
+                companyId={companyId}       
+                workspaceId={workspaceId}   
+                projectId={projectId}       
+            />
+          )}
 
         </div>
 
         {/* Drag Overlay */}
         <DragOverlay dropAnimation={dropAnimation}>
           {activeTask ? (
-            <BacklogTaskItem task={activeTask} index={0} />
+            <BacklogTaskItem task={activeTask} index={0} isOverlay={true} />
           ) : null}
         </DragOverlay>
 
       </DndContext>
 
       {/* --- MODALS --- */}
-      
-      {/* Modal: Sprint Details/Edit */}
       {selectedSprintId && (
         <SprintDetailModal
           projectId={projectId}
@@ -455,7 +485,6 @@ export default function BacklogPage() {
         />
       )}
 
-      {/* Modal: Create Sprint (New) */}
       <CreateSprintModal
          isOpen={isSprintModalOpen}
          onClose={() => setIsSprintModalOpen(false)}
@@ -463,7 +492,6 @@ export default function BacklogPage() {
          projectId={projectId}
       />
 
-      {/* Modal: Create Task */}
       <CreateTaskModal
         isOpen={isCreateTaskModalOpen}
         onClose={() => setIsCreateTaskModalOpen(false)}

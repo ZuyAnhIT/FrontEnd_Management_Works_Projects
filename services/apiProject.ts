@@ -5,7 +5,36 @@ import apiClient from "@/lib/apiClient";
 /* ============================================
    📌 1. INTERFACES CHUNG (Project, Member, Paging)
 ============================================ */
+// Dựa trên Swagger Response
+export interface TaskStatusObj {
+  id: number;
+  name: string;
+  color: string;
+  isCompleted: boolean;
+}
 
+export interface TaskEpicObj {
+  id: number;
+  name: string;
+  color: string;
+}
+
+export interface TaskAssigneeObj {
+  id: number;
+  name: string;
+  avatarUrl: string;
+}
+
+export interface TaskTagObj {
+  id: number;
+  name: string;
+  color: string;
+}
+
+export interface SubtaskSummaryObj {
+  total: number;
+  completed: number;
+}
 export interface PageResponse<T> {
   content: T[];
   pageNumber: number;
@@ -118,18 +147,22 @@ export interface TaskResponse {
   id: number;
   taskCode: string;
   title: string;
-  statusId: number;
-  statusName: string;
-  statusColor: string;
-  priority: TaskPriority;
-  taskType: TaskType;
+  
+  // Các trường Enum vẫn giữ nguyên
+  taskType: TaskType; // STORY, BUG...
+  priority: TaskPriority; // LOW, HIGH...
+   sprintId: number;
   storyPoints: number;
-  dueDate?: string; 
-  assigneeId?: number;
-  assigneeName?: string;
-  assigneeAvatarUrl?: string;
-  reporterName?: string;
-  // ... thêm các trường khác nếu cần
+  startDate: string | null;
+  dueDate: string | null;
+  sortOrder: number;
+
+  // ✅ Object lồng nhau (Nested Objects)
+  status: TaskStatusObj;          // Không bao giờ null theo JSON mẫu
+  epic: TaskEpicObj | null;       // Có thể null
+  assignee: TaskAssigneeObj | null; // Có thể null
+  tags: TaskTagObj[];
+  subtaskSummary: SubtaskSummaryObj;
 }
 
 // --- GROUPED RESPONSE ---
@@ -156,21 +189,21 @@ export interface TaskSummary {
   id: number;
   taskCode: string;
   title: string;
-  taskType: string; 
-  statusId: number;
-  statusName: string;
-  statusColor: string;
+  taskType: string;
   priority: string;
-  sprintId?: number;
-  assigneeId?: number;
-  assigneeName?: string;
-  assigneeAvatarUrl?: string;
-  epicId?: number;
-  epicName?: string;
-  epicColor?: string;
   storyPoints?: number;
   dueDate?: string;
   sortOrder: number;
+  sprintId?: number;
+
+  // 🔴 SỬA: Khớp với cấu trúc object
+  status: TaskStatusObj;
+  assignee: TaskAssigneeObj | null;
+  epic: TaskEpicObj | null;
+  
+  // Các trường khác nếu backend backlog trả về
+  tags?: TaskTagObj[];
+  subtaskSummary?: SubtaskSummaryObj;
 }
 
 export interface SprintDetail {
