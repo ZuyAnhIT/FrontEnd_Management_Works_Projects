@@ -60,9 +60,11 @@ export interface WeeklyOverviewData {
 // Interface chuẩn cho biểu đồ (Dùng chung cho Status/Priority/Type)
 export interface DistributionStat {
   name: string;       // Map từ statusName
-  color: string;      // Map từ color
+  color: string; 
+  code?: string;     
   taskCount: number;  // Giữ nguyên
   percentage: number; // Giữ nguyên
+  [key: string]: any;
 }
 
 // --- API METHODS ---
@@ -83,6 +85,24 @@ export const getStatusDistribution = async (projectId: number): Promise<Distribu
   // Map dữ liệu từ Backend về chuẩn Frontend
   return res.data.data.map((item: any) => ({
       name: item.statusName,   // Backend trả về statusName -> Đổi thành name
+      color: item.color,
+      taskCount: item.taskCount,
+      percentage: item.percentage
+  }));
+};
+
+// 3. Lấy phân bổ mức độ ưu tiên (Priority Distribution)
+export const getPriorityDistribution = async (projectId: number): Promise<DistributionStat[]> => {
+  const res = await apiClient.get(`/statistics/projects/${projectId}/priority-distribution`);
+  
+  if (!res.data.success) throw new Error(res.data.message);
+  
+  // Map dữ liệu từ Backend về chuẩn Frontend
+  // Backend: priorityName, priorityCode
+  // Frontend Interface: name, code
+  return res.data.data.map((item: any) => ({
+      name: item.priorityName, 
+      code: item.priorityCode,
       color: item.color,
       taskCount: item.taskCount,
       percentage: item.percentage

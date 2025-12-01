@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react"; // Thêm useState, useEffect
+import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { 
   LayoutDashboard, 
-  BarChart3, 
   PieChart, 
   ArrowUpRight 
 } from "lucide-react";
@@ -12,12 +11,14 @@ import {
 // API & Types
 import { 
   getStatusDistribution, 
+  getPriorityDistribution, // ✅ Import API này
   DistributionStat 
 } from "@/services/apiStatistics";
 
 // Components
 import WeeklyOverview from "@/components/features/core/summary/WeeklyOverview";
-import StatusChart from "@/components/features/core/summary/StatusChart"; // ✅ Import mới
+import StatusChart from "@/components/features/core/summary/StatusChart";
+import PriorityChart from "@/components/features/core/summary/PriorityChart"; // ✅ Import Component mới
 
 export default function ProjectSummaryPage() {
   const params = useParams();
@@ -26,6 +27,7 @@ export default function ProjectSummaryPage() {
   // --- STATE ---
   const [loading, setLoading] = useState(true);
   const [statusData, setStatusData] = useState<DistributionStat[]>([]);
+  const [priorityData, setPriorityData] = useState<DistributionStat[]>([]); // ✅ State mới
 
   // --- FETCH DATA ---
   useEffect(() => {
@@ -34,11 +36,15 @@ export default function ProjectSummaryPage() {
     const fetchCharts = async () => {
       setLoading(true);
       try {
-         // Gọi API lấy Status Distribution
-         const resStatus = await getStatusDistribution(projectId);
+         // Gọi song song 2 API: Status và Priority
+         const [resStatus, resPriority] = await Promise.all([
+             getStatusDistribution(projectId),
+             getPriorityDistribution(projectId) // ✅ Gọi API
+         ]);
+
          setStatusData(resStatus);
+         setPriorityData(resPriority); // ✅ Lưu data
          
-         // (Sau này gọi thêm Priority, Type ở đây...)
       } catch (error) {
          console.error("Failed to load charts", error);
       } finally {
@@ -71,7 +77,7 @@ export default function ProjectSummaryPage() {
              </button>
           </div>
 
-          {/* --- WEEKLY OVERVIEW (Đã có) --- */}
+          {/* --- WEEKLY OVERVIEW --- */}
           <section className="animate-in fade-in slide-in-from-bottom-4 duration-500">
              <WeeklyOverview projectId={projectId} />
           </section>
@@ -87,15 +93,12 @@ export default function ProjectSummaryPage() {
              
              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 
-                {/* ✅ 1. STATUS CHART (Đã hoàn thiện) */}
+                {/* 1. STATUS CHART (Tròn) */}
                 <StatusChart data={statusData} loading={loading} />
 
-                {/* 2. Placeholder: Priority (Sẽ làm ở bước sau) */}
-                <div className="bg-white p-8 rounded-xl border border-dashed border-slate-300 flex flex-col items-center justify-center text-slate-400 h-[350px]">
-                   <BarChart3 className="w-10 h-10 mb-3 opacity-20" />
-                   <p className="font-medium">Priority Breakdown Chart</p>
-                   <p className="text-xs mt-1">Next Step...</p>
-                </div>
+                {/* ✅ 2. PRIORITY CHART (Cột ngang) */}
+                <PriorityChart data={priorityData} loading={loading} />
+
              </div>
           </section>
        </div>
