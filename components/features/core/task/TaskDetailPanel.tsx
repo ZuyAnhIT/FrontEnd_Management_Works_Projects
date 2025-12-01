@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import { 
   X, Loader2, Flag, User, Clock, Layers, 
   MoreHorizontal, Link as LinkIcon, Zap,
@@ -10,7 +10,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import TagModal from "@/components/features/core/tag/TagModal"; 
+import EpicModal from "@/components/features/core/epic/EpicModal"; 
 // API Services
 import { getTaskDetails, updateTask, TaskDetail, UpdateTaskData } from "@/services/apiTask";
 import {
@@ -20,7 +22,7 @@ import {
     deleteSubtask,
     Subtask
 } from "@/services/apiSubTask";
-import { apiTag, Tag } from "@/services/apiTag";
+import { apiTag, Tag } from "@/services/apiTag"; // Import Tag API
 
 import { useToast } from "@/components/ui/ToastProvider";
 
@@ -101,32 +103,47 @@ export default function TaskDetailPanel({
   const [isAddingSubtask, setIsAddingSubtask] = useState(false);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
 
-  // Tags State
+  // --- TAGS STATE ---
   const [allProjectTags, setAllProjectTags] = useState<Tag[]>([]);
   const [isTagPopoverOpen, setIsTagPopoverOpen] = useState(false);
+  const [tagSearch, setTagSearch] = useState("");
   
+  // --- EPIC MODAL STATE ---
+  const [isEpicModalOpen, setIsEpicModalOpen] = useState(false);
   // Refs
   const tagButtonRef = useRef<HTMLButtonElement>(null);
   const tagPopoverRef = useRef<HTMLDivElement>(null);
-
+  const tagInputRef = useRef<HTMLInputElement>(null);
+  //Tag Details Modal
+const [editingTag, setEditingTag] = useState<Tag | null>(null);
   // Click outside Tag Popover
   useEffect(() => {
     function handleClickOutside(event: any) {
         if (tagPopoverRef.current && !tagPopoverRef.current.contains(event.target) && !tagButtonRef.current?.contains(event.target)) {
             setIsTagPopoverOpen(false);
+            setTagSearch(""); // Reset search when closing
         }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Focus input when popover opens
+  useEffect(() => {
+    if (isTagPopoverOpen && tagInputRef.current) {
+        setTimeout(() => tagInputRef.current?.focus(), 50);
+    }
+  }, [isTagPopoverOpen]);
+  
   // LOAD DATA
   useEffect(() => {
     if (taskId) {
       setLoading(true);
+      
+      // 1. Get Task Details
       getTaskDetails(taskId)
         .then(data => {
-          setTask(data);
+          setTask(data as ExtendedTaskDetail);
           setFormData({
             title: data.title,
             description: data.description || "",
@@ -148,7 +165,10 @@ export default function TaskDetailPanel({
         })
         .finally(() => setLoading(false));
 
+       // 2. Get Subtasks
        fetchSubtasks(taskId);
+
+       // 3. Get All Tags (for dropdown)
        apiTag.getTags(companyId, workspaceId, projectId)
         .then(tags => setAllProjectTags(tags))
         .catch(err => console.error("Failed to load tags", err));
@@ -164,34 +184,74 @@ export default function TaskDetailPanel({
       }
   };
 
-  // HANDLERS
+  // --- TAG HANDLERS ---
+
+  // Filter tags based on search input
+  const filteredTags = useMemo(() => {
+      if (!tagSearch.trim()) return allProjectTags;
+      return allProjectTags.filter(t => 
+          t.name.toLowerCase().includes(tagSearch.toLowerCase())
+      );
+  }, [allProjectTags, tagSearch]);
+
   const handleAddTag = async (tag: Tag) => {
     if (!taskId) return;
     const currentTags = task?.tags || [];
-    if (currentTags.find(t => t.id === tag.id)) return;
+    
+    // Prevent duplicate
+    if (currentTags.find(t => t.id === tag.id)) {
+        setIsTagPopoverOpen(false);
+        setTagSearch("");
+        return;
+    }
 
+    // Optimistic update
     const newTags = [...currentTags, tag];
     setTask(prev => prev ? { ...prev, tags: newTags } : null);
     setIsTagPopoverOpen(false);
+    setTagSearch("");
 
     try {
         await apiTag.assignTagToTask(companyId, workspaceId, projectId, taskId, tag.id);
         showToast("Đã thêm thẻ", "success");
     } catch (error) {
-        setTask(prev => prev ? { ...prev, tags: currentTags } : null);
+        setTask(prev => prev ? { ...prev, tags: currentTags } : null); // Revert
         showToast("Lỗi khi thêm thẻ", "error");
     }
+  };
+
+  const handleCreateNewTag = async () => {
+      if (!taskId || !tagSearch.trim()) return;
+      
+      try {
+          // 1. Create Tag
+          const newTag = await apiTag.createTag(companyId, workspaceId, projectId, {
+              name: tagSearch.trim(),
+              color: "#95a5a6"
+          });
+          
+          // 2. Update local list
+          setAllProjectTags(prev => [...prev, newTag]);
+          
+          // 3. Assign to task
+          handleAddTag(newTag);
+
+      } catch (error) {
+          showToast("Lỗi khi tạo thẻ mới", "error");
+      }
   };
 
   const handleRemoveTag = async (tagId: number) => {
     if (!taskId) return;
     const currentTags = task?.tags || [];
     const newTags = currentTags.filter(t => t.id !== tagId);
+    
     setTask(prev => prev ? { ...prev, tags: newTags } : null);
+    
     try {
         await apiTag.removeTagFromTask(companyId, workspaceId, projectId, taskId, tagId);
     } catch (error) {
-        setTask(prev => prev ? { ...prev, tags: currentTags } : null);
+        setTask(prev => prev ? { ...prev, tags: currentTags } : null); // Revert
         showToast("Lỗi khi xóa thẻ", "error");
     }
   };
@@ -203,7 +263,7 @@ export default function TaskDetailPanel({
     // 1. Update form data local
     setFormData(prev => ({ ...prev, [field]: value }));
     
-    // 2. OPTIMISTIC UI UPDATES (Cập nhật giao diện ngay lập tức)
+    // 2. OPTIMISTIC UI UPDATES
 
     // -> Fix Assignee: Cập nhật Avatar và Tên
     if (field === 'assigneeId') {
@@ -259,7 +319,7 @@ export default function TaskDetailPanel({
     }
   };
 
-  // Subtask Handlers
+  // Subtask Handlers (Giữ nguyên)
   const handleCreateSubtask = async () => {
     if (!newSubtaskTitle.trim() || !taskId) return;
     try {
@@ -299,6 +359,35 @@ export default function TaskDetailPanel({
         {/* HEADER */}
         <div className="h-14 border-b border-slate-100 flex items-center justify-between px-6 bg-white shrink-0">
           <div className="flex items-center gap-3">
+             {/* Epic (Jira Style) */}
+               {task && (
+                 <div 
+                    className={`
+                        group relative flex items-center gap-2 cursor-pointer px-2 py-1 rounded min-w-[100px] transition-colors
+                        ${task.epicId 
+                            ? "hover:bg-purple-50 bg-purple-50/50 border border-purple-100" 
+                            : "hover:bg-slate-100 border border-transparent hover:border-slate-200"
+                        }
+                    `}
+                    onClick={() => setIsEpicModalOpen(true)}
+                >
+                    {task.epicId ? (
+                        <>
+                            <div className="w-2 h-2 rounded-sm bg-purple-500 shrink-0"></div>
+                            <span className="text-sm font-medium text-purple-700 truncate max-w-[120px]">
+                                {/* FIX: Optional chaining cho epics */}
+                                {epics?.find(e => e.id === task.epicId)?.name || "Unknown Epic"}
+                            </span>
+                        </>
+                    ) : (
+                        <span className="text-sm text-slate-400 flex items-center gap-1 italic group-hover:text-slate-600">
+                            <Plus className="w-3 h-3"/> Epic
+                        </span>
+                    )}
+                 </div>
+             )}
+             
+             <div className="h-4 w-px bg-slate-200 mx-1"></div>
              <span className="font-mono font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">{task?.taskCode}</span>
              {isSaving && <span className="text-xs text-blue-600 flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin"/> Saving...</span>}
           </div>
@@ -361,8 +450,8 @@ export default function TaskDetailPanel({
                         onAssigneeChange={() => {}} 
                         onEditContent={() => {}} 
                     />
-                     {/* Add Subtask Input */}
-                     {isAddingSubtask && (
+                      {/* Add Subtask Input */}
+                      {isAddingSubtask && (
                         <div className="mt-2 flex gap-2">
                             <Input 
                                 value={newSubtaskTitle} 
@@ -374,7 +463,7 @@ export default function TaskDetailPanel({
                             <Button size="sm" onClick={handleCreateSubtask} className="h-9">Add</Button>
                             <Button size="sm" variant="ghost" onClick={() => setIsAddingSubtask(false)} className="h-9">Cancel</Button>
                         </div>
-                     )}
+                      )}
 
                     {/* Comments */}
                     <div className="mt-8">
@@ -385,7 +474,7 @@ export default function TaskDetailPanel({
                 {/* --- RIGHT COLUMN (35%) --- */}
                 <div className="w-full md:w-full bg-slate-50/80 p-6 space-y-6 shrink-0 border-l border-slate-100">
                     
-                    {/* ✅ STATUS SELECTOR (FIXED) */}
+                    {/* STATUS SELECTOR */}
                     <div className="space-y-2">
                         <label className="text-[11px] font-bold text-slate-400 uppercase">Status</label>
                         <div className="relative">
@@ -411,13 +500,12 @@ export default function TaskDetailPanel({
 
                     <hr className="border-slate-200"/>
 
-                    {/* ✅ ASSIGNEE BOX (RELOAD FIX) */}
+                    {/* ASSIGNEE & REPORTER */}
                     <div className="space-y-4">
                         <h4 className="text-[11px] font-bold text-slate-400 uppercase">People</h4>
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2 text-sm text-slate-600"><User className="w-4 h-4"/> Assignee</div>
                             <div className="relative group min-w-[140px]">
-                                {/* Visual Box */}
                                 <div className="flex items-center justify-end gap-2 cursor-pointer hover:bg-slate-200 px-2 py-1.5 rounded transition-all">
                                     <div className="w-6 h-6 rounded-full overflow-hidden bg-slate-200 flex items-center justify-center border border-white shadow-sm shrink-0">
                                         {task.assigneeAvatar ? (
@@ -430,7 +518,6 @@ export default function TaskDetailPanel({
                                         {task.assigneeName || "Unassigned"}
                                     </span>
                                 </div>
-                                {/* Hidden Select */}
                                 <select 
                                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                                     value={formData.assigneeId || 0}
@@ -446,7 +533,6 @@ export default function TaskDetailPanel({
                             </div>
                         </div>
 
-                        {/* Reporter */}
                         <div className="flex items-center justify-between text-slate-500">
                              <div className="flex items-center gap-2 text-sm"><Zap className="w-4 h-4"/> Reporter</div>
                              <span className="text-sm text-slate-700">{task.createdByName || "Unknown"}</span>
@@ -454,9 +540,9 @@ export default function TaskDetailPanel({
                     </div>
 
                     <hr className="border-slate-200"/>
-
-                    {/* ✅ TAGS SECTION */}
-                    <div className="space-y-3 relative">
+                                
+                    {/* ✅ TAGS SECTION (CẬP NHẬT MỚI) */}
+                    <div className="space-y-3 relative" ref={tagPopoverRef}>
                         <div className="flex items-center justify-between">
                              <label className="text-[11px] font-bold text-slate-400 uppercase">Tags</label>
                              <button 
@@ -469,34 +555,59 @@ export default function TaskDetailPanel({
                         </div>
                         
                         <div className="flex flex-wrap gap-2">
-                            {task.tags && task.tags.length > 0 ? (
-                                task.tags.map(tag => (
-                                    <div key={tag.id} className="flex items-center gap-1 px-2 py-1 rounded bg-white border border-slate-200 shadow-sm text-xs font-medium text-slate-700 group">
-                                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: tag.color }}></div>
-                                        {tag.name}
-                                        <button 
-                                            onClick={() => handleRemoveTag(tag.id)}
-                                            className="opacity-0 group-hover:opacity-100 hover:text-red-500 transition-opacity ml-1"
+                                {task.tags && task.tags.length > 0 ? (
+                                    task.tags.map(tag => (
+                                        <div 
+                                            key={tag.id} 
+                                            // Sửa cursor-default -> cursor-pointer và thêm sự kiện onClick
+                                            className="flex items-center gap-1 px-2 py-1 rounded bg-white border border-slate-200 shadow-sm text-xs font-medium text-slate-700 group cursor-pointer hover:bg-slate-50 hover:border-slate-300 transition-all"
+                                            onClick={() => setEditingTag(tag)} // <--- MỞ MODAL KHI CLICK
                                         >
-                                            <X className="w-3 h-3"/>
-                                        </button>
-                                    </div>
-                                ))
-                            ) : (
-                                <span className="text-xs text-slate-400 italic">No tags</span>
-                            )}
-                        </div>
+                                            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: tag.color }}></div>
+                                            {tag.name}
+                                            <button 
+                                                onClick={(e) => {
+                                                    e.stopPropagation(); // Ngăn chặn mở modal khi bấm nút X
+                                                    handleRemoveTag(tag.id);
+                                                }}
+                                                className="opacity-0 group-hover:opacity-100 hover:text-red-500 transition-opacity ml-1 p-0.5 rounded-full hover:bg-slate-200"
+                                            >
+                                                <X className="w-3 h-3"/>
+                                            </button>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <span className="text-xs text-slate-400 italic">No tags</span>
+                                )}
+                            </div>
 
                         {/* Tag Popover */}
                         {isTagPopoverOpen && (
-                            <div ref={tagPopoverRef} className="absolute right-0 top-8 z-20 w-48 bg-white rounded-md shadow-lg border border-slate-200 mt-1 p-1 animate-in fade-in zoom-in-95 duration-100">
-                                <div className="text-[10px] text-slate-400 px-2 py-1 border-b border-slate-50 uppercase font-bold">Select a tag</div>
-                                <div className="max-h-40 overflow-y-auto custom-scrollbar p-1">
-                                    {allProjectTags.length > 0 ? (
-                                        allProjectTags.filter(t => !task.tags?.find(tt => tt.id === t.id)).map(tag => (
+                            <div className="absolute right-0 top-8 z-20 w-56 bg-white rounded-md shadow-xl border border-slate-200 p-2 animate-in fade-in zoom-in-95 duration-100">
+                                {/* Input Search */}
+                                <Input 
+                                    ref={tagInputRef}
+                                    placeholder="Search or create tag..."
+                                    className="h-8 text-xs mb-2"
+                                    value={tagSearch}
+                                    onChange={(e) => setTagSearch(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && tagSearch.trim()) {
+                                            const exactMatch = allProjectTags.find(t => t.name.toLowerCase() === tagSearch.trim().toLowerCase());
+                                            if (exactMatch) handleAddTag(exactMatch);
+                                            else handleCreateNewTag();
+                                        }
+                                    }}
+                                />
+
+                                <div className="text-[10px] text-slate-400 px-2 py-1 border-b border-slate-50 uppercase font-bold">Select an option</div>
+                                
+                                <div className="max-h-40 overflow-y-auto custom-scrollbar p-1 space-y-0.5">
+                                    {filteredTags.length > 0 ? (
+                                        filteredTags.filter(t => !task.tags?.find(tt => tt.id === t.id)).map(tag => (
                                             <button
                                                 key={tag.id}
-                                                className="w-full text-left px-2 py-1.5 text-xs hover:bg-slate-50 rounded flex items-center gap-2 transition-colors"
+                                                className="w-full text-left px-2 py-1.5 text-xs hover:bg-blue-50 hover:text-blue-700 rounded flex items-center gap-2 transition-colors"
                                                 onClick={() => handleAddTag(tag)}
                                             >
                                                 <div className="w-2 h-2 rounded-full" style={{ backgroundColor: tag.color }}></div>
@@ -504,7 +615,18 @@ export default function TaskDetailPanel({
                                             </button>
                                         ))
                                     ) : (
-                                        <div className="px-2 py-1 text-xs text-slate-500 text-center">No tags available</div>
+                                        <div className="px-2 py-2 text-xs text-slate-500 italic text-center">No existing tags match</div>
+                                    )}
+
+                                    {/* Create New Option */}
+                                    {tagSearch.trim() && !allProjectTags.find(t => t.name.toLowerCase() === tagSearch.trim().toLowerCase()) && (
+                                        <button
+                                            className="w-full text-left px-2 py-1.5 text-xs hover:bg-blue-50 text-blue-600 font-medium rounded flex items-center gap-2 border-t border-slate-100 mt-1 pt-2"
+                                            onClick={handleCreateNewTag}
+                                        >
+                                            <Plus className="w-3 h-3" />
+                                            Create "{tagSearch}"
+                                        </button>
                                     )}
                                 </div>
                             </div>
@@ -513,7 +635,7 @@ export default function TaskDetailPanel({
 
                     <hr className="border-slate-200"/>
 
-                    {/* Planning */}
+                    {/* Planning (Epic/Sprint) */}
                     <div className="space-y-4">
                         <h4 className="text-[11px] font-bold text-slate-400 uppercase">Planning</h4>
                         
@@ -525,18 +647,6 @@ export default function TaskDetailPanel({
                             </div>
                         </div>
 
-                         {/* Epic */}
-                         <div className="flex items-center justify-between">
-                             <div className="flex items-center gap-2 text-sm text-slate-600"><Layers className="w-4 h-4"/> Epic</div>
-                             <select 
-                                className="w-[140px] text-sm text-right bg-transparent border-none outline-none text-blue-600 font-medium cursor-pointer truncate"
-                                value={formData.epicId || 0}
-                                onChange={e => handleUpdate('epicId', Number(e.target.value))}
-                             >
-                                <option value={0} className="text-slate-500">No Epic</option>
-                                {epics.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
-                             </select>
-                        </div>
                         
                         {/* Sprint */}
                         <div className="flex items-center justify-between">
@@ -608,7 +718,58 @@ export default function TaskDetailPanel({
                             />
                         </div>
                     </div>
-                    
+                    {/* --- TAG MODAL --- */}
+                    {/* Đặt ở đây để nó hiển thị đè lên Panel */}
+                    <TagModal 
+                        isOpen={!!editingTag}
+                        onClose={() => setEditingTag(null)}
+                        tag={editingTag}
+                        companyId={companyId}
+                        workspaceId={workspaceId}
+                        projectId={projectId}
+                        onUpdate={(updatedTag) => {
+                            // 1. Cập nhật trong danh sách allProjectTags
+                            setAllProjectTags(prev => prev.map(t => t.id === updatedTag.id ? updatedTag : t));
+                            // 2. Cập nhật ngay trên UI của Task hiện tại nếu đang hiển thị
+                            setTask(prev => prev ? {
+                                ...prev,
+                                tags: prev.tags?.map(t => t.id === updatedTag.id ? updatedTag : t)
+                            } : null);
+                        }}
+                        onDelete={(deletedTagId) => {
+                            // 1. Xóa khỏi danh sách allProjectTags
+                            setAllProjectTags(prev => prev.filter(t => t.id !== deletedTagId));
+                            // 2. Xóa khỏi Task hiện tại
+                            setTask(prev => prev ? {
+                                ...prev,
+                                tags: prev.tags?.filter(t => t.id !== deletedTagId)
+                            } : null);
+                        }}
+                    />     
+                    {/* --- EPIC MODAL --- */}
+                        <EpicModal
+                            isOpen={isEpicModalOpen}
+                            onClose={() => setIsEpicModalOpen(false)}
+                            projectId={projectId}
+                            currentEpicId={task.epicId}
+                            onSelectEpic={async (epicId) => {
+                                // Cập nhật Local State
+                                setTask(prev => prev ? { ...prev, epicId } : null);
+                                // Cập nhật Form Data
+                                setFormData(prev => ({ ...prev, epicId }));
+                                
+                                // Gọi API Update Task ngay lập tức
+                                try {
+                                    setIsSaving(true);
+                                    await updateTask(taskId, { epicId });
+                                    if (onUpdate) onUpdate();
+                                } catch (error) {
+                                    showToast("Update Epic failed", "error");
+                                } finally {
+                                    setIsSaving(false);
+                                }
+                            }}
+                        />
                     {/* Meta Footer */}
                     <div className="mt-auto pt-6 text-[10px] text-slate-400">
                         {task.createdAt && (
