@@ -11,10 +11,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+
 import TagModal from "@/components/features/core/tag/TagModal"; 
 import EpicModal from "@/components/features/core/epic/EpicModal"; 
 // API Services
-import { getTaskDetails, updateTask, TaskDetail, UpdateTaskData } from "@/services/apiTask";
+import { getTaskDetails, updateTask, updateTaskEpic, TaskDetail, UpdateTaskData } from "@/services/apiTask";
 import {
     getSubtaskList,
     createSubtask,
@@ -350,8 +351,43 @@ const [editingTag, setEditingTag] = useState<Tag | null>(null);
 
   const toInputDate = (iso?: string | null) => iso ? new Date(iso).toISOString().slice(0, 16) : "";
 
-  if (!taskId) return null;
+    if (!taskId) return null;
+    // --- EPIC MODAL HANDLER ---
+    const handleEpicChange = async (selectedEpic: any | null) => {
+      // 1. OPTIMISTIC UPDATE: Cập nhật UI ngay lập tức
+      const newEpicId = selectedEpic ? selectedEpic.id : null;
+      
+      setTask(prev => prev ? { 
+          ...prev, 
+          epicId: newEpicId,
+          // Nếu null (bỏ chọn), set epic object thành null luôn để UI render đúng
+          epic: selectedEpic ? {
+              id: selectedEpic.id,
+              name: selectedEpic.name,
+              color: selectedEpic.color
+          } : null
+      } : null);
 
+      setFormData(prev => ({ ...prev, epicId: newEpicId }));
+
+      // 2. CALL API & SYNC
+      try {
+          setIsSaving(true);
+          
+          // ✅ SỬ DỤNG API PATCH (updateTaskEpic) ĐỂ XỬ LÝ CHÍNH XÁC VIỆC GỠ (NULL)
+          const updatedTaskData = await updateTaskEpic(taskId!, newEpicId);
+          
+          // Cập nhật lại state bằng dữ liệu chuẩn từ Backend
+          setTask(updatedTaskData as ExtendedTaskDetail);
+          
+          if (onUpdate) onUpdate();
+      } catch (error) {
+          showToast("Cập nhật Epic thất bại", "error");
+          // Revert nếu cần thiết (logic revert phức tạp hơn chút nên tạm bỏ qua ở đây)
+      } finally {
+          setIsSaving(false);
+      }
+  };
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/20 backdrop-blur-[1px]" onClick={onClose}>
       <div className="w-full md:w-[800px] bg-white h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-200" onClick={(e) => e.stopPropagation()}>
@@ -362,29 +398,31 @@ const [editingTag, setEditingTag] = useState<Tag | null>(null);
              {/* Epic (Jira Style) */}
                {task && (
                  <div 
-                    className={`
-                        group relative flex items-center gap-2 cursor-pointer px-2 py-1 rounded min-w-[100px] transition-colors
-                        ${task.epicId 
-                            ? "hover:bg-purple-50 bg-purple-50/50 border border-purple-100" 
-                            : "hover:bg-slate-100 border border-transparent hover:border-slate-200"
-                        }
-                    `}
-                    onClick={() => setIsEpicModalOpen(true)}
-                >
-                    {task.epicId ? (
-                        <>
-                            <div className="w-2 h-2 rounded-sm bg-purple-500 shrink-0"></div>
-                            <span className="text-sm font-medium text-purple-700 truncate max-w-[120px]">
-                                {/* FIX: Optional chaining cho epics */}
-                                {epics?.find(e => e.id === task.epicId)?.name || "Unknown Epic"}
-                            </span>
-                        </>
-                    ) : (
-                        <span className="text-sm text-slate-400 flex items-center gap-1 italic group-hover:text-slate-600">
-                            <Plus className="w-3 h-3"/> Epic
-                        </span>
-                    )}
-                 </div>
+           className={`... ${task.epic ? "..." : "..."}`} // Check task.epic thay vì task.epicId để style
+           onClick={() => setIsEpicModalOpen(true)}
+       >
+           {/* ✅ Ưu tiên hiển thị từ object task.epic trước, nếu không có mới fallback sang props epics */}
+           {task && task.epic ? (
+               <>
+                   <div className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: task.epic.color || '#a855f7' }}></div>
+                   <span className="text-sm font-medium truncate max-w-[120px]" style={{ color: task.epic.color || '#a855f7' }}>
+                       {task.epic.name}
+                   </span>
+               </>
+           ) : task && task.epicId ? (
+               // Fallback: Nếu có ID mà chưa có object (trường hợp data cũ), tìm trong danh sách epics truyền vào
+               <>
+                   <div className="w-2 h-2 rounded-sm bg-purple-500 shrink-0"></div>
+                   <span className="text-sm font-medium text-purple-700 truncate max-w-[120px]">
+                       {epics?.find(e => e.id === task.epicId)?.name || "Loading..."}
+                   </span>
+               </>
+           ) : (
+               <span className="text-sm text-slate-400 flex items-center gap-1 italic group-hover:text-slate-600">
+                   <Plus className="w-3 h-3"/> Epic
+               </span>
+           )}
+       </div>
              )}
              
              <div className="h-4 w-px bg-slate-200 mx-1"></div>
@@ -746,30 +784,17 @@ const [editingTag, setEditingTag] = useState<Tag | null>(null);
                             } : null);
                         }}
                     />     
-                    {/* --- EPIC MODAL --- */}
-                        <EpicModal
-                            isOpen={isEpicModalOpen}
-                            onClose={() => setIsEpicModalOpen(false)}
-                            projectId={projectId}
-                            currentEpicId={task.epicId}
-                            onSelectEpic={async (epicId) => {
-                                // Cập nhật Local State
-                                setTask(prev => prev ? { ...prev, epicId } : null);
-                                // Cập nhật Form Data
-                                setFormData(prev => ({ ...prev, epicId }));
-                                
-                                // Gọi API Update Task ngay lập tức
-                                try {
-                                    setIsSaving(true);
-                                    await updateTask(taskId, { epicId });
-                                    if (onUpdate) onUpdate();
-                                } catch (error) {
-                                    showToast("Update Epic failed", "error");
-                                } finally {
-                                    setIsSaving(false);
-                                }
-                            }}
-                        />
+                   {/* EPIC MODAL */}
+                    <EpicModal
+                        isOpen={isEpicModalOpen}
+                        onClose={() => setIsEpicModalOpen(false)}
+                        projectId={projectId}
+                        // Ưu tiên lấy ID từ object 'epic' trước. Nếu không có mới tìm 'epicId'.
+                        currentEpicId={task?.epic?.id ?? task?.epicId ?? null}
+                        
+                        // Handler giữ nguyên
+                        onSelectEpic={handleEpicChange} 
+                    />
                     {/* Meta Footer */}
                     <div className="mt-auto pt-6 text-[10px] text-slate-400">
                         {task.createdAt && (
