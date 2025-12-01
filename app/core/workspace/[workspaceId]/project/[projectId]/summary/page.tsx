@@ -11,14 +11,16 @@ import {
 // API & Types
 import { 
   getStatusDistribution, 
-  getPriorityDistribution, // ✅ Import API này
+  getPriorityDistribution,
+  getTypeDistribution, // ✅ Import API mới
   DistributionStat 
 } from "@/services/apiStatistics";
 
 // Components
 import WeeklyOverview from "@/components/features/core/summary/WeeklyOverview";
 import StatusChart from "@/components/features/core/summary/StatusChart";
-import PriorityChart from "@/components/features/core/summary/PriorityChart"; // ✅ Import Component mới
+import PriorityChart from "@/components/features/core/summary/PriorityChart";
+import TypeChart from "@/components/features/core/summary/TypeChart"; // ✅ Import Component mới
 
 export default function ProjectSummaryPage() {
   const params = useParams();
@@ -27,7 +29,8 @@ export default function ProjectSummaryPage() {
   // --- STATE ---
   const [loading, setLoading] = useState(true);
   const [statusData, setStatusData] = useState<DistributionStat[]>([]);
-  const [priorityData, setPriorityData] = useState<DistributionStat[]>([]); // ✅ State mới
+  const [priorityData, setPriorityData] = useState<DistributionStat[]>([]);
+  const [typeData, setTypeData] = useState<DistributionStat[]>([]); // ✅ State mới
 
   // --- FETCH DATA ---
   useEffect(() => {
@@ -36,14 +39,16 @@ export default function ProjectSummaryPage() {
     const fetchCharts = async () => {
       setLoading(true);
       try {
-         // Gọi song song 2 API: Status và Priority
-         const [resStatus, resPriority] = await Promise.all([
+         // Gọi song song 3 API
+         const [resStatus, resPriority, resType] = await Promise.all([
              getStatusDistribution(projectId),
-             getPriorityDistribution(projectId) // ✅ Gọi API
+             getPriorityDistribution(projectId),
+             getTypeDistribution(projectId) // ✅ Gọi API
          ]);
 
          setStatusData(resStatus);
-         setPriorityData(resPriority); // ✅ Lưu data
+         setPriorityData(resPriority);
+         setTypeData(resType); // ✅ Lưu data
          
       } catch (error) {
          console.error("Failed to load charts", error);
@@ -61,7 +66,7 @@ export default function ProjectSummaryPage() {
     <div className="min-h-screen bg-slate-50 p-6 sm:p-8 font-sans text-slate-900">
        <div className="max-w-[1600px] mx-auto space-y-8">
           
-          {/* --- HEADER --- */}
+          {/* HEADER */}
           <div className="flex items-center justify-between">
              <div>
                 <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
@@ -77,27 +82,31 @@ export default function ProjectSummaryPage() {
              </button>
           </div>
 
-          {/* --- WEEKLY OVERVIEW --- */}
+          {/* WEEKLY OVERVIEW */}
           <section className="animate-in fade-in slide-in-from-bottom-4 duration-500">
              <WeeklyOverview projectId={projectId} />
           </section>
 
           <hr className="border-slate-200" />
 
-          {/* --- CHARTS SECTION --- */}
+          {/* CHARTS SECTION */}
           <section>
              <div className="flex items-center gap-2 mb-4">
                 <PieChart className="w-5 h-5 text-slate-400" />
                 <h2 className="text-lg font-bold text-slate-800">Analytics & Distribution</h2>
              </div>
              
-             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+             {/* ✅ THAY ĐỔI GRID LAYOUT THÀNH 3 CỘT */}
+             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 
-                {/* 1. STATUS CHART (Tròn) */}
+                {/* 1. STATUS */}
                 <StatusChart data={statusData} loading={loading} />
 
-                {/* ✅ 2. PRIORITY CHART (Cột ngang) */}
+                {/* 2. PRIORITY */}
                 <PriorityChart data={priorityData} loading={loading} />
+
+                {/* 3. TASK TYPE (MỚI) */}
+                <TypeChart data={typeData} loading={loading} />
 
              </div>
           </section>
