@@ -5,50 +5,61 @@ import { useParams } from "next/navigation";
 import { 
   LayoutDashboard, 
   PieChart, 
-  ArrowUpRight 
+  ArrowUpRight,
+  BarChart3 
 } from "lucide-react";
 
 // API & Types
 import { 
   getStatusDistribution, 
   getPriorityDistribution,
-  getTypeDistribution, // ✅ Import API mới
-  DistributionStat 
+  getTypeDistribution,
+  getEpicProgress, // ✅ Import API Epic
+  DistributionStat,
+  EpicProgressStat, // ✅ Import Types Epic
+  EpicProgressParams
 } from "@/services/apiStatistics";
 
 // Components
 import WeeklyOverview from "@/components/features/core/summary/WeeklyOverview";
 import StatusChart from "@/components/features/core/summary/StatusChart";
 import PriorityChart from "@/components/features/core/summary/PriorityChart";
-import TypeChart from "@/components/features/core/summary/TypeChart"; // ✅ Import Component mới
+import TypeChart from "@/components/features/core/summary/TypeChart";
+import EpicProgressCard from "@/components/features/core/summary/EpicProgressCard"; // ✅ Component Epic List
+import EpicFilterToolbar from "@/components/features/core/summary/EpicFilterToolbar"; // ✅ Component Filter
 
 export default function ProjectSummaryPage() {
   const params = useParams();
   const projectId = Number(params.projectId);
 
-  // --- STATE ---
+  // --- STATE CHARTS ---
   const [loading, setLoading] = useState(true);
   const [statusData, setStatusData] = useState<DistributionStat[]>([]);
   const [priorityData, setPriorityData] = useState<DistributionStat[]>([]);
-  const [typeData, setTypeData] = useState<DistributionStat[]>([]); // ✅ State mới
+  const [typeData, setTypeData] = useState<DistributionStat[]>([]);
 
-  // --- FETCH DATA ---
+  // --- STATE EPIC ---
+  const [epicData, setEpicData] = useState<EpicProgressStat[]>([]);
+  const [epicLoading, setEpicLoading] = useState(true);
+  const [epicFilters, setEpicFilters] = useState<EpicProgressParams>({});
+
+  // --- 1. FETCH CHARTS DATA (Initial Load) ---
   useEffect(() => {
     if (!projectId) return;
 
     const fetchCharts = async () => {
       setLoading(true);
       try {
-         // Gọi song song 3 API
+         // Gọi song song 3 API biểu đồ
          const [resStatus, resPriority, resType] = await Promise.all([
              getStatusDistribution(projectId),
              getPriorityDistribution(projectId),
-             getTypeDistribution(projectId) // ✅ Gọi API
+             getTypeDistribution(projectId)
          ]);
 
          setStatusData(resStatus);
          setPriorityData(resPriority);
-         setTypeData(resType); // ✅ Lưu data
+         setTypeData(resType);
          
       } catch (error) {
          console.error("Failed to load charts", error);
@@ -59,6 +70,27 @@ export default function ProjectSummaryPage() {
 
     fetchCharts();
   }, [projectId]);
+
+  // --- 2. FETCH EPIC DATA (Triggered by Filters) ---
+  useEffect(() => {
+     if (!projectId) return;
+     
+     const fetchEpics = async () => {
+        setEpicLoading(true);
+        try {
+           const data = await getEpicProgress(projectId, epicFilters);
+           setEpicData(data);
+        } catch (error) {
+           console.error("Failed to load epics", error);
+        } finally {
+           setEpicLoading(false);
+        }
+     };
+
+     // Debounce nhẹ để tránh spam API khi user đổi filter nhanh
+     const t = setTimeout(() => fetchEpics(), 300);
+     return () => clearTimeout(t);
+  }, [projectId, epicFilters]);
 
   if (!projectId) return null;
 
@@ -82,34 +114,49 @@ export default function ProjectSummaryPage() {
              </button>
           </div>
 
-          {/* WEEKLY OVERVIEW */}
+          {/* SECTION 1: WEEKLY OVERVIEW */}
           <section className="animate-in fade-in slide-in-from-bottom-4 duration-500">
              <WeeklyOverview projectId={projectId} />
           </section>
 
           <hr className="border-slate-200" />
 
-          {/* CHARTS SECTION */}
+          {/* SECTION 2: CHARTS */}
           <section>
              <div className="flex items-center gap-2 mb-4">
                 <PieChart className="w-5 h-5 text-slate-400" />
                 <h2 className="text-lg font-bold text-slate-800">Analytics & Distribution</h2>
              </div>
              
-             {/* ✅ THAY ĐỔI GRID LAYOUT THÀNH 3 CỘT */}
              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                
-                {/* 1. STATUS */}
                 <StatusChart data={statusData} loading={loading} />
-
-                {/* 2. PRIORITY */}
                 <PriorityChart data={priorityData} loading={loading} />
-
-                {/* 3. TASK TYPE (MỚI) */}
                 <TypeChart data={typeData} loading={loading} />
-
              </div>
           </section>
+
+          <hr className="border-slate-200" />
+
+          {/* SECTION 3: EPIC PROGRESS & ROADMAP */}
+          <section>
+             <div className="flex items-center gap-2 mb-4">
+                <BarChart3 className="w-5 h-5 text-slate-400" />
+                <h2 className="text-lg font-bold text-slate-800">Epic Progress & Roadmap</h2>
+             </div>
+
+             {/* Filter Toolbar */}
+             <EpicFilterToolbar 
+                projectId={projectId}
+                filters={epicFilters}
+                setFilters={setEpicFilters}
+             />
+
+            <div className="w-full">
+                 <EpicProgressCard data={epicData} loading={epicLoading} />
+             </div>
+             
+          </section>
+
        </div>
     </div>
   );

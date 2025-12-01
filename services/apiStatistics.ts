@@ -67,6 +67,29 @@ export interface DistributionStat {
   [key: string]: any;
 }
 
+export interface EpicProgressStat {
+  epicId: number;
+  epicName: string;
+  epicCode: string;
+  color: string;
+  
+  totalTasks: number;
+  completedTasks: number;
+  taskProgressPercent: number;
+
+  totalPoints: number;
+  completedPoints: number;
+  pointProgressPercent: number;
+}
+
+// Interface cho Params Lọc
+export interface EpicProgressParams {
+  sprintId?: number | null;
+  statusIds?: number[]; // Mảng ID
+  from?: string;        // YYYY-MM-DD
+  to?: string;          // YYYY-MM-DD
+}
+
 // --- API METHODS ---
 
 // 1. Lấy thống kê tổng quan hàng tuần cho project
@@ -123,4 +146,31 @@ export const getTypeDistribution = async (projectId: number): Promise<Distributi
       taskCount: item.taskCount,
       percentage: item.percentage
   }));
+};
+
+// 5. Lấy tiến độ theo Epic với các tham số lọc
+export const getEpicProgress = async (
+  projectId: number, 
+  params?: EpicProgressParams
+): Promise<EpicProgressStat[]> => {
+  
+  // Clean params
+  const cleanParams: any = {};
+  if (params?.sprintId) cleanParams.sprintId = params.sprintId;
+  if (params?.from) cleanParams.from = params.from;
+  if (params?.to) cleanParams.to = params.to;
+  
+  // Xử lý mảng statusIds (axios cần format: statusIds=1&statusIds=2...)
+  // Hoặc gửi dạng chuỗi "1,2,3" tùy backend quy định. 
+  // Ở đây giả định backend nhận array params chuẩn.
+  if (params?.statusIds && params.statusIds.length > 0) {
+      cleanParams.statusIds = params.statusIds.join(","); // Chuyển về chuỗi "1,2,3" cho an toàn
+  }
+
+  const res = await apiClient.get(`/statistics/projects/${projectId}/epic-progress`, { 
+    params: cleanParams 
+  });
+
+  if (!res.data.success) throw new Error(res.data.message);
+  return res.data.data;
 };
