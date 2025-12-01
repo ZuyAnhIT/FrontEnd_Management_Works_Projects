@@ -408,6 +408,9 @@ export default function ProjectListPage() {
           statuses={statuses} // Truyền RawStatusColumn[] vào DetailPanel nếu nó hỗ trợ
           sprints={[]}
           epics={[]}
+          isOpen={isDetailOpen}
+          
+          
         />
       )}
 

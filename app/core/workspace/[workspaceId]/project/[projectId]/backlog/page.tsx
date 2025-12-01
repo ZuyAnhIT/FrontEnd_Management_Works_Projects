@@ -460,7 +460,9 @@ export default function BacklogPage() {
                 statuses={statuses} // 🔥 TRUYỀN LIST STATUS VÀO ĐÂY
                 companyId={companyId}       
                 workspaceId={workspaceId}   
-                projectId={projectId}       
+                projectId={projectId} 
+                isOpen={!!selectedTaskId}
+                   
             />
           )}
 
