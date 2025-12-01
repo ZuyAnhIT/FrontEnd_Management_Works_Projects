@@ -42,6 +42,11 @@ export interface TaskDetail {
   // ✅ Các trường bổ sung từ JSON mới
   sprintId: number | null;
   epicId: number | null; 
+  epic?: {
+    id: number;
+    name: string;
+    color?: string;
+  } | null;
   
   storyPoints: number | null;
   estimatedHours: number | null;
