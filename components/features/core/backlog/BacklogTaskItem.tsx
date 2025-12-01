@@ -13,7 +13,7 @@ import {
 import { TaskSummary } from "@/services/apiProject";
 import { useMemo } from "react";
 
-// Cấu hình màu sắc cho Priority
+// Configuration for Priority Colors
 const priorityConfig: Record<string, string> = {
   URGENT: "border-l-4 border-l-red-500 bg-red-50/30",
   HIGH: "border-l-4 border-l-orange-500 bg-orange-50/30",
@@ -33,16 +33,30 @@ interface BacklogTaskItemProps {
   task: TaskSummary;
   index: number;
   onClick?: () => void;
+  isOverlay?: boolean; // Prop to styling drag overlay
 }
 
-export default function BacklogTaskItem({ task, index, onClick }: BacklogTaskItemProps) {
+export default function BacklogTaskItem({ task, index, onClick, isOverlay }: BacklogTaskItemProps) {
+  // ✅ SAFELY EXTRACT DATA FROM NESTED OBJECTS
   const priorityClass = priorityConfig[task.priority] || "border-l-4 border-l-slate-300";
+  
+  // Status Access
+  const statusName = task.status?.name || "Unknown";
+  const statusColor = task.status?.color || "#64748b";
+
+  // Epic Access
+  const epicName = task.epic?.name;
+  const epicColor = task.epic?.color;
+
+  // Assignee Access
+  const assigneeAvatar = task.assignee?.avatarUrl;
+
   const formatDate = (d?: string) => d ? new Date(d).toLocaleDateString('en-US', {day: '2-digit', month: 'short'}) : null;
 
-  // Tạo ID duy nhất cho dnd-kit
+  // Create unique ID for dnd-kit
   const sortableId = useMemo(() => task.id.toString(), [task.id]);
 
-  // Hook xử lý logic kéo thả
+  // Hook for drag and drop logic
   const {
     attributes,
     listeners,
@@ -57,49 +71,44 @@ export default function BacklogTaskItem({ task, index, onClick }: BacklogTaskIte
       task,
       index, 
     },
+    disabled: isOverlay // Disable sortable logic if this is the overlay
   });
 
-  // 🛠️ STYLE CONFIGURATION (Tối ưu cho dnd-kit)
-  const style = {
-    // Dùng CSS.Translate để di chuyển mượt mà, tránh bị mờ chữ (blur)
+  // 🛠️ STYLE CONFIGURATION (Optimized for dnd-kit)
+  const style: React.CSSProperties = {
     transform: CSS.Translate.toString(transform),
-    
-    // Transition quản lý bởi dnd-kit
     transition,
-    
-    // Style con trỏ chuột
-    cursor: isDragging ? 'grabbing' : 'grab',
-    
-    // Ngăn chặn hành vi cuộn mặc định của trình duyệt trên thiết bị cảm ứng
+    cursor: isOverlay ? 'grabbing' : (isDragging ? 'grabbing' : 'grab'),
     touchAction: 'none',
-    
-    // QUAN TRỌNG: Khi đang kéo, ẩn item gốc đi (opacity: 0) để tạo khoảng trống.
-    // Item thực sự nhìn thấy đang di chuyển là DragOverlay (ở file cha).
-    opacity: isDragging ? 0 : 1,
+    opacity: isDragging ? 0.3 : 1, // Dim original item when dragging
   };
+
+  // Overlay specific style
+  const overlayStyle: React.CSSProperties = isOverlay ? {
+     cursor: 'grabbing',
+     opacity: 1,
+     transform: 'scale(1.02)',
+     boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)',
+     zIndex: 999
+  } : style;
 
   return (
     <div
       ref={setNodeRef}
-      style={style}
-      {...attributes}
-      {...listeners}
+      style={overlayStyle}
+      {...(!isOverlay ? { ...attributes, ...listeners } : {})}
       onClick={onClick}
       className={`
-        group flex flex-col sm:flex-row sm:items-center gap-3 p-3 bg-white border rounded-r-lg select-none
+        group flex flex-col sm:flex-row sm:items-center gap-3 p-3 bg-white border rounded-r-lg select-none mb-2
         ${priorityClass}
         
-        /* Hiệu ứng hover chỉ hiện khi KHÔNG kéo */
-        ${!isDragging ? "hover:shadow-md hover:border-blue-300" : ""}
+        /* Hover effect only when NOT dragging */
+        ${!isDragging && !isOverlay ? "hover:shadow-md hover:border-blue-300 transition-all" : ""}
 
-        /* Khi kéo, placeholder (item gốc ẩn) sẽ hiển thị viền dashed để đánh dấu vị trí */
+        /* Placeholder style when dragging */
         ${isDragging ? "border-dashed border-slate-300 bg-slate-50" : "border-slate-200"}
       `}
     >
-      {/* Nội dung bên trong: 
-         Ta có thể ẩn nội dung khi đang dragging để placeholder sạch sẽ hơn, 
-         nhưng vì đã set opacity: 0 ở style nên không cần thiết phải ẩn thủ công.
-      */}
       
       {/* --- LEFT: INFO --- */}
       <div className="flex-1 min-w-0 pointer-events-none"> 
@@ -109,16 +118,16 @@ export default function BacklogTaskItem({ task, index, onClick }: BacklogTaskIte
              <span>{task.taskCode}</span>
            </div>
 
-           {task.epicName && (
+           {epicName && (
              <span 
-               className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide border"
+               className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide border truncate max-w-[120px]"
                style={{
-                  borderColor: task.epicColor || '#cbd5e1',
-                  color: task.epicColor || '#64748b',
-                  backgroundColor: `${task.epicColor}10`
+                  borderColor: `${epicColor}40` || '#cbd5e1',
+                  color: epicColor || '#64748b',
+                  backgroundColor: `${epicColor}10` || '#f1f5f9'
                }}
              >
-               {task.epicName}
+               {epicName}
              </span>
            )}
         </div>
@@ -131,25 +140,25 @@ export default function BacklogTaskItem({ task, index, onClick }: BacklogTaskIte
       {/* --- RIGHT: META --- */}
       <div className="flex items-center gap-4 sm:justify-end w-full sm:w-auto mt-2 sm:mt-0 text-xs text-slate-500 shrink-0 pointer-events-none">
           <span 
-            className="px-2 py-0.5 rounded font-semibold text-[10px] uppercase border"
+            className="px-2 py-0.5 rounded font-bold text-[10px] uppercase border"
             style={{
-               color: task.statusColor,
-               borderColor: `${task.statusColor}40`,
-               backgroundColor: `${task.statusColor}10`
+               color: statusColor,
+               borderColor: `${statusColor}40`,
+               backgroundColor: `${statusColor}10`
             }}
           >
-            {task.statusName}
+            {statusName}
           </span>
 
-          {task.storyPoints !== undefined && (
-             <div className="flex items-center gap-1 bg-slate-100 px-1.5 py-0.5 rounded">
+          {task.storyPoints !== undefined && task.storyPoints !== null && (
+             <div className="flex items-center gap-1 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
                 <Flame className="w-3 h-3 text-slate-400" />
                 <span className="font-mono font-bold text-slate-600">{task.storyPoints}</span>
              </div>
           )}
 
-          {task.assigneeAvatarUrl ? (
-             <img src={task.assigneeAvatarUrl} alt="Assignee" className="w-6 h-6 rounded-full border border-white shadow-sm" />
+          {assigneeAvatar ? (
+             <img src={assigneeAvatar} alt="Assignee" className="w-6 h-6 rounded-full border border-white shadow-sm object-cover" />
           ) : (
              <div className="w-6 h-6 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center">
                 <User className="w-3 h-3 text-slate-400" />
