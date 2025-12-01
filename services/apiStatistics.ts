@@ -108,3 +108,19 @@ export const getPriorityDistribution = async (projectId: number): Promise<Distri
       percentage: item.percentage
   }));
 };
+
+// 4. Lấy phân bổ loại công việc (Type Distribution)
+export const getTypeDistribution = async (projectId: number): Promise<DistributionStat[]> => {
+  const res = await apiClient.get(`/statistics/projects/${projectId}/type-distribution`);
+  
+  if (!res.data.success) throw new Error(res.data.message);
+  
+  // Map dữ liệu
+  return res.data.data.map((item: any) => ({
+      name: item.typeName, 
+      code: item.typeCode, 
+      color: item.color,
+      taskCount: item.taskCount,
+      percentage: item.percentage
+  }));
+};
