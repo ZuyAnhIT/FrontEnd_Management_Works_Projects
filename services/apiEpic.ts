@@ -61,6 +61,25 @@ interface ApiResponse<T> {
 // ===================================================
 
 export const apiEpic = {
+
+  /**
+   * 🔹 Lấy chi tiết Epic 
+   * GET /api/projects/{projectId}/epics/{epicId}
+   */
+  getEpicDetail: async (
+    projectId: number | string,
+    epicId: number | string
+  ): Promise<Epic> => {
+    const res = await apiClient.get<ApiResponse<Epic>>(
+      `/projects/${projectId}/epics/${epicId}`
+    );
+
+    if (!res.data.success) {
+      throw new Error(res.data.message || "Không thể lấy chi tiết Epic.");
+    }
+    return res.data.data;
+  },
+
   /**
    * 🔹 Lấy danh sách Epics trong Project
    * GET /api/projects/{projectId}/epics
