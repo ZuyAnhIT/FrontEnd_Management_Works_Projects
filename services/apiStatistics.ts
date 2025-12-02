@@ -39,6 +39,16 @@ export interface StatsTask {
   tags?: { id: number; name: string; color: string }[];
 }
 
+export interface OverviewParams {
+  from?: string;        // YYYY-MM-DD
+  to?: string;          // YYYY-MM-DD
+  keyword?: string;
+  assigneeId?: number;
+  priority?: string;    // LOW, MEDIUM, HIGH, URGENT
+  taskType?: string;    // STORY, TASK, BUG...
+  statusIds?: number[]; // Array ID
+}
+
 // Response tổng thể
 export interface WeeklyOverviewData {
   fromDate: string;
@@ -147,9 +157,29 @@ export interface RoadmapItemResponse {
 
 // --- API METHODS ---
 
-// 1. Lấy thống kê tổng quan hàng tuần cho project
-export const getWeeklyOverview = async (projectId: number): Promise<WeeklyOverviewData> => {
-  const res = await apiClient.get(`/statistics/projects/${projectId}`); // Gọi đúng endpoint gốc
+// 1. Lấy tổng quan (Hỗ trợ Filter & Date Range)
+export const getWeeklyOverview = async (
+  projectId: number, 
+  params?: OverviewParams
+): Promise<WeeklyOverviewData> => {
+  
+  const cleanParams: any = {};
+
+  if (params?.from) cleanParams.from = params.from;
+  if (params?.to) cleanParams.to = params.to;
+  if (params?.keyword) cleanParams.keyword = params.keyword;
+  if (params?.assigneeId) cleanParams.assigneeId = params.assigneeId;
+  if (params?.priority) cleanParams.priority = params.priority;
+  if (params?.taskType) cleanParams.taskType = params.taskType;
+  
+  if (params?.statusIds && params.statusIds.length > 0) {
+      cleanParams.statusIds = params.statusIds.join(",");
+  }
+
+  const res = await apiClient.get(`/statistics/projects/${projectId}`, { 
+    params: cleanParams 
+  });
+
   if (!res.data.success) throw new Error(res.data.message);
   return res.data.data;
 };
