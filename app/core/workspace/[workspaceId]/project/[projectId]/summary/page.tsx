@@ -6,7 +6,8 @@ import {
   LayoutDashboard, 
   PieChart, 
   ArrowUpRight,
-  BarChart3 
+  BarChart3,
+  Users // ✅ Thêm icon Users cho section Workload
 } from "lucide-react";
 
 // API & Types
@@ -14,10 +15,13 @@ import {
   getStatusDistribution, 
   getPriorityDistribution,
   getTypeDistribution,
-  getEpicProgress, // ✅ Import API Epic
+  getEpicProgress, 
+  getProjectWorkload, // ✅ API Workload
   DistributionStat,
-  EpicProgressStat, // ✅ Import Types Epic
-  EpicProgressParams
+  EpicProgressStat, 
+  EpicProgressParams,
+  WorkloadStat,      // ✅ Type Workload
+  WorkloadParams     // ✅ Type Workload Filter
 } from "@/services/apiStatistics";
 
 // Components
@@ -25,8 +29,9 @@ import WeeklyOverview from "@/components/features/core/summary/WeeklyOverview";
 import StatusChart from "@/components/features/core/summary/StatusChart";
 import PriorityChart from "@/components/features/core/summary/PriorityChart";
 import TypeChart from "@/components/features/core/summary/TypeChart";
-import EpicProgressCard from "@/components/features/core/summary/EpicProgressCard"; // ✅ Component Epic List
-import EpicFilterToolbar from "@/components/features/core/summary/EpicFilterToolbar"; // ✅ Component Filter
+import EpicProgressCard from "@/components/features/core/summary/EpicProgressCard"; 
+import EpicFilterToolbar from "@/components/features/core/summary/EpicFilterToolbar"; 
+import WorkloadOverview from "@/components/features/core/summary/WorkloadOverview"; // ✅ Component Workload Gộp
 
 export default function ProjectSummaryPage() {
   const params = useParams();
@@ -50,7 +55,6 @@ export default function ProjectSummaryPage() {
     const fetchCharts = async () => {
       setLoading(true);
       try {
-         // Gọi song song 3 API biểu đồ
          const [resStatus, resPriority, resType] = await Promise.all([
              getStatusDistribution(projectId),
              getPriorityDistribution(projectId),
@@ -87,7 +91,6 @@ export default function ProjectSummaryPage() {
         }
      };
 
-     // Debounce nhẹ để tránh spam API khi user đổi filter nhanh
      const t = setTimeout(() => fetchEpics(), 300);
      return () => clearTimeout(t);
   }, [projectId, epicFilters]);
@@ -137,24 +140,35 @@ export default function ProjectSummaryPage() {
 
           <hr className="border-slate-200" />
 
-          {/* SECTION 3: EPIC PROGRESS & ROADMAP */}
+          {/* SECTION 3: EPIC PROGRESS */}
           <section>
              <div className="flex items-center gap-2 mb-4">
                 <BarChart3 className="w-5 h-5 text-slate-400" />
                 <h2 className="text-lg font-bold text-slate-800">Epic Progress & Roadmap</h2>
              </div>
 
-             {/* Filter Toolbar */}
              <EpicFilterToolbar 
                 projectId={projectId}
                 filters={epicFilters}
                 setFilters={setEpicFilters}
              />
 
-            <div className="w-full">
+             <div className="w-full mt-4">
                  <EpicProgressCard data={epicData} loading={epicLoading} />
              </div>
-             
+          </section>
+
+          <hr className="border-slate-200" />
+
+          {/* SECTION 4: TEAM WORKLOAD (MỚI) */}
+          <section>
+             <div className="flex items-center gap-2 mb-4">
+                <Users className="w-5 h-5 text-slate-400" />
+                <h2 className="text-lg font-bold text-slate-800">Team Workload</h2>
+             </div>
+
+             {/* Component này đã bao gồm Toolbar, KPI và Chart */}
+             <WorkloadOverview projectId={projectId} />
           </section>
 
        </div>
