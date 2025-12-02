@@ -90,6 +90,32 @@ export interface EpicProgressParams {
   to?: string;          // YYYY-MM-DD
 }
 
+// Interface cho Workload
+export interface WorkloadBreakdown {
+  stackName: string; // Tên đoạn (vd: "In Progress", "High")
+  color: string;     // Mã màu
+  value: number;     // Giá trị (Points hoặc Hours)
+  taskCount: number; // Số lượng task trong đoạn này
+}
+
+export interface WorkloadStat {
+  userId: number;
+  userName: string;
+  avatarUrl: string;
+  totalLoad: number;
+  breakdowns: WorkloadBreakdown[];
+}
+
+// Params
+export interface WorkloadParams {
+  viewType?: "POINTS" | "HOURS";
+  groupBy?: "STATUS" | "PRIORITY";
+  sprintId?: number | null;
+  from?: string;
+  to?: string;
+  statusIds?: number[];
+}
+
 // --- API METHODS ---
 
 // 1. Lấy thống kê tổng quan hàng tuần cho project
@@ -168,6 +194,32 @@ export const getEpicProgress = async (
   }
 
   const res = await apiClient.get(`/statistics/projects/${projectId}/epic-progress`, { 
+    params: cleanParams 
+  });
+
+  if (!res.data.success) throw new Error(res.data.message);
+  return res.data.data;
+};
+
+// 6. Lấy tải công việc (Workload) với các tham số lọc
+export const getProjectWorkload = async (
+  projectId: number, 
+  params?: WorkloadParams
+): Promise<WorkloadStat[]> => {
+  
+  // Clean params
+  const cleanParams: any = {};
+  if (params?.viewType) cleanParams.viewType = params.viewType;
+  if (params?.groupBy) cleanParams.groupBy = params.groupBy;
+  if (params?.sprintId) cleanParams.sprintId = params.sprintId;
+  if (params?.from) cleanParams.from = params.from;
+  if (params?.to) cleanParams.to = params.to;
+  
+  if (params?.statusIds && params.statusIds.length > 0) {
+      cleanParams.statusIds = params.statusIds.join(",");
+  }
+
+  const res = await apiClient.get(`/statistics/projects/${projectId}/workload`, { 
     params: cleanParams 
   });
 
