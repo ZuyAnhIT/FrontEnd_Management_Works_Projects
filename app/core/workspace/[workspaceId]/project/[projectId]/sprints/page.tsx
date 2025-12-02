@@ -124,11 +124,10 @@ const JiraTaskRow = ({
 
   return (
     <tr
-      onClick={() => onSelect(task)}
       className="group bg-white hover:bg-slate-50 border-b border-slate-100 transition-all cursor-pointer text-sm"
     >
       {/* 1. KEY */}
-      <td className="px-4 py-3 w-28 whitespace-nowrap align-middle">
+      <td onClick={() => onSelect(task)} className="px-4 py-3 w-28 whitespace-nowrap align-middle ">
         <span className="text-slate-500 font-mono text-xs font-medium">{task.taskCode}</span>
       </td>
 
@@ -205,7 +204,7 @@ const JiraTaskRow = ({
       </td>
 
       {/* 4. PRIORITY */}
-      <td className="px-4 py-3 w-32 align-middle">
+      <td onClick={() => onSelect(task)} className="px-4 py-3 w-32 align-middle">
         <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${getPriorityColor(task.priority)}`}>
           {task.priority}
         </span>
