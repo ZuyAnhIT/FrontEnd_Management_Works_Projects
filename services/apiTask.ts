@@ -32,43 +32,64 @@ export interface TaskDetail {
   title: string;
   description: string | null;
 
+  // Flat fields
   statusId: number;
-  statusName: string;
-  statusColor: string;
-
-  taskType: TaskType; 
-  priority: TaskPriority; 
-
-  // ✅ Các trường bổ sung từ JSON mới
   sprintId: number | null;
   epicId: number | null; 
+  assigneeId: number | null;
+  assignerId: number | null;
+
+  // Objects lồng nhau
+  status?: {
+    id: number;
+    name: string;
+    color: string;
+    isCompleted?: boolean;
+  };
+
+  sprint?: {
+    id: number;
+    name: string;
+  } | null;
+
   epic?: {
     id: number;
     name: string;
     color?: string;
   } | null;
+
+  assignee?: {
+    id: number;
+    name: string;
+    avatarUrl: string | null;
+  } | null;
   
-  storyPoints: number | null;
-  estimatedHours: number | null;
-  loggedHours: number | null;
-
-  startDate: string | null;
-  dueDate: string | null;
-  completedAt: string | null; // ✅ Thêm ngày hoàn thành
-
-  // Người gán (Assigner)
-  assignerId: number | null;
+  // ✅ THÊM TRƯỜNG TAGS VÀO ĐÂY ĐỂ HẾT LỖI TS
+  tags?: {
+    id: number;
+    name: string;
+    color: string;
+  }[];
+  
+  // Các trường khác
+  statusName: string;
+  statusColor: string;
   assignerName: string | null;
-
-  // Người được gán (Assignee)
-  assigneeId: number | null;
   assigneeName: string | null;
   assigneeAvatar: string | null;
 
+  taskType: TaskType; 
+  priority: TaskPriority; 
+  storyPoints: number | null;
+  estimatedHours: number | null;
+  loggedHours: number | null;
+  startDate: string | null;
+  dueDate: string | null;
+  completedAt: string | null;
   createdById: number;
   createdByName?: string;
   createdAt?: string;
-  updatedAt?: string | null; // ✅ Thêm ngày update
+  updatedAt?: string | null;
 }
 
 export interface UpdateTaskData {
