@@ -24,24 +24,44 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
-/* ui/ToastProvider */
-@keyframes fadeDown {
-          from {
-            opacity: 0;
-            transform: translateY(-10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        .animate-fadeDown {
-          animation: fadeDown 0.35s ease-out;
-        }
-@keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
-@keyframes fadeInUp { from { opacity: 0; transform: translateY(20px) } to { opacity: 1; transform: translateY(0) } }
-@keyframes slideUp { from { opacity: 0; transform: translateY(40px) } to { opacity: 1; transform: translateY(0) } }
 
+/* --- ANIMATIONS --- */
+@keyframes fadeDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes slideUp { from { opacity: 0; transform: translateY(40px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes pulse-slow { 0%, 100% { opacity: 0.4; transform: scale(1); } 50% { opacity: 0.7; transform: scale(1.05); } }
+
+.animate-fadeDown { animation: fadeDown 0.35s ease-out; }
 .animate-fadeIn { animation: fadeIn 1s ease-out both; }
 .animate-fadeInUp { animation: fadeInUp 1s ease-out both; }
 .animate-slideUp { animation: slideUp 1s ease-out both; }
+.animate-pulse-slow { animation: pulse-slow 6s infinite ease-in-out; }
+
+/* --- JIRA / ATLASSIAN STYLE BACKGROUND --- */
+/* Tạo lớp nền chấm bi mờ */
+.bg-jira-mesh {
+  background-color: transparent;
+  background-image: radial-gradient(rgba(100, 116, 139, 0.12) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .bg-jira-mesh {
+    background-image: radial-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px);
+  }
+}
+
+/* --- OVERRIDE CLASS (QUAN TRỌNG) --- */
+/* Class này buộc các section con phải trong suốt để nhìn thấy background */
+.jira-landing-override section {
+  background-color: transparent !important;
+  border-color: rgba(226, 232, 240, 0.5) !important; /* border-slate-200/50 */
+}
+
+/* Nếu dark mode, chỉnh lại border cho đẹp */
+@media (prefers-color-scheme: dark) {
+  .jira-landing-override section {
+    border-color: rgba(51, 65, 85, 0.5) !important; /* border-slate-700/50 */
+  }
+}
