@@ -116,6 +116,35 @@ export interface WorkloadParams {
   statusIds?: number[];
 }
 
+// ✅ CẬP NHẬT: Interface Params đầy đủ
+export interface RoadmapParams {
+  viewType?: "EPIC" | "SPRINT" | "ALL"; 
+  keyword?: string;
+  from?: string;
+  to?: string;
+  
+  // Filter Mảng (Multi-select)
+  epicIds?: number[];
+  epicStatuses?: string[];
+  sprintIds?: number[];
+  sprintStatuses?: string[];
+}
+
+export interface RoadmapItemResponse {
+  id: string;        // "epic-1", "sprint-2"
+  originalId: number;
+  title: string;
+  type: "EPIC" | "SPRINT";
+  startDate: string;
+  endDate: string;
+  progress: number;  // 0-100
+  status: string;
+  color: string;
+  totalTasks: number;
+  completedTasks: number;
+}
+
+
 // --- API METHODS ---
 
 // 1. Lấy thống kê tổng quan hàng tuần cho project
@@ -220,6 +249,35 @@ export const getProjectWorkload = async (
   }
 
   const res = await apiClient.get(`/statistics/projects/${projectId}/workload`, { 
+    params: cleanParams 
+  });
+
+  if (!res.data.success) throw new Error(res.data.message);
+  return res.data.data;
+};
+
+// 7. Lấy dữ liệu Roadmap với các tham số lọc
+export const getProjectRoadmap = async (
+  projectId: number, 
+  params?: RoadmapParams
+): Promise<RoadmapItemResponse[]> => {
+  
+  const cleanParams: any = {};
+  
+  if (params?.viewType) cleanParams.viewType = params.viewType;
+  if (params?.keyword) cleanParams.keyword = params.keyword;
+  if (params?.from) cleanParams.from = params.from;
+  if (params?.to) cleanParams.to = params.to;
+
+  // Xử lý mảng: Axios mặc định gửi mảng dạng key[]=val, 
+  // nhưng Spring Boot thường thích dạng key=val1,val2 hoặc lặp lại key=val1&key=val2
+  // Ở đây ta join thành chuỗi "1,2,3" để an toàn nhất với nhiều loại backend
+  if (params?.epicIds?.length) cleanParams.epicIds = params.epicIds.join(",");
+  if (params?.sprintIds?.length) cleanParams.sprintIds = params.sprintIds.join(",");
+  if (params?.epicStatuses?.length) cleanParams.epicStatuses = params.epicStatuses.join(",");
+  if (params?.sprintStatuses?.length) cleanParams.sprintStatuses = params.sprintStatuses.join(",");
+
+  const res = await apiClient.get(`/statistics/projects/${projectId}/roadmap`, { 
     params: cleanParams 
   });
 
