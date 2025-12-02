@@ -12,8 +12,10 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 // API Services
 import { updateTask } from "@/services/apiTask";
+
 // Import API Status bạn vừa cung cấp
 import { getProjectStatuses, RawStatusColumn } from "@/services/apiBoard"; 
+import { getSprints, Sprint } from "@/services/apiSprint";
 import {
   getProjectMembers,
   getProjectTasks,
@@ -278,7 +280,7 @@ export default function ProjectListPage() {
   const [tasks, setTasks] = useState<TaskResponse[]>([]);
   const [groupedTasks, setGroupedTasks] = useState<TasksGroupedResponse>({});
   const [members, setMembers] = useState<ProjectMember[]>([]);
-  
+  const [allSprints, setAllSprints] = useState<Sprint[]>([]);
   // ✅ STATE: Sử dụng RawStatusColumn từ API bạn cung cấp
   const [statuses, setStatuses] = useState<RawStatusColumn[]>([]);
 
@@ -295,18 +297,18 @@ export default function ProjectListPage() {
 
     const fetchDataInfo = async () => {
        try {
-         // ✅ Gọi API getProjectStatuses mà bạn đã cung cấp
-         const [membersRes, statusRes] = await Promise.all([
+         const [membersRes, statusRes, sprintsRes] = await Promise.all([
             getProjectMembers(companyId, workspaceId, projectId, { size: 100 }),
-            getProjectStatuses(projectId) 
+            getProjectStatuses(projectId),
+            // ✅ GỌI API LẤY DANH SÁCH SPRINT
+            getSprints(projectId) 
          ]);
          
          if(membersRes.content) setMembers(membersRes.content);
-         
-         // ✅ Lưu trực tiếp dữ liệu chuẩn RawStatusColumn[] vào state
-         if(Array.isArray(statusRes) && statusRes.length > 0) {
-            setStatuses(statusRes);
-         }
+         if(Array.isArray(statusRes)) setStatuses(statusRes);
+         // ✅ SET SPRINTS
+         if(Array.isArray(sprintsRes)) setAllSprints(sprintsRes);
+
        } catch (err) {
          console.error("Load project info failed", err);
        }
@@ -505,9 +507,8 @@ export default function ProjectListPage() {
           projectId={projectId}
           members={members}
           statuses={statuses} // Truyền RawStatusColumn[] vào DetailPanel nếu nó hỗ trợ
-          sprints={[]}
-          epics={[]}
-          
+          sprints={allSprints}
+          epics={[]} 
           
           
         />

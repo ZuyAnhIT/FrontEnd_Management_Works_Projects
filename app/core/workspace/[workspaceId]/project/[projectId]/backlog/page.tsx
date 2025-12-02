@@ -461,7 +461,6 @@ export default function BacklogPage() {
                 companyId={companyId}       
                 workspaceId={workspaceId}   
                 projectId={projectId} 
-                isOpen={!!selectedTaskId}
                    
             />
           )}
