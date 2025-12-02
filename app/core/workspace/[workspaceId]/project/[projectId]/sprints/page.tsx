@@ -55,6 +55,64 @@ const JiraTaskRow = ({
     }
   };
 
+  
+// ===== Inline edit cho title =====
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [title, setTitle] = useState(task.title);
+  const [isSavingTitle, setIsSavingTitle] = useState(false);
+  const [titleError, setTitleError] = useState<string | null>(null);
+
+  // Đồng bộ khi task.title thay đổi từ bên ngoài (reload/list update)
+  useEffect(() => {
+    setTitle(task.title);
+  }, [task.title]);
+
+  const handleSaveTitle = async () => {
+    const trimmed = (title ?? "").trim();
+
+    // Validate nhẹ
+    if (!trimmed) {
+      setTitle(task.title);
+      setTitleError("Tiêu đề không được để trống");
+      setIsEditingTitle(false);
+      return;
+    }
+    if (trimmed === task.title) {
+      setIsEditingTitle(false);
+      return;
+    }
+
+    setIsSavingTitle(true);
+    setTitleError(null);
+
+    // Optimistic UI: cập nhật ngay vào parent
+    onUpdate?.(task.id, { title: trimmed });
+
+    try {
+      await updateTask(task.id, { title: trimmed });
+      setIsEditingTitle(false);
+    } catch (error: any) {
+      // Rollback
+      onUpdate?.(task.id, { title: task.title });
+      setTitle(task.title);
+      setTitleError(error?.message || "Lỗi khi cập nhật tiêu đề");
+    } finally {
+      setIsSavingTitle(false);
+    }
+  };
+
+  const handleTitleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleSaveTitle();
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      setTitle(task.title);
+      setIsEditingTitle(false);
+      setTitleError(null);
+    }
+  };
+
   const statusColor = task.status?.color || '#64748b';
   
   // Style cho Select Status
@@ -74,14 +132,55 @@ const JiraTaskRow = ({
         <span className="text-slate-500 font-mono text-xs font-medium">{task.taskCode}</span>
       </td>
 
-      {/* 2. SUMMARY */}
-      <td className="px-4 py-3 align-middle">
-        <div className="flex flex-col justify-center">
-          <span className="text-slate-700 font-medium hover:text-blue-600 transition-colors truncate max-w-[400px]">
-            {task.title}
-          </span>
-        </div>
-      </td>
+      
+{/* 2. SUMMARY */}
+<td className="px-4 py-3 align-middle">
+  <div className="flex flex-col justify-center">
+    <div className="flex items-center gap-2 overflow-hidden flex-1">
+      {isEditingTitle ? (
+        <input
+          autoFocus
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          onBlur={handleSaveTitle}
+          onKeyDown={handleTitleKeyDown}
+          disabled={isSavingTitle}
+          onPointerDown={(e) => e.stopPropagation()} // tránh click row khi đang edit
+          className="w-full text-[13px] font-medium text-[#172B4D] bg-white border border-blue-500 rounded px-2 py-1 outline-none"
+          placeholder="Nhập tiêu đề"
+        />
+      ) : (
+        <span
+          className="text-slate-700 font-medium hover:text-blue-600 transition-colors truncate max-w-[400px] cursor-text border border-transparent hover:border-gray-300 rounded px-2 py-1"
+          title="Click để sửa tiêu đề"
+          onClick={(e) => {
+            e.stopPropagation(); // nếu row có onClick chọn task
+            setIsEditingTitle(true);
+          }}
+        >
+          {task.title}
+        </span>
+      )}
+
+      {/* Ví dụ: badge số linked items nếu bạn muốn */}
+      {/* {!isEditingTitle && task.subTasks?.length > 0 && (
+        <span className="text-xs font-medium text-[#172B4D] bg-[#DFE1E6] px-2 py-0.5 rounded-full">
+          {task.subTasks.length}
+        </span>
+      )} */}
+    </div>
+
+    <div className="mt-1 h-5">
+      {isSavingTitle && (
+        <span className="text-xs text-slate-500">Đang lưu…</span>
+      )}
+      {titleError && (
+        <span className="text-xs text-red-600">{titleError}</span>
+      )}
+    </div>
+  </div>
+</td>
+
 
       {/* 3. STATUS (DROPDOWN) */}
       <td className="px-4 py-2 w-48 align-middle" onClick={(e) => e.stopPropagation()}>
@@ -408,7 +507,7 @@ export default function ProjectListPage() {
           statuses={statuses} // Truyền RawStatusColumn[] vào DetailPanel nếu nó hỗ trợ
           sprints={[]}
           epics={[]}
-          isOpen={isDetailOpen}
+          
           
           
         />
