@@ -6,12 +6,18 @@ import "gantt-task-react/dist/index.css";
 import { RoadmapItemResponse } from "@/services/apiStatistics";
 import { Loader2, Layers, Rocket, CalendarDays, LayoutList } from "lucide-react";
 
+// ✅ Import Component tạo nhanh Epic
+import QuickEpicCreate from "./QuickEpicCreate";
+
 interface TimelineGanttProps {
   data: RoadmapItemResponse[];
   loading: boolean;
+  // ✅ Thêm props cần thiết cho việc tạo Epic
+  projectId: number;
+  onRefresh: () => void;
 }
 
-export default function TimelineGantt({ data, loading }: TimelineGanttProps) {
+export default function TimelineGantt({ data, loading, projectId, onRefresh }: TimelineGanttProps) {
   const [viewMode, setViewMode] = useState<ViewMode>(ViewMode.Month);
   
   // State bật/tắt cột danh sách bên trái
@@ -25,7 +31,7 @@ export default function TimelineGantt({ data, loading }: TimelineGanttProps) {
       end: new Date(item.endDate),
       name: item.title,
       id: item.id,
-      type: "task", // "task" | "milestone" | "project"
+      type: "task",
       progress: item.progress,
       isDisabled: true, // Read-only mode
       styles: {
@@ -50,13 +56,14 @@ export default function TimelineGantt({ data, loading }: TimelineGanttProps) {
       )
   }
 
+  // ✅ CẬP NHẬT TASK LIST TABLE ĐỂ CHỨA QUICK CREATE
   const TaskListTable = ({ rowHeight, tasks, fontFamily, fontSize }: any) => {
       return (
-          <div className="border-r border-slate-200 bg-white font-sans">
+          <div className="border-r border-slate-200 bg-white font-sans flex flex-col h-full">
               {tasks.map((t: any) => (
                   <div 
                     key={t.id} 
-                    className="flex items-center pl-4 border-b border-slate-100 hover:bg-slate-50 transition-colors truncate"
+                    className="flex items-center pl-4 border-b border-slate-100 hover:bg-slate-50 transition-colors truncate shrink-0"
                     style={{ height: rowHeight, fontFamily, fontSize }}
                     title={t.name}
                   >
@@ -66,6 +73,20 @@ export default function TimelineGantt({ data, loading }: TimelineGanttProps) {
                       <span className="text-sm text-slate-700 font-medium truncate">{t.name}</span>
                   </div>
               ))}
+
+              {/* 🔥 PHẦN TẠO NHANH EPIC (Dòng cuối cùng) */}
+              <div 
+                className="border-b border-slate-100 shrink-0 bg-slate-50/30"
+                style={{ height: rowHeight }}
+              >
+                 <QuickEpicCreate 
+                    projectId={projectId}
+                    onSuccess={onRefresh}
+                 />
+              </div>
+              
+              {/* Phần đệm phía dưới cho đẹp */}
+              <div className="flex-1 bg-slate-50/10"></div>
           </div>
       )
   }
@@ -114,13 +135,22 @@ export default function TimelineGantt({ data, loading }: TimelineGanttProps) {
       </div>
   );
 
-  if (tasks.length === 0) return (
-      <div className="h-[400px] flex flex-col items-center justify-center bg-white rounded-xl border border-slate-200 shadow-sm text-slate-400">
-          <CalendarDays className="w-12 h-12 mb-3 opacity-20" />
-          <p className="text-sm font-medium">No timeline data found.</p>
-          <p className="text-xs mt-1 opacity-70">Try adjusting your filters.</p>
-      </div>
-  );
+  // HACK: Nếu chưa có task nào, Gantt sẽ không render.
+  // Ta tạo 1 task ẩn để khung Gantt hiện ra -> User mới thấy nút Create Epic.
+  const displayTasks: Task[] = tasks.length > 0 ? tasks : [
+      {
+          start: new Date(),
+          end: new Date(),
+          name: "Hidden",
+          id: "hidden-placeholder",
+          type: "task", // Đây là giá trị hợp lệ của TaskType
+          progress: 0,
+          isDisabled: true,
+          styles: { backgroundColor: "transparent", progressColor: "transparent", backgroundSelectedColor: "transparent" },
+          hideChildren: true,
+          project: "HIDDEN"
+      }
+  ];
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col h-full overflow-hidden">
@@ -152,11 +182,10 @@ export default function TimelineGantt({ data, loading }: TimelineGanttProps) {
        </div>
 
        {/* 2. GANTT BODY (SCROLLABLE) */}
-       {/* Sử dụng overflow-auto và minWidth để cho phép cuộn ngang/dọc */}
        <div className="flex-1 overflow-auto custom-scrollbar relative">
-           <div style={{ minWidth: '1000px', minHeight: '400px' }}> {/* Đảm bảo không gian vẽ */}
+           <div style={{ minWidth: '1000px', minHeight: '400px' }}> 
                <Gantt
-                  tasks={tasks}
+                  tasks={displayTasks}
                   viewMode={viewMode}
                   
                   // Layout Configuration
@@ -164,12 +193,12 @@ export default function TimelineGantt({ data, loading }: TimelineGanttProps) {
                   columnWidth={viewMode === ViewMode.Month ? 200 : 60}
                   rowHeight={48}
                   headerHeight={48}
-                  barFill={70} // Độ cao thanh bar (%)
+                  barFill={70} 
                   barCornerRadius={4}
                   
                   // Custom Renderers
                   TaskListHeader={TaskListHeader}
-                  TaskListTable={TaskListTable}
+                  TaskListTable={TaskListTable} // ✅ Đã cập nhật chứa QuickEpicCreate
                   TooltipContent={CustomTooltip}
                />
            </div>
