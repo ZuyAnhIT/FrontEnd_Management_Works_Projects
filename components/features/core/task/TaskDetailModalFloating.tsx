@@ -29,6 +29,7 @@ import {
 } from "@/services/apiSubTask";
 import { apiTag, Tag } from "@/services/apiTag";
 import { useToast } from "@/components/ui/ToastProvider";
+import { getSprints, Sprint } from "@/services/apiSprint";
 
 // Components Con
 import TaskComment from "@/components/features/core/task/TaskComment";
@@ -127,6 +128,8 @@ export default function TaskDetailModalFloating({
   const [allProjectTags, setAllProjectTags] = useState<Tag[]>([]);
   const [isTagPopoverOpen, setIsTagPopoverOpen] = useState(false);
   
+  // Sprint State
+  const [localSprints, setLocalSprints] = useState<any[]>(sprints);
   // ✅ POPOVER & MODAL STATES
   const [isSprintPopoverOpen, setIsSprintPopoverOpen] = useState(false);
   const [isEpicModalOpen, setIsEpicModalOpen] = useState(false);
@@ -149,7 +152,7 @@ export default function TaskDetailModalFloating({
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
-
+  
   // Click Outside Handler
   useEffect(() => {
     function handleClickOutside(event: any) {
@@ -177,7 +180,7 @@ export default function TaskDetailModalFloating({
             description: data.description || "",
             taskType: data.taskType,
             priority: data.priority,
-            statusId: data.status.id,
+            statusId: data.status?.id,
             sprintId: data.sprint?.id,
             epicId: data.epic?.id,
             assigneeId: data.assignee?.id,
@@ -192,10 +195,19 @@ export default function TaskDetailModalFloating({
         })
         .finally(() => setLoading(false));
 
+      // 2. Fetch Subtasks (giữ nguyên)
       fetchSubtasks(taskId);
+
+      // 3. Fetch Tags (giữ nguyên)
       apiTag.getTags(companyId, workspaceId, projectId)
         .then(tags => setAllProjectTags(tags))
-        .catch(() => showToast("Failed to load tags", "error"));
+        .catch(() => console.error("Failed to load tags"));
+
+      // ✅ 4. FETCH SPRINTS (THÊM MỚI)
+      // Gọi API lấy danh sách sprint của project hiện tại
+      getSprints(projectId)
+        .then(data => setLocalSprints(data))
+        .catch(err => console.error("Failed to load sprints", err));
     }
   }, [isOpen, taskId, companyId, workspaceId, projectId]);
 
@@ -385,7 +397,40 @@ export default function TaskDetailModalFloating({
     setIsDragging(true);
     setDragOffset({ x: e.clientX - position.x, y: e.clientY - position.y });
   };
+  const handleUpdateSubtask = async (subTaskId: number, data: any) => {
+    if (!taskId) return;
 
+    // Optimistic Update
+    setSubtasks(prev => prev.map(s => {
+      if (s.id === subTaskId) {
+        if (data.assigneeId !== undefined) {
+          const userId = Number(data.assigneeId);
+          if (userId === 0) {
+            return { ...s, ...data, assigneeId: null, assigneeName: null, assigneeAvatar: null };
+          }
+          const member = members.find(m => (m.userId || m.id) === userId);
+          return {
+            ...s,
+            ...data,
+            assigneeId: userId,
+            assigneeName: member?.fullName || member?.name,
+            assigneeAvatar: member?.avatarUrl || member?.avatar
+          };
+        }
+        return { ...s, ...data };
+      }
+      return s;
+    }));
+
+    // Call API
+    try {
+      await updateSubtask(companyId, workspaceId, projectId, taskId, subTaskId, data);
+    } catch (error) {
+      console.error("Lỗi update subtask:", error);
+      showToast("Cập nhật thất bại", "error");
+      fetchSubtasks(taskId); // Revert
+    }
+  };
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (isDragging) setPosition({ x: e.clientX - dragOffset.x, y: e.clientY - dragOffset.y });
@@ -492,14 +537,15 @@ export default function TaskDetailModalFloating({
                   </div>
 
                   {/* Subtasks */}
-                  <TaskSubtasks 
+                 <TaskSubtasks
                         subtasks={subtasks}
                         members={members}
                         onToggleStatus={handleToggleSubtask}
-                        onDelete={(id) => onClickDeleteSubtask(Number(id))} // Trigger Confirm Modal
+                        onDelete={(id) => onClickDeleteSubtask(Number(id))}
                         onAddSubtask={() => setIsAddingSubtask(true)}
-                        onAssigneeChange={() => {}} 
-                        onEditContent={() => {}} 
+                        // ✅ FIX 2: GẮN HÀM XỬ LÝ VÀO ĐÂY (Thay vì () => {})
+                        onAssigneeChange={(subTaskId, userId) => handleUpdateSubtask(subTaskId, { assigneeId: userId })}
+                        onEditContent={(subTaskId, title) => handleUpdateSubtask(subTaskId, { title })}
                   />
                   {isAddingSubtask && (
                     <div className="mt-2 flex gap-2">
@@ -533,15 +579,15 @@ export default function TaskDetailModalFloating({
                                 value={formData.statusId || ''}
                                 onChange={e => handleUpdate('statusId', Number(e.target.value))}
                                 style={{ 
-                                    color: task.status.color || 'inherit',
+                                    color: task.status?.color || 'inherit',
                                     borderLeftWidth: '4px',
-                                    borderLeftColor: task.status.color || 'transparent'
+                                    borderLeftColor: task.status?.color || 'transparent'
                                 }}
                             >
                                 {statuses.length > 0 ? (
                                     statuses.map(st => <option key={st.id} value={st.id}>{st.name}</option>)
                                 ) : (
-                                    <option value={task.status.id}>{task.status.name}</option>
+                                    <option value={task.status?.id}>{task.status?.name}</option>
                                 )}
                             </select>
                             <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-2.5 pointer-events-none"/>
@@ -684,46 +730,20 @@ export default function TaskDetailModalFloating({
                         </div>
 
                         {/* ✅ SPRINT SELECTOR - CUSTOM POPOVER */}
-                        <div className="flex items-center justify-between relative">
-                             <div className="flex items-center gap-2 text-sm text-slate-600"><Clock className="w-4 h-4"/> Sprint</div>
-                             
-                             <button 
-                                ref={sprintButtonRef}
-                                onClick={() => setIsSprintPopoverOpen(!isSprintPopoverOpen)}
-                                className="w-[140px] text-sm text-right bg-transparent border-none outline-none text-slate-700 hover:text-blue-600 font-medium cursor-pointer truncate transition-colors hover:bg-slate-100 rounded px-2 py-1"
-                             >
-                                {sprints.find(s => s.id === formData.sprintId)?.name || "Backlog"}
-                             </button>
-
-                             {isSprintPopoverOpen && (
-                                <div ref={sprintPopoverRef} className="absolute right-0 top-8 z-20 w-56 bg-white rounded-md shadow-xl border border-slate-200 mt-1 animate-in fade-in zoom-in-95 duration-100 overflow-hidden">
-                                    <div className="text-[10px] text-slate-400 px-3 py-2 border-b border-slate-50 uppercase font-bold bg-slate-50/50">
-                                        Select Sprint
-                                    </div>
-                                    <div className="max-h-56 overflow-y-auto custom-scrollbar">
-                                        <button
-                                            onClick={() => handleSelectSprint(0)}
-                                            className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 text-slate-700 flex items-center justify-between group"
-                                        >
-                                            <span className={formData.sprintId === 0 || !formData.sprintId ? "font-semibold" : ""}>Backlog</span>
-                                            {(formData.sprintId === 0 || !formData.sprintId) && <Check className="w-3.5 h-3.5 text-blue-600" />}
-                                        </button>
-                                        
-                                        {sprints.map(sprint => (
-                                            <button
-                                                key={sprint.id}
-                                                onClick={() => handleSelectSprint(sprint.id)}
-                                                className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 text-slate-700 flex items-center justify-between group border-t border-slate-50"
-                                            >
-                                                <span className={`truncate ${formData.sprintId === sprint.id ? "font-semibold text-blue-700" : ""}`}>
-                                                    {sprint.name}
-                                                </span>
-                                                {formData.sprintId === sprint.id && <Check className="w-3.5 h-3.5 text-blue-600" />}
-                                            </button>
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2 text-sm text-slate-600"><Clock className="w-4 h-4"/> Sprint</div>
+                            <div className="relative w-[140px]">
+                                <select
+                                    className="w-full text-sm text-right bg-transparent border-none outline-none text-slate-700 hover:text-blue-600 font-medium cursor-pointer truncate transition-colors hover:bg-slate-100 rounded px-2 py-1 appearance-none"
+                                    value={Number(formData.sprintId) || 0}
+                                    onChange={e => handleUpdate('sprintId', Number(e.target.value))}
+                                >
+                                    <option value={0}>Backlog</option>
+                                    {localSprints.map(s => (
+                                            <option key={s.id} value={s.id}>{s.name}</option>
                                         ))}
-                                    </div>
-                                </div>
-                             )}
+                                </select>
+                            </div>
                         </div>
                   </div>
 

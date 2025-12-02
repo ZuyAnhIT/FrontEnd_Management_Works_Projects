@@ -118,6 +118,26 @@ export default function TaskDetailPanel({
   //Tag Details Modal
 const [editingTag, setEditingTag] = useState<Tag | null>(null);
   // Click outside Tag Popover
+//   useEffect(() => {
+//     if (task) {
+//       console.group("--- DEBUG ASSIGNEE ---");
+//       console.log("1. ID Assignee trong Task:", task.assigneeId, typeof task.assigneeId);
+      
+//       const memberIds = members.map(m => m.userId || m.id);
+//       console.log("2. Danh sách ID Members có sẵn:", memberIds);
+      
+//       // Kiểm tra xem ID có tồn tại trong danh sách không
+//       const exists = memberIds.includes(task.assigneeId as any); // ép kiểu để check nhanh
+//       console.log("3. Có tìm thấy Assignee trong Members không?", exists ? "✅ CÓ" : "❌ KHÔNG");
+      
+//       // Kiểm tra kiểu dữ liệu (Rất quan trọng: '1' khác 1)
+//       if (members.length > 0) {
+//          const firstMemberId = members[0].userId || members[0].id;
+//          console.log("4. Kiểu dữ liệu ID của Member đầu tiên:", typeof firstMemberId);
+//       }
+//       console.groupEnd();
+//     }
+//   }, [task, members]);
   useEffect(() => {
     function handleClickOutside(event: any) {
         if (tagPopoverRef.current && !tagPopoverRef.current.contains(event.target) && !tagButtonRef.current?.contains(event.target)) {
@@ -141,19 +161,39 @@ const [editingTag, setEditingTag] = useState<Tag | null>(null);
     if (taskId) {
       setLoading(true);
       
-      // 1. Get Task Details
       getTaskDetails(taskId)
         .then(data => {
-          setTask(data as ExtendedTaskDetail);
+          // 1. 🔥 TÍNH TOÁN CÁC ID AN TOÀN TRƯỚC (Ưu tiên lấy từ object lồng nhau)
+          const safeAssigneeId = data.assignee?.id ?? data.assigneeId ?? null;
+          const safeStatusId = data.status?.id ?? data.statusId;
+          const safeSprintId = data.sprint?.id ?? data.sprintId ?? null;
+          const safeEpicId = data.epic?.id ?? data.epicId ?? null;
+
+          // 2. 🔥 CẬP NHẬT STATE TASK VỚI CÁC ID ĐÃ ĐƯỢC TÍNH TOÁN
+          // (Phải làm bước này thì task.assigneeId mới có giá trị 5)
+          setTask({
+              ...data,
+              assigneeId: safeAssigneeId,
+              sprintId: safeSprintId,
+              epicId: safeEpicId,
+              statusId: safeStatusId,
+              // Map thêm thông tin hiển thị nếu API trả về object assignee nhưng thiếu assigneeName ở ngoài
+              assigneeName: data.assignee?.name || data.assigneeName,
+              assigneeAvatar: data.assignee?.avatarUrl || data.assigneeAvatar
+          } as ExtendedTaskDetail);
+
+          // 3. Cập nhật Form Data cho các thẻ Input/Select
           setFormData({
             title: data.title,
             description: data.description || "",
             taskType: data.taskType,
             priority: data.priority,
-            statusId: data.statusId,
-            sprintId: data.sprintId,
-            epicId: data.epicId,
-            assigneeId: data.assigneeId,
+            
+            statusId: safeStatusId,
+            sprintId: safeSprintId,
+            epicId: safeEpicId,
+            assigneeId: safeAssigneeId,
+            
             storyPoints: data.storyPoints || 0,
             estimatedHours: data.estimatedHours || 0,
             startDate: data.startDate || undefined,
@@ -166,13 +206,8 @@ const [editingTag, setEditingTag] = useState<Tag | null>(null);
         })
         .finally(() => setLoading(false));
 
-       // 2. Get Subtasks
        fetchSubtasks(taskId);
-
-       // 3. Get All Tags (for dropdown)
-       apiTag.getTags(companyId, workspaceId, projectId)
-        .then(tags => setAllProjectTags(tags))
-        .catch(err => console.error("Failed to load tags", err));
+       apiTag.getTags(companyId, workspaceId, projectId).then(setAllProjectTags);
     }
   }, [taskId, companyId, workspaceId, projectId]);
 
@@ -388,6 +423,44 @@ const [editingTag, setEditingTag] = useState<Tag | null>(null);
           setIsSaving(false);
       }
   };
+
+  // --- THÊM HÀM NÀY ĐỂ XỬ LÝ UPDATE SUBTASK (ASSIGNEE, TITLE...) ---
+  const handleUpdateSubtask = async (subTaskId: number, data: any) => {
+    if (!taskId) return;
+
+    // 1. Optimistic Update (Cập nhật UI ngay lập tức để không bị giật)
+    setSubtasks(prev => prev.map(s => {
+        if (s.id === subTaskId) {
+            // Nếu đang update người gán
+            if (data.assigneeId !== undefined) {
+                if (data.assigneeId === 0 || data.assigneeId === null) {
+                    return { ...s, ...data, assigneeId: null, assigneeName: null, assigneeAvatar: null };
+                }
+                // Tìm thông tin member để hiển thị avatar ngay
+                const member = members.find(m => (m.userId || m.id) === Number(data.assigneeId));
+                return { 
+                    ...s, 
+                    ...data, 
+                    assigneeId: Number(data.assigneeId),
+                    assigneeName: member?.fullName || member?.name, 
+                    assigneeAvatar: member?.avatarUrl || member?.avatar 
+                };
+            }
+            // Các trường khác (title...)
+            return { ...s, ...data };
+        }
+        return s;
+    }));
+
+    // 2. Call API
+    try {
+        await updateSubtask(companyId, workspaceId, projectId, taskId, subTaskId, data);
+    } catch (error) {
+        console.error("Lỗi update subtask:", error);
+        showToast("Cập nhật thất bại", "error");
+        fetchSubtasks(taskId); // Revert lại dữ liệu gốc nếu lỗi
+    }
+  };
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/20 backdrop-blur-[1px]" onClick={onClose}>
       <div className="w-full md:w-[800px] bg-white h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-200" onClick={(e) => e.stopPropagation()}>
@@ -485,8 +558,10 @@ const [editingTag, setEditingTag] = useState<Tag | null>(null);
                         onToggleStatus={handleToggleSubtask}
                         onDelete={(id) => handleDeleteSubtask(Number(id))}
                         onAddSubtask={() => setIsAddingSubtask(true)}
-                        onAssigneeChange={() => {}} 
-                        onEditContent={() => {}} 
+                        
+                        // ✅ FIX: Truyền hàm xử lý vào đây
+                        onAssigneeChange={(subTaskId, userId) => handleUpdateSubtask(subTaskId, { assigneeId: userId })}
+                        onEditContent={(subTaskId, title) => handleUpdateSubtask(subTaskId, { title })} 
                     />
                       {/* Add Subtask Input */}
                       {isAddingSubtask && (
@@ -558,12 +633,13 @@ const [editingTag, setEditingTag] = useState<Tag | null>(null);
                                 </div>
                                 <select 
                                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                    value={formData.assigneeId || 0}
+                                    // 🔥 FIX: Ép kiểu về chuỗi để so sánh chính xác với value của option
+                                    value={formData.assigneeId ? String(formData.assigneeId) : "0"}
                                     onChange={e => handleUpdate('assigneeId', Number(e.target.value))}
                                 >
-                                    <option value={0}>Unassigned</option>
+                                    <option value="0">Unassigned</option>
                                     {members.map(m => (
-                                        <option key={m.userId || m.id} value={m.userId || m.id}>
+                                        <option key={m.userId || m.id} value={String(m.userId || m.id)}>
                                             {m.fullName || m.name}
                                         </option>
                                     ))}
@@ -688,15 +764,19 @@ const [editingTag, setEditingTag] = useState<Tag | null>(null);
                         
                         {/* Sprint */}
                         <div className="flex items-center justify-between">
-                             <div className="flex items-center gap-2 text-sm text-slate-600"><Clock className="w-4 h-4"/> Sprint</div>
-                             <select 
-                                className="w-[140px] text-sm text-right bg-transparent border-none outline-none text-slate-700 hover:text-blue-600 font-medium cursor-pointer truncate"
-                                value={formData.sprintId || 0}
+                            <div className="flex items-center gap-2 text-sm text-slate-600"><Clock className="w-4 h-4"/> Sprint</div>
+                            <select 
+                                className="w-full text-sm text-right bg-transparent border-none outline-none text-slate-700 hover:text-blue-600 font-medium cursor-pointer truncate transition-colors hover:bg-slate-100 rounded px-2 py-1 appearance-none"
+                                // Ép kiểu về Number để so sánh chính xác
+                                value={Number(formData.sprintId) || 0}
                                 onChange={e => handleUpdate('sprintId', Number(e.target.value))}
-                             >
+                            >
                                 <option value={0}>Backlog</option>
-                                {sprints.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                             </select>
+                                {/* Render list sprint từ props */}
+                                {sprints.map(s => (
+                                    <option key={s.id} value={s.id}>{s.name}</option>
+                                ))}
+                            </select>
                         </div>
                     </div>
 
