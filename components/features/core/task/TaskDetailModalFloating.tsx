@@ -356,13 +356,40 @@ export default function TaskDetailModalFloating({
       showToast("Subtask created", "success");
     } catch (error) { showToast("Failed create subtask", "error"); }
   };
-  const handleToggleSubtask = async (subtask: Subtask) => {
-    if (!taskId) return;
-    const newStatus = subtask.status === 'DONE' ? 'TO_DO' : 'DONE';
-    setSubtasks(prev => prev.map(s => s.id === subtask.id ? { ...s, status: newStatus } : s));
-    try { await updateSubtask(companyId, workspaceId, projectId, taskId, subtask.id, { status: newStatus }); }
-    catch (error) { fetchSubtasks(taskId); }
+ const handleToggleSubtask = async (subtask: Subtask) => {
+  if (!taskId) return;
+
+  // 1. Định nghĩa vòng lặp trạng thái: Key là trạng thái hiện tại -> Value là trạng thái tiếp theo
+  // TO_DO -> IN_PROGRESS -> DONE -> quay lại TO_DO
+  const statusCycle: Record<string, string> = {
+    'TO_DO': 'IN_PROGRESS',
+    'IN_PROGRESS': 'DONE',
+    'DONE': 'TO_DO',
+    // Fallback cho trường hợp backend trả về lowercase (nếu có)
+    'todo': 'IN_PROGRESS', 
+    'in_progress': 'DONE',
+    'done': 'TO_DO'
   };
+
+  // 2. Xác định trạng thái mới
+  const currentStatus = subtask.status || 'TO_DO';
+  const newStatus = statusCycle[currentStatus] || 'TO_DO'; // Mặc định về TO_DO nếu lỗi
+
+  // 3. Optimistic Update (Cập nhật UI ngay lập tức để người dùng thấy mượt)
+  setSubtasks(prev => prev.map(s => 
+    s.id === subtask.id ? { ...s, status: newStatus } : s
+  ));
+
+  try {
+    // 4. Gọi API cập nhật
+    await updateSubtask(companyId, workspaceId, projectId, taskId, subtask.id, { status: newStatus });
+  } catch (error) {
+    // 5. Nếu lỗi, hoàn tác bằng cách tải lại danh sách gốc
+    console.error("Failed to update status", error);
+    fetchSubtasks(taskId);
+    // toast.error("Có lỗi xảy ra khi cập nhật trạng thái");
+  }
+};
 
   // --- DELETE SUBTASK LOGIC WITH CONFIRM MODAL ---
   const onClickDeleteSubtask = (subTaskId: number) => {
