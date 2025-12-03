@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { apiTag, Tag } from "@/services/apiTag";
 import { useToast } from "@/components/ui/ToastProvider";
 
-// Bảng màu gợi ý giống Jira/Trello
+// Preset colors similar to Jira/Trello
 const PRESET_COLORS = [
     "#94a3b8", // Slate (Default)
     "#ef4444", // Red
@@ -28,8 +28,8 @@ interface TagModalProps {
     companyId: number;
     workspaceId: number;
     projectId: number;
-    onUpdate: (updatedTag: Tag) => void; // Callback khi sửa xong
-    onDelete: (tagId: number) => void;   // Callback khi xóa xong
+    onUpdate: (updatedTag: Tag) => void; // Callback when updated
+    onDelete: (tagId: number) => void;   // Callback when deleted
 }
 
 export default function TagModal({
@@ -44,16 +44,16 @@ export default function TagModal({
 }: TagModalProps) {
     const { showToast } = useToast();
 
-    // State cho Edit Form
+    // State for Edit Form
     const [tagName, setTagName] = useState("");
     const [tagColor, setTagColor] = useState("");
     const [isLoading, setIsLoading] = useState(false);
 
-    // State cho Delete Confirmation
+    // State for Delete Confirmation
     const [isDeleteMode, setIsDeleteMode] = useState(false);
     const [deleteConfirmation, setDeleteConfirmation] = useState("");
 
-    // Reset state khi mở modal với tag mới
+    // Reset state when opening modal with a tag
     useEffect(() => {
         if (isOpen && tag) {
             setTagName(tag.name);
@@ -69,7 +69,7 @@ export default function TagModal({
 
     const handleSave = async () => {
         if (!tagName.trim()) {
-            showToast("Tên thẻ không được để trống", "error");
+            showToast("Tag name is required", "error");
             return;
         }
 
@@ -81,11 +81,11 @@ export default function TagModal({
                 description: tag.description
             });
             onUpdate(updatedTag);
-            showToast("Cập nhật thẻ thành công", "success");
+            showToast("Tag updated successfully", "success");
             onClose();
         } catch (error) {
             console.error(error);
-            showToast("Lỗi khi cập nhật thẻ", "error");
+            showToast("Failed to update tag", "error");
         } finally {
             setIsLoading(false);
         }
@@ -98,11 +98,11 @@ export default function TagModal({
             setIsLoading(true);
             await apiTag.deleteTag(companyId, workspaceId, projectId, tag.id);
             onDelete(tag.id);
-            showToast("Đã xóa thẻ vĩnh viễn", "success");
+            showToast("Tag deleted permanently", "success");
             onClose();
         } catch (error) {
             console.error(error);
-            showToast("Không thể xóa thẻ (có thể đang được sử dụng)", "error");
+            showToast("Failed to delete tag (it might be in use)", "error");
         } finally {
             setIsLoading(false);
         }
@@ -115,7 +115,7 @@ export default function TagModal({
                 {/* HEADER */}
                 <div className="px-4 py-3 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                     <h3 className="font-bold text-slate-700 text-sm">
-                        {isDeleteMode ? "Xóa thẻ?" : "Chỉnh sửa thẻ"}
+                        {isDeleteMode ? "Delete Tag?" : "Edit Tag"}
                     </h3>
                     <button onClick={onClose} className="text-slate-400 hover:text-slate-700">
                         <X className="w-5 h-5" />
@@ -139,18 +139,18 @@ export default function TagModal({
 
                             {/* Input Name */}
                             <div className="space-y-1.5">
-                                <label className="text-xs font-bold text-slate-500 uppercase">Tên thẻ</label>
+                                <label className="text-xs font-bold text-slate-500 uppercase">Tag Name</label>
                                 <Input 
                                     value={tagName}
                                     onChange={(e) => setTagName(e.target.value)}
-                                    placeholder="Nhập tên thẻ..."
+                                    placeholder="Enter tag name..."
                                     autoFocus
                                 />
                             </div>
 
                             {/* Color Picker */}
                             <div className="space-y-2">
-                                <label className="text-xs font-bold text-slate-500 uppercase">Màu sắc</label>
+                                <label className="text-xs font-bold text-slate-500 uppercase">Color</label>
                                 <div className="flex flex-wrap gap-2">
                                     {PRESET_COLORS.map((color) => (
                                         <button
@@ -175,13 +175,13 @@ export default function TagModal({
 
                             <div className="pt-4 flex gap-2 justify-between">
                                 <Button variant="ghost" size="sm" className="text-red-600 hover:bg-red-50 hover:text-red-700" onClick={() => setIsDeleteMode(true)}>
-                                    <Trash2 className="w-4 h-4 mr-1.5" /> Xóa thẻ
+                                    <Trash2 className="w-4 h-4 mr-1.5" /> Delete Tag
                                 </Button>
                                 <div className="flex gap-2">
-                                    <Button variant="outline" size="sm" onClick={onClose}>Hủy</Button>
+                                    <Button variant="outline" size="sm" onClick={onClose}>Cancel</Button>
                                     <Button size="sm" className="bg-blue-600 hover:bg-blue-700" onClick={handleSave} disabled={isLoading}>
                                         {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4 mr-1.5" />}
-                                        Lưu
+                                        Save
                                     </Button>
                                 </div>
                             </div>
@@ -192,14 +192,14 @@ export default function TagModal({
                             <div className="bg-red-50 p-4 rounded-md flex gap-3 border border-red-100">
                                 <AlertTriangle className="w-5 h-5 text-red-600 shrink-0" />
                                 <div className="text-sm text-red-800">
-                                    <p className="font-bold">Hành động này không thể hoàn tác!</p>
-                                    <p className="mt-1 text-xs">Thẻ <strong>"{tag.name}"</strong> sẽ bị xóa vĩnh viễn khỏi dự án và gỡ khỏi tất cả các task đang sử dụng nó.</p>
+                                    <p className="font-bold">This action cannot be undone!</p>
+                                    <p className="mt-1 text-xs">Tag <strong>"{tag.name}"</strong> will be permanently removed from the project and unassigned from all tasks using it.</p>
                                 </div>
                             </div>
 
                             <div className="space-y-2">
                                 <label className="text-xs font-medium text-slate-700">
-                                    Nhập <strong>delete</strong> để xác nhận xóa:
+                                    Type <strong>delete</strong> to confirm:
                                 </label>
                                 <Input 
                                     value={deleteConfirmation}
@@ -210,7 +210,7 @@ export default function TagModal({
                             </div>
 
                             <div className="pt-2 flex gap-2 justify-end">
-                                <Button variant="outline" size="sm" onClick={() => setIsDeleteMode(false)}>Quay lại</Button>
+                                <Button variant="outline" size="sm" onClick={() => setIsDeleteMode(false)}>Back</Button>
                                 <Button 
                                     size="sm" 
                                     className="bg-red-600 hover:bg-red-700 text-white" 
@@ -218,7 +218,7 @@ export default function TagModal({
                                     disabled={deleteConfirmation.toLowerCase() !== "delete" || isLoading}
                                 >
                                     {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4 mr-1.5" />}
-                                    Xác nhận xóa
+                                    Confirm Delete
                                 </Button>
                             </div>
                         </div>

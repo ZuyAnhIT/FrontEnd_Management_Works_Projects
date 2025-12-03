@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import {
   X, Lock, Eye, Share2, MoreHorizontal, Maximize2,
   Link as LinkIcon, CheckSquare, ChevronDown, Plus,
@@ -39,6 +39,8 @@ import TaskSubtasks from "@/components/features/core/task/TaskSubtasks";
 import EpicModal from "@/components/features/core/epic/EpicModal"; 
 // Import ConfirmModal (File bạn vừa cung cấp)
 import ConfirmationModal from "@/components/ui/ConfirmationModal"; 
+
+import TagModal from "@/components/features/core/tag/TagModal";
 
 // --- HELPER COMPONENT: PRIORITY SELECT ---
 const PrioritySelect = ({ value, onChange }: { value: string, onChange: (val: string) => void }) => {
@@ -127,7 +129,8 @@ export default function TaskDetailModalFloating({
   // Tags State
   const [allProjectTags, setAllProjectTags] = useState<Tag[]>([]);
   const [isTagPopoverOpen, setIsTagPopoverOpen] = useState(false);
-  
+  const [tagSearch, setTagSearch] = useState("");
+  const [editingTag, setEditingTag] = useState<Tag | null>(null);
   // Sprint State
   const [localSprints, setLocalSprints] = useState<any[]>(sprints);
   // ✅ POPOVER & MODAL STATES
@@ -142,6 +145,7 @@ export default function TaskDetailModalFloating({
   // Refs for click outside
   const tagButtonRef = useRef<HTMLButtonElement>(null);
   const tagPopoverRef = useRef<HTMLDivElement>(null);
+  const tagInputRef = useRef<HTMLInputElement>(null);
   const sprintButtonRef = useRef<HTMLButtonElement>(null);
   const sprintPopoverRef = useRef<HTMLDivElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
@@ -158,6 +162,7 @@ export default function TaskDetailModalFloating({
     function handleClickOutside(event: any) {
       if (tagPopoverRef.current && !tagPopoverRef.current.contains(event.target) && !tagButtonRef.current?.contains(event.target)) {
         setIsTagPopoverOpen(false);
+        setTagSearch("");
       }
       if (sprintPopoverRef.current && !sprintPopoverRef.current.contains(event.target) && !sprintButtonRef.current?.contains(event.target)) {
         setIsSprintPopoverOpen(false);
@@ -166,7 +171,12 @@ export default function TaskDetailModalFloating({
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
-
+  useEffect(() => {
+    if (isTagPopoverOpen && tagInputRef.current) {
+      setTimeout(() => tagInputRef.current?.focus(), 50);
+    }
+  }, [isTagPopoverOpen]);
+  
   // --- 1. LOAD DATA ---
   useEffect(() => {
     if (isOpen && taskId) {
@@ -302,7 +312,12 @@ export default function TaskDetailModalFloating({
     setIsSprintPopoverOpen(false);
     await handleUpdate('sprintId', sprintId);
   };
-
+  const filteredTags = useMemo(() => {
+    if (!tagSearch.trim()) return allProjectTags;
+    return allProjectTags.filter(t =>
+      t.name.toLowerCase().includes(tagSearch.toLowerCase())
+    );
+  }, [allProjectTags, tagSearch]);
   // Tags Handlers
   const handleAddTag = async (tag: Tag) => {
     if (!taskId || !task) return;
@@ -335,7 +350,26 @@ export default function TaskDetailModalFloating({
         showToast("Remove tag failed", "error");
     }
   };
+  const handleCreateNewTag = async () => {
+    if (!taskId || !tagSearch.trim()) return;
 
+    try {
+        // 1. Create Tag
+        const newTag = await apiTag.createTag(companyId, workspaceId, projectId, {
+            name: tagSearch.trim(),
+            color: "#95a5a6"
+        });
+
+        // 2. Update local list
+        setAllProjectTags(prev => [...prev, newTag]);
+
+        // 3. Assign to task
+        handleAddTag(newTag);
+
+    } catch (error) {
+        showToast("Error creating new tag", "error");
+    }
+  };
   // Subtask & Description handlers
   const handleSaveDescription = async () => {
     if (!taskId) return;
@@ -668,64 +702,99 @@ export default function TaskDetailModalFloating({
 
                   {/* Tags */}
                   <div className="space-y-3 relative">
-                        <div className="flex items-center justify-between">
-                             <div className="flex items-center gap-2">
-                                <TagIcon className="w-3 h-3 text-slate-400"/>
-                                <label className="text-[11px] font-bold text-slate-400 uppercase">Tags</label>
-                             </div>
-                             <button 
-                                ref={tagButtonRef}
-                                onClick={() => setIsTagPopoverOpen(!isTagPopoverOpen)}
-                                className="text-slate-500 hover:text-blue-600 transition-colors p-1 hover:bg-slate-200 rounded"
-                             >
-                                <Plus className="w-4 h-4"/>
-                             </button>
-                        </div>
-                        
-                        <div className="flex flex-wrap gap-2">
-                            {task.tags && task.tags.length > 0 ? (
-                                (task.tags as unknown as Tag[]).map(tag => (
-                                    <div key={tag.id} className="flex items-center gap-1 px-2 py-1 rounded bg-white border border-slate-200 shadow-sm text-xs font-medium text-slate-700 group">
-                                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: tag.color || '#cbd5e1' }}></div>
-                                        {tag.name}
-                                        <button 
-                                            onClick={() => handleRemoveTag(tag.id)}
-                                            className="opacity-0 group-hover:opacity-100 hover:text-red-500 transition-opacity ml-1"
-                                        >
-                                            <X className="w-3 h-3"/>
-                                        </button>
-                                    </div>
-                                ))
-                            ) : (
-                                <span className="text-xs text-slate-400 italic">No tags</span>
-                            )}
-                        </div>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <TagIcon className="w-3 h-3 text-slate-400" />
+                        <label className="text-[11px] font-bold text-slate-400 uppercase">Tags</label>
+                      </div>
+                      <button
+                        ref={tagButtonRef}
+                        onClick={() => setIsTagPopoverOpen(!isTagPopoverOpen)}
+                        className="text-slate-500 hover:text-blue-600 transition-colors p-1 hover:bg-slate-200 rounded"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      {task.tags && task.tags.length > 0 ? (
+                        (task.tags as unknown as Tag[]).map(tag => (
+                          <div
+                            key={tag.id}
+                            className="flex items-center gap-1 px-2 py-1 rounded bg-white border border-slate-200 shadow-sm text-xs font-medium text-slate-700 group cursor-pointer hover:bg-slate-50 hover:border-slate-300 transition-all"
+                            onClick={() => setEditingTag(tag)} // ✅ Click to edit
+                          >
+                            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: tag.color || '#cbd5e1' }}></div>
+                            {tag.name}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleRemoveTag(tag.id);
+                              }}
+                              className="opacity-0 group-hover:opacity-100 hover:text-red-500 transition-opacity ml-1 p-0.5 rounded-full hover:bg-slate-200"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ))
+                      ) : (
+                        <span className="text-xs text-slate-400 italic">No tags</span>
+                      )}
+                    </div>
 
                         {/* Tag Popover */}
                         {isTagPopoverOpen && (
-                            <div ref={tagPopoverRef} className="absolute right-0 top-8 z-20 w-48 bg-white rounded-md shadow-lg border border-slate-200 mt-1 p-1 animate-in fade-in zoom-in-95 duration-100">
-                                <div className="text-[10px] text-slate-400 px-2 py-1 border-b border-slate-50 uppercase font-bold">Select a tag</div>
-                                <div className="max-h-40 overflow-y-auto custom-scrollbar p-1">
-                                    {allProjectTags.length > 0 ? (
-                                        allProjectTags.filter(t => !(task.tags as unknown as Tag[])?.find(tt => tt.id === t.id)).map(tag => (
-                                            <button
-                                                key={tag.id}
-                                                className="w-full text-left px-2 py-1.5 text-xs hover:bg-slate-50 rounded flex items-center gap-2 transition-colors"
-                                                onClick={() => handleAddTag(tag)}
-                                            >
-                                                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: tag.color || '#cbd5e1' }}></div>
-                                                {tag.name}
-                                            </button>
-                                        ))
-                                    ) : (
-                                        <div className="px-2 py-1 text-xs text-slate-500 text-center">No tags available</div>
-                                    )}
-                                </div>
-                            </div>
-                        )}
+                      <div className="absolute right-0 top-8 z-20 w-56 bg-white rounded-md shadow-xl border border-slate-200 p-2 animate-in fade-in zoom-in-95 duration-100" ref={tagPopoverRef}>
+                        {/* Input Search */}
+                        <Input
+                          ref={tagInputRef}
+                          placeholder="Search or create tag..."
+                          className="h-8 text-xs mb-2"
+                          value={tagSearch}
+                          onChange={(e) => setTagSearch(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && tagSearch.trim()) {
+                              const exactMatch = allProjectTags.find(t => t.name.toLowerCase() === tagSearch.trim().toLowerCase());
+                              if (exactMatch) handleAddTag(exactMatch);
+                              else handleCreateNewTag();
+                            }
+                          }}
+                        />
+
+                        <div className="text-[10px] text-slate-400 px-2 py-1 border-b border-slate-50 uppercase font-bold">Select an option</div>
+
+                        <div className="max-h-40 overflow-y-auto custom-scrollbar p-1 space-y-0.5">
+                          {filteredTags.length > 0 ? (
+                            filteredTags.filter(t => !(task.tags as unknown as Tag[])?.find(tt => tt.id === t.id)).map(tag => (
+                              <button
+                                key={tag.id}
+                                className="w-full text-left px-2 py-1.5 text-xs hover:bg-blue-50 hover:text-blue-700 rounded flex items-center gap-2 transition-colors"
+                                onClick={() => handleAddTag(tag)}
+                              >
+                                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: tag.color || '#cbd5e1' }}></div>
+                                {tag.name}
+                              </button>
+                            ))
+                          ) : (
+                            <div className="px-2 py-2 text-xs text-slate-500 italic text-center">No existing tags match</div>
+                          )}
+
+                          {/* Create New Option */}
+                          {tagSearch.trim() && !allProjectTags.find(t => t.name.toLowerCase() === tagSearch.trim().toLowerCase()) && (
+                            <button
+                              className="w-full text-left px-2 py-1.5 text-xs hover:bg-blue-50 text-blue-600 font-medium rounded flex items-center gap-2 border-t border-slate-100 mt-1 pt-2"
+                              onClick={handleCreateNewTag}
+                            >
+                              <Plus className="w-3 h-3" />
+                              Create "{tagSearch}"
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
-                  <hr className="border-slate-200"/>
+                  <hr className="border-slate-200" />
 
                   {/* Planning */}
                   <div className="space-y-4">
@@ -843,7 +912,29 @@ export default function TaskDetailModalFloating({
             <div className="absolute bottom-1 right-1 w-2 h-2 bg-slate-300 rounded-sm"></div>
         </div>
       </div>
-
+      {/* ✅ TAG MODAL */}
+      <TagModal
+        isOpen={!!editingTag}
+        onClose={() => setEditingTag(null)}
+        tag={editingTag}
+        companyId={companyId}
+        workspaceId={workspaceId}
+        projectId={projectId}
+        onUpdate={(updatedTag) => {
+          setAllProjectTags(prev => prev.map(t => t.id === updatedTag.id ? updatedTag : t));
+          setTask(prev => prev ? {
+            ...prev,
+            tags: prev.tags?.map(t => t.id === updatedTag.id ? updatedTag : t) as any
+          } : null);
+        }}
+        onDelete={(deletedTagId) => {
+          setAllProjectTags(prev => prev.filter(t => t.id !== deletedTagId));
+          setTask(prev => prev ? {
+            ...prev,
+            tags: prev.tags?.filter(t => t.id !== deletedTagId) as any
+          } : null);
+        }}
+      />
       {/* ✅ EPIC MODAL */}
       <EpicModal 
         isOpen={isEpicModalOpen}
