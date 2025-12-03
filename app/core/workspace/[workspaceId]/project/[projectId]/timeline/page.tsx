@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { Map } from "lucide-react";
+import { Task } from "gantt-task-react"; 
 
 // API Services
 import { 
@@ -10,27 +11,24 @@ import {
   RoadmapItemResponse, 
   RoadmapParams 
 } from "@/services/apiStatistics";
+import { apiEpic } from "@/services/apiEpic"; 
 
 // Components
 import TimelineToolbar from "@/components/features/core/timeline/TimelineToolbar";
 import TimelineGantt from "@/components/features/core/timeline/TimelineGantt";
-// Import Panel chi tiết Epic
 import EpicDetailPanel from "@/components/features/core/epic/EpicDetailPanel";
+import { useToast } from "@/components/ui/ToastProvider"; 
 
 export default function TimelinePage() {
   const params = useParams();
   const projectId = Number(params.projectId);
+  const { showToast } = useToast(); 
 
   // --- STATE ---
   const [data, setData] = useState<RoadmapItemResponse[]>([]);
   const [loading, setLoading] = useState(true);
-  
-  // State quản lý Epic đang được chọn
   const [selectedEpicId, setSelectedEpicId] = useState<number | null>(null);
-
-  const [filters, setFilters] = useState<RoadmapParams>({
-      viewType: "ALL"
-  });
+  const [filters, setFilters] = useState<RoadmapParams>({ viewType: "ALL" });
 
   // --- FETCH DATA ---
   const fetchData = useCallback(async () => {
@@ -40,7 +38,7 @@ export default function TimelinePage() {
          const res = await getProjectRoadmap(projectId, filters);
          setData(res);
       } catch (error) {
-         // Silent error or user notification only
+         // Silent error
       } finally {
          setLoading(false);
       }
@@ -57,17 +55,47 @@ export default function TimelinePage() {
   };
 
   const handleSelect = (item: RoadmapItemResponse) => {
-      // 1. Kiểm tra Type
       const itemType = item.type?.toUpperCase();
-
       if (itemType === 'EPIC') {
-          // 2. Xử lý ID: Ưu tiên originalId từ backend, nếu không có thì parse từ chuỗi id
-          // (item as any) dùng để bypass nếu type chưa cập nhật kịp
           const realId = (item as any).originalId || Number(String(item.id).replace(/\D/g, ''));
-          
           if (realId && !isNaN(realId)) {
               setSelectedEpicId(realId);
           }
+      }
+  };
+
+  // Xử lý kéo thả / resize thanh Bar
+  const handleDateChange = async (task: Task) => {
+      const epicId = Number(String(task.id).replace(/\D/g, ''));
+      if (!epicId || isNaN(epicId)) return;
+
+      const newStartDate = task.start.toISOString();
+      const newEndDate = task.end.toISOString();
+
+      try {
+          await apiEpic.updateEpic(projectId, epicId, {
+              startDate: newStartDate,
+              dueDate: newEndDate
+          } as any);
+          
+          showToast("Updated timeline successfully", "success");
+
+          setData(prev => prev.map(item => {
+              const itemIdString = String(item.id);
+              if (itemIdString === task.id || itemIdString.includes(String(epicId))) {
+                  return {
+                      ...item,
+                      startDate: newStartDate,
+                      endDate: newEndDate
+                  };
+              }
+              return item;
+          }));
+
+      } catch (error) {
+          console.error("Failed to update date", error);
+          showToast("Failed to update date", "error");
+          fetchData(); 
       }
   };
 
@@ -76,15 +104,14 @@ export default function TimelinePage() {
   return (
     <div className="min-h-screen bg-slate-50 relative overflow-x-hidden">
        
-       {/* 1. MAIN CONTENT WRAPPER 
-          - Thêm hiệu ứng transition để mượt mà
-          - Khi có selectedEpicId -> thêm opacity, blur và chặn click (pointer-events-none)
-       */}
+       {/* 1. MAIN CONTENT WRAPPER */}
+       {/* 🔴 ĐÃ XÓA: pointer-events-none, blur. Giờ bạn có thể tương tác thoải mái */}
        <div 
          className={`
             p-6 sm:p-8 font-sans text-slate-900 min-h-screen
             transition-all duration-300 ease-in-out
-            ${selectedEpicId ? 'opacity-30 blur-[2px] pointer-events-none select-none grayscale-[0.5]' : ''}
+            ${selectedEpicId ? 'pr-[460px]' : ''} 
+            /* 👆 Đẩy nội dung sang trái khi Panel mở để không bị che khuất */
          `}
        >
            <div className="max-w-[1800px] mx-auto space-y-6 pb-20"> 
@@ -114,16 +141,16 @@ export default function TimelinePage() {
                   projectId={projectId}
                   onRefresh={handleRefresh}
                   onSelect={handleSelect}
+                  selectedEpicId={selectedEpicId}
+                  onDateChange={handleDateChange}
               />
            </div>
        </div>
 
-       {/* 2. EPIC DETAIL PANEL 
-          - Nằm ngoài wrapper chính để không bị mờ theo
-          - Z-index cao để đè lên trên
-       */}
+       {/* 2. EPIC DETAIL PANEL */}
        {selectedEpicId && (
-          <div className="fixed inset-0 z-[9999]">
+          <div className="fixed inset-y-0 right-0 z-[9999] pointer-events-auto">
+              {/* Thêm bóng đổ để tách biệt với nội dung chính */}
               <EpicDetailPanel 
                   projectId={projectId}
                   epicId={selectedEpicId}
