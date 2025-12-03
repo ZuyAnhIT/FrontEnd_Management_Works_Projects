@@ -461,6 +461,7 @@ const [editingTag, setEditingTag] = useState<Tag | null>(null);
         fetchSubtasks(taskId); // Revert lại dữ liệu gốc nếu lỗi
     }
   };
+  
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/20 backdrop-blur-[1px]" onClick={onClose}>
       <div className="w-full md:w-[800px] bg-white h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-200" onClick={(e) => e.stopPropagation()}>
@@ -561,7 +562,8 @@ const [editingTag, setEditingTag] = useState<Tag | null>(null);
                         
                         // ✅ FIX: Truyền hàm xử lý vào đây
                         onAssigneeChange={(subTaskId, userId) => handleUpdateSubtask(subTaskId, { assigneeId: userId })}
-                        onEditContent={(subTaskId, title) => handleUpdateSubtask(subTaskId, { title })} 
+                        
+                        onEditContent={(subTaskId, data) => handleUpdateSubtask(subTaskId, data)}
                     />
                       {/* Add Subtask Input */}
                       {isAddingSubtask && (
