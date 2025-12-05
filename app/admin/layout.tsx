@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -16,16 +17,17 @@ export default function AdminLayout({
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeMenu, setActiveMenu] = useState("home");
 
-  const { user, isLoading, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, activeCompany,isLoading } = useAuth();
   const { showToast } = useToast();
 
   const [workspaces, setWorkspaces] = useState<any[]>([]);
   const [loadingWs, setLoadingWs] = useState(false);
+  
 
   // Fetch workspaces logic (Giữ nguyên)
   useEffect(() => {
-    if (isAuthenticated && user?.company?.companyId) {
-      const companyId = user.company.companyId;
+    if (isAuthenticated && activeCompany?.companyId) {
+    const companyId = activeCompany.companyId;
       const fetchWorkspaces = async () => {
         try {
           setLoadingWs(true);
@@ -47,7 +49,7 @@ export default function AdminLayout({
 
       fetchWorkspaces();
     }
-  }, [isAuthenticated, user, showToast]);
+  }, [isAuthenticated, activeCompany, showToast]);
 
   // 1. Loading Screen chuyên nghiệp
   if (isLoading) {

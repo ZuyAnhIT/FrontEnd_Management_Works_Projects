@@ -72,19 +72,32 @@ export default function MemberSidebar({
     fetchUser();
   }, []);
 
-  useEffect(() => {
+ useEffect(() => {
     if (!companyId) return;
+    
     const fetchWorkspaces = async () => {
       try {
         setLoading(true);
-        const data = await getCompanyWorkspaces(companyId);
-        setWorkspaces(data || []);
+
+        // 👇 FIX 1: Thêm tham số thứ 2 (Params phân trang)
+        const data = await getCompanyWorkspaces(companyId, {
+            page: 0,
+            size: 100, // Lấy số lượng đủ lớn để hiện trong dropdown
+            sortBy: 'name',
+            sortDir: 'asc'
+        });
+
+        // 👇 FIX 2: Lấy .content (vì data là PageResponse)
+        setWorkspaces(data.content || []); 
+        
       } catch (err: any) {
         // Silent fail
+        console.error("Failed to load workspaces", err);
       } finally {
         setLoading(false);
       }
     };
+    
     fetchWorkspaces();
   }, [companyId]);
 

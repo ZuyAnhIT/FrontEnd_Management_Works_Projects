@@ -19,7 +19,7 @@ interface InviteMemberModalProps {
 
   title?: string;
   description?: string;
-  contextType?: "company" | "workspace";
+  contextType?: "company" | "workspace" |"project";
 }
 
 

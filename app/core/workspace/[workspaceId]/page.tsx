@@ -25,8 +25,12 @@ export default function WorkspaceOverviewPage() {
   const params = useParams();
   const workspaceId = Number(params.workspaceId);
 
-  const { user, isLoading: isAuthLoading } = useAuth();
-  const companyId = user?.company?.companyId || null;
+  // 1. Lấy activeCompany từ hook
+const { user, isLoading: isAuthLoading, activeCompany } = useAuth(); 
+
+// 2. Lấy ID từ activeCompany
+// activeCompany đã được định nghĩa type rõ ràng, nên TS sẽ không báo lỗi
+const companyId = activeCompany?.companyId || null;
 
   const [loading, setLoading] = useState(true);
   const [workspace, setWorkspace] = useState<any>(null);
