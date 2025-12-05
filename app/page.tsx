@@ -4,6 +4,7 @@ import { useState } from "react";
 import AuthModal from "@/components/features/auth/AuthModal";
 import { useToast } from "@/components/ui/ToastProvider";
 import { useTranslation } from "react-i18next";
+import { Chatbot } from "@/components/chatbot/chatbot";
 
 // Sections
 import LandingHeader from "@/components/features/landing/LandingHeader";
@@ -79,6 +80,7 @@ export default function LandingPage() {
         isOpen={isAuthOpen}
         onClose={() => setIsAuthOpen(false)}
       />
+      <Chatbot />
     </div>
   );
 }
