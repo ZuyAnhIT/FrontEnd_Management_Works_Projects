@@ -18,8 +18,12 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useToast } from '@/components/ui/ToastProvider'
-import { createProjectTask } from '@/services/apiProject'
-
+import { 
+  createProjectTask, 
+  TaskType,      // 👈 Import Enum
+  TaskPriority   // 👈 Import Enum
+} from '@/services/apiProject'
+import { useAuth } from "@/context/AuthContext";
 interface CreateTaskModalProps {
   isOpen: boolean
   onClose: () => void
@@ -38,6 +42,7 @@ export function CreateTaskModal({
   onCreated,
 }: CreateTaskModalProps) {
   const { showToast } = useToast()
+  const { activeCompany } = useAuth();
 
   const [formData, setFormData] = useState({
     title: '',
@@ -69,33 +74,57 @@ export function CreateTaskModal({
 
   const handleCreate = async () => {
     setError(null)
+
+    // 1. Validation cơ bản
     if (!formData.title.trim()) {
       setError('Summary is required!')
       return
     }
 
+    // 2. Check Active Company (Bắt buộc cho API Multi-tenant)
+    if (!activeCompany?.companyId) {
+       showToast("Missing company information", "error");
+       return;
+    }
+
     try {
       setLoading(true)
 
+      // 3. Chuẩn bị Payload khớp với Interface CreateTaskPayload
+      // Ép kiểu string từ Form sang Enum
       const payload = {
         title: formData.title,
         description: formData.description,
-        statusName: formData.statusName,
-        taskType: 'STORY',
-        priority: formData.priority,
+        
+        // ✅ FIX: Dùng Enum TaskType (STORY)
+        taskType: TaskType.STORY, 
+        
+        // ✅ FIX: Ép kiểu string sang Enum TaskPriority
+        // formData.priority đang là 'LOW' | 'MEDIUM'... khớp với key của Enum
+        priority: formData.priority as TaskPriority,
+        
         storyPoints: 0,
-        estimatedHours: 0,
-        assigneeId: undefined,
-        attachments: [],
-        links: [],
-        sprintId: sprintId ?? undefined,
+        assigneeId: undefined, // Hoặc null
+        sprintId: sprintId ?? null, // Interface chấp nhận number | null
+        
+        // Lưu ý: Interface CreateTaskPayload yêu cầu `statusId` (number),
+        // không phải `statusName` (string). 
+        // Nếu backend tự set default là TODO thì không cần truyền dòng này.
+        // statusId: undefined 
       }
 
-      await createProjectTask(workspaceId, projectId, payload)
+      // 4. Gọi API với đủ 4 tham số
+      await createProjectTask(
+          activeCompany.companyId, // Tham số 1: Company ID
+          workspaceId,             // Tham số 2: Workspace ID
+          projectId,               // Tham số 3: Project ID
+          payload                  // Tham số 4: Payload chuẩn Type
+      )
 
       showToast(`Task "${formData.title}" created successfully!`, 'success')
       onCreated?.()
 
+      // Reset Form
       setFormData({
         title: '',
         description: '',
@@ -106,12 +135,12 @@ export function CreateTaskModal({
 
       onClose()
     } catch (err: any) {
-      setError(err?.response?.data?.message || 'Cannot create task')
+      console.error(err);
+      setError(err?.message || 'Cannot create task')
     } finally {
       setLoading(false)
     }
   }
-
   if (!isOpen) return null
 
   return (

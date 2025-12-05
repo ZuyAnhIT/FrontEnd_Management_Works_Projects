@@ -6,10 +6,11 @@ import Sidebar from "@/components/features/core/Sidebar"; // Đảm bảo đây 
 import { useAuth } from "@/context/AuthContext";
 import { Loader2 } from "lucide-react";
 import { usePathname } from "next/navigation";
+import { getCompanyWorkspaces } from "@/services/apiWorkspace";
 
 export default function CoreLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { user, isLoading: isAuthLoading, isAuthenticated } = useAuth();
+  const { user, isLoading: isAuthLoading, isAuthenticated, activeCompany } = useAuth();
   const [workspaces, setWorkspaces] = useState<any[]>([]);
   const [loadingWs, setLoadingWs] = useState(true);
 
@@ -21,19 +22,25 @@ export default function CoreLayout({ children }: { children: React.ReactNode }) 
   const insideProject = pathname?.includes("/project/");
 
   useEffect(() => {
-    if (isAuthenticated && user?.workspaces) {
-      // Lọc workspace mà user quản lý (hoặc tất cả tùy business logic)
-      const managedWorkspaces = user.workspaces.filter(
-        (w: any) => w.roleCode === "WORKSPACE_ADMIN" || true // Tạm thời lấy hết để demo
-      );
-      setWorkspaces(managedWorkspaces);
-      setLoadingWs(false);
-    } else if (!isAuthLoading) {
-      // Chỉ set loading false khi auth đã chạy xong
-      setWorkspaces([]);
-      setLoadingWs(false);
+    if (isAuthenticated && activeCompany?.companyId) {
+      const fetchWorkspaces = async () => {
+        try {
+          // setLoadingWs(true);
+          const response = await getCompanyWorkspaces(activeCompany.companyId, {
+             page: 0, size: 100, sortBy: "name", sortDir: "asc" 
+          });
+          setWorkspaces(response.content || []);
+        } catch (err: any) {
+          console.error("Failed to load workspaces", err);
+        } finally {
+          // setLoadingWs(false);
+        }
+      };
+      fetchWorkspaces();
+    } else {
+        setWorkspaces([]);
     }
-  }, [isAuthenticated, user, isAuthLoading]);
+  }, [isAuthenticated, activeCompany]);
 
   if (isAuthLoading)
     return (
