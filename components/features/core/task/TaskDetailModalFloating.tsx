@@ -5,7 +5,8 @@ import {
   X, Lock, Eye, Share2, MoreHorizontal, Maximize2,
   Link as LinkIcon, CheckSquare, ChevronDown, Plus,
   Loader2, Tag as TagIcon, Flag, User, Clock, Layers, Zap,
-  Check, Trash2
+  Check, Trash2,
+  Minimize2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -85,7 +86,7 @@ interface TaskDetailModalProps {
   onClose: () => void;
   onUpdate?: () => void;
   onSwitchToFloating?: () => void;
-
+  onSwitchToPanel?: () => void;
   members?: any[];
   sprints?: any[];
   epics?: any[]; 
@@ -102,6 +103,7 @@ export default function TaskDetailModalFloating({
   onClose,
   onUpdate,
   onSwitchToFloating,
+  onSwitchToPanel,
   members = [],
   sprints = [],
   statuses = [],
@@ -543,7 +545,17 @@ export default function TaskDetailModalFloating({
              <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:bg-slate-100 rounded-md"><Share2 className="w-4 h-4" /></Button>
              <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:bg-slate-100 rounded-md"><MoreHorizontal className="w-4 h-4" /></Button>
              <div className="w-px h-4 bg-slate-200 mx-1"></div>
-             {onSwitchToFloating && (<Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:bg-slate-100 rounded-md" onClick={onSwitchToFloating}><Maximize2 className="w-3.5 h-3.5" /></Button>)}
+             {onSwitchToPanel && (
+               <Button 
+                 variant="ghost" 
+                 size="icon" 
+                 className="h-8 w-8 text-slate-500 hover:bg-slate-100 rounded-md" 
+                 onClick={onSwitchToPanel}
+                 title="Thu nhỏ về Panel"
+               >
+                 <Minimize2 className="w-4 h-4" />
+               </Button>
+             )}
              <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:bg-red-50 hover:text-red-600 rounded-md" onClick={(e) => { e.stopPropagation(); onClose(); }}><X className="w-4 h-4" /></Button>
           </div>
         </div>
