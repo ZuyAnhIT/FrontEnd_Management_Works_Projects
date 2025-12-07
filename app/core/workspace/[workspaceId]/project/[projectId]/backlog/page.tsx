@@ -47,7 +47,7 @@ import BacklogHeader from "@/components/features/core/backlog/BacklogHeader";
 import SprintSection from "@/components/features/core/backlog/SprintSection";
 import BacklogTaskItem from "@/components/features/core/backlog/BacklogTaskItem";
 import TaskDetailPanel from "@/components/features/core/task/TaskDetailPanel";
-
+import TaskDetailModalFloating from "@/components/features/core/task/TaskDetailModalFloating";
 // Components Logic
 import QuickTaskCreate from "@/components/features/core/task/QuickTaskCreate";
 import CreateTaskModal from "@/components/features/core/task/CreateTaskModal";
@@ -103,6 +103,8 @@ export default function BacklogPage() {
   // --- STATE UI ---
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
   const [selectedSprintId, setSelectedSprintId] = useState<number | null>(null);
+  //--Xem chi tiết--
+  const [viewMode, setViewMode] = useState<'panel' | 'floating'>('panel');
   
   // Modal States
   const [isCreateTaskModalOpen, setIsCreateTaskModalOpen] = useState(false);
@@ -450,19 +452,45 @@ export default function BacklogPage() {
           </div>
 
           {/* ✅ PANELS (Đã truyền statuses từ state xuống) */}
-          {selectedTaskId && (
+          {/* ✅ PANELS & FLOATING MODAL LOGIC */}
+          
+          {/* TRƯỜNG HỢP 1: HIỆN PANEL DỌC */}
+          {selectedTaskId && viewMode === 'panel' && (
             <TaskDetailPanel
                 taskId={selectedTaskId}
                 onClose={() => setSelectedTaskId(null)}
+                // 👇 Thêm sự kiện chuyển đổi
+                onSwitchToFloating={() => setViewMode('floating')} 
+                
+                // Truyền props dữ liệu
                 onUpdate={handleRefresh}
                 members={members}
                 sprints={data?.activeSprints}
-                statuses={statuses} // 🔥 TRUYỀN LIST STATUS VÀO ĐÂY
+                statuses={statuses}
                 companyId={companyId}       
                 workspaceId={workspaceId}   
                 projectId={projectId} 
-                   
             />
+          )}
+
+          {/* TRƯỜNG HỢP 2: HIỆN MODAL NỔI (KÉO THẢ ĐƯỢC) */}
+          {selectedTaskId && viewMode === 'floating' && (
+             <TaskDetailModalFloating
+                taskId={selectedTaskId}
+                isOpen={true} // Luôn true khi render
+                onClose={() => setSelectedTaskId(null)}
+                // 👇 Thêm sự kiện chuyển đổi về Panel
+                onSwitchToPanel={() => setViewMode('panel')}
+
+                // Truyền props dữ liệu (giống hệt Panel)
+                onUpdate={handleRefresh}
+                members={members}
+                sprints={data?.activeSprints}
+                statuses={statuses}
+                companyId={companyId}       
+                workspaceId={workspaceId}   
+                projectId={projectId} 
+             />
           )}
 
         </div>
