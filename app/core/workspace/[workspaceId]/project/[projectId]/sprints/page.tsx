@@ -27,6 +27,7 @@ import {
 } from "@/services/apiProject";
 
 import TaskDetailPanel from "@/components/features/core/task/TaskDetailPanel";
+import TaskDetailModalFloating from "@/components/features/core/task/TaskDetailModalFloating";
 import CreateTaskModal from "@/components/features/core/task/CreateTaskModal";
 import ListHeader from "@/components/features/core/list/ListHeader";
 
@@ -58,6 +59,7 @@ const JiraTaskRow = ({
   };
 
   
+
 // ===== Inline edit cho title =====
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [title, setTitle] = useState(task.title);
@@ -283,6 +285,9 @@ export default function ProjectListPage() {
   // ✅ STATE: Sử dụng RawStatusColumn từ API bạn cung cấp
   const [statuses, setStatuses] = useState<RawStatusColumn[]>([]);
 
+   //--Xem chi tiết--
+  const [viewMode, setViewMode] = useState<'panel' | 'floating'>('panel');
+
   // UI State
   const [groupBy, setGroupBy] = useState<string>("none");
   const [filters, setFilters] = useState<ProjectTaskFilterParams>({ search: "", page: 0, size: 50 });
@@ -496,20 +501,46 @@ export default function ProjectListPage() {
         </div>
       </div>
 
-      {isDetailOpen && selectedTask && (
+      {/* TRƯỜNG HỢP 1: HIỆN PANEL DỌC (View Mode = 'panel') */}
+      {isDetailOpen && selectedTask && viewMode === 'panel' && (
         <TaskDetailPanel
           taskId={selectedTask.id}
           onClose={() => { setIsDetailOpen(false); setSelectedTask(null); }}
-          onUpdate={fetchData}
+          // 👇 Nút "Phóng to" -> Chuyển sang Floating
+          onSwitchToFloating={() => setViewMode('floating')} 
+          
+          onUpdate={fetchData} // Reload list khi update xong
+          
+          // Data Props
           companyId={companyId!}
           workspaceId={workspaceId}
           projectId={projectId}
           members={members}
-          statuses={statuses} // Truyền RawStatusColumn[] vào DetailPanel nếu nó hỗ trợ
+          statuses={statuses} 
           sprints={allSprints}
           epics={[]} 
+        />
+      )}
+
+      {/* TRƯỜNG HỢP 2: HIỆN MODAL NỔI (View Mode = 'floating') */}
+      {isDetailOpen && selectedTask && viewMode === 'floating' && (
+        <TaskDetailModalFloating
+          taskId={selectedTask.id}
+          isOpen={true}
+          onClose={() => { setIsDetailOpen(false); setSelectedTask(null); }}
+          // 👇 Nút "Thu nhỏ" -> Chuyển về Panel
+          onSwitchToPanel={() => setViewMode('panel')} 
           
+          onUpdate={fetchData} // Reload list khi update xong
           
+          // Data Props (Giống hệt Panel)
+          companyId={companyId!}
+          workspaceId={workspaceId}
+          projectId={projectId}
+          members={members}
+          statuses={statuses}
+          sprints={allSprints}
+          epics={[]}
         />
       )}
 

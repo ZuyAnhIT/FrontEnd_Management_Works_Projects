@@ -5,7 +5,8 @@ import {
   X, Loader2, Flag, User, Clock, Layers, 
   MoreHorizontal, Link as LinkIcon, Zap,
   Bold, Italic, List, ListOrdered, Code,
-  Tag as TagIcon, Plus, ChevronDown
+  Tag as TagIcon, Plus, ChevronDown,
+Maximize2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -63,6 +64,7 @@ interface Props {
   taskId: number | null;
   onClose: () => void;
   onUpdate?: () => void;
+  onSwitchToFloating?: () => void;
   members?: any[]; 
   sprints?: any[]; 
   epics?: any[]; 
@@ -80,6 +82,7 @@ export default function TaskDetailPanel({
   taskId, 
   onClose, 
   onUpdate, 
+  onSwitchToFloating,
   members = [], 
   sprints = [], 
   epics = [],
@@ -504,6 +507,15 @@ const [editingTag, setEditingTag] = useState<Tag | null>(null);
              {isSaving && <span className="text-xs text-blue-600 flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin"/> Saving...</span>}
           </div>
           <div className="flex items-center gap-1">
+            {onSwitchToFloating && (
+                <button 
+                  onClick={onSwitchToFloating} 
+                  className="p-2 hover:bg-slate-100 rounded-md text-slate-500 hover:text-blue-600 transition-colors"
+                  title="Mở rộng cửa sổ"
+                >
+                  <Maximize2 className="w-5 h-5"/>
+                </button>
+             )}
              <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-md"><X className="w-5 h-5 text-slate-500"/></button>
           </div>
         </div>

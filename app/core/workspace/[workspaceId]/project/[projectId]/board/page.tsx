@@ -49,6 +49,7 @@ import CreateColumnButton from "@/components/features/core/board/CreateColumnBut
 import BoardTaskCard from "@/components/features/core/board/BoardTaskCard";
 // ✅ IMPORT MODAL CHI TIẾT TASK (Floating)
 import TaskDetailModalFloating from "@/components/features/core/task/TaskDetailModalFloating";
+import TaskDetailPanel from "@/components/features/core/task/TaskDetailPanel";
 
 export default function BoardPage() {
   const params = useParams();
@@ -70,6 +71,7 @@ export default function BoardPage() {
   const [activeTask, setActiveTask] = useState<TaskSummary | null>(null);
 
   // ✅ STATE CHO MODAL CHI TIẾT TASK
+  const [viewMode, setViewMode] = useState<'panel' | 'floating'>('floating');
   // Chỉ cần lưu ID của task đang chọn
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -272,22 +274,61 @@ export default function BoardPage() {
       </div>
 
      {/* ✅ RENDER MODAL CHI TIẾT */}
-      <TaskDetailModalFloating 
-        taskId={selectedTaskId} 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)}
-        onUpdate={handleTaskUpdate} // Callback refresh board khi task thay đổi
-        
-        members={members} // Danh sách thành viên để assign
-        statuses={columns.map(c => ({ id: c.id, name: c.name }))} // Danh sách status
-        sprints={[]} // Truyền sprints thật nếu có state sprints ở BoardPage
-        epics={[]}   // Truyền epics thật nếu có
+      {/* TRƯỜNG HỢP 1: HIỆN PANEL DỌC (Cố định bên phải - Minimized) */}
+      {isModalOpen && selectedTaskId && viewMode === 'panel' && (
+        <TaskDetailPanel
+          taskId={selectedTaskId}
+          onClose={() => setIsModalOpen(false)}
+          // 👇 Nút "Phóng to" -> Chuyển sang Floating
+          onSwitchToFloating={() => setViewMode('floating')} 
+          
+          onUpdate={handleTaskUpdate} // Refresh board khi sửa xong
+          
+          // Data Props
+          members={members}
+          // Map column thành status list để dropdown status hoạt động đúng
+          statuses={columns.map(c => ({ 
+             id: c.id, 
+             name: c.name, 
+             color: c.color 
+          }))} 
+          sprints={[]} // Nếu API getProjectBoardData có trả về sprint thì truyền vào
+          epics={[]}   // Tương tự với epics
+          
+          // Context IDs
+          companyId={companyId!}
+          workspaceId={workspaceId}
+          projectId={projectId}
+        />
+      )}
 
-        // 👇 QUAN TRỌNG: THÊM CÁC ID NÀY ĐỂ GỌI API SUBTASK & COMMENT
-        companyId={companyId!} 
-        workspaceId={workspaceId}
-        projectId={projectId}
-      />
+      {/* TRƯỜNG HỢP 2: HIỆN MODAL NỔI (Kéo thả được - Maximized) */}
+      {isModalOpen && selectedTaskId && viewMode === 'floating' && (
+        <TaskDetailModalFloating
+          taskId={selectedTaskId}
+          isOpen={true}
+          onClose={() => setIsModalOpen(false)}
+          // 👇 Nút "Thu nhỏ" -> Chuyển về Panel
+          onSwitchToPanel={() => setViewMode('panel')} 
+          
+          onUpdate={handleTaskUpdate}
+          
+          // Data Props (Phải giống hệt Panel)
+          members={members}
+          statuses={columns.map(c => ({ 
+             id: c.id, 
+             name: c.name, 
+             color: c.color 
+          }))}
+          sprints={[]} 
+          epics={[]}
+          
+          // Context IDs
+          companyId={companyId!}
+          workspaceId={workspaceId}
+          projectId={projectId}
+        />
+      )}
     </div>
   );
 }
