@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-
+import ConfirmationModal from "@/components/ui/ConfirmationModal";
 import TagModal from "@/components/features/core/tag/TagModal"; 
 import EpicModal from "@/components/features/core/epic/EpicModal"; 
 // API Services
@@ -114,6 +114,10 @@ export default function TaskDetailPanel({
   
   // --- EPIC MODAL STATE ---
   const [isEpicModalOpen, setIsEpicModalOpen] = useState(false);
+  //
+  const [subtaskToDelete, setSubtaskToDelete] = useState<number | null>(null);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [isDeletingSubtask, setIsDeletingSubtask] = useState(false);
   // Refs
   const tagButtonRef = useRef<HTMLButtonElement>(null);
   const tagPopoverRef = useRef<HTMLDivElement>(null);
@@ -375,11 +379,33 @@ const [editingTag, setEditingTag] = useState<Tag | null>(null);
     try { await updateSubtask(companyId, workspaceId, projectId, taskId, subtask.id, { status: newStatus }); }
     catch (error) { fetchSubtasks(taskId); }
   };
-  const handleDeleteSubtask = async (subTaskId: number) => {
-    if (!taskId || !confirm("Delete subtask?")) return;
-    setSubtasks(prev => prev.filter(s => s.id !== subTaskId));
-    try { await deleteSubtask(companyId, workspaceId, projectId, taskId, subTaskId); }
-    catch (error) { fetchSubtasks(taskId); }
+  // 1. Hàm này gắn vào nút thùng rác: Chỉ mở Modal
+  const handleDeleteSubtask = (subTaskId: number) => {
+    setSubtaskToDelete(subTaskId);
+    setIsDeleteConfirmOpen(true);
+  };
+
+  // 2. Hàm này gắn vào nút Confirm của Modal: Gọi API xóa thật
+  const onConfirmDeleteSubtask = async () => {
+    if (!taskId || !subtaskToDelete) return;
+    
+    setIsDeletingSubtask(true); // Hiện loading trên nút
+    
+    // Optimistic Update: Xóa trên giao diện trước
+    const previousSubtasks = [...subtasks];
+    setSubtasks(prev => prev.filter(s => s.id !== subtaskToDelete));
+
+    try {
+        await deleteSubtask(companyId, workspaceId, projectId, taskId, subtaskToDelete);
+        showToast("Đã xóa công việc phụ", "success");
+        setIsDeleteConfirmOpen(false); // Đóng modal khi xong
+    } catch (error) {
+        setSubtasks(previousSubtasks); // Hoàn tác nếu lỗi
+        showToast("Xóa thất bại", "error");
+    } finally {
+        setIsDeletingSubtask(false);
+        setSubtaskToDelete(null);
+    }
   };
   const handleSaveDescription = async () => {
     if (!taskId) return;
@@ -888,6 +914,17 @@ const [editingTag, setEditingTag] = useState<Tag | null>(null);
                         
                         // Handler giữ nguyên
                         onSelectEpic={handleEpicChange} 
+                    />
+
+                    <ConfirmationModal
+                        isOpen={isDeleteConfirmOpen}
+                        onClose={() => setIsDeleteConfirmOpen(false)}
+                        onConfirm={onConfirmDeleteSubtask}
+                        isLoading={isDeletingSubtask}
+                        title="Delete Subtask"
+                        description="Are you sure you want to delete this subtask? This action cannot be undone."
+                        confirmText="Delete"
+                        modalVariant="danger"
                     />
                     {/* Meta Footer */}
                     <div className="mt-auto pt-6 text-[10px] text-slate-400">

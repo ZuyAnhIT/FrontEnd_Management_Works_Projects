@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { ChevronDown, CheckSquare, Plus, Trash2, Edit2, Check, X, User as UserIcon, Search } from "lucide-react"; 
+import { ChevronDown, CheckSquare, Plus, Trash2, Edit2, Check, X, User as UserIcon, Search,ArrowUp, ArrowDown, Minus, AlertCircle } from "lucide-react"; 
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
@@ -24,6 +24,14 @@ const getAvatarColor = (id: number | string | null) => {
   ];
   const numId = typeof id === 'number' ? id : (id ? id.toString().charCodeAt(0) : 0);
   return colors[numId % colors.length];
+};
+//-hàm cắt chuỗi--
+const truncateString = (str: string, num: number) => {
+  if (!str) return "";
+  if (str.length <= num) {
+    return str;
+  }
+  return str.slice(0, num) + "...";
 };
 
 // --- MINI ASSIGNEE DROPDOWN (Có Search) ---
@@ -232,12 +240,20 @@ export default function TaskSubtasks({
     return "bg-slate-200 text-slate-700 hover:bg-slate-300 border border-slate-200";
   };
 
-  const PriorityIcon = () => (
-     <div className="flex items-center justify-center w-5 h-5" title="Medium">
-        <div className="w-3 h-[2px] bg-orange-500 my-[1px]"></div>
-        <div className="w-3 h-[2px] bg-orange-500 my-[1px]"></div>
-     </div>
-  );
+  const PriorityIcon = ({ priority }: { priority?: string }) => {
+    const p = (priority || 'LOW').toUpperCase();
+    let icon = <ArrowDown className="w-4 h-4 text-slate-400" />; // Default Low
+
+    if (p === 'URGENT') icon = <ArrowUp className="w-4 h-4 text-red-600" />;
+    else if (p === 'HIGH') icon = <ArrowUp className="w-4 h-4 text-orange-500" />;
+    else if (p === 'MEDIUM') icon = <Minus className="w-4 h-4 text-blue-500" />;
+
+    return (
+        <div title={p} className="cursor-help">
+            {icon}
+        </div>
+    );
+  };
 
 return (
     <div className="space-y-3 pt-2">
@@ -261,124 +277,125 @@ return (
       </div>
 
       {/* ✅ TABLE FIX: Bảng chuẩn HTML giúp cột thẳng hàng */}
-      <div className="border border-slate-200 rounded-lg bg-white shadow-sm">
-         <table className="w-full text-sm text-left border-collapse">
-            {/* 1. HEADER: Định nghĩa độ rộng cột tại đây */}
+      <div className="border border-slate-200 rounded-lg bg-white shadow-sm overflow-hidden">
+         <table className="w-full text-sm text-left border-collapse table-fixed">
             <thead className="bg-slate-50/80 text-[11px] font-semibold text-slate-500 uppercase tracking-wide border-b border-slate-200">
                <tr>
+                  {/* Cột Work (Title) tự động co giãn phần thừa */}
                   <th className="py-2.5 pl-4 pr-2 font-semibold w-auto">Work</th>
-                  <th className="py-2.5 px-2 font-semibold text-center w-[50px]">Pri</th>
-                  <th className="py-2.5 px-2 font-semibold text-center w-[100px]">Assignee</th>
-                  <th className="py-2.5 px-2 font-semibold text-center w-[140px]">Status</th>
-                  <th className="py-2.5 px-2 font-semibold w-[40px]"></th>
+                  
+                  {/* Các cột khác FIX CỨNG width (tổng khoảng 320px) */}
+                  <th className="py-2.5 px-1 font-semibold text-center w-[40px]">Pri</th>
+                  <th className="py-2.5 px-1 font-semibold text-center w-[80px]">Assignee</th>
+                  <th className="py-2.5 px-1 font-semibold text-center w-[110px]">Status</th>
+                  <th className="py-2.5 px-1 font-semibold w-[30px]"></th>
                </tr>
             </thead>
 
-            {/* 2. BODY: Dữ liệu sẽ tự động theo độ rộng của Header */}
             <tbody className="divide-y divide-slate-100">
                {subtasks.length > 0 ? (
                   subtasks.map((sub) => (
-                     <tr key={sub.id} className="group hover:bg-slate-50 transition-colors h-10 relative">
-                        {editingSubtaskId === sub.id ? (
-                           // --- EDIT MODE ---
-                           <td colSpan={5} className="p-1 pl-2">
-                              <div className="flex items-center gap-2 w-full bg-white z-10 relative p-1">
-                                 <Input 
-                                    autoFocus
-                                    value={editTitle}
-                                    onChange={(e) => setEditTitle(e.target.value)}
-                                    className="h-8 text-sm flex-1"
-                                    onKeyDown={(e) => {
-                                       if(e.key === 'Enter') saveEditing();
-                                       if(e.key === 'Escape') cancelEditing();
-                                    }}
-                                 />
-                                 <button onClick={saveEditing} className="p-1.5 hover:bg-green-100 text-green-600 rounded"><Check className="w-4 h-4" /></button>
-                                 <button onClick={cancelEditing} className="p-1.5 hover:bg-red-100 text-red-600 rounded"><X className="w-4 h-4" /></button>
-                              </div>
-                           </td>
-                        ) : (
-                           // --- VIEW MODE ---
-                           <>
-                              {/* 1. Work */}
-                              <td className="py-2 pl-4 pr-2 align-middle">
-                                 <div className="flex items-center gap-3 cursor-pointer group/title min-w-0" onClick={() => onToggleStatus(sub)}>
-                                    <CheckSquare className={`w-4 h-4 shrink-0 transition-colors ${sub.status === 'DONE' ? 'text-green-600' : 'text-blue-500'}`} />
-                                    
-                                    <div className="flex items-center gap-2 min-w-0 flex-1">
-                                        <span className="text-slate-400 text-[10px] font-mono shrink-0 pt-0.5">SUB-{sub.id}</span>
-                                        <TooltipProvider>
-                                          <Tooltip delayDuration={300}>
-                                            <TooltipTrigger asChild>
-                                              <span className={`truncate text-slate-700 font-medium text-sm ${sub.status === 'DONE' ? 'line-through text-slate-400' : ''}`}>
-                                                  {sub.title}
-                                              </span>
-                                            </TooltipTrigger>
-                                            <TooltipContent className="bg-slate-800 text-white text-xs px-2 py-1 max-w-xs break-words">
-                                              {sub.title}
-                                            </TooltipContent>
-                                          </Tooltip>
-                                        </TooltipProvider>
-                                    </div>
-
-                                    {/* Nút Edit hiện khi hover */}
-                                    <button 
-                                        onClick={(e) => { e.stopPropagation(); startEditing(sub); }} 
-                                        className="opacity-0 group-hover/title:opacity-100 p-1.5 hover:bg-slate-200 rounded text-slate-500 transition-all shrink-0"
-                                        title="Edit title"
-                                    >
-                                        <Edit2 className="w-3.5 h-3.5" />
-                                    </button>
-                                 </div>
-                              </td>
-
-                              {/* 2. Priority */}
-                              <td className="py-2 px-2 text-center align-middle border-l border-transparent group-hover:border-slate-100">
-                                 <div className="flex justify-center">
-                                    <PriorityIcon />
-                                 </div>
-                              </td>
-
-                              {/* 3. Assignee */}
-                              <td className="py-2 px-2 text-center align-middle border-l border-transparent group-hover:border-slate-100">
-                                 <div className="flex justify-center relative z-10">
-                                    <MiniAssigneeDropdown 
-                                        subTaskId={Number(sub.id)}
-                                        currentAssigneeId={sub.assigneeId}
-                                        currentAssigneeName={sub.assigneeName}
-                                        currentAssigneeAvatar={sub.assigneeAvatar}
-                                        members={members}
-                                        onUpdate={(newId) => onAssigneeChange(Number(sub.id), newId)}
-                                    />
-                                 </div>
-                              </td>
-
-                              {/* 4. Status */}
-                              <td className="py-2 px-2 text-center align-middle border-l border-transparent group-hover:border-slate-100">
-                                 <div className="flex justify-center">
-                                     <div 
-                                        className={`inline-flex items-center justify-center gap-1.5 px-2.5 py-1 rounded text-[10px] font-bold cursor-pointer transition-all select-none w-[120px] shadow-sm border ${getStatusColor(sub.status)}`}
-                                        onClick={() => onToggleStatus(sub)}
-                                     >
-                                        <span className="whitespace-nowrap truncate">{sub.status?.replace(/_/g, " ") || 'TODO'}</span>
-                                        <ChevronDown className="w-3 h-3 opacity-50 shrink-0" />
+                      <tr key={sub.id} className="group hover:bg-slate-50 transition-colors h-10 relative">
+                         {editingSubtaskId === sub.id ? (
+                            <td colSpan={5} className="p-1 pl-2">
+                               <div className="flex items-center gap-2 w-full bg-white z-10 relative p-1">
+                                  {/* Edit Mode Input: w-full để không bị tràn */}
+                                  <Input 
+                                     autoFocus
+                                     value={editTitle}
+                                     onChange={(e) => setEditTitle(e.target.value)}
+                                     className="h-8 text-sm flex-1 w-full min-w-0"
+                                     onKeyDown={(e) => {
+                                        if(e.key === 'Enter') saveEditing();
+                                        if(e.key === 'Escape') cancelEditing();
+                                     }}
+                                  />
+                                  <div className="flex shrink-0">
+                                    <button onClick={saveEditing} className="p-1.5 hover:bg-green-100 text-green-600 rounded"><Check className="w-4 h-4" /></button>
+                                    <button onClick={cancelEditing} className="p-1.5 hover:bg-red-100 text-red-600 rounded"><X className="w-4 h-4" /></button>
+                                  </div>
+                               </div>
+                            </td>
+                         ) : (
+                            <>
+                               {/* 1. Work */}
+                               <td className="py-2 pl-4 pr-2 align-middle">
+                                  <div className="flex items-center gap-3 cursor-pointer group/title min-w-0 w-full" onClick={() => onToggleStatus(sub)}>
+                                     <CheckSquare className={`w-4 h-4 shrink-0 transition-colors ${sub.status === 'DONE' ? 'text-green-600' : 'text-blue-500'}`} />
+                                     
+                                     {/* ✅ QUAN TRỌNG: 
+                                        - min-w-0: Cho phép flex item co lại nhỏ hơn nội dung của nó.
+                                        - truncate: Cắt chữ khi hết chỗ.
+                                        Kết hợp 2 cái này trong table-fixed sẽ giải quyết việc text dài đẩy vỡ khung.
+                                     */}
+                                     <div className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
+                                         <span className="text-slate-400 text-[10px] font-mono shrink-0 pt-0.5">SUB-{sub.id}</span>
+                                         
+                                         <TooltipProvider>
+                                           <Tooltip delayDuration={300}>
+                                             <TooltipTrigger asChild>
+                                               {/* Class truncate vẫn giữ để xử lý visual, nhưng nội dung đã được cắt cứng bằng JS */}
+                                                   <span className={`truncate text-slate-700 font-medium text-sm block w-full ${sub.status === 'DONE' ? 'line-through text-slate-400' : ''}`}>
+                                                      {/* Cắt xuống còn khoảng 60-70 ký tự tùy độ rộng modal của bạn */}
+                                                      {truncateString(sub.title, 65)} 
+                                                   </span>
+                                             </TooltipTrigger>
+                                             <TooltipContent className="bg-slate-800 text-white text-xs px-2 py-1 max-w-[300px] break-all">
+                                               {/* break-all giúp tooltip xuống dòng nếu chuỗi quá dài không có dấu cách */}
+                                               {sub.title}
+                                             </TooltipContent>
+                                           </Tooltip>
+                                         </TooltipProvider>
                                      </div>
-                                 </div>
-                              </td>
 
-                              {/* 5. Delete Action */}
-                              <td className="py-2 px-2 text-center align-middle">
-                                 <button 
-                                    onClick={(e) => { e.stopPropagation(); onDelete(sub.id); }} 
-                                    className="opacity-0 group-hover:opacity-100 p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-all"
-                                    title="Delete subtask"
-                                 >
-                                    <Trash2 className="w-4 h-4" />
-                                 </button>
-                              </td>
-                           </>
-                        )}
-                     </tr>
+                                     <button onClick={(e) => { e.stopPropagation(); startEditing(sub); }} className="opacity-0 group-hover/title:opacity-100 p-1.5 hover:bg-slate-200 rounded text-slate-500 transition-all shrink-0">
+                                        <Edit2 className="w-3.5 h-3.5" />
+                                     </button>
+                                  </div>
+                               </td>
+
+                               {/* 2. Priority */}
+                               <td className="py-2 px-1 text-center align-middle border-l border-transparent group-hover:border-slate-100">
+                                  <div className="flex justify-center">
+                                     {/* @ts-ignore */}
+                                     <PriorityIcon priority={sub.priority} />
+                                  </div>
+                               </td>
+
+                               {/* 3. Assignee */}
+                               <td className="py-2 px-1 text-center align-middle border-l border-transparent group-hover:border-slate-100">
+                                  <div className="flex justify-center relative z-10">
+                                     <MiniAssigneeDropdown 
+                                         subTaskId={Number(sub.id)}
+                                         currentAssigneeId={sub.assigneeId}
+                                         currentAssigneeName={sub.assigneeName}
+                                         currentAssigneeAvatar={sub.assigneeAvatar}
+                                         members={members}
+                                         onUpdate={(newId: any) => onAssigneeChange(Number(sub.id), newId)}
+                                     />
+                                  </div>
+                               </td>
+
+                               {/* 4. Status */}
+                               <td className="py-2 px-1 text-center align-middle border-l border-transparent group-hover:border-slate-100">
+                                  <div className="flex justify-center">
+                                       <div className={`inline-flex items-center justify-center gap-1 px-2 py-1 rounded text-[10px] font-bold cursor-pointer transition-all select-none w-full max-w-[100px] shadow-sm border ${getStatusColor(sub.status)}`} onClick={() => onToggleStatus(sub)}>
+                                          <span className="whitespace-nowrap truncate">{sub.status?.replace(/_/g, " ") || 'TODO'}</span>
+                                          {/* Ẩn chevron trên màn hình quá bé để tiết kiệm chỗ */}
+                                          <ChevronDown className="w-3 h-3 opacity-50 shrink-0 hidden sm:block" />
+                                       </div>
+                                  </div>
+                               </td>
+
+                               {/* 5. Delete */}
+                               <td className="py-2 px-1 text-center align-middle">
+                                  <button onClick={(e) => { e.stopPropagation(); onDelete(sub.id); }} className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-all">
+                                     <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                               </td>
+                            </>
+                         )}
+                      </tr>
                   ))
                ) : (
                   <tr>
