@@ -11,14 +11,18 @@ import { Loader2 } from 'lucide-react';
 // Services
 import { getProjectCalendar, CalendarEvent, CalendarParams } from '@/services/apiStatistics';
 import { getProjectMembers, ProjectMember } from '@/services/apiProject';
+import { getProjectStatuses, RawStatusColumn } from "@/services/apiBoard"; 
+import { getSprints, Sprint } from "@/services/apiSprint";
+import { apiEpic, Epic } from "@/services/apiEpic";
 
 // Components
 import CalendarFilterBar from '@/components/features/core/calendar/CalendarFilterBar';
 import CalendarEventContent from '@/components/features/core/calendar/CalendarEventContent';
 import { useToast } from "@/components/ui/ToastProvider";
 
-// ✅ Import Modal Sprint
+// Modals
 import SprintDetailModal from "@/components/features/core/sprint/SprintDetailModal";
+import TaskDetailPanel from "@/components/features/core/task/TaskDetailPanel"; // ✅ Import Task Panel
 
 export default function ProjectCalendarPage() {
   const params = useParams();
@@ -30,15 +34,21 @@ export default function ProjectCalendarPage() {
   // --- STATE ---
   const [loading, setLoading] = useState(false);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
-  const [members, setMembers] = useState<ProjectMember[]>([]);
   
-  // Quản lý ngày tháng hiển thị
+  // Data State cho Task Modal
+  const [members, setMembers] = useState<ProjectMember[]>([]);
+  const [sprints, setSprints] = useState<Sprint[]>([]);
+  const [epics, setEpics] = useState<Epic[]>([]);
+  const [statuses, setStatuses] = useState<RawStatusColumn[]>([]);
+
+  // Calendar State
   const [dateRange, setDateRange] = useState<{ from: string; to: string } | null>(null);
   const [currentTitle, setCurrentTitle] = useState("");
   const [currentView, setCurrentView] = useState("dayGridMonth");
 
-  // ✅ State quản lý Sprint đang được chọn để xem chi tiết
+  // Selection State
   const [selectedSprintId, setSelectedSprintId] = useState<number | null>(null);
+  const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null); // ✅ State Task
 
   const [filters, setFilters] = useState({
     keyword: '',
@@ -54,12 +64,31 @@ export default function ProjectCalendarPage() {
 
   // --- API HANDLERS ---
   
-  // 1. Get Members
+  // 1. Fetch All Project Data (Members, Sprints, Epics, Statuses)
+  // Gom lại gọi 1 lần khi load trang để tối ưu
   useEffect(() => {
     if (!projectId || !workspaceId) return;
-    getProjectMembers(companyId, workspaceId, projectId, { size: 100 })
-      .then(res => setMembers(res.content || []))
-      .catch(err => console.error("Failed to fetch members", err));
+
+    const fetchAllData = async () => {
+      try {
+        const [membersRes, sprintsRes, epicsRes, statusesRes] = await Promise.all([
+            getProjectMembers(companyId, workspaceId, projectId, { size: 100 }),
+            getSprints(projectId),
+            apiEpic.getEpics(projectId),
+            getProjectStatuses(projectId)
+        ]);
+
+        setMembers(membersRes.content || []);
+        setSprints(sprintsRes || []);
+        setEpics(epicsRes || []);
+        setStatuses(statusesRes || []);
+
+      } catch (err) {
+        console.error("Failed to fetch project meta data", err);
+      }
+    };
+
+    fetchAllData();
   }, [companyId, workspaceId, projectId]);
 
   // 2. Fetch Events
@@ -90,7 +119,7 @@ export default function ProjectCalendarPage() {
     return () => clearTimeout(t);
   }, [fetchEvents]);
 
-  // --- HANDLERS ---
+  // --- UI HANDLERS ---
 
   const handleFilterChange = (key: keyof typeof filters, value: any) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
@@ -120,18 +149,14 @@ export default function ProjectCalendarPage() {
     }
   };
 
-  // ✅ CLICK EVENT: Kiểm tra type để mở Modal tương ứng
+  // ✅ CLICK EVENT: Mở Modal tương ứng
   const handleEventClick = (info: any) => {
     const props = info.event.extendedProps;
     
-    // Nếu là SPRINT -> Set ID để mở modal
     if (props.type === 'SPRINT') {
-        // originalId là ID số từ Database (đã map trong API Service)
         setSelectedSprintId(props.originalId);
-    } 
-    // Nếu là TASK -> Có thể mở Task Modal (Tính năng sau)
-    else if (props.type === 'TASK') {
-        // alert(`Open Task: ${info.event.title}`); 
+    } else if (props.type === 'TASK') {
+        setSelectedTaskId(props.originalId); // ✅ Set Task ID
     }
   };
 
@@ -174,10 +199,7 @@ export default function ProjectCalendarPage() {
                 events={events}
                 datesSet={handleDatesSet}
                 eventContent={CalendarEventContent}
-                
-                // ✅ Sự kiện Click
                 eventClick={handleEventClick}
-                
                 editable={false}
                 selectable={true}
                 height="100%"
@@ -190,13 +212,29 @@ export default function ProjectCalendarPage() {
         </div>
       </div>
 
-      {/* ✅ MODAL SPRINT DETAIL */}
+      {/* MODAL: SPRINT DETAIL */}
       {selectedSprintId && (
           <SprintDetailModal 
               projectId={projectId}
               sprintId={selectedSprintId}
               onClose={() => setSelectedSprintId(null)}
-              onUpdate={fetchEvents} // Reload lịch khi update xong
+              onUpdate={fetchEvents} 
+          />
+      )}
+
+      {/* ✅ MODAL: TASK DETAIL */}
+      {selectedTaskId && (
+          <TaskDetailPanel 
+              taskId={selectedTaskId}
+              onClose={() => setSelectedTaskId(null)}
+              onUpdate={fetchEvents} // Reload lịch khi task thay đổi
+              companyId={companyId}
+              workspaceId={workspaceId}
+              projectId={projectId}
+              members={members}
+              sprints={sprints}
+              epics={epics}
+              statuses={statuses}
           />
       )}
     </div>
