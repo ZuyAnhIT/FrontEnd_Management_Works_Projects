@@ -108,6 +108,15 @@ export interface UpdateProjectPayload {
   file?: File | null;
 }
 
+export interface ArchivedTaskParams {
+  page?: number;
+  size?: number;
+  keyword?: string;     // Tìm kiếm theo tên hoặc mã task
+  assigneeId?: number;  // Lọc theo người được giao cũ
+  priority?: string;    // 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT'
+  taskType?: string;    // 'STORY' | 'TASK' | 'BUG' | ...
+}
+
 /* ============================================
    📌 2. INTERFACES CHO TASK, BACKLOG & SPRINT
 ============================================ */
@@ -518,6 +527,27 @@ export const getTasksGrouped = async (
         params: cleanParams({ groupBy, sprintId, search })
     }
   );
+  if (!res.data.success) throw new Error(res.data.message);
+  return res.data.data;
+};
+
+// LẤY DANH SÁCH TASK ĐÃ LƯU TRỮ (ARCHIVED TASKS)
+export const getArchivedTasks = async (
+  companyId: number,
+  workspaceId: number,
+  projectId: number,
+  params: ArchivedTaskParams
+): Promise<PageResponse<TaskResponse>> => { // Đảm bảo TaskResponse khớp với cấu trúc TaskSummaryResponse từ Backend
+  
+  // URL phải khớp với: /api/companies/{cid}/workspaces/{wid}/projects/{pid}/archived-tasks
+  const res = await apiClient.get(
+    `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/archived-tasks`,
+    { 
+      // cleanParams giúp loại bỏ các key có value là undefined/null/rỗng để URL sạch đẹp
+      params: cleanParams(params) 
+    } 
+  );
+  
   if (!res.data.success) throw new Error(res.data.message);
   return res.data.data;
 };

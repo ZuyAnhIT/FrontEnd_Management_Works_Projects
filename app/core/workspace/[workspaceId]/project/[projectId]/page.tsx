@@ -1,242 +1,177 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import FullCalendar from '@fullcalendar/react';
-import dayGridPlugin from '@fullcalendar/daygrid';
-import timeGridPlugin from '@fullcalendar/timegrid';
-import interactionPlugin from '@fullcalendar/interaction';
-import { useParams } from 'next/navigation';
-import { Loader2 } from 'lucide-react';
+import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
+import { 
+  LayoutDashboard, 
+  PieChart, 
+  ArrowUpRight,
+  BarChart3,
+  Users // ✅ Thêm icon Users cho section Workload
+} from "lucide-react";
 
-// Services
-import { getProjectCalendar, CalendarEvent, CalendarParams } from '@/services/apiStatistics';
-import { getProjectMembers, ProjectMember } from '@/services/apiProject';
-import { getProjectStatuses, RawStatusColumn } from "@/services/apiBoard"; 
-import { getSprints, Sprint } from "@/services/apiSprint";
-import { apiEpic, Epic } from "@/services/apiEpic";
+// API & Types
+import { 
+  getStatusDistribution, 
+  getPriorityDistribution,
+  getTypeDistribution,
+  getEpicProgress, 
+  getProjectWorkload, // ✅ API Workload
+  DistributionStat,
+  EpicProgressStat, 
+  EpicProgressParams,
+  WorkloadStat,      // ✅ Type Workload
+  WorkloadParams     // ✅ Type Workload Filter
+} from "@/services/apiStatistics";
 
 // Components
-import CalendarFilterBar from '@/components/features/core/calendar/CalendarFilterBar';
-import CalendarEventContent from '@/components/features/core/calendar/CalendarEventContent';
-import { useToast } from "@/components/ui/ToastProvider";
+import WeeklyOverview from "@/components/features/core/summary/WeeklyOverview";
+import StatusChart from "@/components/features/core/summary/StatusChart";
+import PriorityChart from "@/components/features/core/summary/PriorityChart";
+import TypeChart from "@/components/features/core/summary/TypeChart";
+import EpicProgressCard from "@/components/features/core/summary/EpicProgressCard"; 
+import EpicFilterToolbar from "@/components/features/core/summary/EpicFilterToolbar"; 
+import WorkloadOverview from "@/components/features/core/summary/WorkloadOverview"; // ✅ Component Workload Gộp
 
-// Modals
-import SprintDetailModal from "@/components/features/core/sprint/SprintDetailModal";
-import TaskDetailPanel from "@/components/features/core/task/TaskDetailPanel"; // ✅ Import Task Panel
-
-export default function ProjectCalendarPage() {
+export default function ProjectSummaryPage() {
   const params = useParams();
   const projectId = Number(params.projectId);
-  const workspaceId = Number(params.workspaceId);
-  const companyId = Number(params.companyId) || 1; 
-  const { showToast } = useToast();
 
-  // --- STATE ---
-  const [loading, setLoading] = useState(false);
-  const [events, setEvents] = useState<CalendarEvent[]>([]);
-  
-  // Data State cho Task Modal
-  const [members, setMembers] = useState<ProjectMember[]>([]);
-  const [sprints, setSprints] = useState<Sprint[]>([]);
-  const [epics, setEpics] = useState<Epic[]>([]);
-  const [statuses, setStatuses] = useState<RawStatusColumn[]>([]);
+  // --- STATE CHARTS ---
+  const [loading, setLoading] = useState(true);
+  const [statusData, setStatusData] = useState<DistributionStat[]>([]);
+  const [priorityData, setPriorityData] = useState<DistributionStat[]>([]);
+  const [typeData, setTypeData] = useState<DistributionStat[]>([]);
 
-  // Calendar State
-  const [dateRange, setDateRange] = useState<{ from: string; to: string } | null>(null);
-  const [currentTitle, setCurrentTitle] = useState("");
-  const [currentView, setCurrentView] = useState("dayGridMonth");
+  // --- STATE EPIC ---
+  const [epicData, setEpicData] = useState<EpicProgressStat[]>([]);
+  const [epicLoading, setEpicLoading] = useState(true);
+  const [epicFilters, setEpicFilters] = useState<EpicProgressParams>({});
 
-  // Selection State
-  const [selectedSprintId, setSelectedSprintId] = useState<number | null>(null);
-  const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null); // ✅ State Task
-
-  const [filters, setFilters] = useState({
-    keyword: '',
-    assigneeId: '',
-    priority: '',
-    taskType: '',
-    showSprints: true,
-    from: '', 
-    to: ''
-  });
-
-  const calendarRef = useRef<FullCalendar>(null);
-
-  // --- API HANDLERS ---
-  
-  // 1. Fetch All Project Data (Members, Sprints, Epics, Statuses)
-  // Gom lại gọi 1 lần khi load trang để tối ưu
+  // --- 1. FETCH CHARTS DATA (Initial Load) ---
   useEffect(() => {
-    if (!projectId || !workspaceId) return;
+    if (!projectId) return;
 
-    const fetchAllData = async () => {
+    const fetchCharts = async () => {
+      setLoading(true);
       try {
-        const [membersRes, sprintsRes, epicsRes, statusesRes] = await Promise.all([
-            getProjectMembers(companyId, workspaceId, projectId, { size: 100 }),
-            getSprints(projectId),
-            apiEpic.getEpics(projectId),
-            getProjectStatuses(projectId)
-        ]);
+         const [resStatus, resPriority, resType] = await Promise.all([
+             getStatusDistribution(projectId),
+             getPriorityDistribution(projectId),
+             getTypeDistribution(projectId)
+         ]);
 
-        setMembers(membersRes.content || []);
-        setSprints(sprintsRes || []);
-        setEpics(epicsRes || []);
-        setStatuses(statusesRes || []);
-
-      } catch (err) {
-        console.error("Failed to fetch project meta data", err);
+         setStatusData(resStatus);
+         setPriorityData(resPriority);
+         setTypeData(resType);
+         
+      } catch (error) {
+         console.error("Failed to load charts", error);
+      } finally {
+         setLoading(false);
       }
     };
 
-    fetchAllData();
-  }, [companyId, workspaceId, projectId]);
+    fetchCharts();
+  }, [projectId]);
 
-  // 2. Fetch Events
-  const fetchEvents = useCallback(async () => {
-    if (!projectId || !dateRange) return;
-    setLoading(true);
-    try {
-        const apiParams: CalendarParams = {
-            from: filters.from || dateRange.from,
-            to: filters.to || dateRange.to,
-            keyword: filters.keyword || undefined,
-            assigneeId: filters.assigneeId ? Number(filters.assigneeId) : undefined,
-            priority: filters.priority || undefined,
-            taskType: filters.taskType || undefined,
-            showSprints: filters.showSprints,
-        };
-        const data = await getProjectCalendar(projectId, apiParams);
-        setEvents(data);
-    } catch (error) {
-        showToast("Failed to load calendar events", "error");
-    } finally {
-        setLoading(false);
-    }
-  }, [projectId, dateRange, filters]);
-
+  // --- 2. FETCH EPIC DATA (Triggered by Filters) ---
   useEffect(() => {
-    const t = setTimeout(() => fetchEvents(), 300);
-    return () => clearTimeout(t);
-  }, [fetchEvents]);
+     if (!projectId) return;
+     
+     const fetchEpics = async () => {
+        setEpicLoading(true);
+        try {
+           const data = await getEpicProgress(projectId, epicFilters);
+           setEpicData(data);
+        } catch (error) {
+           console.error("Failed to load epics", error);
+        } finally {
+           setEpicLoading(false);
+        }
+     };
 
-  // --- UI HANDLERS ---
-
-  const handleFilterChange = (key: keyof typeof filters, value: any) => {
-    setFilters((prev) => ({ ...prev, [key]: value }));
-  };
-
-  const handleDatesSet = (dateInfo: any) => {
-    setDateRange({
-      from: dateInfo.startStr.split('T')[0],
-      to: dateInfo.endStr.split('T')[0],
-    });
-    setCurrentTitle(dateInfo.view.title);
-  };
-
-  const handleNavigate = (action: 'PREV' | 'NEXT' | 'TODAY') => {
-    const calendarApi = calendarRef.current?.getApi();
-    if (!calendarApi) return;
-    if (action === 'PREV') calendarApi.prev();
-    if (action === 'NEXT') calendarApi.next();
-    if (action === 'TODAY') calendarApi.today();
-  };
-
-  const handleViewChange = (view: string) => {
-    const calendarApi = calendarRef.current?.getApi();
-    if (calendarApi) {
-        calendarApi.changeView(view);
-        setCurrentView(view);
-    }
-  };
-
-  // ✅ CLICK EVENT: Mở Modal tương ứng
-  const handleEventClick = (info: any) => {
-    const props = info.event.extendedProps;
-    
-    if (props.type === 'SPRINT') {
-        setSelectedSprintId(props.originalId);
-    } else if (props.type === 'TASK') {
-        setSelectedTaskId(props.originalId); // ✅ Set Task ID
-    }
-  };
+     const t = setTimeout(() => fetchEpics(), 300);
+     return () => clearTimeout(t);
+  }, [projectId, epicFilters]);
 
   if (!projectId) return null;
 
   return (
-    <div className="flex flex-col h-screen bg-slate-50 overflow-hidden relative">
-      
-      {/* HEADER & FILTER */}
-      <div className="bg-white border-b border-slate-200 shrink-0 z-10 shadow-sm">
-        <div className="px-6 py-3 flex items-center justify-between">
-            <h1 className="text-xl font-bold text-slate-800 tracking-tight">Project Calendar</h1>
-            {loading && (
-                <div className="flex items-center gap-2 text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-full animate-pulse">
-                    <Loader2 className="w-3 h-3 animate-spin"/> Syncing...
-                </div>
-            )}
-        </div>
-        <div className="px-4 pb-3">
-            <CalendarFilterBar 
-                filters={filters} 
-                onFilterChange={handleFilterChange}
-                viewMode={currentView}
-                onViewChange={handleViewChange}
-                onNavigate={handleNavigate}
-                titleDate={currentTitle}
-                members={members} 
-            />
-        </div>
-      </div>
+    <div className="min-h-screen bg-slate-50 p-6 sm:p-8 font-sans text-slate-900">
+       <div className="max-w-[1600px] mx-auto space-y-8">
+          
+          {/* HEADER */}
+          <div className="flex items-center justify-between">
+             <div>
+                <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+                   <LayoutDashboard className="w-6 h-6 text-blue-600" />
+                   Project Summary
+                </h1>
+                <p className="text-sm text-slate-500 mt-1">
+                   Real-time overview of project performance and health.
+                </p>
+             </div>
+             <button className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-blue-600 transition-all shadow-sm">
+                <ArrowUpRight className="w-4 h-4" /> Export Report
+             </button>
+          </div>
 
-      {/* CALENDAR BODY */}
-      <div className="flex-1 p-4 sm:p-6 overflow-hidden">
-        <div className="bg-white p-1 rounded-xl shadow-sm border border-slate-200 h-full relative">
-            <FullCalendar
-                ref={calendarRef}
-                plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-                initialView="dayGridMonth"
-                headerToolbar={false} 
-                events={events}
-                datesSet={handleDatesSet}
-                eventContent={CalendarEventContent}
-                eventClick={handleEventClick}
-                editable={false}
-                selectable={true}
-                height="100%"
-                dayMaxEvents={4}
-                firstDay={1}
-                fixedWeekCount={false}
-                nowIndicator={true}
-                eventClassNames="focus:outline-none"
-            />
-        </div>
-      </div>
+          {/* SECTION 1: WEEKLY OVERVIEW */}
+          <section className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+             <WeeklyOverview projectId={projectId} />
+          </section>
 
-      {/* MODAL: SPRINT DETAIL */}
-      {selectedSprintId && (
-          <SprintDetailModal 
-              projectId={projectId}
-              sprintId={selectedSprintId}
-              onClose={() => setSelectedSprintId(null)}
-              onUpdate={fetchEvents} 
-          />
-      )}
+          <hr className="border-slate-200" />
 
-      {/* ✅ MODAL: TASK DETAIL */}
-      {selectedTaskId && (
-          <TaskDetailPanel 
-              taskId={selectedTaskId}
-              onClose={() => setSelectedTaskId(null)}
-              onUpdate={fetchEvents} // Reload lịch khi task thay đổi
-              companyId={companyId}
-              workspaceId={workspaceId}
-              projectId={projectId}
-              members={members}
-              sprints={sprints}
-              epics={epics}
-              statuses={statuses}
-          />
-      )}
+          {/* SECTION 2: CHARTS */}
+          <section>
+             <div className="flex items-center gap-2 mb-4">
+                <PieChart className="w-5 h-5 text-slate-400" />
+                <h2 className="text-lg font-bold text-slate-800">Analytics & Distribution</h2>
+             </div>
+             
+             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <StatusChart data={statusData} loading={loading} />
+                <PriorityChart data={priorityData} loading={loading} />
+                <TypeChart data={typeData} loading={loading} />
+             </div>
+          </section>
+
+          <hr className="border-slate-200" />
+
+          {/* SECTION 3: EPIC PROGRESS */}
+          <section>
+             <div className="flex items-center gap-2 mb-4">
+                <BarChart3 className="w-5 h-5 text-slate-400" />
+                <h2 className="text-lg font-bold text-slate-800">Epic Progress & Roadmap</h2>
+             </div>
+
+             <EpicFilterToolbar 
+                projectId={projectId}
+                filters={epicFilters}
+                setFilters={setEpicFilters}
+             />
+
+             <div className="w-full mt-4">
+                 <EpicProgressCard data={epicData} loading={epicLoading} />
+             </div>
+          </section>
+
+          <hr className="border-slate-200" />
+
+          {/* SECTION 4: TEAM WORKLOAD (MỚI) */}
+          <section>
+             <div className="flex items-center gap-2 mb-4">
+                <Users className="w-5 h-5 text-slate-400" />
+                <h2 className="text-lg font-bold text-slate-800">Team Workload</h2>
+             </div>
+
+             {/* Component này đã bao gồm Toolbar, KPI và Chart */}
+             <WorkloadOverview projectId={projectId} />
+          </section>
+
+       </div>
     </div>
   );
 }
