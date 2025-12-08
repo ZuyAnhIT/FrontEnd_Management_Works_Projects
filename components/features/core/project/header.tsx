@@ -54,7 +54,8 @@ export default function ProjectHeader({
     if (pathname?.includes("/backlog")) return "Backlog";
     if (pathname?.includes("/sprints")) return "Sprints";
     if (pathname?.includes("/timeline")) return "Timeline";
-    if (pathname?.includes("/summary")) return "Summary";
+    if (pathname?.includes("/calendar")) return "Calendar"; 
+    if (pathname?.includes("/archived")) return "Archived Items"; 
     return "Dashboard";
   };
 

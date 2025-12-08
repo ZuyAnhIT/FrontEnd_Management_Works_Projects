@@ -10,6 +10,8 @@ import {
   GitBranch,
   Calendar,
   BarChart3,
+  CalendarDays, 
+  Archive,
   X,
   Plus,
   Settings,
@@ -65,16 +67,22 @@ export default function ProjectSidebar({
       path: `/core/workspace/project/${projectId}/sprints`,
     },
     {
+      id: "calendar", 
+      icon: CalendarDays,
+      label: "Calendar",
+      path: `/core/workspace/project/${projectId}/calendar`,
+    },
+    {
       id: "timeline",
       icon: Calendar,
       label: "Timeline",
       path: `/core/workspace/project/${projectId}/timeline`,
     },
     {
-      id: "summary",
-      icon: BarChart3,
-      label: "Summary",
-      path: `/core/workspace/project/${projectId}/summary`,
+      id: "archived",
+      icon: Archive,
+      label: "Archived",
+      path: `/core/workspace/project/${projectId}/archived`,
     },
   ];
 

@@ -5,7 +5,9 @@ import {
   ListTodo,
   Menu as MenuIcon,
   GitBranch,
+  Archive,
   Calendar,
+  CalendarDays, 
   BarChart3,
 } from 'lucide-react'
 import { usePathname, useParams } from 'next/navigation'
@@ -48,7 +50,12 @@ export default function ProjectNavTabs({
       label: 'Backlog',
       path: `/core/workspace/${workspaceId}/project/${projectId}/backlog`,
     },
-  
+    {
+      id: 'calendar',
+      icon: CalendarDays,
+      label: 'Calendar',
+      path: `/core/workspace/${workspaceId}/project/${projectId}/calendar`,
+    },
     {
       id: 'timeline',
       icon: Calendar,
@@ -56,10 +63,10 @@ export default function ProjectNavTabs({
       path: `/core/workspace/${workspaceId}/project/${projectId}/timeline`,
     },
     {
-      id: 'summary',
-      icon: BarChart3,
-      label: 'Summary',
-      path: `/core/workspace/${workspaceId}/project/${projectId}/summary`,
+      id: 'archived', 
+      icon: Archive,
+      label: 'Archived',
+      path: `/core/workspace/${workspaceId}/project/${projectId}/archived`,
     },
   ]
 

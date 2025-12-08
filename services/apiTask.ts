@@ -207,3 +207,31 @@ export const uploadTaskAttachment = async (taskId: number, file: File) => {
 
   return res.data; 
 };
+
+/**
+ * 🔹 PATCH: Lưu trữ Task (Chuyển vào thùng rác)
+ * Endpoint: /api/tasks/{taskId}/archive
+ */
+export const archiveTask = async (taskId: number) => {
+  const res = await apiClient.patch(`/tasks/${taskId}/archive`);
+  
+  if (!res.data.success) {
+    throw new Error(res.data.message || "Failed to archive task");
+  }
+  
+  return res.data; // Thường trả về null hoặc message success
+};
+
+/**
+ * 🔹 PATCH: Khôi phục Task (Lấy lại từ thùng rác)
+ * Endpoint: /api/tasks/{taskId}/restore
+ */
+export const restoreTask = async (taskId: number) => {
+  const res = await apiClient.patch(`/tasks/${taskId}/restore`);
+  
+  if (!res.data.success) {
+    throw new Error(res.data.message || "Failed to restore task");
+  }
+  
+  return res.data;
+};
