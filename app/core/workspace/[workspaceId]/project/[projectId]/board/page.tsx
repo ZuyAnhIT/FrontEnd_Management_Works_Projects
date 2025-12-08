@@ -278,7 +278,6 @@ export default function BoardPage() {
       {isModalOpen && selectedTaskId && viewMode === 'panel' && (
         <TaskDetailPanel
           taskId={selectedTaskId}
-          isOpen={true}
           onClose={() => setIsModalOpen(false)}
           // 👇 Nút "Phóng to" -> Chuyển sang Floating
           onSwitchToFloating={() => setViewMode('floating')} 
