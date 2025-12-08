@@ -65,3 +65,116 @@ body {
     border-color: rgba(51, 65, 85, 0.5) !important; /* border-slate-700/50 */
   }
 }
+
+/* --- JIRA / ATLASSIAN CALENDAR STYLE OVERRIDES --- */
+
+/* 1. Header Toolbar (Ẩn toolbar mặc định của FullCalendar vì ta dùng Custom Toolbar) */
+.fc-header-toolbar {
+  display: none !important; 
+}
+
+/* 2. Grid & Border */
+.fc-theme-standard td, 
+.fc-theme-standard th {
+  border-color: #e2e8f0; /* slate-200 */
+}
+
+.fc-scrollgrid {
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem; /* rounded-xl */
+  overflow: hidden;
+}
+
+/* 3. Header Cells (Mon, Tue...) */
+.fc-col-header-cell {
+  background-color: #f8fafc; /* slate-50 */
+  padding: 12px 0 !important;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.fc-col-header-cell-cushion {
+  color: #64748b; /* slate-500 */
+  font-size: 0.75rem; /* text-xs */
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  text-decoration: none !important;
+}
+
+/* 4. Body Cells */
+.fc-daygrid-day {
+  transition: background-color 0.2s;
+}
+.fc-daygrid-day:hover {
+  background-color: #f8fafc;
+}
+
+/* 5. Today Cell */
+.fc-day-today {
+  background-color: #f0f9ff !important; /* sky-50 */
+}
+
+/* 6. Day Number */
+.fc-daygrid-day-top {
+  flex-direction: row;
+  padding: 8px;
+}
+
+.fc-daygrid-day-number {
+  font-size: 0.875rem;
+  color: #475569; /* slate-600 */
+  font-weight: 500;
+  text-decoration: none !important;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  transition: all 0.2s;
+}
+
+/* Highlight Today Number */
+.fc-day-today .fc-daygrid-day-number {
+  background-color: #2563eb; /* blue-600 */
+  color: white;
+  box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);
+}
+
+/* 7. Events Container */
+.fc-daygrid-event {
+  margin-top: 2px !important;
+  margin-bottom: 2px !important;
+  background: transparent !important;
+  border: none !important;
+  cursor: pointer;
+}
+
+.fc-event-main {
+  padding: 0 !important;
+}
+
+/* 8. More Link (+2 more) */
+.fc-daygrid-more-link {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #64748b !important;
+  text-decoration: none !important;
+  padding-left: 8px;
+  display: block;
+  margin-top: 4px;
+}
+.fc-daygrid-more-link:hover {
+  color: #2563eb !important;
+  text-decoration: underline !important;
+}
+
+/* 9. TimeGrid Specific (Week/Day View) */
+.fc-timegrid-slot {
+  height: 3rem !important; /* Các dòng giờ cao hơn cho thoáng */
+}
+.fc-timegrid-slot-label-cushion {
+  font-size: 0.75rem;
+  color: #64748b;
+  text-transform: uppercase;
+}
