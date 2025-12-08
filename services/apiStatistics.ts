@@ -154,6 +154,37 @@ export interface RoadmapItemResponse {
   completedTasks: number;
 }
 
+export interface CalendarEvent {
+  id: string;          // Ví dụ: "task-1", "sprint-2" (để render key trên lịch)
+  originalId: number;  // ID gốc trong DB (để gọi API detail khi click)
+  title: string;
+  start: string;       // ISO 8601 string (2025-09-01T00:00:00)
+  end: string;         // ISO 8601 string
+  allDay: boolean;
+  type: "TASK" | "SPRINT";
+  
+  // UI Properties
+  backgroundColor: string;
+  borderColor: string;
+  textColor: string;
+  
+  // Meta data
+  statusName: string;
+  priority: string | null;      // Chỉ có ở Task
+  assigneeName: string | null;  // Chỉ có ở Task
+  assigneeAvatar: string | null;// Chỉ có ở Task
+}
+
+export interface CalendarParams {
+  from: string; // YYYY-MM-DD (Bắt buộc)
+  to: string;   // YYYY-MM-DD (Bắt buộc)
+  keyword?: string;
+  assigneeId?: number;
+  priority?: string;
+  taskType?: string;
+  showSprints?: boolean;
+}
+
 
 // --- API METHODS ---
 
@@ -308,6 +339,33 @@ export const getProjectRoadmap = async (
   if (params?.sprintStatuses?.length) cleanParams.sprintStatuses = params.sprintStatuses.join(",");
 
   const res = await apiClient.get(`/statistics/projects/${projectId}/roadmap`, { 
+    params: cleanParams 
+  });
+
+  if (!res.data.success) throw new Error(res.data.message);
+  return res.data.data;
+};
+
+// 8. Lấy dữ liệu Lịch dự án (Calendar)
+export const getProjectCalendar = async (
+  projectId: number, 
+  params: CalendarParams
+): Promise<CalendarEvent[]> => {
+  
+  const cleanParams: any = {
+    from: params.from,
+    to: params.to
+  };
+
+  if (params.keyword) cleanParams.keyword = params.keyword;
+  if (params.assigneeId) cleanParams.assigneeId = params.assigneeId;
+  if (params.priority) cleanParams.priority = params.priority;
+  if (params.taskType) cleanParams.taskType = params.taskType;
+  
+  // Kiểm tra boolean để tránh lỗi khi giá trị là false
+  if (params.showSprints !== undefined) cleanParams.showSprints = params.showSprints;
+
+  const res = await apiClient.get(`/statistics/projects/${projectId}/calendar`, { 
     params: cleanParams 
   });
 
