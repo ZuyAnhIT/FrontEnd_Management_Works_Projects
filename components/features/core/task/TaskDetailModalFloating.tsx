@@ -7,7 +7,7 @@ import {
   Link as LinkIcon, CheckSquare, ChevronDown, Plus,
   Loader2, Tag as TagIcon, Flag, User, Clock, Layers, Zap,
   Check, Trash2,
-  Minimize2
+  Minimize2, Archive
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,7 +22,7 @@ import {
 
 import SubtaskDetailView from "./SubtaskDetailView";
 // API Services & Types
-import { getTaskDetails, updateTask, TaskDetail, UpdateTaskData } from "@/services/apiTask";
+import { getTaskDetails, updateTask, TaskDetail, UpdateTaskData, archiveTask } from "@/services/apiTask";
 import {
   getSubtaskList,
   createSubtask,
@@ -126,7 +126,7 @@ export default function TaskDetailModalFloating({
   const { showToast } = useToast();
   const [task, setTask] = useState<TaskDetail | null>(null);
   const [formData, setFormData] = useState<UpdateTaskData>({});
- 
+
   // Loading States
   const [loading, setLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -141,7 +141,7 @@ export default function TaskDetailModalFloating({
   // Description State
   const [isEditingDescription, setIsEditingDescription] = useState(false);
 
-const [selectedSubtaskId, setSelectedSubtaskId] = useState<number | null>(null);
+  const [selectedSubtaskId, setSelectedSubtaskId] = useState<number | null>(null);
   // Tags State
   const [allProjectTags, setAllProjectTags] = useState<Tag[]>([]);
   const [isTagPopoverOpen, setIsTagPopoverOpen] = useState(false);
@@ -153,7 +153,7 @@ const [selectedSubtaskId, setSelectedSubtaskId] = useState<number | null>(null);
   const [isSprintPopoverOpen, setIsSprintPopoverOpen] = useState(false);
   const [isEpicModalOpen, setIsEpicModalOpen] = useState(false);
 
-
+  const [isArchiveConfirmOpen, setIsArchiveConfirmOpen] = useState(false);
   // ✅ CONFIRM MODAL STATE (For Delete Subtask)
   const [subtaskToDelete, setSubtaskToDelete] = useState<number | null>(null);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
@@ -175,7 +175,7 @@ const [selectedSubtaskId, setSelectedSubtaskId] = useState<number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
- 
+
   // Click Outside Handler
   useEffect(() => {
     function handleClickOutside(event: any) {
@@ -195,7 +195,7 @@ const [selectedSubtaskId, setSelectedSubtaskId] = useState<number | null>(null);
       setTimeout(() => tagInputRef.current?.focus(), 50);
     }
   }, [isTagPopoverOpen]);
- 
+
   // --- 1. LOAD DATA ---
   useEffect(() => {
     if (isOpen && taskId) {
@@ -221,7 +221,7 @@ const [selectedSubtaskId, setSelectedSubtaskId] = useState<number | null>(null);
           });
         })
         .catch((err) => {
-            showToast("Failed to load task details", "error");
+          showToast("Failed to load task details", "error");
         })
         .finally(() => setLoading(false));
 
@@ -250,7 +250,7 @@ const [selectedSubtaskId, setSelectedSubtaskId] = useState<number | null>(null);
       const data = await getSubtaskList(companyId, workspaceId, projectId, id);
       setSubtasks(Array.isArray(data) ? data : []);
     } catch (error) {
-        // Silent fail or minimal toast
+      // Silent fail or minimal toast
     }
   };
 
@@ -268,47 +268,47 @@ const [selectedSubtaskId, setSelectedSubtaskId] = useState<number | null>(null);
     if (field === 'assigneeId') {
       const userId = Number(value);
       if (userId === 0) {
-         setTask({ ...task, assignee: null });
+        setTask({ ...task, assignee: null });
       } else {
-         const user = members.find(m => (m.userId || m.id) === userId);
-         if (user) {
-            setTask({
-                ...task,
-                assignee: {
-                    id: userId,
-                    name: user.fullName || user.name,
-                    avatarUrl: user.avatarUrl || user.avatar
-                }
-            });
-         }
+        const user = members.find(m => (m.userId || m.id) === userId);
+        if (user) {
+          setTask({
+            ...task,
+            assignee: {
+              id: userId,
+              name: user.fullName || user.name,
+              avatarUrl: user.avatarUrl || user.avatar
+            }
+          });
+        }
       }
     }
 
 
     // Optimistic UI: Status
     if (field === 'statusId') {
-        const newStatusId = Number(value);
-        const statusObj = statuses.find(s => s.id === newStatusId);
-        if (statusObj) {
-            setTask({
-                ...task,
-                status: {
-                    id: newStatusId,
-                    name: statusObj.name,
-                    color: statusObj.color,
-                    isCompleted: statusObj.isCompleted || false
-                }
-            });
-        }
+      const newStatusId = Number(value);
+      const statusObj = statuses.find(s => s.id === newStatusId);
+      if (statusObj) {
+        setTask({
+          ...task,
+          status: {
+            id: newStatusId,
+            name: statusObj.name,
+            color: statusObj.color,
+            isCompleted: statusObj.isCompleted || false
+          }
+        });
+      }
     }
 
 
     let payloadValue = value;
     if (field === 'startDate' || field === 'dueDate') payloadValue = value ? new Date(value).toISOString() : null;
     if (field === 'storyPoints' || field === 'estimatedHours') payloadValue = Number(value);
-   
+
     if (['sprintId', 'epicId', 'assigneeId'].includes(field) && (value === 0 || value === "0")) {
-        payloadValue = null;
+      payloadValue = null;
     }
     if (field === 'statusId') payloadValue = Number(value);
 
@@ -324,15 +324,42 @@ const [selectedSubtaskId, setSelectedSubtaskId] = useState<number | null>(null);
       setIsSaving(false);
     }
   };
+  // archive handler
+  // --- ARCHIVE HANDLER ---
+  const onClickArchive = async (e: React.MouseEvent) => {
+    e.stopPropagation(); // Ngăn click lan ra ngoài
+    setIsArchiveConfirmOpen(true);
+  };
+  const onConfirmArchive = async () => {
+    if (!taskId) return;
 
+    try {
+      setIsSaving(true); // Tận dụng state loading có sẵn hoặc tạo mới
+      await archiveTask(taskId);
+
+      showToast("Đã lưu trữ task thành công", "success");
+
+      // Đóng modal chi tiết
+      onClose();
+
+      // Quan trọng: Gọi onUpdate để refresh danh sách ở màn hình cha
+      if (onUpdate) {
+        onUpdate();
+      }
+    } catch (error: any) {
+      showToast(error.message || "Lỗi khi lưu trữ task", "error");
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   // ✅ HANDLE SELECT EPIC
   const handleSelectEpic = async (epic: any | null) => {
     setTask(prev => prev ? ({
-        ...prev,
-        epic: epic ? { id: epic.id, name: epic.name, color: epic.color } : null
+      ...prev,
+      epic: epic ? { id: epic.id, name: epic.name, color: epic.color } : null
     }) : null);
-   
+
     setFormData(prev => ({ ...prev, epicId: epic ? epic.id : null }));
     await handleUpdate('epicId', epic ? epic.id : null);
   };
@@ -363,11 +390,11 @@ const [selectedSubtaskId, setSelectedSubtaskId] = useState<number | null>(null);
 
 
     try {
-        await apiTag.assignTagToTask(companyId, workspaceId, projectId, taskId, tag.id);
-        showToast("Tag added", "success");
+      await apiTag.assignTagToTask(companyId, workspaceId, projectId, taskId, tag.id);
+      showToast("Tag added", "success");
     } catch (error) {
-        setTask({ ...task, tags: currentTags as any });
-        showToast("Add tag failed", "error");
+      setTask({ ...task, tags: currentTags as any });
+      showToast("Add tag failed", "error");
     }
   };
 
@@ -376,13 +403,13 @@ const [selectedSubtaskId, setSelectedSubtaskId] = useState<number | null>(null);
     if (!taskId || !task) return;
     const currentTags = (task.tags as unknown as Tag[]) || [];
     const newTags = currentTags.filter(t => t.id !== tagId);
-   
+
     setTask({ ...task, tags: newTags as any });
     try {
-        await apiTag.removeTagFromTask(companyId, workspaceId, projectId, taskId, tagId);
+      await apiTag.removeTagFromTask(companyId, workspaceId, projectId, taskId, tagId);
     } catch (error) {
-        setTask({ ...task, tags: currentTags as any });
-        showToast("Remove tag failed", "error");
+      setTask({ ...task, tags: currentTags as any });
+      showToast("Remove tag failed", "error");
     }
   };
   const handleCreateNewTag = async () => {
@@ -390,23 +417,23 @@ const [selectedSubtaskId, setSelectedSubtaskId] = useState<number | null>(null);
 
 
     try {
-        // 1. Create Tag
-        const newTag = await apiTag.createTag(companyId, workspaceId, projectId, {
-            name: tagSearch.trim(),
-            color: "#95a5a6"
-        });
+      // 1. Create Tag
+      const newTag = await apiTag.createTag(companyId, workspaceId, projectId, {
+        name: tagSearch.trim(),
+        color: "#95a5a6"
+      });
 
 
-        // 2. Update local list
-        setAllProjectTags(prev => [...prev, newTag]);
+      // 2. Update local list
+      setAllProjectTags(prev => [...prev, newTag]);
 
 
-        // 3. Assign to task
-        handleAddTag(newTag);
+      // 3. Assign to task
+      handleAddTag(newTag);
 
 
     } catch (error) {
-        showToast("Error creating new tag", "error");
+      showToast("Error creating new tag", "error");
     }
   };
   // Subtask & Description handlers
@@ -429,44 +456,44 @@ const [selectedSubtaskId, setSelectedSubtaskId] = useState<number | null>(null);
       showToast("Subtask created", "success");
     } catch (error) { showToast("Failed create subtask", "error"); }
   };
- const handleToggleSubtask = async (subtask: Subtask) => {
-  if (!taskId) return;
+  const handleToggleSubtask = async (subtask: Subtask) => {
+    if (!taskId) return;
 
 
-  // 1. Định nghĩa vòng lặp trạng thái: Key là trạng thái hiện tại -> Value là trạng thái tiếp theo
-  // TO_DO -> IN_PROGRESS -> DONE -> quay lại TO_DO
-  const statusCycle: Record<string, string> = {
-    'TO_DO': 'IN_PROGRESS',
-    'IN_PROGRESS': 'DONE',
-    'DONE': 'TO_DO',
-    // Fallback cho trường hợp backend trả về lowercase (nếu có)
-    'todo': 'IN_PROGRESS',
-    'in_progress': 'DONE',
-    'done': 'TO_DO'
+    // 1. Định nghĩa vòng lặp trạng thái: Key là trạng thái hiện tại -> Value là trạng thái tiếp theo
+    // TO_DO -> IN_PROGRESS -> DONE -> quay lại TO_DO
+    const statusCycle: Record<string, string> = {
+      'TO_DO': 'IN_PROGRESS',
+      'IN_PROGRESS': 'DONE',
+      'DONE': 'TO_DO',
+      // Fallback cho trường hợp backend trả về lowercase (nếu có)
+      'todo': 'IN_PROGRESS',
+      'in_progress': 'DONE',
+      'done': 'TO_DO'
+    };
+
+
+    // 2. Xác định trạng thái mới
+    const currentStatus = subtask.status || 'TO_DO';
+    const newStatus = statusCycle[currentStatus] || 'TO_DO'; // Mặc định về TO_DO nếu lỗi
+
+
+    // 3. Optimistic Update (Cập nhật UI ngay lập tức để người dùng thấy mượt)
+    setSubtasks(prev => prev.map(s =>
+      s.id === subtask.id ? { ...s, status: newStatus } : s
+    ));
+
+
+    try {
+      // 4. Gọi API cập nhật
+      await updateSubtask(companyId, workspaceId, projectId, taskId, subtask.id, { status: newStatus });
+    } catch (error) {
+      // 5. Nếu lỗi, hoàn tác bằng cách tải lại danh sách gốc
+      console.error("Failed to update status", error);
+      fetchSubtasks(taskId);
+      // toast.error("Có lỗi xảy ra khi cập nhật trạng thái");
+    }
   };
-
-
-  // 2. Xác định trạng thái mới
-  const currentStatus = subtask.status || 'TO_DO';
-  const newStatus = statusCycle[currentStatus] || 'TO_DO'; // Mặc định về TO_DO nếu lỗi
-
-
-  // 3. Optimistic Update (Cập nhật UI ngay lập tức để người dùng thấy mượt)
-  setSubtasks(prev => prev.map(s =>
-    s.id === subtask.id ? { ...s, status: newStatus } : s
-  ));
-
-
-  try {
-    // 4. Gọi API cập nhật
-    await updateSubtask(companyId, workspaceId, projectId, taskId, subtask.id, { status: newStatus });
-  } catch (error) {
-    // 5. Nếu lỗi, hoàn tác bằng cách tải lại danh sách gốc
-    console.error("Failed to update status", error);
-    fetchSubtasks(taskId);
-    // toast.error("Có lỗi xảy ra khi cập nhật trạng thái");
-  }
-};
 
 
   // --- DELETE SUBTASK LOGIC WITH CONFIRM MODAL ---
@@ -478,19 +505,19 @@ const [selectedSubtaskId, setSelectedSubtaskId] = useState<number | null>(null);
 
   const onConfirmDeleteSubtask = async () => {
     if (!taskId || !subtaskToDelete) return;
-   
+
     setIsDeletingSubtask(true);
     try {
-        await deleteSubtask(companyId, workspaceId, projectId, taskId, subtaskToDelete);
-        setSubtasks(prev => prev.filter(s => s.id !== subtaskToDelete));
-        showToast("Subtask deleted", "success");
-        setIsDeleteConfirmOpen(false);
+      await deleteSubtask(companyId, workspaceId, projectId, taskId, subtaskToDelete);
+      setSubtasks(prev => prev.filter(s => s.id !== subtaskToDelete));
+      showToast("Subtask deleted", "success");
+      setIsDeleteConfirmOpen(false);
     } catch (error) {
-        showToast("Failed to delete subtask", "error");
-        fetchSubtasks(taskId); // Revert UI on error
+      showToast("Failed to delete subtask", "error");
+      fetchSubtasks(taskId); // Revert UI on error
     } finally {
-        setIsDeletingSubtask(false);
-        setSubtaskToDelete(null);
+      setIsDeletingSubtask(false);
+      setSubtaskToDelete(null);
     }
   };
 
@@ -569,10 +596,10 @@ const [selectedSubtaskId, setSelectedSubtaskId] = useState<number | null>(null);
         className="fixed bg-white border border-slate-200 rounded-xl shadow-2xl z-50 overflow-hidden flex flex-col transition-shadow"
         style={{ left: `${position.x}px`, top: `${position.y}px`, width: `${size.width}px`, height: `${size.height}px` }}
       >
-        
+
         {/* ✅ KIỂM TRA ĐIỀU KIỆN: Nếu có selectedSubtaskId -> Hiện màn hình chi tiết Subtask */}
         {selectedSubtaskId && taskId ? (
-          <SubtaskDetailView 
+          <SubtaskDetailView
             subtaskId={selectedSubtaskId}
             taskId={taskId}
             companyId={companyId}
@@ -589,34 +616,53 @@ const [selectedSubtaskId, setSelectedSubtaskId] = useState<number | null>(null);
             {/* --- HEADER --- */}
             <div className="modal-header bg-white border-b border-slate-100 px-6 py-3 flex items-center justify-between cursor-grab active:cursor-grabbing select-none shrink-0" onMouseDown={handleMouseDown}>
               <div className="flex items-center gap-2 text-xs text-slate-500">
-                  <CheckSquare className="w-3.5 h-3.5 text-purple-600" />
-                  <TooltipProvider>
-                    <Tooltip delayDuration={200}>
-                        <TooltipTrigger asChild>
-                            <span className="flex items-center gap-1 hover:underline cursor-pointer text-slate-600 font-medium">
-                                {task?.taskCode || (taskId ? `TASK-${taskId}` : '...')}
-                            </span>
-                        </TooltipTrigger>
-                        <TooltipContent className="bg-slate-800 text-white border-slate-700 max-w-[300px]">
-                            <p className="font-bold text-xs mb-1 text-blue-300">{task?.taskCode}</p>
-                            <p className="text-xs leading-relaxed">{formData.title}</p>
-                        </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                  {isSaving && <span className="ml-2 flex items-center gap-1 text-blue-600"><Loader2 className="w-3 h-3 animate-spin" /> Saving...</span>}
+                <CheckSquare className="w-3.5 h-3.5 text-purple-600" />
+                <TooltipProvider>
+                  <Tooltip delayDuration={200}>
+                    <TooltipTrigger asChild>
+                      <span className="flex items-center gap-1 hover:underline cursor-pointer text-slate-600 font-medium">
+                        {task?.taskCode || (taskId ? `TASK-${taskId}` : '...')}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent className="bg-slate-800 text-white border-slate-700 max-w-[300px]">
+                      <p className="font-bold text-xs mb-1 text-blue-300">{task?.taskCode}</p>
+                      <p className="text-xs leading-relaxed">{formData.title}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                {isSaving && <span className="ml-2 flex items-center gap-1 text-blue-600"><Loader2 className="w-3 h-3 animate-spin" /> Saving...</span>}
               </div>
               <div className="flex items-center gap-1" onMouseDown={(e) => e.stopPropagation()}>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:bg-slate-100 rounded-md"><Lock className="w-4 h-4" /></Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:bg-slate-100 rounded-md"><Eye className="w-4 h-4" /></Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:bg-slate-100 rounded-md"><Share2 className="w-4 h-4" /></Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:bg-slate-100 rounded-md"><MoreHorizontal className="w-4 h-4" /></Button>
-                  <div className="w-px h-4 bg-slate-200 mx-1"></div>
-                  {onSwitchToPanel && (
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:bg-slate-100 rounded-md" onClick={onSwitchToPanel} title="Thu nhỏ về Panel">
-                      <Minimize2 className="w-4 h-4" />
-                    </Button>
-                  )}
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:bg-red-50 hover:text-red-600 rounded-md" onClick={(e) => { e.stopPropagation(); onClose(); }}><X className="w-4 h-4" /></Button>
+
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-slate-500 hover:bg-red-50 hover:text-red-600 rounded-md transition-colors"
+                        onClick={onClickArchive}
+                        disabled={isSaving}
+                      >
+                        {isSaving ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Archive className="w-4 h-4" />
+                        )}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Lưu trữ Task</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                <div className="w-px h-4 bg-slate-200 mx-1"></div>
+                {onSwitchToPanel && (
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:bg-slate-100 rounded-md" onClick={onSwitchToPanel} title="Thu nhỏ về Panel">
+                    <Minimize2 className="w-4 h-4" />
+                  </Button>
+                )}
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:bg-red-50 hover:text-red-600 rounded-md" onClick={(e) => { e.stopPropagation(); onClose(); }}><X className="w-4 h-4" /></Button>
               </div>
             </div>
 
@@ -639,34 +685,34 @@ const [selectedSubtaskId, setSelectedSubtaskId] = useState<number | null>(null);
                       />
 
                       <div className="flex gap-2">
-                          <Button variant="outline" className="h-8 bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"><LinkIcon className="w-3 h-3 mr-1.5" /> Attach</Button>
-                          <Button variant="outline" className="h-8 bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100" onClick={() => setIsAddingSubtask(true)}><Plus className="w-3 h-3 mr-1.5" /> Add child</Button>
+                        <Button variant="outline" className="h-8 bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"><LinkIcon className="w-3 h-3 mr-1.5" /> Attach</Button>
+                        <Button variant="outline" className="h-8 bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100" onClick={() => setIsAddingSubtask(true)}><Plus className="w-3 h-3 mr-1.5" /> Add child</Button>
                       </div>
 
                       {/* Description */}
                       <div className="space-y-2 group">
-                          <h3 className="text-sm font-bold text-slate-900">Description</h3>
-                          {isEditingDescription ? (
-                              <div className="border border-blue-500 rounded-md p-2">
-                                  <Textarea
-                                      className="min-h-[150px] border-none focus-visible:ring-0 resize-none text-sm"
-                                      value={formData.description || ''}
-                                      onChange={e => setFormData({ ...formData, description: e.target.value })}
-                                      autoFocus
-                                  />
-                                  <div className="flex justify-end gap-2 mt-2">
-                                      <Button size="sm" onClick={handleSaveDescription}>Save</Button>
-                                      <Button size="sm" variant="ghost" onClick={handleCancelDescription}>Cancel</Button>
-                                  </div>
-                              </div>
-                          ) : (
-                              <div
-                                  className="min-h-[60px] text-sm text-slate-700 hover:bg-slate-50 p-2 rounded cursor-pointer border border-transparent hover:border-slate-200"
-                                  onClick={() => setIsEditingDescription(true)}
-                              >
-                                  {formData.description ? <div className="whitespace-pre-wrap">{formData.description}</div> : <span className="text-slate-400 italic">Add description...</span>}
-                              </div>
-                          )}
+                        <h3 className="text-sm font-bold text-slate-900">Description</h3>
+                        {isEditingDescription ? (
+                          <div className="border border-blue-500 rounded-md p-2">
+                            <Textarea
+                              className="min-h-[150px] border-none focus-visible:ring-0 resize-none text-sm"
+                              value={formData.description || ''}
+                              onChange={e => setFormData({ ...formData, description: e.target.value })}
+                              autoFocus
+                            />
+                            <div className="flex justify-end gap-2 mt-2">
+                              <Button size="sm" onClick={handleSaveDescription}>Save</Button>
+                              <Button size="sm" variant="ghost" onClick={handleCancelDescription}>Cancel</Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div
+                            className="min-h-[60px] text-sm text-slate-700 hover:bg-slate-50 p-2 rounded cursor-pointer border border-transparent hover:border-slate-200"
+                            onClick={() => setIsEditingDescription(true)}
+                          >
+                            {formData.description ? <div className="whitespace-pre-wrap">{formData.description}</div> : <span className="text-slate-400 italic">Add description...</span>}
+                          </div>
+                        )}
                       </div>
 
                       {/* Subtasks */}
@@ -684,15 +730,15 @@ const [selectedSubtaskId, setSelectedSubtaskId] = useState<number | null>(null);
 
                       {isAddingSubtask && (
                         <div className="mt-2 flex gap-2">
-                            <Input
-                                value={newSubtaskTitle}
-                                onChange={e => setNewSubtaskTitle(e.target.value)}
-                                onKeyDown={e => e.key === 'Enter' && handleCreateSubtask()}
-                                autoFocus placeholder="Subtask title..."
-                                className="h-9 text-sm"
-                            />
-                            <Button size="sm" onClick={handleCreateSubtask} className="h-9">Add</Button>
-                            <Button size="sm" variant="ghost" onClick={() => setIsAddingSubtask(false)} className="h-9">Cancel</Button>
+                          <Input
+                            value={newSubtaskTitle}
+                            onChange={e => setNewSubtaskTitle(e.target.value)}
+                            onKeyDown={e => e.key === 'Enter' && handleCreateSubtask()}
+                            autoFocus placeholder="Subtask title..."
+                            className="h-9 text-sm"
+                          />
+                          <Button size="sm" onClick={handleCreateSubtask} className="h-9">Add</Button>
+                          <Button size="sm" variant="ghost" onClick={() => setIsAddingSubtask(false)} className="h-9">Cancel</Button>
                         </div>
                       )}
 
@@ -704,75 +750,75 @@ const [selectedSubtaskId, setSelectedSubtaskId] = useState<number | null>(null);
                   {/* --- RIGHT PANEL (35%) --- */}
                   <div className="w-[340px] flex flex-col overflow-y-auto custom-scrollbar bg-slate-50/50">
                     <div className="p-6 space-y-6">
-                      
+
                       {/* Status Selector */}
                       <div className="space-y-2">
-                            <label className="text-[11px] font-bold text-slate-400 uppercase">Status</label>
-                            <div className="relative">
-                                <select
-                                    className="w-full pl-3 pr-8 py-2 bg-white border border-slate-200 rounded-md text-sm font-bold shadow-sm cursor-pointer outline-none focus:ring-2 focus:ring-blue-500 appearance-none uppercase transition-all"
-                                    value={formData.statusId || ''}
-                                    onChange={e => handleUpdate('statusId', Number(e.target.value))}
-                                    style={{
-                                        color: task.status?.color || 'inherit',
-                                        borderLeftWidth: '4px',
-                                        borderLeftColor: task.status?.color || 'transparent'
-                                    }}
-                                >
-                                    {statuses.length > 0 ? (
-                                        statuses.map(st => <option key={st.id} value={st.id}>{st.name}</option>)
-                                    ) : (
-                                        <option value={task.status?.id}>{task.status?.name}</option>
-                                    )}
-                                </select>
-                                <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-2.5 pointer-events-none"/>
-                            </div>
+                        <label className="text-[11px] font-bold text-slate-400 uppercase">Status</label>
+                        <div className="relative">
+                          <select
+                            className="w-full pl-3 pr-8 py-2 bg-white border border-slate-200 rounded-md text-sm font-bold shadow-sm cursor-pointer outline-none focus:ring-2 focus:ring-blue-500 appearance-none uppercase transition-all"
+                            value={formData.statusId || ''}
+                            onChange={e => handleUpdate('statusId', Number(e.target.value))}
+                            style={{
+                              color: task.status?.color || 'inherit',
+                              borderLeftWidth: '4px',
+                              borderLeftColor: task.status?.color || 'transparent'
+                            }}
+                          >
+                            {statuses.length > 0 ? (
+                              statuses.map(st => <option key={st.id} value={st.id}>{st.name}</option>)
+                            ) : (
+                              <option value={task.status?.id}>{task.status?.name}</option>
+                            )}
+                          </select>
+                          <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-2.5 pointer-events-none" />
+                        </div>
                       </div>
 
-                      <hr className="border-slate-200"/>
+                      <hr className="border-slate-200" />
 
                       {/* Assignee & Reporter */}
                       <div className="space-y-4">
-                            <h4 className="text-[11px] font-bold text-slate-400 uppercase">People</h4>
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2 text-sm text-slate-600"><User className="w-4 h-4"/> Assignee</div>
-                                <div className="relative group min-w-[140px]">
-                                    <div className="flex items-center justify-end gap-2 cursor-pointer hover:bg-slate-200 px-2 py-1.5 rounded transition-all">
-                                        <Avatar className="w-6 h-6 border border-white shadow-sm">
-                                            {task.assignee?.avatarUrl ? (
-                                                <AvatarImage src={task.assignee.avatarUrl} className="object-cover" />
-                                            ) : (
-                                                <AvatarFallback className="bg-blue-600 text-white text-[10px]">
-                                                    {task.assignee?.name ? task.assignee.name.substring(0, 2).toUpperCase() : "UN"}
-                                                </AvatarFallback>
-                                            )}
-                                        </Avatar>
-                                        <span className={`text-sm font-medium truncate max-w-[120px] ${!task.assignee ? 'text-slate-400 italic' : 'text-slate-700'}`}>
-                                            {task.assignee?.name || "Unassigned"}
-                                        </span>
-                                    </div>
-                                    <select
-                                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                        value={formData.assigneeId || 0}
-                                        onChange={e => handleUpdate('assigneeId', Number(e.target.value))}
-                                    >
-                                        <option value={0}>Unassigned</option>
-                                        {members.map(m => (
-                                            <option key={m.userId || m.id} value={m.userId || m.id}>
-                                                {m.fullName || m.name}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
+                        <h4 className="text-[11px] font-bold text-slate-400 uppercase">People</h4>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 text-sm text-slate-600"><User className="w-4 h-4" /> Assignee</div>
+                          <div className="relative group min-w-[140px]">
+                            <div className="flex items-center justify-end gap-2 cursor-pointer hover:bg-slate-200 px-2 py-1.5 rounded transition-all">
+                              <Avatar className="w-6 h-6 border border-white shadow-sm">
+                                {task.assignee?.avatarUrl ? (
+                                  <AvatarImage src={task.assignee.avatarUrl} className="object-cover" />
+                                ) : (
+                                  <AvatarFallback className="bg-blue-600 text-white text-[10px]">
+                                    {task.assignee?.name ? task.assignee.name.substring(0, 2).toUpperCase() : "UN"}
+                                  </AvatarFallback>
+                                )}
+                              </Avatar>
+                              <span className={`text-sm font-medium truncate max-w-[120px] ${!task.assignee ? 'text-slate-400 italic' : 'text-slate-700'}`}>
+                                {task.assignee?.name || "Unassigned"}
+                              </span>
                             </div>
+                            <select
+                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                              value={formData.assigneeId || 0}
+                              onChange={e => handleUpdate('assigneeId', Number(e.target.value))}
+                            >
+                              <option value={0}>Unassigned</option>
+                              {members.map(m => (
+                                <option key={m.userId || m.id} value={m.userId || m.id}>
+                                  {m.fullName || m.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
 
-                            <div className="flex items-center justify-between text-slate-500">
-                                <div className="flex items-center gap-2 text-sm"><Zap className="w-4 h-4"/> Reporter</div>
-                                <span className="text-sm text-slate-700">{task.createdByName || "Unknown"}</span>
-                            </div>
+                        <div className="flex items-center justify-between text-slate-500">
+                          <div className="flex items-center gap-2 text-sm"><Zap className="w-4 h-4" /> Reporter</div>
+                          <span className="text-sm text-slate-700">{task.createdByName || "Unknown"}</span>
+                        </div>
                       </div>
 
-                      <hr className="border-slate-200"/>
+                      <hr className="border-slate-200" />
 
                       {/* Tags */}
                       <div className="space-y-3 relative">
@@ -870,108 +916,108 @@ const [selectedSubtaskId, setSelectedSubtaskId] = useState<number | null>(null);
 
                       {/* Planning */}
                       <div className="space-y-4">
-                            <h4 className="text-[11px] font-bold text-slate-400 uppercase">Planning</h4>
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2 text-sm text-slate-600"><Flag className="w-4 h-4"/> Priority</div>
-                                <div className="w-[120px]">
-                                    <PrioritySelect value={formData.priority || 'LOW'} onChange={(v) => handleUpdate('priority', v)} />
-                                </div>
-                            </div>
+                        <h4 className="text-[11px] font-bold text-slate-400 uppercase">Planning</h4>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 text-sm text-slate-600"><Flag className="w-4 h-4" /> Priority</div>
+                          <div className="w-[120px]">
+                            <PrioritySelect value={formData.priority || 'LOW'} onChange={(v) => handleUpdate('priority', v)} />
+                          </div>
+                        </div>
 
-                            {/* EPIC SELECTOR */}
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2 text-sm text-slate-600"><Layers className="w-4 h-4"/> Epic</div>
-                                
-                                <button
-                                    onClick={() => setIsEpicModalOpen(true)}
-                                    className={`
+                        {/* EPIC SELECTOR */}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 text-sm text-slate-600"><Layers className="w-4 h-4" /> Epic</div>
+
+                          <button
+                            onClick={() => setIsEpicModalOpen(true)}
+                            className={`
                                         max-w-[160px] px-2 py-1 rounded text-xs font-bold truncate transition-colors border
                                         ${task?.epic
-                                            ? 'bg-white border-slate-200 text-slate-700 hover:border-blue-300'
-                                            : 'bg-slate-100 border-transparent text-slate-400 hover:bg-slate-200'
-                                        }
+                                ? 'bg-white border-slate-200 text-slate-700 hover:border-blue-300'
+                                : 'bg-slate-100 border-transparent text-slate-400 hover:bg-slate-200'
+                              }
                                     `}
-                                    style={task?.epic ? { borderLeftColor: task.epic.color || '#ccc', borderLeftWidth: '3px' } : {}}
-                                >
-                                    {task?.epic ? task.epic.name : "Add Epic"}
-                                </button>
-                            </div>
+                            style={task?.epic ? { borderLeftColor: task.epic.color || '#ccc', borderLeftWidth: '3px' } : {}}
+                          >
+                            {task?.epic ? task.epic.name : "Add Epic"}
+                          </button>
+                        </div>
 
-                            {/* SPRINT SELECTOR */}
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2 text-sm text-slate-600"><Clock className="w-4 h-4"/> Sprint</div>
-                                <div className="relative w-[140px]">
-                                    <select
-                                        className="w-full text-sm text-right bg-transparent border-none outline-none text-slate-700 hover:text-blue-600 font-medium cursor-pointer truncate transition-colors hover:bg-slate-100 rounded px-2 py-1 appearance-none"
-                                        value={Number(formData.sprintId) || 0}
-                                        onChange={e => handleUpdate('sprintId', Number(e.target.value))}
-                                    >
-                                        <option value={0}>Backlog</option>
-                                        {localSprints.map(s => (
-                                                <option key={s.id} value={s.id}>{s.name}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </div>
+                        {/* SPRINT SELECTOR */}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 text-sm text-slate-600"><Clock className="w-4 h-4" /> Sprint</div>
+                          <div className="relative w-[140px]">
+                            <select
+                              className="w-full text-sm text-right bg-transparent border-none outline-none text-slate-700 hover:text-blue-600 font-medium cursor-pointer truncate transition-colors hover:bg-slate-100 rounded px-2 py-1 appearance-none"
+                              value={Number(formData.sprintId) || 0}
+                              onChange={e => handleUpdate('sprintId', Number(e.target.value))}
+                            >
+                              <option value={0}>Backlog</option>
+                              {localSprints.map(s => (
+                                <option key={s.id} value={s.id}>{s.name}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
                       </div>
 
                       {/* Time Tracking */}
                       <div className="grid grid-cols-2 gap-3">
-                              <div className="bg-white p-2.5 rounded border border-slate-200">
-                                <label className="text-[10px] text-slate-400 font-bold uppercase block mb-1">Points</label>
-                                <input
-                                    type="number" min="0" className="w-full font-bold text-slate-800 outline-none text-sm"
-                                    value={formData.storyPoints || ''}
-                                    onChange={e => setFormData({...formData, storyPoints: Number(e.target.value)})}
-                                    onBlur={e => handleUpdate('storyPoints', Number(e.target.value))}
-                                />
-                              </div>
-                              <div className="bg-white p-2.5 rounded border border-slate-200">
-                                <label className="text-[10px] text-slate-400 font-bold uppercase block mb-1">Est. Hours</label>
-                                <div className="flex items-center gap-1">
-                                    <input
-                                        type="number" min="0" className="w-full font-bold text-slate-800 outline-none text-sm"
-                                        value={formData.estimatedHours || ''}
-                                        onChange={e => setFormData({...formData, estimatedHours: Number(e.target.value)})}
-                                        onBlur={e => handleUpdate('estimatedHours', Number(e.target.value))}
-                                    />
-                                    <span className="text-xs text-slate-400">h</span>
-                                </div>
-                              </div>
+                        <div className="bg-white p-2.5 rounded border border-slate-200">
+                          <label className="text-[10px] text-slate-400 font-bold uppercase block mb-1">Points</label>
+                          <input
+                            type="number" min="0" className="w-full font-bold text-slate-800 outline-none text-sm"
+                            value={formData.storyPoints || ''}
+                            onChange={e => setFormData({ ...formData, storyPoints: Number(e.target.value) })}
+                            onBlur={e => handleUpdate('storyPoints', Number(e.target.value))}
+                          />
+                        </div>
+                        <div className="bg-white p-2.5 rounded border border-slate-200">
+                          <label className="text-[10px] text-slate-400 font-bold uppercase block mb-1">Est. Hours</label>
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="number" min="0" className="w-full font-bold text-slate-800 outline-none text-sm"
+                              value={formData.estimatedHours || ''}
+                              onChange={e => setFormData({ ...formData, estimatedHours: Number(e.target.value) })}
+                              onBlur={e => handleUpdate('estimatedHours', Number(e.target.value))}
+                            />
+                            <span className="text-xs text-slate-400">h</span>
+                          </div>
+                        </div>
                       </div>
 
-                      <hr className="border-slate-200"/>
+                      <hr className="border-slate-200" />
 
                       {/* Dates */}
                       <div className="space-y-4">
-                            <h4 className="text-[11px] font-bold text-slate-400 uppercase">Timeline</h4>
-                            <div className="space-y-1.5">
-                                <div className="flex justify-between text-xs text-slate-600 font-medium"><span>Start Date</span></div>
-                                <input
-                                    type="datetime-local"
-                                    className="w-full text-xs p-2 border border-slate-200 rounded bg-white text-slate-700 outline-none focus:border-blue-500"
-                                    value={toInputDate(formData.startDate)}
-                                    onChange={e => handleUpdate('startDate', e.target.value)}
-                                />
-                            </div>
-                            <div className="space-y-1.5">
-                                <div className="flex justify-between text-xs text-slate-600 font-medium">
-                                    <span>Due Date</span>
-                                    {task.dueDate && new Date(task.dueDate) < new Date() && <span className="text-red-500 font-bold text-[10px]">Overdue</span>}
-                                </div>
-                                <input
-                                    type="datetime-local"
-                                    className="w-full text-xs p-2 border border-slate-200 rounded bg-white text-slate-700 outline-none focus:border-blue-500"
-                                    value={toInputDate(formData.dueDate)}
-                                    onChange={e => handleUpdate('dueDate', e.target.value)}
-                                />
-                            </div>
+                        <h4 className="text-[11px] font-bold text-slate-400 uppercase">Timeline</h4>
+                        <div className="space-y-1.5">
+                          <div className="flex justify-between text-xs text-slate-600 font-medium"><span>Start Date</span></div>
+                          <input
+                            type="datetime-local"
+                            className="w-full text-xs p-2 border border-slate-200 rounded bg-white text-slate-700 outline-none focus:border-blue-500"
+                            value={toInputDate(formData.startDate)}
+                            onChange={e => handleUpdate('startDate', e.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <div className="flex justify-between text-xs text-slate-600 font-medium">
+                            <span>Due Date</span>
+                            {task.dueDate && new Date(task.dueDate) < new Date() && <span className="text-red-500 font-bold text-[10px]">Overdue</span>}
+                          </div>
+                          <input
+                            type="datetime-local"
+                            className="w-full text-xs p-2 border border-slate-200 rounded bg-white text-slate-700 outline-none focus:border-blue-500"
+                            value={toInputDate(formData.dueDate)}
+                            onChange={e => handleUpdate('dueDate', e.target.value)}
+                          />
+                        </div>
                       </div>
 
                       {/* Meta Footer */}
                       <div className="mt-auto pt-6 text-[10px] text-slate-400">
-                            {task.createdAt && <p>Created on {new Date(task.createdAt).toLocaleString('vi-VN')}</p>}
-                            <p className="mt-1">Last updated just now</p>
+                        {task.createdAt && <p>Created on {new Date(task.createdAt).toLocaleString('vi-VN')}</p>}
+                        <p className="mt-1">Last updated just now</p>
                       </div>
 
                     </div>
@@ -983,7 +1029,7 @@ const [selectedSubtaskId, setSelectedSubtaskId] = useState<number | null>(null);
         )}
 
         <div className="resize-handle absolute bottom-0 right-0 w-4 h-4 cursor-se-resize z-50" onMouseDown={() => setIsResizing(true)}>
-            <div className="absolute bottom-1 right-1 w-2 h-2 bg-slate-300 rounded-sm"></div>
+          <div className="absolute bottom-1 right-1 w-2 h-2 bg-slate-300 rounded-sm"></div>
         </div>
       </div>
       {/* ✅ TAG MODAL */}
@@ -1029,6 +1075,18 @@ const [selectedSubtaskId, setSelectedSubtaskId] = useState<number | null>(null);
         description="Are you sure you want to delete this subtask? This action cannot be undone."
         confirmText="Delete"
         modalVariant="danger"
+      />
+         {/* ✅ MỚI: ARCHIVE TASK CONFIRMATION MODAL */}
+      <ConfirmationModal
+        isOpen={isArchiveConfirmOpen}
+        onClose={() => setIsArchiveConfirmOpen(false)}
+        onConfirm={onConfirmArchive}
+        isLoading={isSaving}
+        title="Lưu trữ công việc"
+        description="Công việc này sẽ được chuyển vào kho lưu trữ. Bạn có thể khôi phục lại sau nếu cần."
+        confirmText="Lưu trữ"
+        cancelText="Hủy"
+        modalVariant="warning" // Hoặc "danger" tùy bạn chọn màu
       />
     </>
   );
