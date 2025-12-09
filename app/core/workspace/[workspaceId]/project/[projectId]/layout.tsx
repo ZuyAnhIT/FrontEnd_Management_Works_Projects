@@ -2,9 +2,14 @@
 
 import { useState } from 'react'
 import { useParams } from 'next/navigation'
+
+// Components
 import ProjectCoreSidebar from '@/components/features/core/project/sidebar'
 import ProjectNavTabs from '@/components/features/core/project/nav-tabs'
-import ProjectHeader from '@/components/features/core/project/header'
+// ✅ Sử dụng AdminHeader mới (đã có NotificationPopover)
+import AdminHeader from '@/components/features/admin/Header' 
+
+// Modals
 import { CreateTaskModal } from '@/components/features/core/project/create-task-modal'
 import { CreateSprintModal } from '@/components/features/core/project/create-sprint-modal'
 import { useToast } from "@/components/ui/ToastProvider"
@@ -42,11 +47,10 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
 
         {/* Header Area (Fixed Top) */}
         <div className="flex-col bg-white border-b border-slate-200 shadow-sm z-20 relative">
-          <ProjectHeader
-            projectName={projectName}
-            onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
-            onTaskCreate={() => setShowTaskModal(true)}
-            onSprintCreate={() => setShowSprintModal(true)}
+          
+          {/* ✅ Sử dụng AdminHeader mới */}
+          <AdminHeader 
+            onMenuToggle={() => setSidebarOpen(!sidebarOpen)} 
           />
           
           <ProjectNavTabs
@@ -57,7 +61,7 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
 
         {/* Main Content Area (Scrollable) */}
         {/* ⚠️ Loại bỏ padding p-4 để Board/Backlog có thể full-width */}
-        <main className="flex-1 overflow-y-auto overflow-x-hidden scroll-smooth">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden scroll-smooth custom-scrollbar">
           {children}
         </main>
       </div>
@@ -70,7 +74,7 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
         projectId={Number(projectId)}
         workspaceId={workspaceId}
         onCreated={() => {
-          showToast("Task created successfully", "success") // ✅ Thay console.log bằng toast
+          showToast("Task created successfully", "success")
           setShowTaskModal(false)
         }}
       />
@@ -80,7 +84,7 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
         onClose={() => setShowSprintModal(false)}
         projectId={Number(projectId)}
         onCreated={() => {
-          showToast("Sprint created successfully", "success") // ✅ Thay console.log bằng toast
+          showToast("Sprint created successfully", "success")
           setShowSprintModal(false)
         }}
       />
