@@ -18,7 +18,7 @@ import {
   Filter,
   Briefcase
 } from "lucide-react";
-
+import { Chatbot } from "@/components/chatbot/chatbot";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/components/ui/ToastProvider";
 import { Button } from "@/components/ui/button";
@@ -429,7 +429,7 @@ export default function ProjectPage() {
           cancelText="Cancel"
           modalVariant="danger"
         />
-
+        <Chatbot />
       </div>
     </div>
   );

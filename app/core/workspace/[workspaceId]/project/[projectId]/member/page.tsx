@@ -29,7 +29,7 @@ import {
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/components/ui/ToastProvider";
 import { Button } from "@/components/ui/button";
-
+import { Chatbot } from "@/components/chatbot/chatbot";
 // API Services
 import {
   getProjectMembers,
@@ -506,7 +506,7 @@ const style = isAdmin
             </div>
           </div>
         )}
-
+        <Chatbot />
       </div>
     </div>
   );

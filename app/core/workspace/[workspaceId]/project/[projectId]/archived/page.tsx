@@ -7,7 +7,7 @@ import {
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
   Bug, FileText, Bookmark, CheckCircle2
 } from "lucide-react";
-
+import { Chatbot } from "@/components/chatbot/chatbot";
 // Services
 import { 
   getArchivedTasks, 
@@ -321,6 +321,7 @@ export default function ArchivedPage() {
             confirmText="Restore"
             modalVariant="info" // Dùng màu xanh dương cho hành động khôi phục (không phải nguy hiểm)
         />
+        <Chatbot />
     </div>
   );
 }

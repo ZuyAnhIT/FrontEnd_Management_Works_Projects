@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation"; // Added useRouter
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/components/ui/ToastProvider";
 import { Loader2, AlertCircle } from "lucide-react";
+import { Chatbot } from "@/components/chatbot/chatbot";
 
 // --- DND KIT IMPORTS ---
 import {
@@ -329,6 +330,7 @@ export default function BoardPage() {
           projectId={projectId}
         />
       )}
+      <Chatbot />
     </div>
   );
 }
