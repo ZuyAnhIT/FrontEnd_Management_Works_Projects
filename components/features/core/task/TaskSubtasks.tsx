@@ -42,6 +42,7 @@ const MiniAssigneeDropdown = ({
    currentAssigneeAvatar,
    members = [],
    onUpdate,
+   isLastRow = false,
 
 }: {
    subTaskId: number;
@@ -50,6 +51,7 @@ const MiniAssigneeDropdown = ({
    currentAssigneeAvatar: string | null;
    members: any[];
    onUpdate: (id: number | null) => void
+   isLastRow?: boolean;
 }) => {
    const [isOpen, setIsOpen] = useState(false);
    const [keyword, setKeyword] = useState(""); // State tìm kiếm
@@ -114,8 +116,9 @@ const MiniAssigneeDropdown = ({
 
          {/* Dropdown List */}
          {isOpen && (
-            <div className="absolute top-full right-0 mt-1 w-60 bg-white rounded-lg shadow-xl z-50 border border-slate-200 flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-100">
-
+          <div className={`absolute right-0 w-60 bg-white rounded-lg shadow-xl z-50 border border-slate-200 flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-100 
+               ${isLastRow ? 'bottom-full mb-2' : 'top-full mt-1'}
+            `}>
                {/* Search Box */}
                <div className="p-2 border-b border-slate-100 bg-slate-50/50">
                   <div className="relative">
@@ -280,7 +283,7 @@ export default function TaskSubtasks({
          </div>
 
          {/* ✅ TABLE FIX: Bảng chuẩn HTML giúp cột thẳng hàng */}
-         <div className="border border-slate-200 rounded-lg bg-white shadow-sm overflow-hidden">
+         <div className="border border-slate-200 rounded-lg bg-white shadow-sm overflow-visible">
             <table className="w-full text-sm text-left border-collapse table-fixed">
                <thead className="bg-slate-50/80 text-[11px] font-semibold text-slate-500 uppercase tracking-wide border-b border-slate-200">
                   <tr>
@@ -297,7 +300,7 @@ export default function TaskSubtasks({
 
                <tbody className="divide-y divide-slate-100">
                   {subtasks.length > 0 ? (
-                     subtasks.map((sub) => (
+                     subtasks.map((sub,index) => (
                         <tr key={sub.id} className="group hover:bg-slate-50 transition-colors h-10 relative">
                            {editingSubtaskId === sub.id ? (
                               <td colSpan={5} className="p-1 pl-2">
@@ -370,19 +373,25 @@ export default function TaskSubtasks({
                                     </div>
                                  </td>
 
-                                 {/* 3. Assignee */}
-                                 <td className="py-2 px-1 text-center align-middle border-l border-transparent group-hover:border-slate-100">
-                                    <div className="flex justify-center relative z-10">
-                                       <MiniAssigneeDropdown
-                                          subTaskId={Number(sub.id)}
-                                          currentAssigneeId={sub.assigneeId}
-                                          currentAssigneeName={sub.assigneeName}
-                                          currentAssigneeAvatar={sub.assigneeAvatar}
-                                          members={members}
-                                          onUpdate={(newId: any) => onAssigneeChange(Number(sub.id), newId)}
-                                       />
-                                    </div>
-                                 </td>
+                                {/* 3. Assignee */}
+<td className="py-2 px-1 text-center align-middle border-l border-transparent group-hover:border-slate-100 overflow-visible">
+   {/* Thêm overflow-visible vào td ^^^ */}
+   
+   <div className="flex justify-center relative z-10">
+      <MiniAssigneeDropdown
+         subTaskId={Number(sub.id)}
+         currentAssigneeId={sub.assigneeId}
+         currentAssigneeName={sub.assigneeName}
+         currentAssigneeAvatar={sub.assigneeAvatar}
+         members={members}
+         onUpdate={(newId: any) => onAssigneeChange(Number(sub.id), newId)}
+         
+         // ✅ BỔ SUNG: Truyền logic dòng cuối để Dropdown tự đảo chiều
+         // (Lưu ý: Bạn cần sửa dòng .map ở trên thành .map((sub, index) => ... )
+         isLastRow={index >= subtasks.length - 2 && subtasks.length > 2}
+      />
+   </div>
+</td>
 
                                  {/* 4. Status */}
                                  <td className="py-2 px-1 text-center align-middle border-l border-transparent group-hover:border-slate-100">
