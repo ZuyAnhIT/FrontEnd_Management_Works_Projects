@@ -23,7 +23,7 @@ import { useToast } from "@/components/ui/ToastProvider";
 // Modals
 import SprintDetailModal from "@/components/features/core/sprint/SprintDetailModal";
 import TaskDetailPanel from "@/components/features/core/task/TaskDetailPanel"; // ✅ Import Task Panel
-
+import TaskDetailModalFloating from "@/components/features/core/task/TaskDetailModalFloating";
 export default function ProjectCalendarPage() {
   const params = useParams();
   const projectId = Number(params.projectId);
@@ -34,6 +34,11 @@ export default function ProjectCalendarPage() {
   // --- STATE ---
   const [loading, setLoading] = useState(false);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
+  
+  // ✅ STATE CHO MODAL CHI TIẾT TASK
+  const [viewMode, setViewMode] = useState<'panel' | 'floating'>('floating');
+  // Chỉ cần lưu ID của task đang chọn
+  const [isModalOpen, setIsModalOpen] = useState(false);
   
   // Data State cho Task Modal
   const [members, setMembers] = useState<ProjectMember[]>([]);
@@ -149,14 +154,20 @@ export default function ProjectCalendarPage() {
     }
   };
 
-  // ✅ CLICK EVENT: Mở Modal tương ứng
+    // ✅ FIX: Hàm xử lý khi Task được update -> Load lại lịch
+  const handleTaskUpdate = () => {
+      fetchEvents(); 
+  };
+
+  // ✅ FIX: Sửa lại hàm click để mở Modal
   const handleEventClick = (info: any) => {
     const props = info.event.extendedProps;
     
     if (props.type === 'SPRINT') {
         setSelectedSprintId(props.originalId);
     } else if (props.type === 'TASK') {
-        setSelectedTaskId(props.originalId); // ✅ Set Task ID
+        setSelectedTaskId(props.originalId); 
+        setIsModalOpen(true); // <--- BẮT BUỘC PHẢI CÓ DÒNG NÀY
     }
   };
 
@@ -222,21 +233,58 @@ export default function ProjectCalendarPage() {
           />
       )}
 
-      {/* ✅ MODAL: TASK DETAIL */}
-      {selectedTaskId && (
-          <TaskDetailPanel 
-              taskId={selectedTaskId}
-              onClose={() => setSelectedTaskId(null)}
-              onUpdate={fetchEvents} // Reload lịch khi task thay đổi
-              companyId={companyId}
-              workspaceId={workspaceId}
-              projectId={projectId}
-              members={members}
-              sprints={sprints}
-              epics={epics}
-              statuses={statuses}
-          />
+      {/* ✅ RENDER MODAL CHI TIẾT */}
+      
+      {/* TRƯỜNG HỢP 1: HIỆN PANEL DỌC (View Mode = 'panel') */}
+      {isModalOpen && selectedTaskId && viewMode === 'panel' && (
+        <TaskDetailPanel
+          taskId={selectedTaskId}
+          // Đóng thì reset cả cờ mở và ID
+          onClose={() => { setIsModalOpen(false); setSelectedTaskId(null); }}
           
+          // Chuyển sang Floating
+          onSwitchToFloating={() => setViewMode('floating')} 
+          
+          onUpdate={handleTaskUpdate} 
+          
+          // Data Props
+          members={members}
+          // ✅ FIX: Dùng state 'statuses' có sẵn, không dùng 'columns' (vì file này không có columns)
+          statuses={statuses} 
+          sprints={sprints} // ✅ Dùng state sprints
+          epics={epics}     // ✅ Dùng state epics
+          
+          // Context IDs
+          companyId={companyId!}
+          workspaceId={workspaceId}
+          projectId={projectId}
+        />
+      )}
+
+      {/* TRƯỜNG HỢP 2: HIỆN MODAL NỔI (View Mode = 'floating') */}
+      {isModalOpen && selectedTaskId && viewMode === 'floating' && (
+        <TaskDetailModalFloating
+          taskId={selectedTaskId}
+          isOpen={true}
+          // Đóng thì reset cả cờ mở và ID
+          onClose={() => { setIsModalOpen(false); setSelectedTaskId(null); }}
+          
+          // Chuyển về Panel
+          onSwitchToPanel={() => setViewMode('panel')} 
+          
+          onUpdate={handleTaskUpdate}
+          
+          // Data Props (Giống hệt Panel)
+          members={members}
+          statuses={statuses} // ✅ FIX: Dùng state statuses
+          sprints={sprints}
+          epics={epics}
+          
+          // Context IDs
+          companyId={companyId!}
+          workspaceId={workspaceId}
+          projectId={projectId}
+        />
       )}
       <Chatbot />
     </div>
