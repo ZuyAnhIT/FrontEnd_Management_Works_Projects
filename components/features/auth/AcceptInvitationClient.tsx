@@ -3,13 +3,13 @@
 import { useState, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
-
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/components/ui/ToastProvider";
 import { getInvitationDetails, acceptInvitation } from "@/services/apiInvitation";
 import { registerFromInvite } from "@/services/apiAuth";
 import {
-  Loader2, User, Mail, Building2, UserPlus, LogOut, CheckCircle2, AlertTriangle
+  Loader2, User, Mail, Building2, UserPlus, LogOut, CheckCircle2,
+  AlertTriangle
 } from "lucide-react";
 
 import AuthFormLogin from "./AuthFormLogin";
@@ -24,13 +24,13 @@ interface InviteDetails {
   accountExists: boolean;
 }
 
-/* =====================================================================================
-   🟢 CASE 1 — NEW USER FLOW  
-===================================================================================== */
+/* 🟢 CASE 1 — NEW USER FLOW 
+*/
 function NewUserFlow({ details, token }: { details: InviteDetails; token: string }) {
   const { t } = useTranslation();
   const { showToast } = useToast();
   const { loginWithTokens } = useAuth();
+  const router = useRouter(); 
 
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -54,7 +54,6 @@ function NewUserFlow({ details, token }: { details: InviteDetails; token: string
     }
 
     setLoading(true);
-
     try {
       const data = await registerFromInvite({
         fullName: form.fullName,
@@ -63,10 +62,16 @@ function NewUserFlow({ details, token }: { details: InviteDetails; token: string
       });
 
       showToast(t("invite.newUser.welcomeToast"), "success");
-      await loginWithTokens(data.accessToken, data.refreshToken);
-
+      
+      // Đăng nhập và chuyển hướng về trang chủ "/"
+      if(loginWithTokens) {
+          await loginWithTokens(data.accessToken, data.refreshToken);
+          router.push("/"); 
+      }
+      
     } catch (err: any) {
       showToast(err.message, "error");
+    } finally {
       setLoading(false);
     }
   };
@@ -77,21 +82,15 @@ function NewUserFlow({ details, token }: { details: InviteDetails; token: string
         <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4">
           <UserPlus className="w-8 h-8 text-blue-600" />
         </div>
-
         <h2 className="text-xl font-bold text-slate-900">
           {t("invite.newUser.title")}
         </h2>
-
-        <p
-          className="text-sm text-slate-500 mt-2"
-          dangerouslySetInnerHTML={{
-            __html: t("invite.newUser.subtitle", { company: details.companyName }),
-          }}
-        />
+        <p className="text-sm text-slate-500 mt-2">
+            Tham gia <strong>{details.companyName}</strong>
+        </p>
       </div>
 
       <form className="px-8 pb-8 space-y-4" onSubmit={handleSubmit}>
-
         <div className="p-3 bg-slate-50 rounded-lg border border-slate-100 flex items-center gap-3">
           <div className="p-1.5 bg-white rounded-md shadow-sm">
             <Mail className="w-4 h-4 text-slate-400" />
@@ -144,9 +143,8 @@ function NewUserFlow({ details, token }: { details: InviteDetails; token: string
   );
 }
 
-/* =====================================================================================
-   🟠 CASE 2 — EXISTING USER FLOW  
-===================================================================================== */
+/* 🟠 CASE 2 — EXISTING USER FLOW  
+*/
 function ExistingUserFlow({ details, token }: { details: InviteDetails; token: string }) {
   const { t } = useTranslation();
   const { showToast } = useToast();
@@ -165,7 +163,7 @@ function ExistingUserFlow({ details, token }: { details: InviteDetails; token: s
     try {
       await acceptInvitation(token);
       showToast(t("invite.existing.acceptedToast"), "success");
-      router.push("/admin");
+      router.push("/"); // Chuyển hướng về trang chủ sau khi chấp nhận
     } catch (err: any) {
       showToast(err.message, "error");
       setIsAccepting(false);
@@ -176,6 +174,7 @@ function ExistingUserFlow({ details, token }: { details: InviteDetails; token: s
     e.preventDefault();
     try {
       await login(form.email, form.password);
+      // Sau khi login xong, component sẽ re-render và rơi vào case "Already logged in"
     } catch (err: any) {
       showToast(err.message || "Login failed", "error");
     }
@@ -183,7 +182,7 @@ function ExistingUserFlow({ details, token }: { details: InviteDetails; token: s
 
   /* SCENARIO A — Already logged in */
   if (isAuthenticated && user) {
-
+    
     /* A1 — Correct account */
     if (user.email === details.email) {
       return (
@@ -191,28 +190,18 @@ function ExistingUserFlow({ details, token }: { details: InviteDetails; token: s
           <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4">
             <CheckCircle2 className="w-8 h-8 text-green-600" />
           </div>
-
           <h2 className="text-xl font-bold text-slate-900">
             {t("invite.existing.acceptTitle")}
           </h2>
-
-          <p
-            className="text-sm text-slate-500 mt-2 mb-6"
-            dangerouslySetInnerHTML={{
-              __html: t("invite.existing.acceptSubtitle", {
-                email: user.email,
-                company: details.companyName,
-              }),
-            }}
-          />
-
+          <p className="text-sm text-slate-500 mt-2 mb-6">
+             Bạn đang đăng nhập với <strong>{user.email}</strong>. Tham gia <strong>{details.companyName}</strong> ngay?
+          </p>
           <LoadingButton
             text={t("invite.existing.acceptButton")}
             isLoading={isAccepting}
             onClick={handleAccept}
             className="w-full bg-blue-600 hover:bg-blue-700 shadow-md mb-3"
           />
-
           <button
             onClick={() => logout()}
             className="text-sm text-slate-400 hover:text-slate-600 hover:underline transition-all"
@@ -229,16 +218,13 @@ function ExistingUserFlow({ details, token }: { details: InviteDetails; token: s
         <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-4">
           <AlertTriangle className="w-8 h-8 text-amber-500" />
         </div>
-
         <h2 className="text-lg font-bold text-slate-900">
           {t("invite.existing.wrongAccountTitle")}
         </h2>
-
         <div className="bg-amber-50 border border-amber-100 p-4 rounded-lg my-4 text-left text-sm text-amber-800">
           <p><strong>{t("invite.existing.wrongAccountFor")}</strong> {details.email}</p>
           <p className="mt-1"><strong>{t("invite.existing.wrongAccountCurrent")}</strong> {user.email}</p>
         </div>
-
         <button
           onClick={() => logout()}
           className="w-full py-2 px-4 bg-white border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 flex items-center justify-center gap-2 transition-all"
@@ -256,20 +242,12 @@ function ExistingUserFlow({ details, token }: { details: InviteDetails; token: s
         <div className="w-14 h-14 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-3">
           <Building2 className="w-7 h-7 text-blue-600" />
         </div>
-
         <h2 className="text-xl font-bold text-slate-900">
           {t("invite.existing.welcomeBack")}
         </h2>
-
-        <p
-          className="text-sm text-slate-500 mt-1"
-          dangerouslySetInnerHTML={{
-            __html: t("invite.existing.loginToJoin", {
-              email: details.email,
-              company: details.companyName,
-            }),
-          }}
-        />
+        <p className="text-sm text-slate-500 mt-1">
+           Vui lòng đăng nhập tài khoản <strong>{details.email}</strong> để tham gia <strong>{details.companyName}</strong>.
+        </p>
       </div>
 
       <form className="p-8 space-y-4 pt-4" onSubmit={handleSubmitLogin}>
@@ -284,9 +262,8 @@ function ExistingUserFlow({ details, token }: { details: InviteDetails; token: s
   );
 }
 
-/* =====================================================================================
-   🔵 PARENT LOGIC  
-===================================================================================== */
+/* 🔵 PARENT LOGIC 
+*/
 export default function AcceptInvitationClient() {
   const { t } = useTranslation();
   const searchParams = useSearchParams();
@@ -336,13 +313,10 @@ export default function AcceptInvitationClient() {
         <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
           <AlertTriangle className="w-8 h-8 text-red-500" />
         </div>
-
         <h3 className="text-lg font-bold text-slate-900 mb-2">
           {t("invite.errorPage.title")}
         </h3>
-
         <p className="text-slate-500 mb-6">{error}</p>
-
         <a href="/" className="text-blue-600 font-medium hover:underline">
           {t("invite.errorPage.backHome")}
         </a>
