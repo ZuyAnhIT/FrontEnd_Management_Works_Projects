@@ -1,16 +1,12 @@
-// ⛔️ Sửa đường dẫn nếu cần
 import apiClient from "@/lib/apiClient";
 
 // ===================================================
 // ✅ HÀM MỚI: Lấy chi tiết lời mời (Public)
-// (Backend sẽ kiểm tra token VÀ user.exists)
 // ===================================================
 export const getInvitationDetails = async (token: string) => {
   try {
-    // API này là public, không cần token
-    const res = await apiClient.get(`/invitations/details?token=${token}`);
-    // Trả về { email, companyName, accountExists }
-    return res.data.data;
+    const res = await apiClient.get(`/invitations/companies/details?token=${token}`);
+    return res.data.data; 
   } catch (err: any) {
     throw new Error(
       err.response?.data?.message || "Lời mời không hợp lệ hoặc đã hết hạn."
@@ -23,11 +19,10 @@ export const getInvitationDetails = async (token: string) => {
 // ===================================================
 export const acceptInvitation = async (invitationToken: string) => {
   try {
-    // API này là protected, apiClient sẽ tự động gắn Bearer token
-    const res = await apiClient.post("/invitations/accept", {
+    const res = await apiClient.post("/invitations/companies/accept", {
       invitationToken,
     });
-    return res.data; // Trả về { success, message, data: companyMember }
+    return res.data; 
   } catch (err: any) {
     throw new Error(
       err.response?.data?.message || "Không thể chấp nhận lời mời."
