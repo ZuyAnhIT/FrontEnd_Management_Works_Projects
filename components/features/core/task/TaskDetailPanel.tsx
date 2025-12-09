@@ -6,8 +6,14 @@ import {
   MoreHorizontal, Link as LinkIcon, Zap,
   Bold, Italic, List, ListOrdered, Code,
   Tag as TagIcon, Plus, ChevronDown,
-Maximize2
+Maximize2,Archive
 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -16,7 +22,7 @@ import ConfirmationModal from "@/components/ui/ConfirmationModal";
 import TagModal from "@/components/features/core/tag/TagModal"; 
 import EpicModal from "@/components/features/core/epic/EpicModal"; 
 // API Services
-import { getTaskDetails, updateTask, updateTaskEpic, TaskDetail, UpdateTaskData } from "@/services/apiTask";
+import { getTaskDetails, updateTask, updateTaskEpic, TaskDetail, UpdateTaskData ,archiveTask} from "@/services/apiTask";
 import {
     getSubtaskList,
     createSubtask,
@@ -115,6 +121,8 @@ export default function TaskDetailPanel({
   // --- EPIC MODAL STATE ---
   const [isEpicModalOpen, setIsEpicModalOpen] = useState(false);
   const [selectedSubtaskId, setSelectedSubtaskId] = useState<number | null>(null);
+  //archive
+  const [isArchiveConfirmOpen, setIsArchiveConfirmOpen] = useState(false);
   //
   const [subtaskToDelete, setSubtaskToDelete] = useState<number | null>(null);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
@@ -363,6 +371,33 @@ const [editingTag, setEditingTag] = useState<Tag | null>(null);
     }
   };
 
+  // --- ARCHIVE HANDLER ---
+    const onClickArchive = async (e: React.MouseEvent) => {
+      e.stopPropagation(); // Ngăn click lan ra ngoài
+      setIsArchiveConfirmOpen(true);
+    };
+    const onConfirmArchive = async () => {
+      if (!taskId) return;
+  
+      try {
+        setIsSaving(true); // Tận dụng state loading có sẵn hoặc tạo mới
+        await archiveTask(taskId);
+  
+        showToast("Đã lưu trữ task thành công", "success");
+  
+        // Đóng modal chi tiết
+        onClose();
+  
+        // Quan trọng: Gọi onUpdate để refresh danh sách ở màn hình cha
+        if (onUpdate) {
+          onUpdate();
+        }
+      } catch (error: any) {
+        showToast(error.message || "Lỗi khi lưu trữ task", "error");
+      } finally {
+        setIsSaving(false);
+      }
+    };
   // Subtask Handlers (Giữ nguyên)
   const handleCreateSubtask = async () => {
     if (!newSubtaskTitle.trim() || !taskId) return;
@@ -543,17 +578,42 @@ const [editingTag, setEditingTag] = useState<Tag | null>(null);
                   <span className="font-mono font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">{task?.taskCode}</span>
                   {isSaving && <span className="text-xs text-blue-600 flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin"/> Saving...</span>}
               </div>
+                  
               <div className="flex items-center gap-1">
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-slate-500 hover:bg-red-50 hover:text-red-600 rounded-md transition-colors"
+                        onClick={onClickArchive}
+                        disabled={isSaving}
+                      >
+                        {isSaving ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Archive className="w-4 h-4" />
+                        )}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Lưu trữ Task</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                <div className="w-px h-4 bg-slate-200 mx-1"></div>
                 {onSwitchToFloating && (
+                    
                     <button 
                       onClick={onSwitchToFloating} 
                       className="p-2 hover:bg-slate-100 rounded-md text-slate-500 hover:text-blue-600 transition-colors"
                       title="Mở rộng cửa sổ"
                     >
-                      <Maximize2 className="w-5 h-5"/>
+                      <Maximize2 className="w-4 h-4"/>
                     </button>
                   )}
-                  <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-md"><X className="w-5 h-5 text-slate-500"/></button>
+                  <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-md"><X className="w-4 h-4 text-slate-500"/></button>
               </div>
             </div>
 
@@ -917,6 +977,17 @@ const [editingTag, setEditingTag] = useState<Tag | null>(null);
                             confirmText="Delete"
                             modalVariant="danger"
                         />
+                         <ConfirmationModal
+                                isOpen={isArchiveConfirmOpen}
+                                onClose={() => setIsArchiveConfirmOpen(false)}
+                                onConfirm={onConfirmArchive}
+                                isLoading={isSaving}
+                                title="Lưu trữ công việc"
+                                description="Công việc này sẽ được chuyển vào kho lưu trữ. Bạn có thể khôi phục lại sau nếu cần."
+                                confirmText="Lưu trữ"
+                                cancelText="Hủy"
+                                modalVariant="warning" // Hoặc "danger" tùy bạn chọn màu
+                              />
                         {/* Meta Footer */}
                         <div className="mt-auto pt-6 text-[10px] text-slate-400">
                             {task.createdAt && (
