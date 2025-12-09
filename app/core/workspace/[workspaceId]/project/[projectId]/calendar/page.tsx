@@ -14,7 +14,7 @@ import { getProjectMembers, ProjectMember } from '@/services/apiProject';
 import { getProjectStatuses, RawStatusColumn } from "@/services/apiBoard"; 
 import { getSprints, Sprint } from "@/services/apiSprint";
 import { apiEpic, Epic } from "@/services/apiEpic";
-
+import { Chatbot } from "@/components/chatbot/chatbot";
 // Components
 import CalendarFilterBar from '@/components/features/core/calendar/CalendarFilterBar';
 import CalendarEventContent from '@/components/features/core/calendar/CalendarEventContent';
@@ -236,7 +236,9 @@ export default function ProjectCalendarPage() {
               epics={epics}
               statuses={statuses}
           />
+          
       )}
+      <Chatbot />
     </div>
   );
 }

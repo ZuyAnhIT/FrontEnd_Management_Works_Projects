@@ -32,6 +32,7 @@ import TypeChart from "@/components/features/core/summary/TypeChart";
 import EpicProgressCard from "@/components/features/core/summary/EpicProgressCard"; 
 import EpicFilterToolbar from "@/components/features/core/summary/EpicFilterToolbar"; 
 import WorkloadOverview from "@/components/features/core/summary/WorkloadOverview"; // ✅ Component Workload Gộp
+import { Chatbot } from "@/components/chatbot/chatbot";
 
 export default function ProjectSummaryPage() {
   const params = useParams();
@@ -171,6 +172,7 @@ export default function ProjectSummaryPage() {
              <WorkloadOverview projectId={projectId} />
           </section>
 
+         <Chatbot />
        </div>
     </div>
   );

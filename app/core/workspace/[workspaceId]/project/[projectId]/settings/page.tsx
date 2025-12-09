@@ -24,7 +24,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/components/ui/ToastProvider";
 import LoadingButton from "@/components/ui/LoadingButton";
 import ConfirmationModal from "@/components/ui/ConfirmationModal";
-
+import { Chatbot } from "@/components/chatbot/chatbot";
 // Helper URL ảnh
 const getFullImageUrl = (path: string | null | undefined) => {
   if (!path) return null;
@@ -369,6 +369,7 @@ export default function ProjectSettingsPage() {
         cancelText="Cancel"
         modalVariant="danger"
       />
+      <Chatbot />
     </div>
   );
 }

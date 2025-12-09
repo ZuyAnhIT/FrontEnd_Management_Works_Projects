@@ -25,7 +25,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { useDroppable } from "@dnd-kit/core";
-
+import { Chatbot } from "@/components/chatbot/chatbot";
 // API & Types
 import {
   getProjectBacklog,
@@ -530,6 +530,7 @@ export default function BacklogPage() {
         projectId={projectId}
         members={members}
       />
+      <Chatbot />
     </div>
   );
 }

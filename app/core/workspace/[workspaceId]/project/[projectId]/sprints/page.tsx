@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/ToastProvider";
 import { useAuth } from "@/context/AuthContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-
+import { Chatbot } from "@/components/chatbot/chatbot";
 // API Services
 import { updateTask } from "@/services/apiTask";
 
@@ -553,6 +553,7 @@ export default function ProjectListPage() {
         projectId={projectId}
         members={members}
       />
+      <Chatbot />
     </div>
   );
 }

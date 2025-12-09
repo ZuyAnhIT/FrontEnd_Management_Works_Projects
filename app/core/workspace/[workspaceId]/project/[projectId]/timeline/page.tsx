@@ -18,6 +18,7 @@ import TimelineToolbar from "@/components/features/core/timeline/TimelineToolbar
 import TimelineGantt from "@/components/features/core/timeline/TimelineGantt";
 import EpicDetailPanel from "@/components/features/core/epic/EpicDetailPanel";
 import { useToast } from "@/components/ui/ToastProvider"; 
+import { Chatbot } from "@/components/chatbot/chatbot";
 
 export default function TimelinePage() {
   const params = useParams();
@@ -157,6 +158,7 @@ export default function TimelinePage() {
                   onClose={() => setSelectedEpicId(null)}
                   onUpdate={handleRefresh}
               />
+              <Chatbot />
           </div>
        )}
     </div>
