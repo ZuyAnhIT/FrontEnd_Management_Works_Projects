@@ -64,7 +64,7 @@ export const logoutUser = async () => {
 };
 
 // ===================================================
-// 🧩 Đăng ký từ lời mời (Invitation)
+// 🧩 Đăng ký từ lời mời Company (Invitation)
 // ===================================================
 export const registerFromInvite = async (payload: {
   fullName: string;
@@ -82,6 +82,27 @@ export const registerFromInvite = async (payload: {
   } catch (err: any) {
     throw new Error(
       err.response?.data?.message || "System error, cannot register from invitation."
+    );
+  }
+};
+
+// ✅ Đăng ký từ lời mời Project
+export const registerFromProjectInvite = async (payload: {
+  fullName: string;
+  password: string;
+  invitationToken: string;
+}) => {
+  try {
+    const res = await apiClient.post("/auth/register-from-project-invite", payload);
+    const data = res.data;
+
+    if (!data.success) {
+      throw new Error(data.message || "Cannot register from project invitation.");
+    }
+    return data.data; // { accessToken, refreshToken, ... }
+  } catch (err: any) {
+    throw new Error(
+      err.response?.data?.message || "System error during project registration."
     );
   }
 };
