@@ -29,3 +29,31 @@ export const acceptInvitation = async (invitationToken: string) => {
     );
   }
 };
+
+// --- ✅ PROJECT INVITATIONS  ---
+
+// 1. Kiểm tra chi tiết lời mời Project (Public)
+export const getProjectInvitationDetails = async (token: string) => {
+  try {
+    const res = await apiClient.get(`/invitations/projects/details?token=${token}`);
+    return res.data.data; // { email, projectName, accountExists, ... }
+  } catch (err: any) {
+    throw new Error(
+      err.response?.data?.message || "Project invitation invalid or expired."
+    );
+  }
+};
+
+// 2. Chấp nhận lời mời Project (Protected - Đã có tài khoản)
+export const acceptProjectInvitation = async (invitationToken: string) => {
+  try {
+    const res = await apiClient.post("/invitations/projects/accept", {
+      invitationToken,
+    });
+    return res.data;
+  } catch (err: any) {
+    throw new Error(
+      err.response?.data?.message || "Could not accept project invitation."
+    );
+  }
+};

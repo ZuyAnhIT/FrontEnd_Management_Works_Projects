@@ -18,11 +18,9 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
-  Edit,
   ShieldAlert,
   X,
   Save,
-  Trash2,
   UserPlus
 } from "lucide-react";
 
@@ -30,16 +28,18 @@ import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/components/ui/ToastProvider";
 import { Button } from "@/components/ui/button";
 import { Chatbot } from "@/components/chatbot/chatbot";
+
 // API Services
 import {
   getProjectMembers,
-  searchProjectMembers, // ✅ Import thêm hàm tìm kiếm
+  searchProjectMembers, 
   updateProjectMemberRole,
+  inviteProjectMember, // ✅ API Mới
   ProjectMember,
   PageResponse
 } from "@/services/apiProject";
 
-// Components UI Tái sử dụng
+// Components UI
 import MemberTable from "@/components/ui/MemberTable";
 import MemberDetailModalBase from "@/components/ui/MemberDetailModalBase";
 import ConfirmationModal from "@/components/ui/ConfirmationModal";
@@ -60,7 +60,6 @@ const SEARCH_FIELDS = [
   { value: "phone", label: "Phone" },
 ];
 
-// Định nghĩa kiểu dữ liệu params tìm kiếm
 interface MemberSearchParams {
   page: number;
   size: number;
@@ -111,35 +110,38 @@ export default function ProjectMembersPage() {
   });
 
   // --- MODAL STATES ---
+  
+  // 1. Invite Modal State
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRoleCode, setInviteRoleCode] = useState("PROJECT_MEMBER");
+  const [isInviting, setIsInviting] = useState(false);
 
+  // 2. Edit Role Modal State
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedMember, setSelectedMember] = useState<ProjectMember | null>(null);
   const [newRole, setNewRole] = useState("");
   const [isUpdating, setIsUpdating] = useState(false);
 
+  // 3. Detail Modal State
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [detailMember, setDetailMember] = useState<ProjectMember | null>(null);
 
+  // 4. Delete Modal State
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [memberToDelete, setMemberToDelete] = useState<ProjectMember | null>(null);
 
 
   // ===============================================================
-  // 4️⃣ FETCH DATA LOGIC (Đã Cập Nhật Logic Search)
+  // 4️⃣ FETCH DATA LOGIC
   // ===============================================================
   const fetchMembers = useCallback(async (params: MemberSearchParams) => {
     if (!companyId || !workspaceId || !projectId) return;
-    
     setLoading(true);
 
     try {
-      // Tách các tham số tìm kiếm ra để kiểm tra
       const { name, email, phone, role, ...pagingParams } = params;
       
-      // Kiểm tra xem có đang tìm kiếm không (ít nhất 1 trường có giá trị)
       const isSearching = (name && name.trim() !== "") || 
                           (email && email.trim() !== "") || 
                           (phone && phone.trim() !== "") || 
@@ -148,10 +150,8 @@ export default function ProjectMembersPage() {
       let data: PageResponse<ProjectMember>;
 
       if (isSearching) {
-        // ✅ Gọi API Search nếu đang tìm kiếm
         data = await searchProjectMembers(companyId, workspaceId, projectId, params);
       } else {
-        // ✅ Gọi API List thường nếu không tìm kiếm
         data = await getProjectMembers(companyId, workspaceId, projectId, pagingParams);
       }
 
@@ -166,7 +166,6 @@ export default function ProjectMembersPage() {
       });
 
     } catch (err: any) {
-      // console.error("Fetch error:", err); // Uncomment để debug
       showToast(err.message || "Failed to load members", "error");
       setMembers([]);
     } finally {
@@ -174,17 +173,15 @@ export default function ProjectMembersPage() {
     }
   }, [companyId, workspaceId, projectId, showToast]);
 
-  // Auto reload (Debounce 300ms)
   useEffect(() => {
     if (!companyId || !workspaceId || !projectId || isAuthLoading) return;
-    
     const t = setTimeout(() => fetchMembers(searchParams), 300);
     return () => clearTimeout(t);
   }, [searchParams, companyId, workspaceId, projectId, isAuthLoading, fetchMembers]);
 
 
   // ===============================================================
-  // 5️⃣ HANDLERS (XỬ LÝ SỰ KIỆN)
+  // 5️⃣ HANDLERS
   // ===============================================================
 
   // --- PAGINATION & SORT ---
@@ -201,23 +198,17 @@ export default function ProjectMembersPage() {
     }));
   };
 
-  // --- SEARCH LOGIC ---
+  // --- SEARCH ---
   const handleSearchChange = (text: string) => {
     setSearchValue(text);
     setSearchParams((prev) => {
         const newParams = { ...prev };
-        // Xóa sạch các key cũ để tránh conflict
         delete newParams.name;
         delete newParams.email;
         delete newParams.phone;
         delete newParams.role;
-        
         newParams.page = 0;
-
-        // Gán key mới nếu text không rỗng
-        if (text.trim() !== "") {
-            newParams[searchBy] = text.trim();
-        }
+        if (text.trim() !== "") newParams[searchBy] = text.trim();
         return newParams;
     });
   };
@@ -235,17 +226,38 @@ export default function ProjectMembersPage() {
     });
   };
 
-  // --- INVITE ---
+  // ✅ --- INVITE LOGIC (GỌI API MỚI) ---
   const handleInvite = async () => {
     if (!inviteEmail.trim()) {
       showToast("Please enter an email", "warning");
       return;
     }
-    showToast("Feature coming soon (requires API)", "info");
-    setShowInviteModal(false);
+    if (!companyId || !workspaceId || !projectId) return;
+
+    setIsInviting(true);
+    try {
+        await inviteProjectMember(companyId, workspaceId, projectId, {
+            email: inviteEmail,
+            roleCode: inviteRoleCode
+        });
+        
+        showToast(`Invited ${inviteEmail} to project successfully!`, "success");
+        
+        // Reset form & Close modal
+        setInviteEmail("");
+        setInviteRoleCode("PROJECT_MEMBER");
+        setShowInviteModal(false);
+        
+        // Refresh list
+        fetchMembers(searchParams); 
+    } catch (err: any) {
+        showToast(err.message || "Failed to invite", "error");
+    } finally {
+        setIsInviting(false);
+    }
   };
 
-  // --- EDIT ROLE ---
+  // --- UPDATE ROLE ---
   const openEditModal = (member: ProjectMember) => {
     setSelectedMember(member);
     const currentRole = member.roleName?.includes("Admin") ? "PROJECT_ADMIN" : "PROJECT_MEMBER";
@@ -261,7 +273,7 @@ export default function ProjectMembersPage() {
       await updateProjectMemberRole(companyId, workspaceId, projectId, selectedMember.memberId, newRole);
       showToast("Role updated successfully!", "success");
       setShowEditModal(false);
-      fetchMembers(searchParams); // Refresh danh sách
+      fetchMembers(searchParams); 
     } catch (err: any) {
       showToast(err.message || "Update failed", "error");
     } finally {
@@ -269,46 +281,19 @@ export default function ProjectMembersPage() {
     }
   };
 
-  // --- VIEW DETAIL ---
-  const handleViewDetail = (member: ProjectMember) => {
-    setDetailMember(member);
-    setShowDetailModal(true);
-  };
-
-  // --- DELETE ---
-  const openDeleteConfirmation = (member: ProjectMember) => {
-     if (member.userId === user?.id) {
-        showToast("Cannot remove yourself", "error");
-        return;
-     }
-     setMemberToDelete(member);
-     setIsDeleteModalOpen(true);
-  };
-
-
-  // ===============================================================
-  // 🎨 HELPERS RENDER
-  // ===============================================================
+  // --- HELPERS RENDER ---
   const renderStatusBadge = (status: string) => {
     switch (status) {
-      case "ACTIVE":
-        return <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200"><CheckCircle className="w-3 h-3" /> Active</div>;
-      case "PENDING":
-        return <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200"><Clock className="w-3 h-3" /> Pending</div>;
-      default:
-        return <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-50 text-slate-500 border border-slate-200">{status}</div>;
+      case "ACTIVE": return <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200"><CheckCircle className="w-3 h-3" /> Active</div>;
+      case "PENDING": return <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200"><Clock className="w-3 h-3" /> Pending</div>;
+      default: return <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-50 text-slate-500 border border-slate-200">{status}</div>;
     }
   };
 
   const renderRoleBadge = (m: ProjectMember) => {
     const isAdmin = m.roleName?.toUpperCase().includes("ADMIN");
     const Icon = isAdmin ? Crown : Shield;
-    
-const style = isAdmin
-    ? "bg-amber-50 text-amber-800 border-2 border-amber-500"
-    : "bg-blue-50 text-blue-700 border border-blue-300";
-
-
+    const style = isAdmin ? "bg-amber-50 text-amber-800 border-2 border-amber-500" : "bg-blue-50 text-blue-700 border border-blue-300";
     return (
       <div className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${style}`}>
         <Icon className="w-3 h-3" />
@@ -321,11 +306,6 @@ const style = isAdmin
     if (!date) return "—";
     return new Date(date).toLocaleDateString("en-US", { month: 'short', day: 'numeric', year: 'numeric' });
   };
-
-
-  // ===============================================================
-  // 🖥️ RENDER UI
-  // ===============================================================
 
   if (isAuthLoading) {
     return <div className="flex items-center justify-center h-screen bg-slate-50"><Loader2 className="w-10 h-10 text-blue-600 animate-spin" /></div>;
@@ -346,7 +326,6 @@ const style = isAdmin
             <p className="text-sm text-slate-500 mt-1">Manage team members within this project.</p>
           </div>
           
-          {/* Invite Button */}
           <Button
             onClick={() => setShowInviteModal(true)}
             className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm font-bold h-10 px-5 rounded-[3px] flex items-center gap-2"
@@ -357,8 +336,6 @@ const style = isAdmin
 
         {/* TOOLBAR */}
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-3 items-center">
-          
-          {/* Select Field */}
           <div className="relative w-full md:w-40">
             <select
               value={searchBy}
@@ -370,7 +347,6 @@ const style = isAdmin
             <Filter className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>
 
-          {/* Input Search */}
           <div className="relative w-full md:w-96 group">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
             <input
@@ -395,9 +371,9 @@ const style = isAdmin
               renderStatus={renderStatusBadge}
               renderRole={renderRoleBadge}
               formatDateTime={formatDateTime}
-              onViewDetail={(m) => handleViewDetail(m)}
+              onViewDetail={(m) => { setDetailMember(m); setShowDetailModal(true); }}
               onEdit={openEditModal}
-              onDelete={openDeleteConfirmation}
+              onDelete={(m) => { if(m.userId !== user?.id) { setMemberToDelete(m); setIsDeleteModalOpen(true); } else showToast("Cannot remove yourself", "error"); }}
               onSort={handleSort}
               currentSortBy={searchParams.sortBy}
               currentSortDir={searchParams.sortDir}
@@ -405,7 +381,6 @@ const style = isAdmin
               disableDelete={(m) => m.userId === user?.id} 
             />
             
-            {/* PAGINATION */}
             <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100">
                <p className="text-sm text-slate-500">
                   Page {pagination.pageNumber + 1} of {pagination.totalPages || 1}
@@ -430,18 +405,18 @@ const style = isAdmin
 
         {/* --- MODALS --- */}
         
-        {/* Invite Modal */}
+        {/* ✅ Invite Modal */}
         <InviteMemberModal
           isOpen={showInviteModal}
           onClose={() => setShowInviteModal(false)}
           onInvite={handleInvite}
-          isLoading={false}
+          isLoading={isInviting} 
           email={inviteEmail}
           setEmail={setInviteEmail}
           roleCode={inviteRoleCode}
           setRoleCode={setInviteRoleCode}
           title="Add Member to Project"
-          description="Add an existing workspace member to this project."
+          description="Invite an existing workspace member or a new user to this project."
           contextType="project" 
         />
 

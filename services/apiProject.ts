@@ -493,6 +493,29 @@ export const createProjectTask = async (
   return res.data.data; 
 };
 
+// -- 4.14 MỜI THÀNH VIÊN VÀO DỰ ÁN.
+export const inviteProjectMember = async (
+  companyId: number,
+  workspaceId: number,
+  projectId: number,
+  data: { email: string; roleCode: string }
+) => {
+  try {
+    const res = await apiClient.post(
+      `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/members`,
+      data
+    );
+    
+    if (!res.data.success) {
+      throw new Error(res.data.message || "Failed to invite member.");
+    }
+    return res.data;
+  } catch (err: any) {
+    throw new Error(
+      err.response?.data?.message || "Could not invite member to project."
+    );
+  }
+};
 /* ========================================================================
    🔥 4.14 CHỨC NĂNG MỚI: TASK LIST VIEW & GROUP VIEW
    ======================================================================== */
