@@ -303,7 +303,7 @@ export const getTrashedProjects = async (
   return data.content;
 };
 
-// --- 4.4 CREATE PROJECT ---
+// --- 4.4 CREATE PROJECT (With File Upload) ---
 export const createProject = async (
   companyId: number,
   workspaceId: number,
@@ -311,13 +311,21 @@ export const createProject = async (
   file?: File | null
 ): Promise<Project> => {
   const formData = new FormData();
+  
+  // Backend Spring Boot thường yêu cầu JSON body nằm trong 1 key (ví dụ "data" hoặc "project")
+  // Bạn đã confirm là key "data"
   formData.append("data", new Blob([JSON.stringify(payload)], { type: "application/json" }));
-  if (file) formData.append("file", file);
+  
+  if (file) {
+    formData.append("file", file);
+  }
 
   const res = await apiClient.post(
-    `/companies/${Number(companyId)}/workspaces/${Number(workspaceId)}/projects`,
+    `/companies/${companyId}/workspaces/${workspaceId}/projects`,
     formData,
-    { headers: { "Content-Type": "multipart/form-data" } }
+    { 
+      headers: { "Content-Type": "multipart/form-data" } 
+    }
   );
 
   if (!res.data?.success) throw new Error(res.data?.message || "Tạo dự án thất bại");
