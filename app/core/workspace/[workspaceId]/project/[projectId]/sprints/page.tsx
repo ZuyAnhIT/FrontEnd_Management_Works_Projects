@@ -580,7 +580,8 @@ export default function ProjectListPage() {
           onClose={() => setIsImportModalOpen(false)}
           onSuccess={fetchData}
           projectId={projectId}
-          statuses={statuses} // Truyền danh sách status lấy từ API
+          statuses={statuses} 
+          members={members}
         />
       )}
       <Chatbot />
