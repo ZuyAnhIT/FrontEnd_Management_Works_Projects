@@ -12,7 +12,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Chatbot } from "@/components/chatbot/chatbot";
 // API Services
 import { updateTask } from "@/services/apiTask";
-
+import { Upload } from "lucide-react"; // Import thêm icon Upload
+import ImportTaskModal from "@/components/features/core/task/ImportTaskModal"; // 
 // Import API Status bạn vừa cung cấp
 import { getProjectStatuses, RawStatusColumn } from "@/services/apiBoard"; 
 import { getSprints, Sprint } from "@/services/apiSprint";
@@ -279,6 +280,7 @@ export default function ProjectListPage() {
   // Data State
   const [loading, setLoading] = useState(true);
   const [tasks, setTasks] = useState<TaskResponse[]>([]);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [groupedTasks, setGroupedTasks] = useState<TasksGroupedResponse>({});
   const [members, setMembers] = useState<ProjectMember[]>([]);
   const [allSprints, setAllSprints] = useState<Sprint[]>([]);
@@ -428,12 +430,29 @@ export default function ProjectListPage() {
         members={members}
         totalTasks={groupBy === "none" ? tasks.length : Object.values(groupedTasks).flat().length}
       />
+      {/* 🔹 THANH CÔNG CỤ (Updated) */}
+      <div className="flex items-center justify-end px-6 py-3 bg-white border-b border-slate-200 shrink-0 z-10 gap-3">
+        
+        {/* ✅ NÚT IMPORT MỚI */}
+        <Button 
+          variant="outline"
+          onClick={() => setIsImportModalOpen(true)} 
+          className="h-8 px-3 text-xs font-bold text-slate-700 border-slate-300 hover:bg-slate-50 flex items-center rounded-[3px]"
+        >
+          <Upload className="w-3.5 h-3.5 mr-1.5" /> 
+          Import
+        </Button>
 
-      <div className="flex items-center justify-end px-6 py-3 bg-white border-b border-slate-200 shrink-0 z-10">
-        <Button onClick={() => setIsCreateModalOpen(true)} className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm h-8 px-4 text-xs font-bold flex items-center rounded-[3px]">
-          <Plus className="w-3.5 h-3.5 mr-1.5" /> Create
+        {/* Nút Create cũ */}
+        <Button 
+          onClick={() => setIsCreateModalOpen(true)} 
+          className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm h-8 px-4 text-xs font-bold flex items-center rounded-[3px]"
+        >
+          <Plus className="w-3.5 h-3.5 mr-1.5" /> 
+          Create
         </Button>
       </div>
+      
 
       <div className="flex-1 overflow-hidden relative bg-slate-50/30">
         <div className="h-full overflow-y-auto custom-scrollbar">
@@ -553,6 +572,17 @@ export default function ProjectListPage() {
         projectId={projectId}
         members={members}
       />
+
+      {/* ✅ RENDER MODAL IMPORT */}
+      {isImportModalOpen && (
+        <ImportTaskModal
+          isOpen={isImportModalOpen}
+          onClose={() => setIsImportModalOpen(false)}
+          onSuccess={fetchData}
+          projectId={projectId}
+          statuses={statuses} // Truyền danh sách status lấy từ API
+        />
+      )}
       <Chatbot />
     </div>
   );
