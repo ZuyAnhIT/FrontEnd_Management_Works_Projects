@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Plus, X, Loader2 } from "lucide-react";
 // Đảm bảo đường dẫn import đúng file api của bạn
 import { createProjectStatus } from "@/services/apiBoard"; 
+import {useToast} from "@/components/ui/ToastProvider";
 
 interface Props {
   projectId: number; // Bắt buộc phải có projectId để gọi API
@@ -14,6 +15,7 @@ export default function CreateColumnButton({ projectId, onSuccess }: Props) {
   const [isEditing, setIsEditing] = useState(false);
   const [columnName, setColumnName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const { showToast } = useToast();
 
   // Hàm xử lý gọi API
   const handleCreateColumn = async (e: React.FormEvent) => {
@@ -43,7 +45,7 @@ export default function CreateColumnButton({ projectId, onSuccess }: Props) {
 
     } catch (error) {
       console.error("Lỗi tạo cột:", error);
-      alert("Không thể tạo trạng thái mới. Vui lòng thử lại.");
+      showToast("Không thể tạo trạng thái mới. Vui lòng thử lại.");
     } finally {
       setIsLoading(false);
     }
@@ -70,7 +72,7 @@ export default function CreateColumnButton({ projectId, onSuccess }: Props) {
               className="px-3 py-1.5 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
             >
               {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
-              Thêm
+              Add
             </button>
             <button
               type="button"
