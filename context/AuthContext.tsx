@@ -25,6 +25,7 @@ type AppRole =
   | "WORKSPACE_MEMBER"
   | "PROJECT_ADMIN"
   | "PROJECT_MEMBER"
+  | "GUEST"
   | "USER" // User mới, chưa thuộc công ty nào
   | null;
 
@@ -50,6 +51,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const PUBLIC_PAGES = [
   "/",
   "/accept-invitation",
+  "/accept-project-invitation",
   "/register-from-invite",
   "/reset-password",
 ];
@@ -68,14 +70,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const { showToast } = useToast();
 
   // ============================================================
-  // 3️⃣ LOGIC: CHỌN CÔNG TY (SWITCH CONTEXT)
+  // 3️⃣ LOGIC: CHỌN CÔNG TY (ROUTING CONTROLLER)
   // ============================================================
+  // Hàm này CHỈ chạy khi người dùng chủ động Click vào 1 công ty ở trang /admin
   const handleSelectCompany = useCallback((companyId: number, userData: UserProfile) => {
     // Tìm xem user có thuộc công ty này không
     const selected = userData.companyMemberships?.find(c => c.companyId === companyId);
 
     if (selected) {
-      console.log(`🏢 [AuthContext] Switched context to: ${selected.companyName}`);
+      console.log(`🏢 [AuthContext] Switched context to: ${selected.companyName} (${selected.roleCode})`);
 
       // Cập nhật State Active
       setActiveCompany(selected);
@@ -84,14 +87,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Lưu ID công ty vào LocalStorage (để F5 không bị mất)
       localStorage.setItem("lastActiveCompanyId", companyId.toString());
 
-      // Điều hướng thông minh dựa trên Role
-      if (selected.roleCode === "COMPANY_ADMIN") {
-        // Admin thì vào Dashboard quản trị
-        router.push("/admin/company/dashboard");
-      } else {
-        // Member thì vào khu vực làm việc Core
-        router.push("/core/dashboard");
+      // 🔥 PHÂN LUỒNG DỰA TRÊN ROLE (CORE ROUTING LOGIC)
+      switch (selected.roleCode) {
+        case "COMPANY_ADMIN":
+          // 1. Admin -> Trang quản trị công ty
+          router.push("/admin/company/dashboard");
+          break;
+        
+        case "GUEST":
+          // 2. Guest -> Trang danh sách dự án (Portal)
+          router.push("/portal");
+          break;
+
+        case "COMPANY_MEMBER":
+        default:
+          // 3. Member -> Trang danh sách phòng ban (Core)
+          router.push("/core"); 
+          break;
       }
+
     } else {
       console.error("❌ [AuthContext] Invalid Company ID");
       showToast("You are not a member of this company", "error");
@@ -99,8 +113,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [router, showToast]);
 
   // ============================================================
-  // 4️⃣ LOGIC: LẤY USER & KHÔI PHỤC PHIÊN (RESTORE SESSION)
+  // 4️⃣ LOGIC: KHÔI PHỤC PHIÊN (RESTORE SESSION ON RELOAD)
   // ============================================================
+  // Hàm này chạy khi F5 để lấy lại user và active company cũ (nếu đang ở trang trong)
   const fetchAndSetUser = useCallback(async () => {
     try {
       const userData = await getCurrentUser();
@@ -113,18 +128,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         setUser(userData);
 
-        // Restore company context
+        // Restore company context (Giữ nguyên trang hiện tại nếu F5)
         const lastCompanyId = localStorage.getItem("lastActiveCompanyId");
-        const memberships = userData.companyMemberships;
-
-        if (lastCompanyId && memberships.length > 0) {
+        
+        if (lastCompanyId && userData.companyMemberships.length > 0) {
           const targetId = parseInt(lastCompanyId);
-          const targetCompany = memberships.find(c => c.companyId === targetId);
+          const targetCompany = userData.companyMemberships.find(c => c.companyId === targetId);
 
           if (targetCompany) {
             setActiveCompany(targetCompany);
             setRole(targetCompany.roleCode as AppRole);
           } else {
+            // Nếu user bị kick khỏi công ty cũ -> Xóa cache
             localStorage.removeItem("lastActiveCompanyId");
           }
         }
@@ -138,7 +153,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 
   // ============================================================
-  // 5️⃣ EFFECT: CHẠY KHI LOAD TRANG (CHECK TOKEN)
+  // 5️⃣ INIT AUTH (CHẠY 1 LẦN KHI APP START)
   // ============================================================
   useEffect(() => {
     const initAuth = async () => {
@@ -152,42 +167,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [fetchAndSetUser]);
 
   // ============================================================
-  // 6️⃣ LOGIC: XỬ LÝ ĐIỀU HƯỚNG SAU KHI LOGIN (QUAN TRỌNG)
+  // 6️⃣ LOGIN SUCCESS HANDLER
   // ============================================================
+  // Hàm này chạy sau khi login thành công
   const processLoginSuccess = async () => {
-    await fetchAndSetUser();
+    // Gọi lại API lấy user mới nhất
+    const userData = await getCurrentUser();
 
-    const userData = user;
     if (!userData) {
       showToast("Cannot load user data.", "error");
       return;
     }
+    
+    setUser(userData);
 
-    const memberships = userData.companyMemberships || [];
-
-    showToast(`Memberships found: ${memberships.length}`, "info");
-
-    // CASE 1: User chưa thuộc công ty nào
-    if (memberships.length === 0) {
-      showToast("Welcome! Please set up your company to continue.", "info");
-      setRole("USER");
-      router.push("/admin");
-      return;
-    }
-
-    // CASE 2: User thuộc đúng 1 công ty
-    if (memberships.length === 1) {
-      showToast(`Switched to company: ${memberships[0].companyName}`, "success");
-      handleSelectCompany(memberships[0].companyId, userData);
-      return;
-    }
-
-    // CASE 3: User thuộc nhiều công ty
-    if (memberships.length > 1) {
-      showToast("Select a company to continue.", "info");
-      router.push("/admin");
-      return;
-    }
+    // ✅ QUAN TRỌNG: Luôn đưa về HUB (/admin) sau khi Login thành công
+    // Để người dùng tự chọn nơi họ muốn đến (Admin/Core/Portal)
+    router.push("/admin");
   };
 
 
@@ -199,12 +195,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsLoading(true);
     try {
       await loginUser({ email, password });
-      showToast("Login successful!", "success");
-      await processLoginSuccess();
+      await processLoginSuccess(); // Redirect to /admin
     } catch (error: any) {
       showToast(error.message || "Login failed", "error");
     } finally {
-      // ✅ FIX: Luôn tắt loading dù thành công hay thất bại để tránh treo UI
       setIsLoading(false);
     }
   };
@@ -214,12 +208,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       localStorage.setItem("accessToken", accessToken);
       localStorage.setItem("refreshToken", refreshToken);
-      showToast("Login successful!", "success");
-      await processLoginSuccess();
+      await processLoginSuccess(); // Redirect to /admin
     } catch (error) {
       console.error(error);
     } finally {
-      // ✅ FIX: Luôn tắt loading
       setIsLoading(false);
     }
   };
@@ -252,55 +244,55 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   // ============================================================
-  // 8️⃣ GUARD LOGIC (BẢO VỆ ROUTE)
+  // 8️⃣ ROUTE PROTECTION (GUARD)
   // ============================================================
   useEffect(() => {
     if (isLoading) return; // Đợi loading xong mới check
 
     const isPublicPage = PUBLIC_PAGES.some((p) => pathname.startsWith(p));
-    const isAuthPage = pathname.startsWith("/(auth)") || pathname === "/";
+    const isAuthPage = pathname === "/" || pathname.startsWith("/(auth)");
 
     // --- A. CHƯA LOGIN ---
+    // Nếu chưa login mà vào trang Private -> Đá về Home
     if (!user) {
       if (!isPublicPage && !isAuthPage) {
-        // Cố truy cập trang kín -> Đá về Home
         router.push("/");
       }
       return;
     }
 
     // --- B. ĐÃ LOGIN ---
-    const memberships = user.companyMemberships || [];
-
-    // 1. Nếu đang ở trang Login/Register/Home (Auth Pages)
-    // -> Phải điều hướng vào trong ứng dụng
+    
+    // 1. Nếu đang ở trang Login/Register/Home -> Đá vào HUB (/admin)
     if (isAuthPage) {
-      if (memberships.length === 0) {
-        // Chưa có công ty -> Vào Admin Hub để tạo
-        router.push("/admin");
-      }
-      else if (memberships.length === 1) {
-        // 1 công ty -> Auto vào Dashboard
-        handleSelectCompany(memberships[0].companyId, user);
-      }
-      else {
-        // >1 công ty -> Vào Admin Hub để chọn
-        router.push("/admin");
-      }
+      router.push("/admin");
       return;
     }
 
-    // 2. Bảo vệ các trang Admin sâu (Ví dụ: /admin/company/billing...)
-    // Trang "/admin" (Hub) thì ai login rồi cũng được vào.
-    // Chỉ chặn các trang con "/admin/..."
-    if (pathname.startsWith("/admin/") && pathname !== "/admin") {
-      if (role !== "COMPANY_ADMIN") {
-        showToast("Access denied. Company Admin only.", "error");
-        router.push("/core/dashboard");
-      }
+    // 2. Bảo vệ Route theo Role (Ngăn chặn truy cập chéo)
+    
+    // GUEST: Không được vào trang Admin Company, không được vào Core (Workspace list)
+    // Guest chỉ được phép ở /portal (Project List) hoặc trang chi tiết Project (/project/...)
+    if (role === "GUEST") {
+        const isProjectDetail = pathname.includes("/project/");
+        const isPortal = pathname.startsWith("/portal");
+        
+        // Nếu cố tình vào các trang khác (kể cả /admin/company) -> Đá về Portal
+        // Ngoại trừ trang /admin (Hub) để chọn công ty khác
+        if (!isProjectDetail && !isPortal && pathname !== "/admin") {
+            router.push("/portal");
+        }
     }
 
-  }, [user, role, pathname, isLoading, router, showToast, handleSelectCompany]);
+    // MEMBER: Không được vào trang Admin Company (trừ dashboard chung nếu cho phép)
+    if (role === "COMPANY_MEMBER") {
+        if (pathname.startsWith("/admin/company") && !pathname.includes("dashboard")) { 
+             // Logic tùy chỉnh: Có thể cho member xem dashboard, nhưng chặn settings/billing
+             // router.push("/core");
+        }
+    }
+
+  }, [user, role, pathname, isLoading, router, showToast]);
 
   return (
     <AuthContext.Provider

@@ -8,36 +8,66 @@ import {
   ArrowRight, 
   ShieldCheck, 
   User, 
-  Loader2 
+  Loader2,
+  ExternalLink, // Icon cho Guest
+  Briefcase
 } from "lucide-react";
 
-// Định nghĩa lại Interface dựa trên API users/me
+// Interface Workspace từ API profile
 interface WorkspaceMembership {
   workspaceId: number;
   workspaceName: string;
   companyId: number;
-  roleCode: string; // "WORKSPACE_ADMIN" | "WORKSPACE_MEMBER"
+  roleCode: string; // "WORKSPACE_ADMIN" | "WORKSPACE_MEMBER" | "GUEST"
 }
 
 export default function CoreDashboardPage() {
   const router = useRouter();
-  // Lấy user và activeCompany từ AuthContext
-  // user chứa mảng workspaceMemberships
-  // activeCompany chứa công ty đang được chọn (để lọc workspace thuộc công ty này)
   const { user, activeCompany, isLoading } = useAuth();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => setMounted(true), []);
 
-  // 1. Lọc Workspace theo Công ty đang Active
-  // API /users/me trả về TẤT CẢ workspace của user ở MỌI công ty.
-  // Chúng ta chỉ hiển thị workspace thuộc activeCompany hiện tại.
+  // 1. Lọc Workspace thuộc công ty đang active
   const myWorkspaces = (user?.workspaceMemberships || []).filter(
     (ws) => ws.companyId === activeCompany?.companyId
   );
 
-  const handleEnterWorkspace = (workspaceId: number) => {
-    router.push(`/core/workspace/${workspaceId}`);
+  // 2. Hàm xử lý Click dựa trên Role
+  const handleEnterWorkspace = (ws: WorkspaceMembership) => {
+    // Nếu là ADMIN -> Vào Dashboard quản lý Workspace
+    if (ws.roleCode === "WORKSPACE_ADMIN") {
+        router.push(`/core/workspace/${ws.workspaceId}`);
+    } 
+    // Nếu là MEMBER hoặc GUEST -> Chuyển sang Portal xem danh sách dự án
+    // (Lọc dự án theo Workspace này)
+    else {
+        router.push(`/portal?workspaceId=${ws.workspaceId}`);
+    }
+  };
+
+  // Helper render Badge
+  const renderRoleBadge = (roleCode: string) => {
+    switch (roleCode) {
+      case "WORKSPACE_ADMIN":
+        return (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border bg-purple-50 text-purple-700 border-purple-200">
+            <ShieldCheck className="w-3.5 h-3.5" /> Admin
+          </span>
+        );
+      case "GUEST":
+        return (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border bg-amber-50 text-amber-700 border-amber-200">
+            <ExternalLink className="w-3.5 h-3.5" /> Guest
+          </span>
+        );
+      default: // MEMBER
+        return (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border bg-slate-50 text-slate-600 border-slate-200">
+            <User className="w-3.5 h-3.5" /> Member
+          </span>
+        );
+    }
   };
 
   if (isLoading || !mounted) {
@@ -67,38 +97,32 @@ export default function CoreDashboardPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {myWorkspaces.map((ws: WorkspaceMembership) => {
               const isAdmin = ws.roleCode === "WORKSPACE_ADMIN";
+              const isGuest = ws.roleCode === "GUEST";
               
               return (
                 <div 
                   key={ws.workspaceId}
-                  onClick={() => handleEnterWorkspace(ws.workspaceId)}
-                  className="group relative bg-white rounded-2xl border border-slate-200 p-6 shadow-sm hover:shadow-xl hover:border-blue-300 transition-all duration-300 cursor-pointer flex flex-col justify-between min-h-[200px]"
+                  onClick={() => handleEnterWorkspace(ws)}
+                  className={`
+                    group relative bg-white rounded-2xl border p-6 shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer flex flex-col justify-between min-h-[200px]
+                    ${isGuest 
+                        ? 'border-amber-200 hover:border-amber-400' 
+                        : 'border-slate-200 hover:border-purple-300'}
+                  `}
                 >
                   {/* Top: Icon & Badge */}
                   <div className="flex justify-between items-start mb-4">
                     <div className={`w-14 h-14 rounded-xl flex items-center justify-center text-2xl font-bold shadow-sm transition-colors
-                      ${isAdmin ? 'bg-purple-600 text-white' : 'bg-slate-100 text-slate-600 group-hover:bg-purple-50 group-hover:text-purple-600'}`}
+                      ${isAdmin 
+                          ? 'bg-purple-600 text-white' 
+                          : isGuest
+                              ? 'bg-amber-100 text-amber-600'
+                              : 'bg-slate-100 text-slate-600 group-hover:bg-purple-50 group-hover:text-purple-600'}`}
                     >
                       {ws.workspaceName.charAt(0).toUpperCase()}
                     </div>
 
-                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border
-                      ${isAdmin 
-                        ? 'bg-purple-50 text-purple-700 border-purple-200' 
-                        : 'bg-slate-50 text-slate-600 border-slate-200'}`}
-                    >
-                      {isAdmin ? (
-                        <>
-                          <ShieldCheck className="w-3.5 h-3.5" />
-                          Admin
-                        </>
-                      ) : (
-                        <>
-                          <User className="w-3.5 h-3.5" />
-                          Member
-                        </>
-                      )}
-                    </span>
+                    {renderRoleBadge(ws.roleCode)}
                   </div>
 
                   {/* Content: Name & ID */}
@@ -112,8 +136,11 @@ export default function CoreDashboardPage() {
                   </div>
 
                   {/* Bottom: Action Arrow */}
-                  <div className="mt-6 flex items-center text-sm font-semibold text-purple-600 opacity-0 -translate-x-4 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300">
-                    Open Workspace <ArrowRight className="w-4 h-4 ml-2" />
+                  <div className="mt-6 flex items-center text-sm font-semibold opacity-0 -translate-x-4 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300">
+                    <span className={isGuest ? "text-amber-600" : "text-purple-600"}>
+                        {isAdmin ? "Manage Workspace" : "View Projects"}
+                    </span>
+                    <ArrowRight className={`w-4 h-4 ml-2 ${isGuest ? "text-amber-600" : "text-purple-600"}`} />
                   </div>
                 </div>
               );
@@ -123,7 +150,7 @@ export default function CoreDashboardPage() {
           // --- EMPTY STATE ---
           <div className="flex flex-col items-center justify-center py-24 bg-white rounded-2xl border-2 border-dashed border-slate-200 text-center">
              <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mb-6">
-                <FolderKanban className="w-10 h-10 text-slate-300" />
+                <Briefcase className="w-10 h-10 text-slate-300" />
              </div>
              <h2 className="text-2xl font-bold text-slate-900 mb-2">No Workspaces Found</h2>
              <p className="text-slate-500 max-w-md text-lg">
