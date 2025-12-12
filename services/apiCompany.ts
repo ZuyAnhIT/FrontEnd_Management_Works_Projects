@@ -50,6 +50,27 @@ export interface UpdateCompanyPayload {
   logoFile?: File | null; // ✨ File ảnh thực tế từ máy
 }
 
+// --- INTERFACES CHO INVITATION ---
+export interface CompanyInvitation {
+  id: number;
+  email: string;
+  roleName: string;
+  invitedByName: string;
+  status: "PENDING" | "ACCEPTED" | "EXPIRED" | "CANCELLED";
+  expiresAt: string;
+  invitationLink: string;
+  createdAt?: string;
+}
+
+export interface InvitationSearchParams {
+  page: number;
+  size: number;
+  sortBy: string;
+  sortDir: "asc" | "desc";
+  keyword?: string;
+  status?: string;
+}
+
 // ===================================================
 // 1️⃣ Get Company by ID
 // ===================================================
@@ -176,6 +197,24 @@ export const inviteMemberToCompany = async (
       err.response?.data?.message || "Unable to send invitation."
     );
   }
+};
+
+// Lấy danh sách lời mời (Có search & filter)
+export const getCompanyInvitations = async (
+  companyId: number, 
+  params: InvitationSearchParams
+): Promise<PageResponse<CompanyInvitation>> => {
+  const res = await apiClient.get(`/companies/${companyId}/invitations`, { params });
+  return res.data.data;
+};
+
+// Hủy lời mời
+export const cancelCompanyInvitation = async (
+  companyId: number, 
+  invitationId: number
+) => {
+  const res = await apiClient.delete(`/companies/${companyId}/invitations/${invitationId}`);
+  return res.data;
 };
 
 // ===================================================
