@@ -235,3 +235,44 @@ export const restoreTask = async (taskId: number) => {
   
   return res.data;
 };
+/**
+ * 1. Tải file mẫu CSV
+ * URL: /api/tasks/tasks/import-template
+ */
+export const downloadTemplate = async () => {
+  try {
+    const response = await apiClient.get("/tasks/import-template", {
+      responseType: "blob", 
+    });
+
+    // Tạo link ảo để trình duyệt tải xuống
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", "tasks_import_template.xlsx");
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  } catch (error: any) {
+    throw new Error(error.response?.data?.message || "Lỗi khi tải file mẫu.");
+  }
+};
+
+/**
+ * 2. Import Task từ file CSV
+ * URL: /api/tasks/{projectId}/tasks/import
+ */
+// src/services/apiTask.ts
+export const previewImportTasks = async (projectId: number, file: File) => {
+  const formData = new FormData();
+  formData.append("file", file);
+  const res = await apiClient.post(`/tasks/${projectId}/import/preview`, formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return res.data.data; // Trả về List<TaskImportPreviewResponse>
+};
+
+export const saveImportedTasks = async (projectId: number, data: any[]) => {
+  const res = await apiClient.post(`/tasks/${projectId}/import/save`, data);
+  return res.data.data;
+};
