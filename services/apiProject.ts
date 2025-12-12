@@ -248,6 +248,25 @@ export interface BacklogQueryParams {
   sortDir?: 'asc' | 'desc';
 }
 
+export interface ProjectInvitation {
+  id: number;
+  email: string;
+  roleCode: string;
+  status: "PENDING" | "ACCEPTED" | "EXPIRED" | "CANCELLED";
+  invitedAt: string;
+  inviterName: string;
+  inviterAvatar: string;
+}
+
+export interface InvitationSearchParams {
+  page: number;
+  size: number;
+  sortBy: string;
+  sortDir: "asc" | "desc";
+  keyword?: string;
+  status?: string;
+}
+
 /* ============================================
    🛠️ 3. HELPER: LÀM SẠCH PARAMS
 ============================================ */
@@ -524,6 +543,34 @@ export const inviteProjectMember = async (
     );
   }
 };
+
+// 1. Lấy danh sách lời mời dự án
+export const getProjectInvitations = async (
+  companyId: number,
+  workspaceId: number,
+  projectId: number,
+  params: InvitationSearchParams
+): Promise<PageResponse<ProjectInvitation>> => {
+  const res = await apiClient.get(
+    `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/invitations`,
+    { params }
+  );
+  return res.data.data;
+};
+
+// 2. Hủy lời mời dự án
+export const cancelProjectInvitation = async (
+  companyId: number,
+  workspaceId: number,
+  projectId: number,
+  invitationId: number
+) => {
+  const res = await apiClient.delete(
+    `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/invitations/${invitationId}`
+  );
+  return res.data;
+};
+
 /* ========================================================================
    🔥 4.14 CHỨC NĂNG MỚI: TASK LIST VIEW & GROUP VIEW
    ======================================================================== */
