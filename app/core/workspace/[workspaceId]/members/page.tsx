@@ -374,10 +374,8 @@ export default function WorkspaceMembersPage() {
     const isAdmin = m.roleName?.toUpperCase().includes("ADMIN");
     const Icon = isAdmin ? Crown : Shield;
     const style = isAdmin
-        ? "bg-amber-50 text-amber-800 border-2 border-amber-500"
-        : "bg-blue-50 text-blue-700 border border-blue-300";
-
-
+      ? "bg-amber-50 text-amber-800 border-2 border-amber-500"
+      : "bg-blue-50 text-blue-700 border border-blue-300";
 
     return (
       <div
@@ -559,7 +557,8 @@ export default function WorkspaceMembersPage() {
           setRoleCode={setInviteRoleCode}
           title="Invite to Workspace"
           description="Add a new member to this workspace."
-          contextType="workspace" // Để Modal hiển thị đúng role options (Workspace Admin/Member)
+          contextType="workspace"
+          companyId={companyId} // ✅ TRUYỀN COMPANY ID
         />
 
         {/* Detail Modal */}

@@ -13,7 +13,6 @@ import { useToast } from "@/components/ui/ToastProvider";
 import { Button } from "@/components/ui/button";
 import { Chatbot } from "@/components/chatbot/chatbot";
 
-// API Services
 import {
   getProjectMembers,
   searchProjectMembers, 
@@ -415,7 +414,6 @@ export default function ProjectMembersPage() {
           <div className="flex justify-center py-20 bg-white rounded-xl border border-slate-200 shadow-sm"><Loader2 className="w-10 h-10 text-blue-600 animate-spin" /></div>
         ) : (
           <>
-            {/* 1. MEMBER LIST */}
             {activeTab === "MEMBERS" && (
                 members.length > 0 ? (
                     <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden animate-fadeInUp">
@@ -437,7 +435,6 @@ export default function ProjectMembersPage() {
                 ) : <div className="text-center py-20 bg-white border-2 border-dashed rounded-xl"><p className="text-slate-500">No members found.</p></div>
             )}
 
-            {/* 2. INVITATION LIST */}
             {activeTab === "INVITATIONS" && (
                 invitations.length > 0 ? (
                     <ProjectInvitationTable 
@@ -463,7 +460,7 @@ export default function ProjectMembersPage() {
 
         {/* --- MODALS --- */}
         
-        {/* Invite Modal */}
+        {/* ✅ Truyền companyId cho Invite Modal */}
         <InviteMemberModal
           isOpen={showInviteModal}
           onClose={() => setShowInviteModal(false)}
@@ -474,39 +471,14 @@ export default function ProjectMembersPage() {
           roleCode={inviteRoleCode}
           setRoleCode={setInviteRoleCode}
           title="Add Member to Project"
-          description="Add an existing workspace member to this project."
-          contextType="project" 
+          description="Invite an existing workspace member or a new user to this project."
+          contextType="project"
+          companyId={companyId}
         />
 
-        {/* Detail Modal */}
-        <MemberDetailModalBase
-          isOpen={showDetailModal}
-          onClose={() => setShowDetailModal(false)}
-          member={detailMember}
-          loading={false}
-          title="Project Member Details"
-          fields={[
-             { label: "Full Name", key: "fullName" },
-             { label: "Email", key: "email" },
-             { label: "Role", key: "roleName" },
-             { label: "Joined At", key: "joinedAt" },
-             { label: "Phone", key: "phoneNumber" },
-          ]}
-        />
-
-        {/* Confirm Modal */}
-        <ConfirmationModal
-          isOpen={isConfirmOpen}
-          onClose={() => setIsConfirmOpen(false)}
-          onConfirm={handleConfirmAction}
-          isLoading={isProcessingAction}
-          title={confirmTitle}
-          description={confirmDesc}
-          confirmText="Confirm"
-          modalVariant="danger"
-        />
-
-        {/* Edit Role Modal */}
+        <MemberDetailModalBase isOpen={showDetailModal} onClose={() => setShowDetailModal(false)} member={detailMember} loading={false} title="Project Member Details" fields={[{ label: "Full Name", key: "fullName" }, { label: "Email", key: "email" }, { label: "Role", key: "roleName" }, { label: "Joined At", key: "joinedAt" }, { label: "Phone", key: "phoneNumber" }]} />
+        <ConfirmationModal isOpen={isConfirmOpen} onClose={() => setIsConfirmOpen(false)} onConfirm={handleConfirmAction} isLoading={isProcessingAction} title={confirmTitle} description={confirmDesc} confirmText="Confirm" modalVariant="danger" />
+        
         {showEditModal && selectedMember && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in">
             <div className="w-full max-w-sm bg-white rounded-xl shadow-2xl overflow-hidden animate-in zoom-in-95">
@@ -516,24 +488,11 @@ export default function ProjectMembersPage() {
               </div>
               <div className="p-6 space-y-5">
                  <p className="text-sm text-slate-600">Select a new role for <span className="font-bold text-slate-900">{selectedMember.fullName}</span>.</p>
-                 <div className="relative">
-                    <select 
-                        value={newRole} 
-                        onChange={(e) => setNewRole(e.target.value)}
-                        className="w-full pl-3 pr-8 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-500 bg-white appearance-none"
-                    >
-                        <option value="PROJECT_MEMBER">Project Member</option>
-                        <option value="PROJECT_ADMIN">Project Admin</option>
-                    </select>
-                    <ShieldAlert className="w-4 h-4 text-slate-400 absolute right-3 top-3 pointer-events-none" />
-                 </div>
+                 <div className="relative"><select value={newRole} onChange={(e) => setNewRole(e.target.value)} className="w-full pl-3 pr-8 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-500 bg-white appearance-none"><option value="PROJECT_MEMBER">Project Member</option><option value="PROJECT_ADMIN">Project Admin</option></select><ShieldAlert className="w-4 h-4 text-slate-400 absolute right-3 top-3 pointer-events-none" /></div>
               </div>
               <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
                  <Button variant="outline" onClick={() => setShowEditModal(false)}>Cancel</Button>
-                 <Button onClick={handleUpdateRole} disabled={isUpdating} className="bg-blue-600 hover:bg-blue-700 text-white">
-                    {isUpdating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
-                    Save
-                 </Button>
+                 <Button onClick={handleUpdateRole} disabled={isUpdating} className="bg-blue-600 hover:bg-blue-700 text-white">{isUpdating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />} Save</Button>
               </div>
             </div>
           </div>
