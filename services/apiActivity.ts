@@ -1,76 +1,69 @@
 import apiClient from "@/lib/apiClient";
 
+// Định nghĩa cấu trúc dữ liệu Activity Log chuẩn
 export interface ActivityLog {
   id: number;
-  userName: string;
-  userAvatar: string;
-  action: "CREATE" | "UPDATE" | "DELETE" | "LOGIN" | "OTHER";
-  entityType: string;
+  // Thông tin người thực hiện
+  userName: string;       
+  userAvatar: string;     
+  
+  // Thông tin hành động
+  action: "CREATE" | "UPDATE" | "DELETE" | "MOVE_STATUS" | "START" | "COMPLETE" | "COMMENT" | string;
+  
+  // Thông tin đối tượng bị tác động
+  entityType: "TASK" | "PROJECT" | "WORKSPACE" | "SPRINT" | "USER" | "COMPANY" | string;
+  entityName: string;
+  entityCode?: string | null; // Ví dụ: "ECOM-12"
   entityId: number;
+  
+  // Nội dung chi tiết (HTML)
   description: string;
+  
+  // Thời gian
   timestamp: string;
   timeAgo: string;
+  
+  // Context để điều hướng (quan trọng cho tính năng click)
+  projectId?: number;   
+  workspaceId?: number; 
 }
 
+/**
+ * Lấy danh sách hoạt động dựa trên phạm vi (Scope)
+ * @param scope "COMPANY" | "PROJECT" | "USER" | "WORKSPACE"
+ * @param id ID của đối tượng scope (ví dụ: companyId, projectId...)
+ * @param page Trang hiện tại (mặc định 0)
+ * @param size Số lượng item (mặc định 20)
+ */
 export const getActivities = async (
-  scope: string, // "COMPANY", "PROJECT", "USER"
+  scope: string, 
   id: number,
   page: number = 0,
   size: number = 20
 ): Promise<ActivityLog[]> => {
-  // 1️⃣ LOG ĐẦU VÀO
-  console.group("🚀 [API Debug] getActivities Called");
-  console.log("   ▶ Params:", { scope, id, page, size });
-  console.log("   ▶ ID Type:", typeof id); // Kiểm tra xem id có phải là number không hay là string/NaN
-
-  // Kiểm tra nhanh đầu vào trước khi gọi
+  // Kiểm tra ID hợp lệ để tránh lỗi 400 không đáng có
   if (!id || isNaN(id)) {
-    console.error("   ❌ Error: ID is invalid (NaN or Null). Aborting request.");
-    console.groupEnd();
     return [];
   }
 
   try {
-    // 2️⃣ LOG URL SẮP GỌI
-    // Lưu ý: Đảm bảo scope đúng chuẩn (Ví dụ backend cần "COMPANY" chứ không phải "Company")
-    // Tôi sẽ thử uppercase scope lên để an toàn nếu backend dùng Enum
+    // Đảm bảo scope luôn viết hoa theo chuẩn Enum backend
     const safeScope = scope.toUpperCase(); 
     const url = `/activities/${safeScope}/${id}`;
     
-    console.log("   ▶ Request URL:", url);
-
     const res = await apiClient.get(url, {
       params: { page, size }
     });
     
-    // 3️⃣ LOG KẾT QUẢ THÀNH CÔNG
-    console.log("   ✅ API Response Status:", res.status);
-    console.log("   ✅ API Data:", res.data);
-    
-    if (!res.data.success) {
-      throw new Error(res.data.message);
+    if (res.data && res.data.success) {
+      return res.data.data;
     }
     
-    console.groupEnd();
-    return res.data.data;
+    return [];
 
   } catch (error: any) {
-    // 4️⃣ LOG LỖI CHI TIẾT (QUAN TRỌNG NHẤT)
-    console.error("   ❌ API Failed!");
-    
-    if (error.response) {
-      // Server trả về response lỗi (500, 400, 403...)
-      console.error("   🔻 Status Code:", error.response.status);
-      console.error("   🔻 Server Message:", error.response.data); // Xem server báo lỗi gì cụ thể
-    } else if (error.request) {
-      // Không nhận được phản hồi
-      console.error("   🔻 No response received from server.");
-    } else {
-      // Lỗi khi setup request
-      console.error("   🔻 Request Setup Error:", error.message);
-    }
-    
-    console.groupEnd();
-    return []; // Trả về mảng rỗng để không crash UI
+    // Chỉ log lỗi gọn gàng để dev dễ trace, không làm phiền console production
+    console.error(`[ActivityAPI] Failed to fetch logs for ${scope}/${id}:`, error?.message || error);
+    return []; 
   }
 };

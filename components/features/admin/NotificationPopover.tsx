@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState, useRef, useMemo } from "react";
-import { useParams, usePathname } from "next/navigation";
+import { useEffect, useState, useRef } from "react";
+import { useParams, usePathname, useRouter } from "next/navigation"; // ✅ Thêm useRouter
 import { 
   Bell, Loader2, CheckCheck, Inbox, 
   User, Building2, FolderKanban, LayoutGrid, AlertCircle 
@@ -15,13 +15,12 @@ interface NotificationPopoverProps {
   onClose: () => void;
 }
 
-// Định nghĩa cấu trúc Tab
 interface LogTab {
-  key: string;      // Unique key: "USER", "COMPANY", "PROJECT"...
-  label: string;    // Tên hiển thị
-  icon: any;        // Icon Component
-  scope: string;    // API Scope
-  entityId: number; // ID để gọi API
+  key: string;
+  label: string;
+  icon: any;
+  scope: string;
+  entityId: number;
 }
 
 export default function NotificationPopover({ isOpen, onClose }: NotificationPopoverProps) {
@@ -37,19 +36,19 @@ export default function NotificationPopover({ isOpen, onClose }: NotificationPop
   // Hooks
   const params = useParams();
   const pathname = usePathname();
+  const router = useRouter(); // ✅ Init Router để chuyển trang
   const popoverRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
 
   // --------------------------------------------------------
-  // 1. TÍNH TOÁN CÁC TAB KHẢ DỤNG (DYNAMIC TABS)
+  // 1. TÍNH TOÁN CÁC TAB KHẢ DỤNG (LOGIC GIỮ NGUYÊN)
   // --------------------------------------------------------
   useEffect(() => {
     if (!isOpen || !user) return;
 
-    console.group("🔔 [Notif] Detecting Context...");
     const tabs: LogTab[] = [];
 
-    // --- A. USER TAB (Luôn có) ---
+    // A. USER TAB
     tabs.push({
         key: "USER",
         label: "My Logs",
@@ -58,8 +57,7 @@ export default function NotificationPopover({ isOpen, onClose }: NotificationPop
         entityId: Number(user.id)
     });
 
-    // --- B. PROJECT TAB (Nếu có projectId trên URL) ---
-    // URL mẫu: /core/workspace/1/project/99
+    // B. PROJECT TAB
     if (params.projectId) {
         const pId = Number(params.projectId);
         if (!isNaN(pId)) {
@@ -73,8 +71,7 @@ export default function NotificationPopover({ isOpen, onClose }: NotificationPop
         }
     }
 
-    // --- C. WORKSPACE TAB (Nếu có workspaceId trên URL) ---
-    // URL mẫu: /core/workspace/1
+    // C. WORKSPACE TAB
     if (params.workspaceId) {
         const wId = Number(params.workspaceId);
         if (!isNaN(wId)) {
@@ -88,20 +85,14 @@ export default function NotificationPopover({ isOpen, onClose }: NotificationPop
         }
     }
 
-    // --- D. COMPANY TAB (Logic phức tạp hơn) ---
-    // URL mẫu: /admin/company/1/dashboard
+    // D. COMPANY TAB
     const isCompanyPage = pathname?.includes("/admin/company");
     const urlCompanyId = params.companyId || params.id;
-    
-    // Ưu tiên lấy ID từ URL, nếu không có thì lấy từ LocalStorage
     let targetCompanyId = urlCompanyId ? Number(urlCompanyId) : null;
     
     if (!targetCompanyId && isCompanyPage) {
         const storedId = localStorage.getItem("lastActiveCompanyId"); 
-        if (storedId) {
-            targetCompanyId = Number(storedId);
-            console.log("   -> Found Company ID in Storage:", targetCompanyId);
-        }
+        if (storedId) targetCompanyId = Number(storedId);
     }
 
     if (targetCompanyId && !isNaN(targetCompanyId)) {
@@ -114,49 +105,101 @@ export default function NotificationPopover({ isOpen, onClose }: NotificationPop
         });
     }
 
-    console.log("   -> Available Tabs:", tabs.map(t => t.key));
     setAvailableTabs(tabs);
 
-    // --- E. SMART DEFAULT ACTIVE (Chọn tab mặc định thông minh) ---
-    // Tự động chọn tab có ngữ cảnh cụ thể nhất
-    // Thứ tự ưu tiên: Project > Workspace > Company > User
+    // E. SMART DEFAULT ACTIVE
     if (params.projectId) setActiveTabKey("PROJECT");
     else if (params.workspaceId) setActiveTabKey("WORKSPACE");
     else if (targetCompanyId && isCompanyPage) setActiveTabKey("COMPANY");
-    else setActiveTabKey("USER"); // Mặc định về User nếu ở Dashboard chung
-
-    console.groupEnd();
+    else setActiveTabKey("USER");
 
   }, [isOpen, pathname, params, user]);
 
   // --------------------------------------------------------
-  // 2. FETCH DATA KHI ACTIVE TAB THAY ĐỔI
+  // 2. FETCH DATA
   // --------------------------------------------------------
   useEffect(() => {
     if (!isOpen || availableTabs.length === 0) return;
 
     const currentTab = availableTabs.find(t => t.key === activeTabKey);
     if (!currentTab) return;
-
-    console.log(`🚀 [Notif] Fetching logs for: ${currentTab.key} (ID: ${currentTab.entityId})`);
     
     setLoading(true);
     setErrorMsg(null);
 
     getActivities(currentTab.scope, currentTab.entityId)
-      .then(data => {
-          console.log(`✅ [Notif] Loaded ${data.length} activities.`);
-          setActivities(data);
-      })
+      .then(data => setActivities(data))
       .catch(err => {
-          console.error("❌ [Notif] Fetch error:", err);
+          console.error("Fetch activities error:", err);
           setErrorMsg("Failed to load logs.");
       })
       .finally(() => setLoading(false));
 
   }, [activeTabKey, isOpen, availableTabs]);
 
-  // Click outside to close
+  // --------------------------------------------------------
+  // 3. 🎯 HANDLE NAVIGATION (LOGIC MỚI)
+  // --------------------------------------------------------
+  const handleNavigate = (log: ActivityLog) => {
+    // 1. Xác định Workspace ID và Project ID
+    // Ưu tiên lấy từ log (nếu API trả về), nếu không thì lấy từ URL hiện tại (params)
+    // Lưu ý: Nếu ở tab "My Logs" mà click vào task của dự án khác với URL hiện tại, 
+    // cần API trả về projectId/workspaceId trong log để điều hướng đúng.
+    const wsId = log.workspaceId || params.workspaceId;
+    const pId = log.projectId || params.projectId;
+
+    if (!wsId) {
+        console.warn("Cannot navigate: Missing Workspace ID");
+        return;
+    }
+
+    let url = "";
+
+    switch (log.entityType) {
+        case "TASK":
+        case "SPRINT":
+            // -> Chuyển hướng đến trang Sprints (List Task)
+            if (pId) {
+                url = `/core/workspace/${wsId}/project/${pId}/sprints`;
+            }
+            break;
+
+        case "PROJECT":
+            // Nếu Entity là Project, thì entityId chính là Project ID cần đến
+            const targetProjectId = log.entityId; 
+            
+            if (log.action === "UPDATE") {
+                // Thay đổi thông tin dự án -> Settings
+                url = `/core/workspace/${wsId}/project/${targetProjectId}/settings`;
+            } else {
+                // Tạo mới, start, complete -> Board
+                url = `/core/workspace/${wsId}/project/${targetProjectId}/board`;
+            }
+            break;
+
+        case "WORKSPACE":
+            // Thay đổi thông tin workspace -> Settings Workspace
+            if (log.action === "UPDATE") {
+                url = `/core/workspace/${wsId}/settings`;
+            }
+            break;
+            
+        default:
+            // Mặc định không làm gì hoặc log ra console
+            console.log("No navigation rule for type:", log.entityType);
+            break;
+    }
+
+    // Thực hiện chuyển trang và đóng popover
+    if (url) {
+        router.push(url);
+        onClose();
+    }
+  };
+
+  // --------------------------------------------------------
+  // 4. CLICK OUTSIDE
+  // --------------------------------------------------------
   useEffect(() => {
     function handleClickOutside(event: any) {
         if (popoverRef.current && !popoverRef.current.contains(event.target)) {
@@ -185,7 +228,7 @@ export default function NotificationPopover({ isOpen, onClose }: NotificationPop
         </button>
       </div>
 
-      {/* --- TABS BAR (Dynamic) --- */}
+      {/* --- TABS BAR --- */}
       {availableTabs.length > 1 && (
           <div className="flex items-center px-2 bg-slate-50 border-b border-slate-100 overflow-x-auto no-scrollbar">
               {availableTabs.map((tab) => {
@@ -226,7 +269,12 @@ export default function NotificationPopover({ isOpen, onClose }: NotificationPop
         ) : activities.length > 0 ? (
           <div className="divide-y divide-slate-50">
             {activities.map((item) => (
-              <NotificationItem key={item.id} item={item} />
+              <NotificationItem 
+                key={item.id} 
+                item={item} 
+                // ✅ Truyền hàm click xuống Item để xử lý chuyển trang
+                onClick={() => handleNavigate(item)} 
+              />
             ))}
             <div className="p-2 text-center bg-slate-50/50 sticky bottom-0 border-t border-slate-100">
                 <button className="text-xs font-bold text-blue-600 hover:text-blue-700 hover:underline transition-colors py-1">
