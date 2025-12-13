@@ -120,10 +120,12 @@ export interface WorkloadStat {
 export interface WorkloadParams {
   viewType?: "POINTS" | "HOURS";
   groupBy?: "STATUS" | "PRIORITY";
-  sprintId?: number | null;
+  sprintId?: number | "ALL" | null;
   from?: string;
   to?: string;
   statusIds?: number[];
+  export?: boolean;
+
 }
 
 // ✅ CẬP NHẬT: Interface Params đầy đủ
@@ -292,29 +294,50 @@ export const getEpicProgress = async (
 };
 
 // 6. Lấy tải công việc (Workload) với các tham số lọc
+// 1. Hàm lấy dữ liệu JSON 
+// 1. Hàm lấy dữ liệu JSON
 export const getProjectWorkload = async (
   projectId: number, 
   params?: WorkloadParams
 ): Promise<WorkloadStat[]> => {
+  const cleanParams = buildCleanParams(params); 
   
-  // Clean params
+  const res = await apiClient.get(`/statistics/${projectId}/workload`, { 
+    params: { ...cleanParams, export: false } 
+  });
+
+  if (!res.data.success) throw new Error(res.data.message);
+  return res.data.data;
+};
+
+// 2. Hàm Export Excel
+export const exportWorkloadReport = async (
+  projectId: number,
+  params?: WorkloadParams
+): Promise<Blob> => {
+  const cleanParams = buildCleanParams(params);
+  
+  const res = await apiClient.get(`/statistics/${projectId}/workload`, {
+    params: { ...cleanParams, export: true },
+    responseType: "blob", 
+  });
+
+  return res.data;
+};
+
+// Helper function để tái sử dụng logic clean params
+const buildCleanParams = (params?: WorkloadParams) => {
   const cleanParams: any = {};
   if (params?.viewType) cleanParams.viewType = params.viewType;
   if (params?.groupBy) cleanParams.groupBy = params.groupBy;
-  if (params?.sprintId) cleanParams.sprintId = params.sprintId;
+  if (params?.sprintId && params.sprintId !== "ALL") cleanParams.sprintId = params.sprintId;
   if (params?.from) cleanParams.from = params.from;
   if (params?.to) cleanParams.to = params.to;
   
   if (params?.statusIds && params.statusIds.length > 0) {
       cleanParams.statusIds = params.statusIds.join(",");
   }
-
-  const res = await apiClient.get(`/statistics/projects/${projectId}/workload`, { 
-    params: cleanParams 
-  });
-
-  if (!res.data.success) throw new Error(res.data.message);
-  return res.data.data;
+  return cleanParams;
 };
 
 // 7. Lấy dữ liệu Roadmap với các tham số lọc
