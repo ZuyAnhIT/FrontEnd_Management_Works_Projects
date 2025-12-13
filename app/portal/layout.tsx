@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import AdminHeader from "@/components/features/admin/Header"; 
-import Sidebar from "@/components/features/core/Sidebar"; 
+import AdminSidebar from "@/components/features/admin/Sidebar"; // ✅ Dùng AdminSidebar
 import { useAuth } from "@/context/AuthContext";
 import { Loader2, ShieldAlert } from "lucide-react";
 
 export default function PortalLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [activeMenu, setActiveMenu] = useState("/portal"); // State để highlight menu
   const { user, isLoading, isAuthenticated } = useAuth();
 
   // 1. Loading
@@ -31,7 +32,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
   }
 
   return (
-    <div className="h-screen flex flex-col bg-slate-50 font-sans text-slate-900 overflow-hidden">
+    <div className="h-screen w-full bg-slate-50 flex flex-col font-sans text-slate-900 overflow-hidden">
       
       {/* HEADER */}
       <div className="flex-shrink-0 z-50">
@@ -40,14 +41,16 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
 
       <div className="flex flex-1 overflow-hidden">
         
-        {/* SIDEBAR */}
+        {/* SIDEBAR (Admin Style) */}
         <div className="flex-shrink-0 z-40">
-          <Sidebar
+          <AdminSidebar
             isOpen={sidebarOpen}
             onClose={() => setSidebarOpen(false)}
-            activeMenu="/portal" // Highlight menu item nếu cần
-            setActiveMenu={() => {}}
-            workspaces={[]} // 🔴 Guest không thấy workspace list
+            activeMenu={activeMenu}
+            setActiveMenu={setActiveMenu}
+            // Portal không cần hiển thị danh sách workspace quản trị ở sidebar
+            workspaces={[]} 
+            loadingWs={false}
           />
         </div>
 

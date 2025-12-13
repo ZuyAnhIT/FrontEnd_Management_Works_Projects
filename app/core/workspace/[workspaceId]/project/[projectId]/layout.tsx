@@ -6,7 +6,6 @@ import { useParams } from 'next/navigation'
 // Components
 import ProjectCoreSidebar from '@/components/features/core/project/sidebar'
 import ProjectNavTabs from '@/components/features/core/project/nav-tabs'
-// ✅ Sử dụng AdminHeader mới (đã có NotificationPopover)
 import AdminHeader from '@/components/features/admin/Header' 
 
 // Modals
@@ -38,8 +37,7 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
         projectName={projectName}
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
-        onCreateTask={() => setShowTaskModal(true)}
-        onCreateSprint={() => setShowSprintModal(true)}
+        // Đã bỏ onCreateTask và onCreateSprint props
       />
 
       {/* Right Content Wrapper */}
@@ -56,18 +54,19 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
           <ProjectNavTabs
             projectId={projectId}
             onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
+            // Nếu bạn muốn nút Create Task/Sprint nằm ở Tab này, bạn có thể truyền hàm xuống đây
+            // onCreateTask={() => setShowTaskModal(true)} 
           />
         </div>
 
         {/* Main Content Area (Scrollable) */}
-        {/* ⚠️ Loại bỏ padding p-4 để Board/Backlog có thể full-width */}
         <main className="flex-1 overflow-y-auto overflow-x-hidden scroll-smooth custom-scrollbar">
           {children}
         </main>
       </div>
 
       {/* --- MODALS --- */}
-
+      {/* Vẫn giữ Modal ở đây để có thể kích hoạt từ các thành phần con khác nếu cần */}
       <CreateTaskModal
         isOpen={showTaskModal}
         onClose={() => setShowTaskModal(false)}
