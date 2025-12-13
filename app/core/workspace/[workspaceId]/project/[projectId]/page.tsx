@@ -7,8 +7,9 @@ import {
   PieChart, 
   ArrowUpRight,
   BarChart3,
-  Users // ✅ Thêm icon Users cho section Workload
+  Users
 } from "lucide-react";
+import { useToast } from "@/components/ui/ToastProvider"; // ✅ Import Toast
 
 // API & Types
 import { 
@@ -16,12 +17,13 @@ import {
   getPriorityDistribution,
   getTypeDistribution,
   getEpicProgress, 
-  getProjectWorkload, // ✅ API Workload
+  exportEpicProgress, // ✅ Import API Export Epic mới
+  // getProjectWorkload, (Không cần import ở đây nếu dùng component con)
   DistributionStat,
   EpicProgressStat, 
   EpicProgressParams,
-  WorkloadStat,      // ✅ Type Workload
-  WorkloadParams     // ✅ Type Workload Filter
+  // WorkloadStat, (Không cần dùng trực tiếp ở page)
+  // WorkloadParams 
 } from "@/services/apiStatistics";
 
 // Components
@@ -31,10 +33,11 @@ import PriorityChart from "@/components/features/core/summary/PriorityChart";
 import TypeChart from "@/components/features/core/summary/TypeChart";
 import EpicProgressCard from "@/components/features/core/summary/EpicProgressCard"; 
 import EpicFilterToolbar from "@/components/features/core/summary/EpicFilterToolbar"; 
-import WorkloadOverview from "@/components/features/core/summary/WorkloadOverview"; // ✅ Component Workload Gộp
+import WorkloadOverview from "@/components/features/core/summary/WorkloadOverview"; 
 import { Chatbot } from "@/components/chatbot/chatbot";
 
 export default function ProjectSummaryPage() {
+  const { showToast } = useToast();
   const params = useParams();
   const projectId = Number(params.projectId);
 
@@ -48,11 +51,11 @@ export default function ProjectSummaryPage() {
   const [epicData, setEpicData] = useState<EpicProgressStat[]>([]);
   const [epicLoading, setEpicLoading] = useState(true);
   const [epicFilters, setEpicFilters] = useState<EpicProgressParams>({});
+  const [isExportingEpic, setIsExportingEpic] = useState(false); // ✅ State loading cho export epic
 
-  // --- 1. FETCH CHARTS DATA (Initial Load) ---
+  // --- 1. FETCH CHARTS DATA ---
   useEffect(() => {
     if (!projectId) return;
-
     const fetchCharts = async () => {
       setLoading(true);
       try {
@@ -61,25 +64,21 @@ export default function ProjectSummaryPage() {
              getPriorityDistribution(projectId),
              getTypeDistribution(projectId)
          ]);
-
          setStatusData(resStatus);
          setPriorityData(resPriority);
          setTypeData(resType);
-         
       } catch (error) {
          console.error("Failed to load charts", error);
       } finally {
          setLoading(false);
       }
     };
-
     fetchCharts();
   }, [projectId]);
 
-  // --- 2. FETCH EPIC DATA (Triggered by Filters) ---
+  // --- 2. FETCH EPIC DATA ---
   useEffect(() => {
      if (!projectId) return;
-     
      const fetchEpics = async () => {
         setEpicLoading(true);
         try {
@@ -91,10 +90,39 @@ export default function ProjectSummaryPage() {
            setEpicLoading(false);
         }
      };
-
      const t = setTimeout(() => fetchEpics(), 300);
      return () => clearTimeout(t);
   }, [projectId, epicFilters]);
+
+  // --- ✅ 3. HANDLE EXPORT EPIC ---
+  const handleExportEpic = async () => {
+    if (!projectId) return;
+    
+    setIsExportingEpic(true);
+    try {
+        const blobData = await exportEpicProgress(projectId, epicFilters);
+        
+        // Tạo thẻ a ảo để download
+        const url = window.URL.createObjectURL(new Blob([blobData]));
+        const link = document.createElement('a');
+        link.href = url;
+        const timestamp = new Date().toISOString().split('T')[0];
+        link.setAttribute('download', `Epic_Progress_Report_P${projectId}_${timestamp}.xlsx`);
+        
+        document.body.appendChild(link);
+        link.click();
+        
+        link.parentNode?.removeChild(link);
+        window.URL.revokeObjectURL(url);
+
+        showToast("Epic report downloaded successfully!", "success");
+    } catch (error) {
+        console.error("Export epic failed", error);
+        showToast("Failed to export Epic report", "error");
+    } finally {
+        setIsExportingEpic(false);
+    }
+  };
 
   if (!projectId) return null;
 
@@ -113,8 +141,9 @@ export default function ProjectSummaryPage() {
                    Real-time overview of project performance and health.
                 </p>
              </div>
+             {/* Nút export chung cho cả trang (nếu cần) - Hiện tại chưa gán chức năng */}
              <button className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-blue-600 transition-all shadow-sm">
-                <ArrowUpRight className="w-4 h-4" /> Export Report
+                <ArrowUpRight className="w-4 h-4" /> Global Report
              </button>
           </div>
 
@@ -131,7 +160,6 @@ export default function ProjectSummaryPage() {
                 <PieChart className="w-5 h-5 text-slate-400" />
                 <h2 className="text-lg font-bold text-slate-800">Analytics & Distribution</h2>
              </div>
-             
              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <StatusChart data={statusData} loading={loading} />
                 <PriorityChart data={priorityData} loading={loading} />
@@ -148,10 +176,13 @@ export default function ProjectSummaryPage() {
                 <h2 className="text-lg font-bold text-slate-800">Epic Progress & Roadmap</h2>
              </div>
 
+             {/* ✅ Truyền props Export xuống Toolbar */}
              <EpicFilterToolbar 
                 projectId={projectId}
                 filters={epicFilters}
                 setFilters={setEpicFilters}
+                onExport={handleExportEpic}
+                isExporting={isExportingEpic}
              />
 
              <div className="w-full mt-4">
@@ -161,14 +192,12 @@ export default function ProjectSummaryPage() {
 
           <hr className="border-slate-200" />
 
-          {/* SECTION 4: TEAM WORKLOAD (MỚI) */}
+          {/* SECTION 4: TEAM WORKLOAD */}
           <section>
              <div className="flex items-center gap-2 mb-4">
                 <Users className="w-5 h-5 text-slate-400" />
                 <h2 className="text-lg font-bold text-slate-800">Team Workload</h2>
              </div>
-
-             {/* Component này đã bao gồm Toolbar, KPI và Chart */}
              <WorkloadOverview projectId={projectId} />
           </section>
 

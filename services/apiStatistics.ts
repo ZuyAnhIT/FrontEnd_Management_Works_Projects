@@ -98,6 +98,7 @@ export interface EpicProgressParams {
   statusIds?: number[]; // Mảng ID
   from?: string;        // YYYY-MM-DD
   to?: string;          // YYYY-MM-DD
+  export?: boolean; 
 }
 
 // Interface cho Workload
@@ -291,6 +292,31 @@ export const getEpicProgress = async (
 
   if (!res.data.success) throw new Error(res.data.message);
   return res.data.data;
+};
+
+// Hàm Export Excel cho Epic (Trả về Blob)
+export const exportEpicProgress = async (
+  projectId: number,
+  params?: EpicProgressParams
+): Promise<Blob> => {
+  
+  // 1. Clean params (Logic giống hệt hàm getEpicProgress)
+  const cleanParams: any = {};
+  if (params?.sprintId) cleanParams.sprintId = params.sprintId;
+  if (params?.from) cleanParams.from = params.from;
+  if (params?.to) cleanParams.to = params.to;
+  
+  if (params?.statusIds && params.statusIds.length > 0) {
+      cleanParams.statusIds = params.statusIds.join(",");
+  }
+
+  // 2. Gọi API với export=true và responseType='blob'
+  const res = await apiClient.get(`/statistics/projects/${projectId}/epic-progress`, {
+    params: { ...cleanParams, export: true },
+    responseType: "blob", 
+  });
+
+  return res.data;
 };
 
 // 6. Lấy tải công việc (Workload) với các tham số lọc
