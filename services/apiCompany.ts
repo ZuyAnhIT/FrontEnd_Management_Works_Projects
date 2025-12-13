@@ -90,7 +90,7 @@ export const getCompanyById = async (companyId: number): Promise<Company> => {
 };
 
 // ===================================================
-// 2️⃣ Update Company (Multipart/Form-data) - FIX LỖI
+// 2️⃣ Update Company (Multipart/Form-data) 
 // ===================================================
 export const updateCompany = async (
   companyId: number,
