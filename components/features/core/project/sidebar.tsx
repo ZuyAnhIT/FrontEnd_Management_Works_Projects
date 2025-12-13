@@ -6,9 +6,8 @@ import {
   Settings, 
   ChevronLeft, 
   ChevronRight, 
-  X, 
-  Plus, 
-  GitBranch 
+  X,
+  LayoutGrid // Icon cho phần Manage
 } from 'lucide-react'
 import { useState } from 'react'
 import { usePathname, useParams } from 'next/navigation'
@@ -19,17 +18,13 @@ interface ProjectCoreSidebarProps {
   projectName: string
   isOpen: boolean
   onClose: () => void
-  onCreateTask?: () => void
-  onCreateSprint?: () => void
 }
 
 export default function ProjectCoreSidebar({
   projectId,
-  projectName,
+  projectName, // (Có thể không dùng nữa nhưng giữ lại prop để tránh lỗi type ở cha)
   isOpen,
   onClose,
-  onCreateTask,
-  onCreateSprint,
 }: ProjectCoreSidebarProps) {
   const [collapsed, setCollapsed] = useState(false)
   const pathname = usePathname()
@@ -76,24 +71,24 @@ export default function ProjectCoreSidebar({
       >
         
         {/* =================================================
-            HEADER: Project Info
+            HEADER: "MANAGE" LABEL (Thay thế Project Info)
+            Chiều cao h-14 để khớp với Admin Header
         ================================================= */}
-        <div className="h-16 flex items-center justify-between px-4 border-b border-slate-200/50">
-          <div className={`flex items-center gap-3 overflow-hidden transition-all ${collapsed ? 'justify-center w-full' : ''}`}>
-            {/* Icon Project: Vuông bo góc, nền xanh */}
-            <div className="w-8 h-8 rounded-md bg-blue-600 flex items-center justify-center shrink-0 shadow-sm">
-              <FolderKanban className="w-4 h-4 text-white" />
-            </div>
+        <div className="h-14 flex items-center justify-between px-4 border-b border-slate-200/50 bg-[#F4F5F7] shrink-0">
+          <div className={`flex items-center gap-2 overflow-hidden transition-all text-slate-500 font-bold text-xs uppercase tracking-wider ${collapsed ? 'justify-center w-full' : ''}`}>
+            
+            {/* Icon Quản lý */}
+            <LayoutGrid className="w-4 h-4" />
 
+            {/* Text Manage */}
             {!collapsed && (
-              <div className="min-w-0 flex-1 animate-in fade-in duration-200">
-                <span className="block text-slate-900 font-bold text-sm truncate">{projectName}</span>
-                <span className="block text-slate-500 text-[10px] font-semibold uppercase tracking-wide">Software Project</span>
-              </div>
+              <span className="animate-in fade-in duration-200 whitespace-nowrap">
+                Manage Project
+              </span>
             )}
           </div>
 
-          {/* Close Button (Mobile) */}
+          {/* Close Button (Mobile Only) */}
           <button
             onClick={onClose}
             className="lg:hidden p-1.5 rounded-md hover:bg-slate-200 text-slate-500 transition-colors"
@@ -105,15 +100,10 @@ export default function ProjectCoreSidebar({
         {/* =================================================
             MENU LIST
         ================================================= */}
-        <nav className="flex-1 overflow-y-auto py-6 px-3 space-y-6 custom-scrollbar">
+        <nav className="flex-1 overflow-y-auto pt-2 px-3 pb-6 space-y-6 custom-scrollbar">
           
-          {/* Main Menu Section */}
           <div className="space-y-1">
-            {!collapsed && (
-               <div className="px-3 mb-2 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                 Manage
-               </div>
-            )}
+            {/* Đã xóa label Manage ở đây vì đã đẩy lên header */}
 
             {projectMenu.map((item) => {
               const isActive = pathname === item.path
@@ -150,51 +140,12 @@ export default function ProjectCoreSidebar({
               )
             })}
           </div>
-
-          {/* Quick Actions Section */}
-          <div className="space-y-1 border-t border-slate-200 pt-4 mx-1">
-            {!collapsed && (
-               <div className="px-2 mb-2 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                 Quick Actions
-               </div>
-            )}
-
-            <button
-              onClick={() => {
-                  onCreateTask?.();
-                  if (window.innerWidth < 1024) onClose();
-              }}
-              className={`
-                group w-full flex items-center rounded-md transition-all duration-200 text-slate-600 hover:bg-slate-200/60 hover:text-slate-900
-                ${collapsed ? 'justify-center px-0 py-3' : 'px-3 py-2 gap-3'}
-              `}
-              title={collapsed ? "Create Task" : undefined}
-            >
-              <Plus className={`${collapsed ? 'w-5 h-5' : 'w-4 h-4'} text-slate-500 group-hover:text-slate-700`} />
-              {!collapsed && <span className="text-sm font-medium">Create Task</span>}
-            </button>
-
-            <button
-              onClick={() => {
-                  onCreateSprint?.();
-                  if (window.innerWidth < 1024) onClose();
-              }}
-              className={`
-                group w-full flex items-center rounded-md transition-all duration-200 text-slate-600 hover:bg-slate-200/60 hover:text-slate-900
-                ${collapsed ? 'justify-center px-0 py-3' : 'px-3 py-2 gap-3'}
-              `}
-              title={collapsed ? "Create Sprint" : undefined}
-            >
-              <GitBranch className={`${collapsed ? 'w-5 h-5' : 'w-4 h-4'} text-slate-500 group-hover:text-slate-700`} />
-              {!collapsed && <span className="text-sm font-medium">Create Sprint</span>}
-            </button>
-          </div>
         </nav>
 
         {/* =================================================
             FOOTER: Collapse Button
         ================================================= */}
-        <div className="p-4 border-t border-slate-200">
+        <div className="p-4 border-t border-slate-200 bg-[#F4F5F7] shrink-0">
            <button
              onClick={() => setCollapsed(!collapsed)}
              className={`

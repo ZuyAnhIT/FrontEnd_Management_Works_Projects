@@ -1,21 +1,21 @@
 "use client";
 
 import {
-  Home,
-  UserCheck,
-  ChevronRight,
-  ChevronLeft,
-  Building,
+  Building2,
   Users,
   FolderKanban,
   CreditCard,
   LayoutDashboard,
+  Settings,
+  ChevronLeft,
+  ChevronRight,
   X,
-  Settings
+  Briefcase,
+  LayoutGrid,
+  Home
 } from "lucide-react";
 import { useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { useAuth } from "@/context/AuthContext";
 import Link from "next/link";
 
 interface SidebarProps {
@@ -23,7 +23,7 @@ interface SidebarProps {
   onClose: () => void;
   activeMenu: string;
   setActiveMenu: (id: string) => void;
-  workspaces: any[];
+  workspaces: any[]; // Giữ lại để không lỗi type, dù portal không dùng
   loadingWs: boolean;
 }
 
@@ -32,38 +32,71 @@ export default function AdminSidebar({
   onClose,
   activeMenu,
   setActiveMenu,
-  workspaces,
-  loadingWs,
 }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
-  const { role } = useAuth();
 
-  const isCompanyAdminPage = pathname?.startsWith("/admin/company");
-  const isCompanyAdminRole = role === "COMPANY_ADMIN";
+  // 🔍 Detect Context
+  const isPortal = pathname?.startsWith("/portal");
+  const isCompanyContext = pathname?.startsWith("/admin/company");
 
-  const defaultMenu = [
-    { id: "home", icon: Home, label: "Dashboard", path: "/admin" },
-    { id: "tasks", icon: UserCheck, label: "My Tasks", path: "/admin/tasks" },
+  // --- MENU CONFIG ---
+
+  // 1. Menu cho Portal (User/Guest)
+  const portalMenu = [
+    { 
+      id: "portal-home", 
+      icon: Home, 
+      label: "Portal Home", 
+      path: "/portal" 
+    },
+    // Có thể thêm "My Tasks", "Profile" v.v...
+  ];
+
+  // 2. Menu cho Admin Hub (Danh sách công ty)
+  const rootMenu = [
+    { 
+      id: "companies", 
+      icon: LayoutGrid, 
+      label: "My Companies", 
+      path: "/admin" 
+    },
   ];
   
+  // 3. Menu cho Company Admin (Chi tiết công ty)
   const companyMenu = [
     { id: "dashboard", icon: LayoutDashboard, label: "Overview", path: "/admin/company/dashboard" },
-    { id: "info", icon: Building, label: "Company Info", path: "/admin/company/companyinfo" },
+    { id: "info", icon: Building2, label: "Company Info", path: "/admin/company/companyinfo" },
     { id: "members", icon: Users, label: "Members", path: "/admin/company/members" },
     { id: "workspaces", icon: FolderKanban, label: "Workspaces", path: "/admin/company/workspaces" },
     { id: "billing", icon: CreditCard, label: "Billing", path: "/admin/company/billing" },
   ];
 
-  const menuItems = isCompanyAdminPage ? companyMenu : defaultMenu;
+  // 👉 Logic chọn Menu
+  let menuItems = rootMenu;
+  if (isPortal) {
+      menuItems = portalMenu;
+  } else if (isCompanyContext) {
+      menuItems = companyMenu;
+  }
+
+  // 👉 Logic hiển thị Header Sidebar
+  const getSidebarHeader = () => {
+      if (isPortal) return { title: "My Workspace", subtitle: "User Portal", icon: FolderKanban, color: "bg-indigo-600" };
+      if (isCompanyContext) return { title: "Company Admin", subtitle: "Management", icon: Building2, color: "bg-blue-600" };
+      return { title: "Admin Hub", subtitle: "Select Company", icon: Briefcase, color: "bg-slate-900" };
+  };
+
+  const headerInfo = getSidebarHeader();
+  const HeaderIcon = headerInfo.icon;
 
   return (
     <>
       {/* Mobile Overlay */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-black/40 backdrop-blur-[2px] z-40 lg:hidden animate-in fade-in duration-200"
+          className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 lg:hidden animate-in fade-in"
           onClick={onClose}
         />
       )}
@@ -72,122 +105,144 @@ export default function AdminSidebar({
       <aside
         className={`
           fixed top-0 bottom-0 left-0 z-50
-          bg-[#F4F5F7] border-r border-slate-200
+          bg-white border-r border-slate-200 shadow-sm
           flex flex-col transition-all duration-300 ease-in-out
-          ${collapsed ? "w-[64px]" : "w-64"} 
+          ${collapsed ? "w-[70px]" : "w-64"} 
           ${isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
         `}
       >
-        {/* ===== HEADER (FIXED TOP) ===== */}
-        <div className="h-16 flex items-center justify-between px-4 border-b border-slate-200/50 bg-[#F4F5F7] shrink-0">
+        {/* ===== HEADER ===== */}
+        <div className="h-16 flex items-center justify-between px-4 border-b border-slate-100 shrink-0">
           <div className={`flex items-center gap-3 overflow-hidden transition-all ${collapsed ? 'justify-center w-full' : ''}`}>
             
-            {/* Logo Icon */}
-            <div className="w-8 h-8 rounded-md bg-slate-800 flex items-center justify-center shrink-0 shadow-sm">
-               <Building className="w-4 h-4 text-white" />
+            {/* Logo Context */}
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-sm transition-colors text-white ${headerInfo.color}`}>
+               <HeaderIcon className="w-5 h-5" />
             </div>
 
             {!collapsed && (
-              <div className="min-w-0 flex-1 animate-in fade-in duration-200">
-                <span className="block text-slate-900 font-bold text-sm truncate">
-                    {isCompanyAdminPage ? "Company Admin" : "System Admin"}
+              <div className="min-w-0 flex-1 animate-in fade-in duration-300">
+                <span className="block text-slate-900 font-bold text-sm truncate leading-tight">
+                    {headerInfo.title}
                 </span>
-                <span className="block text-slate-500 text-[10px] font-semibold uppercase tracking-wide">
-                    Management Console
+                <span className="block text-slate-400 text-[10px] font-semibold uppercase tracking-wide mt-0.5">
+                    {headerInfo.subtitle}
                 </span>
               </div>
             )}
           </div>
 
-          {/* Mobile Close */}
-          <button
-            onClick={onClose}
-            className="lg:hidden p-1.5 rounded-md hover:bg-slate-200 text-slate-500 transition-colors"
-          >
+          <button onClick={onClose} className="lg:hidden text-slate-400 hover:text-slate-600">
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* ===== SCROLLABLE CONTENT ===== */}
-        <nav className="flex-1 overflow-y-auto py-6 px-3 space-y-6 custom-scrollbar">
+        {/* ===== NAVIGATION ===== */}
+        <nav className="flex-1 overflow-y-auto py-6 px-3 space-y-1 custom-scrollbar">
           
-          {/* SECTION: MAIN MENU */}
-          <div className="space-y-1">
-             {!collapsed && (
-                 <div className="px-3 mb-2 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                    General
-                 </div>
-             )}
+          {/* Label (Chỉ hiện ở Admin Context) */}
+          {!collapsed && isCompanyContext && (
+             <div className="px-3 mb-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+               Management
+             </div>
+          )}
 
-             {menuItems.map((item) => {
-                 const isActive = pathname === item.path;
-                 return (
-                    <Link key={item.id} href={item.path} className="block">
-                        <button
-                            className={`group relative w-full flex items-center rounded-md transition-all duration-200 ${collapsed ? 'justify-center px-0 py-3' : 'px-3 py-2 gap-3'} ${isActive ? 'bg-blue-100 text-blue-700' : 'text-slate-600 hover:bg-slate-200/60 hover:text-slate-900'}`}
-                            onClick={() => { 
-                                setActiveMenu(item.id);
-                                if(window.innerWidth < 1024) onClose(); 
-                            }}
-                            title={collapsed ? item.label : undefined}
-                        >
-                            {isActive && <div className="absolute left-0 top-1 bottom-1 w-1 bg-blue-600 rounded-r-full"></div>}
-                            <item.icon className={`${collapsed ? 'w-5 h-5' : 'w-4 h-4'} ${isActive ? 'text-blue-700' : 'text-slate-500 group-hover:text-slate-700'} transition-colors`} />
-                            {!collapsed && <span className="text-sm font-medium">{item.label}</span>}
-                        </button>
-                    </Link>
-                 )
-             })}
-          </div>
-          
-          {/* Settings Link (Static) */}
-          <div className="space-y-1 border-t border-slate-200 pt-4 mx-1">
-             <button 
-                onClick={() => router.push("/admin/settings")}
-                className={`group w-full flex items-center rounded-md transition-all duration-200 text-slate-600 hover:bg-slate-200/60 hover:text-slate-900 ${collapsed ? 'justify-center px-0 py-3' : 'px-3 py-2 gap-3'}`}
-                title={collapsed ? "Global Settings" : undefined}
-             >
-                 <Settings className={`${collapsed ? 'w-5 h-5' : 'w-4 h-4'} text-slate-500 group-hover:text-slate-700`} />
-                 {!collapsed && <span className="text-sm font-medium">Global Settings</span>}
-             </button>
-          </div>
+          {menuItems.map((item) => {
+            const isActive = item.path === "/admin" || item.path === "/portal"
+                ? pathname === item.path 
+                : pathname?.startsWith(item.path);
+
+            return (
+              <Link key={item.id} href={item.path} className="block">
+                <div
+                  onClick={() => { 
+                      setActiveMenu(item.id);
+                      if(window.innerWidth < 1024) onClose(); 
+                  }}
+                  className={`
+                    group relative flex items-center rounded-xl transition-all duration-200 cursor-pointer
+                    ${collapsed ? 'justify-center py-3 px-0' : 'px-3 py-2.5 gap-3'} 
+                    ${isActive 
+                        ? 'bg-blue-50 text-blue-700 font-medium' 
+                        : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                    }
+                  `}
+                  title={collapsed ? item.label : undefined}
+                >
+                  {isActive && (
+                      <div className="absolute left-0 top-2 bottom-2 w-1 bg-blue-600 rounded-r-full" />
+                  )}
+
+                  <item.icon 
+                    className={`
+                        transition-colors
+                        ${collapsed ? 'w-5 h-5' : 'w-4.5 h-4.5'} 
+                        ${isActive ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-600'}
+                    `} 
+                  />
+                  
+                  {!collapsed && <span>{item.label}</span>}
+                </div>
+              </Link>
+            )
+          })}
+
+          {/* Dòng kẻ phân cách */}
+          {isCompanyContext && <div className="my-4 border-t border-slate-100 mx-2" />}
+
+          {/* Nút Back (Chỉ hiện khi ở Company Admin) */}
+          {isCompanyContext && !isPortal && (
+            <Link href="/admin" className="block">
+                <div 
+                    className={`
+                        group flex items-center rounded-xl transition-all duration-200 cursor-pointer text-slate-500 hover:bg-slate-50 hover:text-slate-900
+                        ${collapsed ? 'justify-center py-3 px-0' : 'px-3 py-2.5 gap-3'} 
+                    `}
+                    title="Back to all companies"
+                >
+                    <LayoutGrid className={`${collapsed ? 'w-5 h-5' : 'w-4.5 h-4.5'} text-slate-400 group-hover:text-slate-600`} />
+                    {!collapsed && <span className="text-sm">Back to Hub</span>}
+                </div>
+            </Link>
+          )}
 
         </nav>
 
-        {/* ===== FOOTER: COLLAPSE TOGGLE (FIXED BOTTOM) ===== */}
-        <div className="p-4 border-t border-slate-200 bg-[#F4F5F7] shrink-0">
+        {/* ===== FOOTER ===== */}
+        <div className="p-3 border-t border-slate-100 bg-white space-y-1">
+           {/* Settings */}
+           <button 
+             onClick={() => router.push("/settings/profile")}
+             className={`
+                w-full flex items-center rounded-xl text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition-colors
+                ${collapsed ? 'justify-center py-3' : 'px-3 py-2.5 gap-3'}
+             `}
+             title="Settings"
+           >
+             <Settings className="w-4.5 h-4.5" />
+             {!collapsed && <span className="text-sm font-medium">Settings</span>}
+           </button>
+
+           {/* Collapse Toggle */}
            <button
              onClick={() => setCollapsed(!collapsed)}
              className={`
-                hidden lg:flex w-full items-center rounded-md text-slate-500 hover:bg-slate-200/60 hover:text-slate-900 transition-colors
-                ${collapsed ? 'justify-center py-2' : 'justify-start gap-3 px-2 py-2'}
+                hidden lg:flex w-full items-center rounded-xl text-slate-400 hover:bg-slate-50 hover:text-slate-700 transition-colors
+                ${collapsed ? 'justify-center py-3' : 'justify-end px-3 py-2'}
              `}
-             title={collapsed ? "Expand" : "Collapse"}
            >
-             {collapsed ? (
-                <ChevronRight className="w-5 h-5" />
-             ) : (
-                <>
-                   <div className="flex items-center justify-center w-6 h-6 rounded bg-slate-200 text-slate-500 group-hover:text-slate-700">
-                      <ChevronLeft className="w-4 h-4" />
-                   </div>
-                   <span className="text-xs font-medium">Collapse sidebar</span>
-                </>
-             )}
+             {collapsed ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}
            </button>
         </div>
       </aside>
 
-      {/* ⚠️ QUAN TRỌNG: Placeholder div để đẩy nội dung chính sang phải */}
-      <div 
-         className={`hidden lg:block transition-all duration-300 ease-in-out ${collapsed ? "w-[64px]" : "w-64"}`} 
-      />
+      {/* Spacer */}
+      <div className={`hidden lg:block transition-all duration-300 ease-in-out ${collapsed ? "w-[70px]" : "w-64"}`} />
 
       <style jsx>{`
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
       `}</style>
     </>
   );
