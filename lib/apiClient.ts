@@ -14,9 +14,12 @@ const apiClient = axios.create({
 // ==========================
 apiClient.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem("accessToken");
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+    // Kiểm tra window để tránh lỗi SSR
+    if (typeof window !== "undefined") {
+      const token = localStorage.getItem("accessToken");
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
     }
     return config;
   },
@@ -24,7 +27,7 @@ apiClient.interceptors.request.use(
 );
 
 // ==========================
-// 🔁 Response Interceptor (refresh token)
+// 🔁 Response Interceptor (refresh token + error handling)
 // ==========================
 let isRefreshing = false;
 let refreshSubscribers: ((token: string) => void)[] = [];
@@ -39,24 +42,45 @@ function onRefreshed(token: string) {
   refreshSubscribers = [];
 }
 
+// Hàm logout & redirect an toàn
+const forceLogout = () => {
+  if (typeof window !== "undefined") {
+    localStorage.clear();
+    // Chuyển hướng về trang chủ/login nếu không phải đang ở đó
+    if (window.location.pathname !== "/") {
+      window.location.href = "/";
+    }
+  }
+};
+
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
-    console.log(error)
 
-    // Nếu lỗi 401 (token hết hạn) và chưa retry
+    // ✅ CASE 1: Xử lý lỗi 403 (Forbidden) - Token hỏng hoặc không có quyền
+    // "Đá" thẳng ra trang chủ để người dùng đăng nhập lại
+    if (error.response?.status === 403) {
+      forceLogout();
+      return Promise.reject(error);
+    }
+
+    // ✅ CASE 2: Xử lý lỗi 401 (Unauthorized) - Token hết hạn -> Thử Refresh
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
-      const refreshToken = localStorage.getItem("refreshToken");
+      
+      let refreshToken = null;
+      if (typeof window !== "undefined") {
+         refreshToken = localStorage.getItem("refreshToken");
+      }
 
+      // Nếu không có refresh token -> Logout
       if (!refreshToken) {
-        localStorage.clear();
-        //window.location.href = "/login";
+        forceLogout();
         return Promise.reject(error);
       }
 
-      // Nếu đang refresh → đợi token mới rồi retry request
+      // Nếu đang có tiến trình refresh khác chạy -> Xếp hàng đợi
       if (isRefreshing) {
         return new Promise((resolve) => {
           subscribeTokenRefresh((token: string) => {
@@ -66,7 +90,7 @@ apiClient.interceptors.response.use(
         });
       }
 
-      // Nếu chưa refresh → gọi API refresh
+      // Bắt đầu refresh
       isRefreshing = true;
       try {
         const { data } = await axios.post(`${BASE_URL}/auth/refresh-token`, {
@@ -74,7 +98,10 @@ apiClient.interceptors.response.use(
         });
 
         const newAccessToken = data.data?.accessToken;
-        localStorage.setItem("accessToken", newAccessToken);
+        
+        if (typeof window !== "undefined") {
+            localStorage.setItem("accessToken", newAccessToken);
+        }
 
         // Gọi lại các request đang chờ
         onRefreshed(newAccessToken);
@@ -83,11 +110,11 @@ apiClient.interceptors.response.use(
         // Gắn token mới và retry request cũ
         originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
         return apiClient(originalRequest);
+        
       } catch (err) {
-        //Refresh token invalid → logout toàn bộ
+        // Refresh token cũng hết hạn hoặc lỗi -> Logout toàn bộ
         isRefreshing = false;
-        localStorage.clear();
-        //window.location.href = "/login";
+        forceLogout();
         return Promise.reject(err);
       }
     }
