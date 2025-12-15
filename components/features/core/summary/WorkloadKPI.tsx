@@ -2,7 +2,7 @@
 
 import { WorkloadStat } from "@/services/apiStatistics";
 import { Users, Trophy, BarChart2, TrendingUp, User } from "lucide-react";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/Avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/Avatars";
 
 // =============================================================================
 // 1. INTERFACES & HELPERS

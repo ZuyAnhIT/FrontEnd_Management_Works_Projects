@@ -22,8 +22,8 @@ import {
   Heading2,
   File,
 } from "lucide-react";
-import { Button } from "@/components/ui/Button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/Avatar";
+import { Button } from "@/components/ui/Buttons";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/Avatars";
 import {
   getTaskComments,
   addTaskComment,

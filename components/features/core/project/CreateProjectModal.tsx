@@ -17,8 +17,8 @@ import {
 import { createProject, ProjectRequest } from "@/services/apiProject";
 import { useToast } from "@/components/ui/ToastProvider";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Cards";
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
+import { Button } from "@/components/ui/Buttons";
+import { Input } from "@/components/ui/Inputs";
 import { Textarea } from "@/components/ui/TextAreas";
 
 // =============================================================================

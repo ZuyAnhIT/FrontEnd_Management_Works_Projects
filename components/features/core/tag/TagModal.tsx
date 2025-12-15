@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 import { X, Loader2, AlertTriangle, Trash2, Check } from "lucide-react";
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
+import { Button } from "@/components/ui/Buttons";
+import { Input } from "@/components/ui/Inputs";
 import { apiTag, Tag } from "@/services/apiTag";
 import { useToast } from "@/components/ui/ToastProvider";
 

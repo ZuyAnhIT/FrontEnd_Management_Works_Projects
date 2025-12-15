@@ -10,7 +10,7 @@ import {
   Minimize2,
   Paperclip,
 } from "lucide-react";
-import { Button } from "@/components/ui/Button";
+import { Button } from "@/components/ui/Buttons";
 import { sendChatMessage, uploadChatFile } from "@/services/apiChat";
 
 // =============================================================================

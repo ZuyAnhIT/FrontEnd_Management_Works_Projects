@@ -9,14 +9,14 @@ import {
   HardDrive,
   Calendar,
 } from "lucide-react";
-import { Button } from "@/components/ui/Button"; // Giả sử có Button component
+import { Button } from "@/components/ui/Buttons"; // Giả sử có Button component
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
 } from "@/components/ui/Cards"; // Giả sử có Card components
-import { Badge } from "@/components/ui/Badge"; // Giả sử có Badge component
+import { Badge } from "@/components/ui/Badges"; // Giả sử có Badge component
 
 // Dữ liệu giả cho lịch sử
 const invoices = [
