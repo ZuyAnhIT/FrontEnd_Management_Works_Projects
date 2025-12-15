@@ -192,7 +192,7 @@ export default function ImportTaskModal(props: ImportTaskModalProps) {
                 {step === 1 ? "Import Tasks" : "Review & Edit Data"}
               </h2>
               <p className="text-xs text-slate-500 mt-0.5">
-                {step === 1 ? "Upload CSV to start" : `Found ${previewData.length} rows. Please review errors before importing.`}
+                {step === 1 ? "Upload Excel to start" : `Found ${previewData.length} rows. Please review errors before importing.`}
               </p>
             </div>
             {/* ✅ USING props.onClose */}
@@ -214,7 +214,7 @@ export default function ImportTaskModal(props: ImportTaskModalProps) {
                       <h3 className="text-sm font-bold text-slate-700">Download sample file</h3>
                       <p className="text-xs text-slate-500 mb-2">Use a template file to avoid formatting errors.</p>
                       <Button variant="outline" size="sm" onClick={handleDownloadTemplate} className="h-7 text-xs bg-white text-blue-700 border-blue-200 hover:bg-blue-100">
-                        <Download className="w-3 h-3 mr-2" /> Download .CSV
+                        <Download className="w-3 h-3 mr-2" /> Download Excel
                       </Button>
                     </div>
                  </div>
