@@ -1,7 +1,57 @@
 "use client";
 
-import { ShieldCheck, User, ArrowRight, Plus, ExternalLink, Briefcase } from "lucide-react";
+import { ShieldCheck, User, ArrowRight, Plus, ExternalLink, Briefcase, LucideIcon } from "lucide-react";
 import { CompanyMembership } from "@/services/apiUser";
+
+// =============================================================================
+// 1. CONFIGURATION (Cấu hình giao diện theo Role)
+// =============================================================================
+
+interface RoleStyle {
+  label: string;
+  icon: LucideIcon;
+  badgeClass: string;
+  cardBorderClass: string;
+  avatarClass: string;
+  actionTextClass: string;
+  actionLabel: string;
+}
+
+// Map role code sang style tương ứng để tránh hardcode trong JSX
+const ROLE_CONFIG: Record<string, RoleStyle> = {
+  COMPANY_ADMIN: {
+    label: "Admin",
+    icon: ShieldCheck,
+    badgeClass: "bg-blue-50 text-blue-700 border-blue-200",
+    cardBorderClass: "border-slate-200 hover:border-blue-400 hover:shadow-blue-100/50",
+    avatarClass: "bg-gradient-to-br from-blue-600 to-indigo-600 text-white",
+    actionTextClass: "text-blue-600",
+    actionLabel: "Manage",
+  },
+  GUEST: {
+    label: "Guest",
+    icon: ExternalLink,
+    badgeClass: "bg-amber-50 text-amber-700 border-amber-200",
+    cardBorderClass: "border-amber-200/60 hover:border-amber-400 hover:shadow-amber-100/50",
+    avatarClass: "bg-gradient-to-br from-amber-100 to-orange-100 text-amber-600",
+    actionTextClass: "text-amber-600",
+    actionLabel: "Enter",
+  },
+  // Default fallback
+  COMPANY_MEMBER: {
+    label: "Member",
+    icon: User,
+    badgeClass: "bg-slate-50 text-slate-600 border-slate-200",
+    cardBorderClass: "border-slate-200 hover:border-blue-400 hover:shadow-blue-100/50",
+    avatarClass: "bg-gradient-to-br from-slate-100 to-slate-200 text-slate-600",
+    actionTextClass: "text-blue-600",
+    actionLabel: "Enter",
+  },
+};
+
+// =============================================================================
+// 2. INTERFACES
+// =============================================================================
 
 interface CompanyListProps {
   memberships: CompanyMembership[];
@@ -9,95 +59,68 @@ interface CompanyListProps {
   onAddClick: () => void;
 }
 
+// =============================================================================
+// 3. MAIN COMPONENT
+// =============================================================================
+
 export default function CompanyList({ memberships, onSelect, onAddClick }: CompanyListProps) {
   
-  // Helper render Badge Role đẹp hơn
-  const renderRoleBadge = (roleCode: string) => {
-    switch (roleCode) {
-      case "COMPANY_ADMIN":
-        return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wide border bg-blue-50 text-blue-700 border-blue-200 shadow-sm">
-            <ShieldCheck className="w-3.5 h-3.5" /> Admin
-          </span>
-        );
-      case "GUEST":
-        return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wide border bg-amber-50 text-amber-700 border-amber-200 shadow-sm">
-            <ExternalLink className="w-3.5 h-3.5" /> Guest
-          </span>
-        );
-      default: // COMPANY_MEMBER
-        return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wide border bg-slate-50 text-slate-600 border-slate-200 shadow-sm">
-            <User className="w-3.5 h-3.5" /> Member
-          </span>
-        );
-    }
-  };
-
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-10">
       
-      {/* 1. Danh sách Card Công ty */}
+      {/* --- Render Danh sách Company --- */}
       {memberships.map((membership) => {
-        const isGuest = membership.roleCode === "GUEST";
-        const isAdmin = membership.roleCode === "COMPANY_ADMIN";
-        
+        // Lấy config dựa trên role, fallback về MEMBER nếu không tìm thấy
+        const config = ROLE_CONFIG[membership.roleCode] || ROLE_CONFIG["COMPANY_MEMBER"];
+        const RoleIcon = config.icon;
+
         return (
-          <div 
+          <div
             key={membership.companyId}
             onClick={() => onSelect(membership.companyId)}
             className={`
-              group relative bg-white p-6 rounded-2xl border transition-all duration-300 cursor-pointer flex flex-col justify-between h-[220px]
-              ${isGuest 
-                ? 'border-amber-200/60 hover:border-amber-400 hover:shadow-lg hover:shadow-amber-100/50' 
-                : 'border-slate-200 hover:border-blue-400 hover:shadow-lg hover:shadow-blue-100/50'
-              }
+              group relative bg-white p-6 rounded-2xl border transition-all duration-300 cursor-pointer flex flex-col justify-between h-[220px] hover:shadow-lg
+              ${config.cardBorderClass}
             `}
           >
-            {/* Top Section */}
+            {/* Top Section: Avatar & Badge */}
             <div className="flex justify-between items-start">
-              {/* Logo Avatar */}
-              <div className={`w-16 h-16 rounded-2xl flex items-center justify-center text-3xl font-bold shadow-sm transition-transform group-hover:scale-105 duration-300
-                ${isAdmin 
-                    ? 'bg-gradient-to-br from-blue-600 to-indigo-600 text-white' 
-                    : isGuest 
-                        ? 'bg-gradient-to-br from-amber-100 to-orange-100 text-amber-600'
-                        : 'bg-gradient-to-br from-slate-100 to-slate-200 text-slate-600'
-                }`}
-              >
+              {/* Avatar Logo */}
+              <div className={`w-16 h-16 rounded-2xl flex items-center justify-center text-3xl font-bold shadow-sm transition-transform group-hover:scale-105 duration-300 ${config.avatarClass}`}>
                 {membership.companyName.charAt(0).toUpperCase()}
               </div>
 
               {/* Role Badge */}
-              {renderRoleBadge(membership.roleCode)}
+              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wide border shadow-sm ${config.badgeClass}`}>
+                <RoleIcon className="w-3.5 h-3.5" /> {config.label}
+              </span>
             </div>
 
-            {/* Middle Section: Company Info */}
+            {/* Middle Section: Info */}
             <div className="mt-4">
               <h3 className="text-xl font-bold text-slate-900 group-hover:text-blue-700 transition-colors line-clamp-1" title={membership.companyName}>
                 {membership.companyName}
               </h3>
               <p className="text-xs font-medium text-slate-400 mt-1 flex items-center gap-1.5">
-                 <Briefcase className="w-3.5 h-3.5" /> 
-                 Organization
+                <Briefcase className="w-3.5 h-3.5" />
+                Organization
               </p>
             </div>
 
-            {/* Bottom Section: Action Link */}
+            {/* Bottom Section: Actions */}
             <div className="flex items-center justify-between mt-auto pt-4 border-t border-slate-50">
-               <span className="text-xs font-medium text-slate-400 group-hover:text-slate-600 transition-colors">
-                  Access Portal
-               </span>
-               <div className={`flex items-center gap-1 text-sm font-bold opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300 ${isGuest ? 'text-amber-600' : 'text-blue-600'}`}>
-                  {isAdmin ? "Manage" : "Enter"} <ArrowRight className="w-4 h-4" />
-               </div>
+              <span className="text-xs font-medium text-slate-400 group-hover:text-slate-600 transition-colors">
+                Access Portal
+              </span>
+              <div className={`flex items-center gap-1 text-sm font-bold opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300 ${config.actionTextClass}`}>
+                {config.actionLabel} <ArrowRight className="w-4 h-4" />
+              </div>
             </div>
           </div>
         );
       })}
 
-      {/* 2. Card "Add Organization" (Luôn nằm cuối) */}
+      {/* --- Card "Add Organization" (Luôn nằm cuối) --- */}
       <button
         onClick={onAddClick}
         className="group flex flex-col items-center justify-center h-[220px] rounded-2xl border-2 border-dashed border-slate-300 hover:border-blue-500 hover:bg-blue-50/30 transition-all duration-300"
@@ -106,9 +129,11 @@ export default function CompanyList({ memberships, onSelect, onAddClick }: Compa
           <Plus className="w-8 h-8 text-slate-400 group-hover:text-blue-600 transition-colors" />
         </div>
         <span className="text-lg font-bold text-slate-500 group-hover:text-blue-700 transition-colors">
-            Add Organization
+          Add Organization
         </span>
-        <span className="text-xs text-slate-400 mt-1 font-medium">Create a new workspace</span>
+        <span className="text-xs text-slate-400 mt-1 font-medium">
+          Create a new workspace
+        </span>
       </button>
     </div>
   );

@@ -1,11 +1,16 @@
 import apiClient from "@/lib/apiClient";
 
+// =============================================================================
+// INTERFACES & TYPES
+// =============================================================================
+
 // Định nghĩa cấu trúc dữ liệu Activity Log chuẩn
 export interface ActivityLog {
   id: number;
+  
   // Thông tin người thực hiện
-  userName: string;       
-  userAvatar: string;     
+  userName: string;
+  userAvatar: string;
   
   // Thông tin hành động
   action: "CREATE" | "UPDATE" | "DELETE" | "MOVE_STATUS" | "START" | "COMPLETE" | "COMMENT" | string;
@@ -24,16 +29,21 @@ export interface ActivityLog {
   timeAgo: string;
   
   // Context để điều hướng (quan trọng cho tính năng click)
-  projectId?: number;   
-  workspaceId?: number; 
+  projectId?: number;
+  workspaceId?: number;
 }
+
+// =============================================================================
+// API METHODS
+// =============================================================================
 
 /**
  * Lấy danh sách hoạt động dựa trên phạm vi (Scope)
- * @param scope "COMPANY" | "PROJECT" | "USER" | "WORKSPACE"
+ * * @param scope Phạm vi: "COMPANY" | "PROJECT" | "USER" | "WORKSPACE"
  * @param id ID của đối tượng scope (ví dụ: companyId, projectId...)
  * @param page Trang hiện tại (mặc định 0)
  * @param size Số lượng item (mặc định 20)
+ * @returns Promise<ActivityLog[]> Danh sách hoạt động hoặc mảng rỗng nếu lỗi
  */
 export const getActivities = async (
   scope: string, 
@@ -41,29 +51,43 @@ export const getActivities = async (
   page: number = 0,
   size: number = 20
 ): Promise<ActivityLog[]> => {
-  // Kiểm tra ID hợp lệ để tránh lỗi 400 không đáng có
+  
+  // 1. Validation: Kiểm tra ID hợp lệ
   if (!id || isNaN(id)) {
+    // Log cảnh báo nhẹ nhàng cho dev biết
+    console.warn(`[ActivityAPI] Invalid ID provided: ${id}`);
     return [];
   }
 
   try {
-    // Đảm bảo scope luôn viết hoa theo chuẩn Enum backend
-    const safeScope = scope.toUpperCase(); 
-    const url = `/activities/${safeScope}/${id}`;
+    // 2. Prepare Data: Chuẩn hóa dữ liệu đầu vào
+    const formattedScope = scope.toUpperCase(); 
+    const url = `/activities/${formattedScope}/${id}`;
     
-    const res = await apiClient.get(url, {
+    // 3. API Call
+    const response = await apiClient.get(url, {
       params: { page, size }
     });
+
+    // Destructuring dữ liệu từ ApiResponse chuẩn (success, message, data)
+    const { success, message, data } = response.data;
     
-    if (res.data && res.data.success) {
-      return res.data.data;
+    // 4. Handle Success: Chỉ trả về data khi success = true
+    if (success && data) {
+      return data;
     }
     
+    // 5. Handle Logical Error: API trả về nhưng báo lỗi (success = false)
+    // Sử dụng 'message' từ API để log lý do
+    console.warn(`[ActivityAPI] Request failed. Server message: ${message}`);
     return [];
 
   } catch (error: any) {
-    // Chỉ log lỗi gọn gàng để dev dễ trace, không làm phiền console production
-    console.error(`[ActivityAPI] Failed to fetch logs for ${scope}/${id}:`, error?.message || error);
+    // 6. Handle Network/System Error
+    // Ưu tiên lấy message từ response lỗi của API nếu có
+    const apiErrorMessage = error.response?.data?.message || error.message || "Unknown error";
+    
+    console.error(`[ActivityAPI] Exception while fetching logs for ${scope}/${id}: ${apiErrorMessage}`);
     return []; 
   }
 };

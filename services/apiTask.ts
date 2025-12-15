@@ -1,13 +1,15 @@
 "use client";
 
 import apiClient from "@/lib/apiClient";
-// ✅ Import Types chuẩn từ apiProject
-import { TaskType, TaskPriority } from "./apiProject"; 
+import { TaskType, TaskPriority } from "./apiProject";
 
-// ------------------------------------------------
-// 1. INTERFACES (Cập nhật đầy đủ fields)
-// ------------------------------------------------
+// =============================================================================
+// 1. INTERFACES & DTOs (Định nghĩa kiểu dữ liệu)
+// =============================================================================
 
+// -----------------------------------------------------------------------------
+// Filter Params
+// -----------------------------------------------------------------------------
 export interface ProjectTaskFilterParams {
   search?: string;
   keyword?: string;
@@ -15,14 +17,15 @@ export interface ProjectTaskFilterParams {
   size?: number;
   assigneeId?: number;
   sprintId?: number | null;
-  
-  // ✅ Type chuẩn
-  priority?: TaskPriority; 
+  priority?: TaskPriority;
   taskType?: TaskType;
-  
   sortBy?: string;
   sortDir?: "asc" | "desc";
 }
+
+// -----------------------------------------------------------------------------
+// Data Models (Response)
+// -----------------------------------------------------------------------------
 
 // ✅ Cập nhật TaskDetail khớp với JSON GET /api/tasks/{taskId}
 export interface TaskDetail {
@@ -64,14 +67,14 @@ export interface TaskDetail {
     avatarUrl: string | null;
   } | null;
   
-  // ✅ THÊM TRƯỜNG TAGS VÀO ĐÂY ĐỂ HẾT LỖI TS
+  // ✅ Tags field
   tags?: {
     id: number;
     name: string;
     color: string;
   }[];
   
-  // Các trường khác
+  // UI Display fields
   statusName: string;
   statusColor: string;
   assignerName: string | null;
@@ -91,6 +94,10 @@ export interface TaskDetail {
   createdAt?: string;
   updatedAt?: string | null;
 }
+
+// -----------------------------------------------------------------------------
+// Payloads (Request Body)
+// -----------------------------------------------------------------------------
 
 export interface UpdateTaskData {
   title?: string;
@@ -112,132 +119,189 @@ export interface MoveTaskPayload {
   newSortOrder?: number;   
 }
 
-// ------------------------------------------------
-// 2. API METHODS CORE
-// ------------------------------------------------
+// =============================================================================
+// 2. CORE TASK APIs (CRUD Basic)
+// =============================================================================
 
-// 🔹 GET: Lấy chi tiết Task
+/**
+ * 🔹 GET: Lấy chi tiết Task
+ */
 export const getTaskDetails = async (taskId: number): Promise<TaskDetail> => {
-  const res = await apiClient.get(`/tasks/${taskId}`);
-  // Kiểm tra success dựa trên JSON mẫu
-  if (!res.data.success) throw new Error(res.data.message);
-  return res.data.data;
+  try {
+    const res = await apiClient.get(`/tasks/${taskId}`);
+    const { success, message, data } = res.data;
+
+    if (!success) throw new Error(message || "Failed to fetch task details.");
+    return data;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.message || "System error fetching task details.");
+  }
 };
 
-// 🔹 PUT: Cập nhật thông tin chung (Title, Desc, Priority...)
+/**
+ * 🔹 PUT: Cập nhật thông tin chung (Title, Desc, Priority...)
+ */
 export const updateTask = async (taskId: number, data: UpdateTaskData) => {
-  const res = await apiClient.put(`/tasks/${taskId}`, data);
-  if (!res.data.success) throw new Error(res.data.message);
-  return res.data.data;
+  try {
+    const res = await apiClient.put(`/tasks/${taskId}`, data);
+    const { success, message } = res.data;
+
+    if (!success) throw new Error(message || "Failed to update task.");
+    return res.data.data;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.message || "System error updating task.");
+  }
 };
 
-// 🔹 PATCH: Cập nhật Epic cho Task (✅ Mới thêm)
+/**
+ * 🔹 PATCH: Cập nhật Epic cho Task
+ */
 export const updateTaskEpic = async (taskId: number, epicId: number | null) => {
-  const res = await apiClient.patch(`/tasks/${taskId}/epic`, { epicId });
-  if (!res.data.success) throw new Error(res.data.message);
-  return res.data.data;
+  try {
+    const res = await apiClient.patch(`/tasks/${taskId}/epic`, { epicId });
+    const { success, message } = res.data;
+
+    if (!success) throw new Error(message || "Failed to update task epic.");
+    return res.data.data;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.message || "System error updating epic.");
+  }
 };
 
-// 🔹 PUT: Di chuyển Task sang Sprint khác
+// =============================================================================
+// 3. MOVE & TRANSITION APIs (Di chuyển Task)
+// =============================================================================
+
+/**
+ * 🔹 PUT: Di chuyển Task sang Sprint khác
+ */
 export const moveTaskToSprint = async (
   taskId: number,
   sprintId: number | null,
   newSortOrder?: number
 ) => {
-  const payload: MoveTaskPayload = {
-    sprintId,
-    newSortOrder
-  };
+  try {
+    const payload: MoveTaskPayload = { sprintId, newSortOrder };
+    const res = await apiClient.put(`/tasks/${taskId}/sprint`, payload);
+    const { success, message } = res.data;
 
-  const res = await apiClient.put(`/tasks/${taskId}/sprint`, payload);
-
-  if (!res.data.success) {
-    throw new Error(res.data.message || "Không thể di chuyển công việc.");
+    if (!success) throw new Error(message || "Failed to move task to sprint.");
+    return res.data.data;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.message || "System error moving task.");
   }
-
-  return res.data.data;
 };
 
-// 🔹 PUT: Di chuyển Task sang Status khác (Kéo thả cột Board)
+/**
+ * 🔹 PUT: Di chuyển Task sang Status khác (Kéo thả cột Board)
+ */
 export const moveTaskToStatus = async (
   taskId: number,
   payload: { newStatusId: number; newSortOrder?: number }
 ) => {
-  const res = await apiClient.put(`/tasks/${taskId}/move`, payload);
-  if (!res.data.success) throw new Error(res.data.message);
-  return res.data.data; 
+  try {
+    const res = await apiClient.put(`/tasks/${taskId}/move`, payload);
+    const { success, message } = res.data;
+
+    if (!success) throw new Error(message || "Failed to move task status.");
+    return res.data.data; 
+  } catch (error: any) {
+    throw new Error(error.response?.data?.message || "System error moving task status.");
+  }
 };
 
-// =============================
-// 🧩 COMMENTS
-// =============================
+// =============================================================================
+// 4. COMMENT APIs
+// =============================================================================
 
 export const getTaskComments = async (taskId: number) => {
-  const res = await apiClient.get(`/tasks/${taskId}/comments`);
-  return res.data; 
+  try {
+    const res = await apiClient.get(`/tasks/${taskId}/comments`);
+    // Assuming standard response format
+    return res.data; 
+  } catch (error: any) {
+    throw new Error(error.response?.data?.message || "Failed to load comments.");
+  }
 };
 
 export const addTaskComment = async (taskId: number, content: string) => {
-  const res = await apiClient.post(`/tasks/${taskId}/comments`, {
-    content,
-  });
-  return res.data; 
+  try {
+    const res = await apiClient.post(`/tasks/${taskId}/comments`, { content });
+    return res.data; 
+  } catch (error: any) {
+    throw new Error(error.response?.data?.message || "Failed to add comment.");
+  }
 };
 
-// =============================
-// 🧩 ATTACHMENTS
-// =============================
+// =============================================================================
+// 5. ATTACHMENT APIs
+// =============================================================================
 
 export const getTaskAttachments = async (taskId: number) => {
-  const res = await apiClient.get(`/tasks/${taskId}/attachments`);
-  return res.data; 
+  try {
+    const res = await apiClient.get(`/tasks/${taskId}/attachments`);
+    return res.data; 
+  } catch (error: any) {
+    throw new Error(error.response?.data?.message || "Failed to load attachments.");
+  }
 };
 
 export const uploadTaskAttachment = async (taskId: number, file: File) => {
-  const formData = new FormData();
-  formData.append("file", file);
+  try {
+    const formData = new FormData();
+    formData.append("file", file);
 
-  const res = await apiClient.post(
-    `/tasks/${taskId}/attachments`,
-    formData,
-    {
-      headers: { "Content-Type": "multipart/form-data" },
-    }
-  );
-
-  return res.data; 
+    const res = await apiClient.post(
+      `/tasks/${taskId}/attachments`,
+      formData,
+      { headers: { "Content-Type": "multipart/form-data" } }
+    );
+    return res.data; 
+  } catch (error: any) {
+    throw new Error(error.response?.data?.message || "Failed to upload attachment.");
+  }
 };
+
+// =============================================================================
+// 6. ARCHIVE & RESTORE APIs
+// =============================================================================
 
 /**
  * 🔹 PATCH: Lưu trữ Task (Chuyển vào thùng rác)
- * Endpoint: /api/tasks/{taskId}/archive
  */
 export const archiveTask = async (taskId: number) => {
-  const res = await apiClient.patch(`/tasks/${taskId}/archive`);
-  
-  if (!res.data.success) {
-    throw new Error(res.data.message || "Failed to archive task");
+  try {
+    const res = await apiClient.patch(`/tasks/${taskId}/archive`);
+    const { success, message } = res.data;
+
+    if (!success) throw new Error(message || "Failed to archive task.");
+    return res.data;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.message || "System error archiving task.");
   }
-  
-  return res.data; // Thường trả về null hoặc message success
 };
 
 /**
  * 🔹 PATCH: Khôi phục Task (Lấy lại từ thùng rác)
- * Endpoint: /api/tasks/{taskId}/restore
  */
 export const restoreTask = async (taskId: number) => {
-  const res = await apiClient.patch(`/tasks/${taskId}/restore`);
-  
-  if (!res.data.success) {
-    throw new Error(res.data.message || "Failed to restore task");
+  try {
+    const res = await apiClient.patch(`/tasks/${taskId}/restore`);
+    const { success, message } = res.data;
+
+    if (!success) throw new Error(message || "Failed to restore task.");
+    return res.data;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.message || "System error restoring task.");
   }
-  
-  return res.data;
 };
+
+// =============================================================================
+// 7. IMPORT APIs
+// =============================================================================
+
 /**
  * 1. Tải file mẫu CSV
- * URL: /api/tasks/tasks/import-template
  */
 export const downloadTemplate = async () => {
   try {
@@ -254,25 +318,41 @@ export const downloadTemplate = async () => {
     link.click();
     link.remove();
   } catch (error: any) {
-    throw new Error(error.response?.data?.message || "Lỗi khi tải file mẫu.");
+    throw new Error(error.response?.data?.message || "Failed to download template.");
   }
 };
 
 /**
- * 2. Import Task từ file CSV
- * URL: /api/tasks/{projectId}/tasks/import
+ * 2. Xem trước Import Task (Preview)
  */
-// src/services/apiTask.ts
 export const previewImportTasks = async (projectId: number, file: File) => {
-  const formData = new FormData();
-  formData.append("file", file);
-  const res = await apiClient.post(`/tasks/${projectId}/import/preview`, formData, {
-    headers: { "Content-Type": "multipart/form-data" },
-  });
-  return res.data.data; // Trả về List<TaskImportPreviewResponse>
+  try {
+    const formData = new FormData();
+    formData.append("file", file);
+    
+    const res = await apiClient.post(`/tasks/${projectId}/import/preview`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    const { success, message, data } = res.data;
+
+    if (!success) throw new Error(message || "Failed to preview import.");
+    return data; // Trả về List<TaskImportPreviewResponse>
+  } catch (error: any) {
+    throw new Error(error.response?.data?.message || "System error previewing import.");
+  }
 };
 
+/**
+ * 3. Lưu Import Task (Save)
+ */
 export const saveImportedTasks = async (projectId: number, data: any[]) => {
-  const res = await apiClient.post(`/tasks/${projectId}/import/save`, data);
-  return res.data.data;
+  try {
+    const res = await apiClient.post(`/tasks/${projectId}/import/save`, data);
+    const { success, message, data: resData } = res.data;
+
+    if (!success) throw new Error(message || "Failed to save imported tasks.");
+    return resData;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.message || "System error saving import.");
+  }
 };

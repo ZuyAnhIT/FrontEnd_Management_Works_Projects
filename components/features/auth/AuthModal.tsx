@@ -14,18 +14,31 @@ import AuthFormVerify from "./AuthFormVerify";
 import AuthFormForgot from "./AuthFormForgot";
 import AuthSocialButtons from "./AuthSocialButtons";
 
-type AuthFormData = {
+// =============================================================================
+// 1. CONSTANTS & TYPES
+// =============================================================================
+
+export type AuthTab = "login" | "register" | "verify" | "forgot";
+
+interface AuthFormData {
   fullName: string;
   email: string;
   password: string;
   confirmPassword: string;
   otp: string;
-  token: string;
-  newPassword: string;
-  confirmNewPassword: string;
+}
+
+const INITIAL_FORM_STATE: AuthFormData = {
+  fullName: "",
+  email: "",
+  password: "",
+  confirmPassword: "",
+  otp: "",
 };
 
-type AuthTab = "login" | "register" | "verify" | "forgot";
+// =============================================================================
+// 2. MAIN COMPONENT
+// =============================================================================
 
 export default function AuthModal({
   isOpen,
@@ -34,127 +47,104 @@ export default function AuthModal({
   isOpen: boolean;
   onClose: () => void;
 }) {
-  const router = useRouter();
+  // --- HOOKS ---
   const { showToast } = useToast();
   const { login, loginWithTokens, isLoading: isAuthLoading } = useAuth();
 
+  // --- STATE ---
   const [tab, setTab] = useState<AuthTab>("login");
   const [isLoading, setIsLoading] = useState(false);
+  const [form, setForm] = useState<AuthFormData>(INITIAL_FORM_STATE);
 
-  const [form, setForm] = useState<AuthFormData>({
-    fullName: "",
-    email: "",
-    password: "",
-    confirmPassword: "",
-    otp: "",
-    token: "",
-    newPassword: "",
-    confirmNewPassword: "",
-  });
+  // --- HANDLERS ---
 
-  const handleChange =
-    (field: keyof AuthFormData) => (e: React.ChangeEvent<HTMLInputElement>) => {
-      setForm((prev) => ({ ...prev, [field]: e.target.value }));
-    };
+  const handleChange = (field: keyof AuthFormData) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    setForm((prev) => ({ ...prev, [field]: e.target.value }));
+  };
 
-  // ----------------------------------------------------------------
-  // HÀM SUBMIT (Đã xóa console.log)
-  // ----------------------------------------------------------------
+  // 1. Handle Login
+  const handleLogin = async () => {
+    if (!form.email || !form.password) {
+      throw new Error("Please enter email and password.");
+    }
+    await login(form.email.trim(), form.password.trim());
+    onClose(); // Close modal on success
+  };
+
+  // 2. Handle Register
+  const handleRegister = async () => {
+    if (!form.fullName || !form.email || !form.password || !form.confirmPassword) {
+      throw new Error("Please fill in all fields.");
+    }
+    if (form.password !== form.confirmPassword) {
+      throw new Error("Passwords do not match.");
+    }
+
+    const res = await registerUser({
+      fullName: form.fullName.trim(),
+      email: form.email.trim(),
+      password: form.password.trim(),
+    });
+
+    showToast(res.message || "Registration successful! Please check your email for OTP.", "success");
+    setTab("verify");
+  };
+
+  // 3. Handle Verify OTP
+  const handleVerify = async () => {
+    if (!form.otp) throw new Error("Please enter the OTP code.");
+
+    const res = await verifyEmail({
+      email: form.email.trim(),
+      otp: form.otp.trim(),
+    });
+
+    showToast(res.message || "Verification successful! You can now login.", "success");
+    setTab("login");
+  };
+
+  // Main Submit Handler
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
 
     try {
-      // 🔹 Đăng nhập
-      if (tab === "login") {
-        if (!form.email || !form.password) {
-          throw new Error("Please enter email and password!");
-        }
-
-        // Gọi login từ context
-        await login(form.email.trim(), form.password.trim());
-
-        // ✅ QUAN TRỌNG: Đóng modal ngay sau khi login thành công
-        // (Guard effect sẽ tự động redirect)
-        onClose();
-      }
-
-      // 🔹 Đăng ký
-      else if (tab === "register") {
-        if (
-          !form.fullName ||
-          !form.email ||
-          !form.password ||
-          !form.confirmPassword
-        ) {
-          throw new Error("Please fill in all fields!");
-        }
-        if (form.password !== form.confirmPassword) {
-          throw new Error("Passwords do not match!");
-        }
-
-        const res = await registerUser({
-          fullName: form.fullName.trim(),
-          email: form.email.trim(),
-          password: form.password.trim(),
-        });
-
-        showToast(
-          res.message || "Please check your email for OTP!",
-          "success" // Dùng success thay vì info cho nổi bật
-        );
-        setTab("verify");
-      }
-
-      // 🔹 Xác thực email
-      else if (tab === "verify") {
-        if (!form.otp) throw new Error("Please enter OTP!");
-
-        const res = await verifyEmail({
-          email: form.email.trim(),
-          otp: form.otp.trim(),
-        });
-
-        showToast(
-          res.message || "Verification successful! Please login.",
-          "success"
-        );
-        setTab("login");
+      switch (tab) {
+        case "login":
+          await handleLogin();
+          break;
+        case "register":
+          await handleRegister();
+          break;
+        case "verify":
+          await handleVerify();
+          break;
+        default:
+          break;
       }
     } catch (error: any) {
-      // Thay console.error bằng showToast
-      showToast(
-        error.response?.data?.message || error.message || "An error occurred!",
-        "error"
-      );
+      const message = error.response?.data?.message || error.message || "An unexpected error occurred.";
+      showToast(message, "error");
     } finally {
       setIsLoading(false);
     }
   };
 
-  // ----------------------------------------------------------------
-  // HÀM XỬ LÝ SOCIAL LOGIN
-  // ----------------------------------------------------------------
-  const handleSocialLoginSuccess = async (data: {
-    accessToken: string;
-    refreshToken: string;
-  }) => {
+  // Social Login Handler
+  const handleSocialLoginSuccess = async (data: { accessToken: string; refreshToken: string }) => {
     try {
-      // Gọi loginWithTokens từ context
       await loginWithTokens(data.accessToken, data.refreshToken);
-
-      // ✅ Đóng modal ngay sau khi login thành công
-      onClose();
       showToast("Login successful!", "success");
+      onClose();
     } catch (error: any) {
-      // Thay console.error bằng showToast
-      showToast(error.message || "Social login failed!", "error");
+      showToast(error.message || "Social login failed.", "error");
     }
   };
 
+  // --- RENDER ---
+
   if (!isOpen) return null;
 
-  // Dùng isAuthLoading để biết context đang xử lý
   const isProcessing = isLoading || isAuthLoading;
 
   return (
@@ -166,13 +156,16 @@ export default function AuthModal({
         onClick={(e) => e.stopPropagation()}
         className="relative w-full max-w-sm bg-white rounded-xl shadow-2xl overflow-hidden border border-slate-200 transition-all animate-in zoom-in-95 duration-200"
       >
+        {/* Header */}
         <AuthHeader tab={tab} setTab={setTab} onClose={onClose} />
 
         <div className="p-6">
+          {/* Tabs (Login/Register) */}
           {(tab === "login" || tab === "register") && (
             <AuthTabs tab={tab} setTab={setTab} />
           )}
 
+          {/* Forms */}
           <form onSubmit={handleSubmit} className="space-y-4 mt-4">
             {tab === "login" && (
               <AuthFormLogin
@@ -206,6 +199,7 @@ export default function AuthModal({
             )}
           </form>
 
+          {/* Social Buttons */}
           {(tab === "login" || tab === "register") && (
             <AuthSocialButtons
               onAuthSuccess={handleSocialLoginSuccess}

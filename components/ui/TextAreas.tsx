@@ -6,7 +6,7 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, React.ComponentProps<"tex
     return (
       <textarea
         className={cn(
-          // Base styles
+          // Base Styles
           "flex min-h-[80px] w-full rounded-md border bg-white px-3 py-2 text-sm shadow-sm transition-all",
           
           // Colors & Borders (Jira Style)
@@ -28,4 +28,7 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, React.ComponentProps<"tex
 )
 Textarea.displayName = "Textarea"
 
+// =============================================================================
+// EXPORTS
+// =============================================================================
 export { Textarea }

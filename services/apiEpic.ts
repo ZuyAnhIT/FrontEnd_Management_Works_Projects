@@ -2,11 +2,22 @@
 
 import apiClient from "@/lib/apiClient";
 
-// ===================================================
-// 1. INTERFACES & TYPES
-// ===================================================
+// =============================================================================
+// 1. INTERFACES & TYPES (Định nghĩa kiểu dữ liệu)
+// =============================================================================
 
-// Dữ liệu Epic trả về từ Backend (Khớp với Output JSON)
+// -----------------------------------------------------------------------------
+// Response Models (Dữ liệu trả về)
+// -----------------------------------------------------------------------------
+
+// Wrapper Response chuẩn
+export interface ApiResponse<T> {
+  success: boolean;
+  message: string;
+  data: T;
+}
+
+// Dữ liệu Epic trả về từ Backend
 export interface Epic {
   id: number;
   projectId: number;
@@ -25,7 +36,11 @@ export interface Epic {
   progressPercentage: number;
 }
 
-// Payload: Tạo Epic mới (Input JSON POST)
+// -----------------------------------------------------------------------------
+// Payload & Params (Dữ liệu gửi đi)
+// -----------------------------------------------------------------------------
+
+// Payload: Tạo Epic mới
 export interface CreateEpicPayload {
   name: string;
   description?: string;
@@ -34,7 +49,7 @@ export interface CreateEpicPayload {
   dueDate?: string;
 }
 
-// Payload: Cập nhật Epic (Input JSON PUT - có thêm status)
+// Payload: Cập nhật Epic
 export interface UpdateEpicPayload {
   name: string;
   description?: string;
@@ -44,21 +59,14 @@ export interface UpdateEpicPayload {
   dueDate?: string;
 }
 
-// Params lọc danh sách Epic (Input GET)
+// Params lọc danh sách Epic
 export interface EpicFilterParams {
   keyword?: string;
 }
 
-// Wrapper Response chuẩn
-interface ApiResponse<T> {
-  success: boolean;
-  message: string;
-  data: T;
-}
-
-// ===================================================
-// 2. API SERVICE
-// ===================================================
+// =============================================================================
+// 2. API SERVICE IMPLEMENTATION
+// =============================================================================
 
 export const apiEpic = {
 
@@ -70,14 +78,19 @@ export const apiEpic = {
     projectId: number | string,
     epicId: number | string
   ): Promise<Epic> => {
-    const res = await apiClient.get<ApiResponse<Epic>>(
-      `/projects/${projectId}/epics/${epicId}`
-    );
+    try {
+      const res = await apiClient.get<ApiResponse<Epic>>(
+        `/projects/${projectId}/epics/${epicId}`
+      );
+      const { success, message, data } = res.data;
 
-    if (!res.data.success) {
-      throw new Error(res.data.message || "Không thể lấy chi tiết Epic.");
+      if (!success) {
+        throw new Error(message || "Failed to fetch epic details.");
+      }
+      return data;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || "System error fetching epic details.");
     }
-    return res.data.data;
   },
 
   /**
@@ -88,15 +101,20 @@ export const apiEpic = {
     projectId: number | string,
     params?: EpicFilterParams
   ): Promise<Epic[]> => {
-    const res = await apiClient.get<ApiResponse<Epic[]>>(
-      `/projects/${projectId}/epics`,
-      { params }
-    );
+    try {
+      const res = await apiClient.get<ApiResponse<Epic[]>>(
+        `/projects/${projectId}/epics`,
+        { params }
+      );
+      const { success, message, data } = res.data;
 
-    if (!res.data.success) {
-      throw new Error(res.data.message || "Không thể tải danh sách Epic.");
+      if (!success) {
+        throw new Error(message || "Failed to load epics.");
+      }
+      return data;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || "System error loading epics.");
     }
-    return res.data.data;
   },
 
   /**
@@ -107,15 +125,20 @@ export const apiEpic = {
     projectId: number | string,
     payload: CreateEpicPayload
   ): Promise<Epic> => {
-    const res = await apiClient.post<ApiResponse<Epic>>(
-      `/projects/${projectId}/epics`,
-      payload
-    );
+    try {
+      const res = await apiClient.post<ApiResponse<Epic>>(
+        `/projects/${projectId}/epics`,
+        payload
+      );
+      const { success, message, data } = res.data;
 
-    if (!res.data.success) {
-      throw new Error(res.data.message || "Không thể tạo Epic.");
+      if (!success) {
+        throw new Error(message || "Failed to create epic.");
+      }
+      return data;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || "System error creating epic.");
     }
-    return res.data.data;
   },
 
   /**
@@ -127,15 +150,20 @@ export const apiEpic = {
     epicId: number | string,
     payload: UpdateEpicPayload
   ): Promise<Epic> => {
-    const res = await apiClient.put<ApiResponse<Epic>>(
-      `/projects/${projectId}/epics/${epicId}`,
-      payload
-    );
+    try {
+      const res = await apiClient.put<ApiResponse<Epic>>(
+        `/projects/${projectId}/epics/${epicId}`,
+        payload
+      );
+      const { success, message, data } = res.data;
 
-    if (!res.data.success) {
-      throw new Error(res.data.message || "Không thể cập nhật Epic.");
+      if (!success) {
+        throw new Error(message || "Failed to update epic.");
+      }
+      return data;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || "System error updating epic.");
     }
-    return res.data.data;
   },
 
   /**
@@ -146,13 +174,18 @@ export const apiEpic = {
     projectId: number | string,
     epicId: number | string
   ): Promise<boolean> => {
-    const res = await apiClient.delete<ApiResponse<{}>>(
-      `/projects/${projectId}/epics/${epicId}`
-    );
+    try {
+      const res = await apiClient.delete<ApiResponse<{}>>(
+        `/projects/${projectId}/epics/${epicId}`
+      );
+      const { success, message } = res.data;
 
-    if (!res.data.success) {
-      throw new Error(res.data.message || "Không thể xóa Epic.");
+      if (!success) {
+        throw new Error(message || "Failed to delete epic.");
+      }
+      return true;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || "System error deleting epic.");
     }
-    return true;
   }
 };

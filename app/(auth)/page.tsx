@@ -1,28 +1,30 @@
 "use client";
 
-import AuthModal from "@/components/features/auth/AuthModal";
 import { useRouter } from "next/navigation";
+import AuthModal from "@/components/features/auth/AuthModal";
 
-// Đây là một trang đăng nhập/đăng ký chuyên dụng.
-// Nó có nền và nội dung, làm cho AuthModal (giờ là AuthCard)
-// xuất hiện một cách chuyên nghiệp.
-
+/**
+ * Trang Auth (Đăng nhập/Đăng ký) chuyên biệt.
+ * Trang này hoạt động như một wrapper để hiển thị AuthModal dưới dạng một trang đầy đủ
+ * thay vì một popup đè lên nội dung khác.
+ */
 export default function AuthPage() {
   const router = useRouter();
 
-  // Vì đây là một trang (page), "onClose" có nghĩa là
-  // người dùng nhấn "X" để quay về trang chủ.
+  // Xử lý khi đóng modal: Quay về trang chủ
   const handleClose = () => {
     router.push("/");
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen p-4 bg-gradient-to-b from-white via-blue-50/40 to-white">
-      {/* AuthModal được render ở đây.
-        Nó vẫn dùng 'fixed' để che toàn màn hình,
-        nhưng trang này cung cấp một background đẹp.
+    <div className="flex min-h-screen items-center justify-center p-4 bg-gradient-to-b from-white via-blue-50/40 to-white">
+      {/* Render AuthModal ở trạng thái luôn mở (isOpen=true).
+        Giao diện sẽ hiển thị như một Card nằm giữa màn hình nhờ class của div bao ngoài.
       */}
-      <AuthModal isOpen={true} onClose={handleClose} />
+      <AuthModal 
+        isOpen={true} 
+        onClose={handleClose} 
+      />
     </div>
   );
 }

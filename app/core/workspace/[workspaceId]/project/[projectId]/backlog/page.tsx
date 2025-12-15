@@ -8,42 +8,43 @@ import { Loader2, LayoutList, Plus, CalendarPlus } from "lucide-react";
 
 // --- DND KIT IMPORTS ---
 import {
-  DndContext,
-  DragOverlay,
-  useSensor,
-  useSensors,
-  PointerSensor,
-  KeyboardSensor,
-  DragStartEvent,
-  DragEndEvent,
-  closestCorners,
-  defaultDropAnimationSideEffects,
-  DropAnimation,
+    DndContext,
+    DragOverlay,
+    useSensor,
+    useSensors,
+    PointerSensor,
+    KeyboardSensor,
+    DragStartEvent,
+    DragEndEvent,
+    closestCorners,
+    defaultDropAnimationSideEffects,
+    DropAnimation,
 } from "@dnd-kit/core";
 import {
-  SortableContext,
-  verticalListSortingStrategy,
+    SortableContext,
+    verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { useDroppable } from "@dnd-kit/core";
 import { Chatbot } from "@/components/chatbot/chatbot";
+
 // API & Types
 import {
-  getProjectBacklog,
-  getProjectMembers,
-  ProjectBacklogResponse,
-  BacklogQueryParams,
-  TaskSummary,
-  ProjectMember
+    getProjectBacklog,
+    getProjectMembers,
+    ProjectBacklogResponse,
+    BacklogQueryParams,
+    TaskSummary,
+    ProjectMember,
 } from "@/services/apiProject";
-
-// ✅ FIX: Import API Status từ apiBoard (theo yêu cầu của bạn)
-import { getProjectStatuses, RawStatusColumn } from "@/services/apiBoard"; 
 
 import { moveTaskToSprint } from "@/services/apiTask";
 
+// ✅ FIX: Import API Status
+import { getProjectStatuses, RawStatusColumn } from "@/services/apiBoard"; 
+
 // Components UI
-import { Button } from "@/components/ui/button";
-import BacklogHeader from "@/components/features/core/backlog/BacklogHeader"; 
+import { Button } from "@/components/ui/Button";
+import BacklogHeader from "@/components/features/core/backlog/BacklogHeader";
 import SprintSection from "@/components/features/core/backlog/SprintSection";
 import BacklogTaskItem from "@/components/features/core/backlog/BacklogTaskItem";
 import TaskDetailPanel from "@/components/features/core/task/TaskDetailPanel";
@@ -54,483 +55,554 @@ import CreateTaskModal from "@/components/features/core/task/CreateTaskModal";
 import SprintDetailModal from "@/components/features/core/sprint/SprintDetailModal";
 import CreateSprintModal from "@/components/features/core/sprint/CreateSprintModal";
 
-// --- Helper Component: Droppable Area ---
-function BacklogDroppableArea({ children, id }: { children: React.ReactNode, id: string }) {
-  const { setNodeRef, isOver } = useDroppable({
+// --- Helper Component: Droppable Area (Giữ nguyên logic) ---
+function BacklogDroppableArea({
+    children,
     id,
-    data: { type: "Backlog", id }
-  });
+}: {
+    children: React.ReactNode;
+    id: string;
+}) {
+    const { setNodeRef, isOver } = useDroppable({
+        id,
+        data: { type: "Backlog", id },
+    });
 
-  return (
-    <div
-      ref={setNodeRef}
-      className={`space-y-2 mb-2 min-h-[50px] transition-colors rounded-lg ${isOver ? 'bg-blue-50/50' : ''}`}
-    >
-      {children}
-    </div>
-  );
+    return (
+        <div
+            ref={setNodeRef}
+            className={`space-y-2 mb-2 min-h-[50px] transition-colors rounded-lg ${
+                isOver ? "bg-blue-50/50" : ""
+            }`}
+        >
+            {children}
+        </div>
+    );
 }
 
+// Helper để chuẩn hóa Sprint Status
 function normalizeSprint(raw: any) {
-  return {
-    ...raw,
-    status: raw.status as "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED",
-    tasks: Array.isArray(raw.tasks) ? raw.tasks : [],
-  };
+    return {
+        ...raw,
+        status: raw.status as
+            | "NOT_STARTED"
+            | "IN_PROGRESS"
+            | "COMPLETED"
+            | "CANCELLED",
+        tasks: Array.isArray(raw.tasks) ? raw.tasks : [],
+    };
 }
+
+// ===============================================================
+// 3. MAIN COMPONENT
+// ===============================================================
 
 export default function BacklogPage() {
-  const params = useParams();
-  const router = useRouter();
-  const { showToast } = useToast();
-  const { activeCompany, isLoading: isAuthLoading } = useAuth();
+    const params = useParams();
+    const router = useRouter();
+    const { showToast } = useToast();
+    const { activeCompany, isLoading: isAuthLoading } = useAuth();
 
-  const companyId = activeCompany?.companyId;
-  const workspaceId = Number(params.workspaceId);
-  const projectId = Number(params.projectId);
+    const companyId = activeCompany?.companyId;
+    const workspaceId = Number(params.workspaceId);
+    const projectId = Number(params.projectId);
 
-  // --- STATE DATA ---
-  const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
+    // --- STATE DATA ---
+    const [loading, setLoading] = useState(true);
+    const [loadingMore, setLoadingMore] = useState(false);
 
-  const [data, setData] = useState<ProjectBacklogResponse | null>(null);
-  const [backlogTasks, setBacklogTasks] = useState<TaskSummary[]>([]);
-  const [members, setMembers] = useState<ProjectMember[]>([]);
-  
-  // ✅ STATE: Lưu danh sách status lấy từ API
-  const [statuses, setStatuses] = useState<RawStatusColumn[]>([]);
+    const [data, setData] = useState<ProjectBacklogResponse | null>(null);
+    const [backlogTasks, setBacklogTasks] = useState<TaskSummary[]>([]);
+    const [members, setMembers] = useState<ProjectMember[]>([]);
 
-  // --- STATE UI ---
-  const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
-  const [selectedSprintId, setSelectedSprintId] = useState<number | null>(null);
-  //--Xem chi tiết--
-  const [viewMode, setViewMode] = useState<'panel' | 'floating'>('panel');
-  
-  // Modal States
-  const [isCreateTaskModalOpen, setIsCreateTaskModalOpen] = useState(false);
-  const [isSprintModalOpen, setIsSprintModalOpen] = useState(false); 
+    // ✅ STATE: Lưu danh sách status lấy từ API
+    const [statuses, setStatuses] = useState<RawStatusColumn[]>([]);
 
-  // DND Active State
-  const [activeTask, setActiveTask] = useState<TaskSummary | null>(null);
+    // --- STATE UI ---
+    const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
+    const [selectedSprintId, setSelectedSprintId] = useState<number | null>(null);
+    //--Xem chi tiết--
+    const [viewMode, setViewMode] = useState<"panel" | "floating">("panel");
 
-  // --- FILTER STATE ---
-  const [filters, setFilters] = useState<BacklogQueryParams>({
-    keyword: "",
-    page: 0,
-    size: 20,
-    sortBy: "createdAt",
-    sortDir: "desc",
-  });
+    // Modal States
+    const [isCreateTaskModalOpen, setIsCreateTaskModalOpen] = useState(false);
+    const [isSprintModalOpen, setIsSprintModalOpen] = useState(false);
 
-  // --- SENSORS ---
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: { distance: 5 },
-    }),
-    useSensor(KeyboardSensor)
-  );
+    // DND Active State
+    const [activeTask, setActiveTask] = useState<TaskSummary | null>(null);
 
-  // ===============================================================
-  // 1. FETCH DATA
-  // ===============================================================
-  useEffect(() => {
-    if (!companyId || !workspaceId || !projectId) return;
+    // --- FILTER STATE ---
+    const [filters, setFilters] = useState<BacklogQueryParams>({
+        keyword: "",
+        page: 0,
+        size: 20,
+        sortBy: "createdAt",
+        sortDir: "desc",
+    });
 
-    // ✅ Gọi API getProjectMembers và getProjectStatuses song song
-    const fetchMetadata = async () => {
-        try {
-            const [membersRes, statusRes] = await Promise.all([
-                getProjectMembers(companyId, workspaceId, projectId, { size: 100 }),
-                getProjectStatuses(projectId) // API từ apiBoard
-            ]);
-            
-            if (membersRes.content) setMembers(membersRes.content);
-            
-            // Lưu status vào state nếu có dữ liệu
-            if (Array.isArray(statusRes)) {
-                setStatuses(statusRes);
+    // --- SENSORS ---
+    const sensors = useSensors(
+        useSensor(PointerSensor, {
+            activationConstraint: { distance: 5 },
+        }),
+        useSensor(KeyboardSensor)
+    );
+
+    // ===============================================================
+    // 1. FETCH DATA (Logic nghiệp vụ quan trọng)
+    // ===============================================================
+    useEffect(() => {
+        if (!companyId || !workspaceId || !projectId) return;
+
+        // ✅ Gọi API getProjectMembers và getProjectStatuses song song
+        const fetchMetadata = async () => {
+            try {
+                const [membersRes, statusRes] = await Promise.all([
+                    getProjectMembers(companyId, workspaceId, projectId, { size: 100 }),
+                    getProjectStatuses(projectId), 
+                ]);
+
+                if (membersRes.content) setMembers(membersRes.content);
+
+                // Lưu status vào state nếu có dữ liệu
+                if (Array.isArray(statusRes)) {
+                    setStatuses(statusRes);
+                }
+            } catch (error) {
+                console.error("Failed to load metadata:", error);
             }
-        } catch (error) {
-            console.error("Failed to load metadata:", error);
+        };
+
+        fetchMetadata();
+    }, [companyId, workspaceId, projectId]);
+
+    const fetchData = useCallback(
+        async (isLoadMore = false) => {
+            if (!companyId) return;
+            if (!isLoadMore) setLoading(true);
+            else setLoadingMore(true);
+
+            try {
+                const res = await getProjectBacklog(
+                    companyId,
+                    workspaceId,
+                    projectId,
+                    filters
+                );
+                setData(res);
+                if (isLoadMore) {
+                    setBacklogTasks((prev) => [...prev, ...res.backlogTasks]);
+                } else {
+                    setBacklogTasks(res.backlogTasks);
+                }
+            } catch (err: any) {
+                const message = err.response?.data?.message || err.message || "Failed to load backlog";
+                showToast(message, "error");
+            } finally {
+                setLoading(false);
+                setLoadingMore(false);
+            }
+        },
+        [companyId, workspaceId, projectId, filters, showToast]
+    );
+
+    // Debounce & Pagination Logic
+    useEffect(() => {
+        if (isAuthLoading) return;
+        const t = setTimeout(() => {
+            if (filters.page === 0) fetchData(false);
+        }, 300);
+        return () => clearTimeout(t);
+    }, [filters, isAuthLoading, fetchData]);
+
+    useEffect(() => {
+        if (isAuthLoading) return;
+        if ((filters.page || 0) > 0) fetchData(true);
+    }, [filters.page, isAuthLoading]);
+
+    // ===============================================================
+    // 2. DRAG & DROP LOGIC (Giữ nguyên không đổi)
+    // ===============================================================
+    const onDragStart = (event: DragStartEvent) => {
+        if (event.active.data.current?.type === "Task") {
+            setActiveTask(event.active.data.current.task);
         }
     };
 
-    fetchMetadata();
-  }, [companyId, workspaceId, projectId]);
+    const onDragEnd = async (event: DragEndEvent) => {
+        const { active, over } = event;
+        setActiveTask(null);
 
-  const fetchData = useCallback(async (isLoadMore = false) => {
-    if (!companyId) return;
-    if (!isLoadMore) setLoading(true);
-    else setLoadingMore(true);
+        if (!over) return;
 
-    try {
-      const res = await getProjectBacklog(companyId, workspaceId, projectId, filters);
-      setData(res);
-      if (isLoadMore) {
-        setBacklogTasks(prev => [...prev, ...res.backlogTasks]);
-      } else {
-        setBacklogTasks(res.backlogTasks);
-      }
-    } catch (err: any) {
-      showToast(err.message || "Failed to load backlog", "error");
-    } finally {
-      setLoading(false);
-      setLoadingMore(false);
-    }
-  }, [companyId, workspaceId, projectId, filters, showToast]);
+        const activeId = active.id.toString();
+        const overId = over.id.toString();
 
-  // Debounce & Pagination Logic
-  useEffect(() => {
-    if (isAuthLoading) return;
-    const t = setTimeout(() => {
-      if (filters.page === 0) fetchData(false);
-    }, 300);
-    return () => clearTimeout(t);
-  }, [filters, isAuthLoading, fetchData]);
+        // Helper find container
+        const findContainerId = (itemId: string) => {
+            if (backlogTasks.some((t) => t.id.toString() === itemId))
+                return "backlog";
+            if (data?.activeSprints) {
+                for (const s of data.activeSprints) {
+                    if (s.tasks.some((t) => t.id.toString() === itemId))
+                        return `sprint-${s.id}`;
+                }
+            }
+            return null;
+        };
 
-  useEffect(() => {
-    if (isAuthLoading) return;
-    if ((filters.page || 0) > 0) fetchData(true);
-  }, [filters.page, isAuthLoading]);
+        const sourceId = findContainerId(activeId);
 
-  // ===============================================================
-  // 2. DRAG & DROP LOGIC (Giữ nguyên không đổi)
-  // ===============================================================
-  const onDragStart = (event: DragStartEvent) => {
-    if (event.active.data.current?.type === "Task") {
-      setActiveTask(event.active.data.current.task);
-    }
-  };
-
-  const onDragEnd = async (event: DragEndEvent) => {
-    const { active, over } = event;
-    setActiveTask(null);
-
-    if (!over) return;
-
-    const activeId = active.id.toString();
-    const overId = over.id.toString();
-
-    // Helper find container
-    const findContainerId = (itemId: string) => {
-      if (backlogTasks.some(t => t.id.toString() === itemId)) return 'backlog';
-      if (data?.activeSprints) {
-        for (const s of data.activeSprints) {
-          if (s.tasks.some(t => t.id.toString() === itemId)) return `sprint-${s.id}`;
+        let destId = overId;
+        if (
+            activeId !== overId &&
+            !overId.startsWith("backlog") &&
+            !overId.startsWith("sprint-")
+        ) {
+            destId = findContainerId(overId) || overId;
         }
-      }
-      return null;
+        if (over.data.current?.type === "Backlog") destId = "backlog";
+        if (over.data.current?.type === "Sprint") destId = over.id.toString();
+
+        if (!sourceId || !destId || sourceId === destId) return;
+
+        // --- Optimistic Update ---
+        const newBacklogTasks = [...backlogTasks];
+        const newSprints = data?.activeSprints ? [...data.activeSprints] : [];
+        let movedTask: TaskSummary | undefined;
+
+        // Remove from Source
+        if (sourceId === "backlog") {
+            const idx = newBacklogTasks.findIndex(
+                (t) => t.id.toString() === activeId
+            );
+            if (idx !== -1) {
+                [movedTask] = newBacklogTasks.splice(idx, 1);
+                setBacklogTasks(newBacklogTasks);
+            }
+        } else {
+            const sprintId = Number(sourceId.split("-")[1]);
+            const sprintIndex = newSprints.findIndex((s) => s.id === sprintId);
+            if (sprintIndex !== -1) {
+                const sprintTasks = [...newSprints[sprintIndex].tasks];
+                const idx = sprintTasks.findIndex((t) => t.id.toString() === activeId);
+                if (idx !== -1) {
+                    [movedTask] = sprintTasks.splice(idx, 1);
+                    newSprints[sprintIndex] = {
+                        ...newSprints[sprintIndex],
+                        tasks: sprintTasks,
+                        taskCount: sprintTasks.length,
+                    } as any; // Ép kiểu vì logic phức tạp
+                    setData((prev) =>
+                        prev ? { ...prev, activeSprints: newSprints } : null
+                    );
+                }
+            }
+        }
+
+        if (!movedTask) return;
+
+        // Calculate Dest Index
+        let destinationIndex = 0;
+        if (destId === "backlog") {
+            if (over.data.current?.sortable?.index !== undefined) {
+                destinationIndex = over.data.current.sortable.index;
+            } else {
+                destinationIndex = newBacklogTasks.length;
+            }
+        } else {
+            const sprintId = Number(destId.split("-")[1]);
+            const sprint = newSprints.find((s) => s.id === sprintId);
+            destinationIndex = sprint ? sprint.tasks.length : 0;
+        }
+
+        // Add to Destination
+        if (destId === "backlog") {
+            newBacklogTasks.splice(destinationIndex, 0, movedTask);
+            setBacklogTasks(newBacklogTasks);
+        } else {
+            const sprintId = Number(destId.split("-")[1]);
+            const sprintIndex = newSprints.findIndex((s) => s.id === sprintId);
+            if (sprintIndex !== -1) {
+                const sprintTasks = [...newSprints[sprintIndex].tasks];
+                sprintTasks.splice(destinationIndex, 0, movedTask);
+                newSprints[sprintIndex] = {
+                    ...newSprints[sprintIndex],
+                    tasks: sprintTasks,
+                    taskCount: sprintTasks.length,
+                } as any; // Ép kiểu
+                setData((prev) =>
+                    prev ? { ...prev, activeSprints: newSprints } : null
+                );
+            }
+        }
+
+        // Call API
+        try {
+            const taskId = Number(activeId);
+            const targetSprintId =
+                destId === "backlog" ? null : Number(destId.split("-")[1]);
+            await moveTaskToSprint(taskId, targetSprintId, destinationIndex);
+        } catch (error: any) {
+            const message = error.response?.data?.message || error.message || "Failed to move task. Reverting...";
+            showToast(message, "error");
+            handleRefresh(); // Revert bằng cách refresh
+        }
     };
 
-    const sourceId = findContainerId(activeId);
-    
-    let destId = overId;
-    if (activeId !== overId && !overId.startsWith('backlog') && !overId.startsWith('sprint-')) {
-      destId = findContainerId(overId) || overId;
-    }
-    if (over.data.current?.type === 'Backlog') destId = 'backlog';
-    if (over.data.current?.type === 'Sprint') destId = over.id.toString();
+    const dropAnimation: DropAnimation = {
+        sideEffects: defaultDropAnimationSideEffects({
+            styles: { active: { opacity: "0.5" } },
+        }),
+    };
+    const backlogTaskIds = useMemo(
+        () => backlogTasks.map((t) => t.id.toString()),
+        [backlogTasks]
+    );
 
-    if (!sourceId || !destId || sourceId === destId) return;
+    // ===============================================================
+    // 3. HANDLERS
+    // ===============================================================
+    const handleRefresh = () => fetchData(false);
+    const handleLoadMore = () =>
+        setFilters((prev) => ({ ...prev, page: (prev.page || 0) + 1 }));
 
-    // --- Optimistic Update ---
-    const newBacklogTasks = [...backlogTasks];
-    const newSprints = data?.activeSprints ? [...data.activeSprints] : [];
-    let movedTask: TaskSummary | undefined;
-
-    // Remove from Source
-    if (sourceId === 'backlog') {
-      const idx = newBacklogTasks.findIndex(t => t.id.toString() === activeId);
-      if (idx !== -1) {
-        [movedTask] = newBacklogTasks.splice(idx, 1);
-        setBacklogTasks(newBacklogTasks);
-      }
-    } else {
-      const sprintId = Number(sourceId.split('-')[1]);
-      const sprintIndex = newSprints.findIndex(s => s.id === sprintId);
-      if (sprintIndex !== -1) {
-        const sprintTasks = [...newSprints[sprintIndex].tasks];
-        const idx = sprintTasks.findIndex(t => t.id.toString() === activeId);
-        if (idx !== -1) {
-          [movedTask] = sprintTasks.splice(idx, 1);
-          newSprints[sprintIndex] = { ...newSprints[sprintIndex], tasks: sprintTasks, taskCount: sprintTasks.length };
-          setData(prev => prev ? { ...prev, activeSprints: newSprints } : null);
-        }
-      }
-    }
-
-    if (!movedTask) return;
-
-    // Calculate Dest Index
-    let destinationIndex = 0;
-    if (destId === 'backlog') {
-      if (over.data.current?.sortable?.index !== undefined) {
-        destinationIndex = over.data.current.sortable.index;
-      } else {
-        destinationIndex = newBacklogTasks.length;
-      }
-    } else {
-      const sprintId = Number(destId.split('-')[1]);
-      const sprint = newSprints.find(s => s.id === sprintId);
-      destinationIndex = sprint ? sprint.tasks.length : 0;
-    }
-
-    // Add to Destination
-    if (destId === 'backlog') {
-      newBacklogTasks.splice(destinationIndex, 0, movedTask);
-      setBacklogTasks(newBacklogTasks);
-    } else {
-      const sprintId = Number(destId.split('-')[1]);
-      const sprintIndex = newSprints.findIndex(s => s.id === sprintId);
-      if (sprintIndex !== -1) {
-        const sprintTasks = [...newSprints[sprintIndex].tasks];
-        sprintTasks.splice(destinationIndex, 0, movedTask);
-        newSprints[sprintIndex] = { ...newSprints[sprintIndex], tasks: sprintTasks, taskCount: sprintTasks.length };
-        setData(prev => prev ? { ...prev, activeSprints: newSprints } : null);
-      }
-    }
-
-    // Call API
-    try {
-      const taskId = Number(activeId);
-      const targetSprintId = destId === 'backlog' ? null : Number(destId.split('-')[1]);
-      await moveTaskToSprint(taskId, targetSprintId, destinationIndex);
-    } catch (error) {
-      showToast("Failed to move task. Reverting...", "error");
-      handleRefresh();
-    }
-  };
-
-  const dropAnimation: DropAnimation = {
-    sideEffects: defaultDropAnimationSideEffects({ styles: { active: { opacity: "0.5" } } }),
-  };
-  const backlogTaskIds = useMemo(() => backlogTasks.map(t => t.id.toString()), [backlogTasks]);
-
-  // ===============================================================
-  // 3. HANDLERS
-  // ===============================================================
-  const handleRefresh = () => fetchData(false);
-  const handleLoadMore = () => setFilters(prev => ({ ...prev, page: (prev.page || 0) + 1 }));
-
-  if (isAuthLoading) return <div className="h-screen flex items-center justify-center"><Loader2 className="animate-spin text-blue-600" /></div>;
-  if (!companyId) return <div className="p-8 text-center">No Active Company</div>;
-
-  return (
-    <div className="flex flex-col h-[calc(100vh-64px)] bg-slate-50 overflow-hidden">
-
-      {/* ✅ 1. HEADER */}
-      <BacklogHeader
-        totalTasks={data?.backlogTotalElements || 0}
-        projectId={projectId}
-        filters={filters}
-        setFilters={setFilters}
-        members={members}
-        onCreateClick={() => setIsCreateTaskModalOpen(true)} 
-        onRefresh={handleRefresh} 
-      />
-
-      {/* ✅ 2. ACTION BAR */}
-      <div className="flex items-center justify-end gap-3 px-6 py-3 bg-white border-b border-slate-200 shrink-0">
-          <Button
-             variant="outline"
-             size="sm"
-             onClick={() => setIsSprintModalOpen(true)}
-             className="h-8 bg-white text-slate-700 border-slate-300 hover:bg-slate-50 hover:text-blue-600 font-medium shadow-sm"
-          >
-             <CalendarPlus className="w-4 h-4 mr-2" />
-             Create Sprint
-          </Button>
-
-          <Button
-            size="sm"
-            onClick={() => setIsCreateTaskModalOpen(true)}
-            className="h-8 bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-sm flex items-center gap-2"
-          >
-            <Plus className="w-4 h-4" /> 
-            Create Issue
-          </Button>
-      </div>
-
-      {/* ✅ 3. MAIN CONTENT */}
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCorners}
-        onDragStart={onDragStart}
-        onDragEnd={onDragEnd}
-      >
-        <div className="flex flex-1 overflow-hidden relative">
-          <div className="flex-1 overflow-y-auto custom-scrollbar px-6 pb-6 transition-all duration-300 pt-4">
-            <div className={`mx-auto pb-20 ${selectedTaskId ? 'max-w-full' : 'max-w-[1800px]'}`}>
-
-              {loading && (!filters.page || filters.page === 0) ? (
-                <div className="py-20 flex justify-center"><Loader2 className="w-8 h-8 text-blue-600 animate-spin" /></div>
-              ) : (
-                <>
-                  {/* A. ACTIVE SPRINTS */}
-                  {data?.activeSprints && (
-                    <div className="animate-fadeInUp mb-6">
-                      <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 ml-1">
-                        Active Sprints ({data.activeSprints.length})
-                      </h2>
-                      <SprintSection
-                        sprints={data.activeSprints.map(normalizeSprint)}
-                        onTaskClick={(id) => setSelectedTaskId(id)}
-                        onTaskCreated={handleRefresh}
-                        onSprintSettingsClick={(id) => setSelectedSprintId(id)}
-                        onRefresh={handleRefresh}
-                      />
-                    </div>
-                  )}
-
-                  {/* B. BACKLOG SECTION */}
-                  <div className="animate-fadeInUp delay-100">
-                    <div className="flex items-center justify-between mb-3 px-1">
-                      <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                        Backlog ({data?.backlogTotalElements || 0} issues)
-                      </h2>
-                      <span className="text-[10px] text-slate-400 bg-white px-2 py-1 rounded border border-slate-200">Unscheduled</span>
-                    </div>
-
-                    <div className="bg-slate-100/50 p-1.5 rounded-xl border border-slate-200/60 min-h-[100px]">
-                      {/* Header Row */}
-                      {backlogTasks.length > 0 && (
-                        <div className="flex items-center px-4 py-2 mb-2 text-xs font-semibold text-slate-500 bg-white border border-slate-200 rounded-lg shadow-sm">
-                            <div className="flex-1 pl-8">Issue</div>
-                            <div className="w-32 text-center">Status</div>
-                            <div className="w-32 pl-2">Assignee</div>
-                            <div className="w-20 text-right pr-2">Priority</div>
-                        </div>
-                      )}
-
-                      {/* Droppable Area */}
-                      <BacklogDroppableArea id="backlog">
-                        <SortableContext items={backlogTaskIds} strategy={verticalListSortingStrategy}>
-                          {backlogTasks.length > 0 ? (
-                            backlogTasks.map((task, index) => (
-                              <BacklogTaskItem
-                                key={task.id}
-                                task={task}
-                                index={index}
-                                onClick={() => setSelectedTaskId(task.id)}
-                              />
-                            ))
-                          ) : (
-                            activeTask === null && (
-                              <div className="flex flex-col items-center justify-center py-10 text-slate-400">
-                                <LayoutList className="w-10 h-10 mb-2 opacity-50" />
-                                <p className="text-sm">Backlog is empty.</p>
-                              </div>
-                            )
-                          )}
-                        </SortableContext>
-                      </BacklogDroppableArea>
-
-                      {/* Quick Create */}
-                      <div className="px-1">
-                        <QuickTaskCreate
-                          companyId={companyId!}
-                          workspaceId={workspaceId}
-                          projectId={projectId}
-                          sprintId={null}
-                          onSuccess={handleRefresh}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Pagination */}
-                    {data && data.backlogPageNumber + 1 < data.backlogTotalPages && (
-                      <div className="mt-4 text-center">
-                        <Button variant="ghost" onClick={handleLoadMore} disabled={loadingMore} className="text-slate-500">
-                          {loadingMore ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null} Load More
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                </>
-              )}
+    if (isAuthLoading)
+        return (
+            <div className="h-screen flex items-center justify-center">
+                <Loader2 className="animate-spin text-blue-600" />
             </div>
-          </div>
+        );
+    if (!companyId)
+        return <div className="p-8 text-center">No Active Company</div>;
 
-          {/* ✅ PANELS (Đã truyền statuses từ state xuống) */}
-          {/* ✅ PANELS & FLOATING MODAL LOGIC */}
-          
-          {/* TRƯỜNG HỢP 1: HIỆN PANEL DỌC */}
-          {selectedTaskId && viewMode === 'panel' && (
-            <TaskDetailPanel
-                taskId={selectedTaskId}
-                onClose={() => setSelectedTaskId(null)}
-                // 👇 Thêm sự kiện chuyển đổi
-                onSwitchToFloating={() => setViewMode('floating')} 
-                
-                // Truyền props dữ liệu
-                onUpdate={handleRefresh}
+    return (
+        <div className="flex flex-col h-[calc(100vh-64px)] bg-slate-50 overflow-hidden">
+            {/* ✅ 1. HEADER */}
+            <BacklogHeader
+                totalTasks={data?.backlogTotalElements || 0}
+                projectId={projectId}
+                filters={filters}
+                setFilters={setFilters}
                 members={members}
-                sprints={data?.activeSprints}
-                statuses={statuses}
-                companyId={companyId}       
-                workspaceId={workspaceId}   
-                projectId={projectId} 
+                onCreateClick={() => setIsCreateTaskModalOpen(true)}
+                onRefresh={handleRefresh}
             />
-          )}
 
-          {/* TRƯỜNG HỢP 2: HIỆN MODAL NỔI (KÉO THẢ ĐƯỢC) */}
-          {selectedTaskId && viewMode === 'floating' && (
-             <TaskDetailModalFloating
-                taskId={selectedTaskId}
-                isOpen={true} // Luôn true khi render
-                onClose={() => setSelectedTaskId(null)}
-                // 👇 Thêm sự kiện chuyển đổi về Panel
-                onSwitchToPanel={() => setViewMode('panel')}
+            {/* ✅ 2. ACTION BAR */}
+            <div className="flex items-center justify-end gap-3 px-6 py-3 bg-white border-b border-slate-200 shrink-0">
+                <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsSprintModalOpen(true)}
+                    className="h-8 bg-white text-slate-700 border-slate-300 hover:bg-slate-50 hover:text-blue-600 font-medium shadow-sm"
+                >
+                    <CalendarPlus className="w-4 h-4 mr-2" />
+                    Create Sprint
+                </Button>
 
-                // Truyền props dữ liệu (giống hệt Panel)
-                onUpdate={handleRefresh}
+                <Button
+                    size="sm"
+                    onClick={() => setIsCreateTaskModalOpen(true)}
+                    className="h-8 bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-sm flex items-center gap-2"
+                >
+                    <Plus className="w-4 h-4" />
+                    Create Issue
+                </Button>
+            </div>
+
+            {/* ✅ 3. MAIN CONTENT */}
+            <DndContext
+                sensors={sensors}
+                collisionDetection={closestCorners}
+                onDragStart={onDragStart}
+                onDragEnd={onDragEnd}
+            >
+                <div className="flex flex-1 overflow-hidden relative">
+                    <div className="flex-1 overflow-y-auto custom-scrollbar px-6 pb-6 transition-all duration-300 pt-4">
+                        <div
+                            className={`mx-auto pb-20 ${
+                                selectedTaskId ? "max-w-full" : "max-w-[1800px]"
+                            }`}
+                        >
+                            {loading && (!filters.page || filters.page === 0) ? (
+                                <div className="py-20 flex justify-center">
+                                    <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+                                </div>
+                            ) : (
+                                <>
+                                    {/* A. ACTIVE SPRINTS */}
+                                    {data?.activeSprints && (
+                                        <div className="animate-fadeInUp mb-6">
+                                            <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 ml-1">
+                                                Active Sprints ({data.activeSprints.length})
+                                            </h2>
+                                            <SprintSection
+                                                sprints={data.activeSprints.map(normalizeSprint)}
+                                                onTaskClick={(id) => setSelectedTaskId(id)}
+                                                onTaskCreated={handleRefresh}
+                                                onSprintSettingsClick={(id) => setSelectedSprintId(id)}
+                                                onRefresh={handleRefresh}
+                                            />
+                                        </div>
+                                    )}
+
+                                    {/* B. BACKLOG SECTION */}
+                                    <div className="animate-fadeInUp delay-100">
+                                        <div className="flex items-center justify-between mb-3 px-1">
+                                            <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                                Backlog ({data?.backlogTotalElements || 0} issues)
+                                            </h2>
+                                            <span className="text-[10px] text-slate-400 bg-white px-2 py-1 rounded border border-slate-200">
+                                                Unscheduled
+                                            </span>
+                                        </div>
+
+                                        <div className="bg-slate-100/50 p-1.5 rounded-xl border border-slate-200/60 min-h-[100px]">
+                                            {/* Header Row */}
+                                            {backlogTasks.length > 0 && (
+                                                <div className="flex items-center px-4 py-2 mb-2 text-xs font-semibold text-slate-500 bg-white border border-slate-200 rounded-lg shadow-sm">
+                                                    <div className="flex-1 pl-8">Issue</div>
+                                                    <div className="w-32 text-center">Status</div>
+                                                    <div className="w-32 pl-2">Assignee</div>
+                                                    <div className="w-20 text-right pr-2">Priority</div>
+                                                </div>
+                                            )}
+
+                                            {/* Droppable Area */}
+                                            <BacklogDroppableArea id="backlog">
+                                                <SortableContext
+                                                    items={backlogTaskIds}
+                                                    strategy={verticalListSortingStrategy}
+                                                >
+                                                    {backlogTasks.length > 0
+                                                        ? backlogTasks.map((task, index) => (
+                                                              <BacklogTaskItem
+                                                                  key={task.id}
+                                                                  task={task}
+                                                                  index={index}
+                                                                  onClick={() => setSelectedTaskId(task.id)}
+                                                              />
+                                                          ))
+                                                        : activeTask === null && (
+                                                              <div className="flex flex-col items-center justify-center py-10 text-slate-400">
+                                                                  <LayoutList className="w-10 h-10 mb-2 opacity-50" />
+                                                                  <p className="text-sm">Backlog is empty.</p>
+                                                              </div>
+                                                          )}
+                                                </SortableContext>
+                                            </BacklogDroppableArea>
+
+                                            {/* Quick Create */}
+                                            <div className="px-1">
+                                                <QuickTaskCreate
+                                                    companyId={companyId!}
+                                                    workspaceId={workspaceId}
+                                                    projectId={projectId}
+                                                    sprintId={null}
+                                                    onSuccess={handleRefresh}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {/* Pagination */}
+                                        {data &&
+                                            data.backlogPageNumber + 1 < data.backlogTotalPages && (
+                                                <div className="mt-4 text-center">
+                                                    <Button
+                                                        variant="ghost"
+                                                        onClick={handleLoadMore}
+                                                        disabled={loadingMore}
+                                                        className="text-slate-500"
+                                                    >
+                                                        {loadingMore ? (
+                                                            <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                                                        ) : null}{" "}
+                                                        Load More
+                                                    </Button>
+                                                </div>
+                                            )}
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* ✅ PANELS & FLOATING MODAL LOGIC */}
+
+                    {/* TRƯỜNG HỢP 1: HIỆN PANEL DỌC */}
+                    {selectedTaskId && viewMode === "panel" && (
+                        <TaskDetailPanel
+                            taskId={selectedTaskId}
+                            onClose={() => setSelectedTaskId(null)}
+                            // 👇 Thêm sự kiện chuyển đổi
+                            onSwitchToFloating={() => setViewMode("floating")}
+                            // Truyền props dữ liệu
+                            onUpdate={handleRefresh}
+                            members={members}
+                            sprints={data?.activeSprints}
+                            statuses={statuses}
+                            companyId={companyId}
+                            workspaceId={workspaceId}
+                            projectId={projectId}
+                        />
+                    )}
+
+                    {/* TRƯỜNG HỢP 2: HIỆN MODAL NỔI (KÉO THẢ ĐƯỢC) */}
+                    {selectedTaskId && viewMode === "floating" && (
+                        <TaskDetailModalFloating
+                            taskId={selectedTaskId}
+                            isOpen={true} // Luôn true khi render
+                            onClose={() => setSelectedTaskId(null)}
+                            // 👇 Thêm sự kiện chuyển đổi về Panel
+                            onSwitchToPanel={() => setViewMode("panel")}
+                            // Truyền props dữ liệu (giống hệt Panel)
+                            onUpdate={handleRefresh}
+                            members={members}
+                            sprints={data?.activeSprints}
+                            statuses={statuses}
+                            companyId={companyId}
+                            workspaceId={workspaceId}
+                            projectId={projectId}
+                        />
+                    )}
+                </div>
+
+                {/* Drag Overlay */}
+                <DragOverlay dropAnimation={dropAnimation}>
+                    {activeTask ? (
+                        <BacklogTaskItem task={activeTask} index={0} isOverlay={true} />
+                    ) : null}
+                </DragOverlay>
+            </DndContext>
+
+            {/* --- MODALS --- */}
+            {selectedSprintId && (
+                <SprintDetailModal
+                    projectId={projectId}
+                    sprintId={selectedSprintId}
+                    onClose={() => setSelectedSprintId(null)}
+                    onUpdate={handleRefresh}
+                />
+            )}
+
+            <CreateSprintModal
+                isOpen={isSprintModalOpen}
+                onClose={() => setIsSprintModalOpen(false)}
+                onSuccess={handleRefresh}
+                projectId={projectId}
+            />
+
+            <CreateTaskModal
+                isOpen={isCreateTaskModalOpen}
+                onClose={() => setIsCreateTaskModalOpen(false)}
+                onSuccess={handleRefresh}
+                companyId={companyId!}
+                workspaceId={workspaceId}
+                projectId={projectId}
                 members={members}
-                sprints={data?.activeSprints}
-                statuses={statuses}
-                companyId={companyId}       
-                workspaceId={workspaceId}   
-                projectId={projectId} 
-             />
-          )}
-
+            />
+            <Chatbot />
         </div>
-
-        {/* Drag Overlay */}
-        <DragOverlay dropAnimation={dropAnimation}>
-          {activeTask ? (
-            <BacklogTaskItem task={activeTask} index={0} isOverlay={true} />
-          ) : null}
-        </DragOverlay>
-
-      </DndContext>
-
-      {/* --- MODALS --- */}
-      {selectedSprintId && (
-        <SprintDetailModal
-          projectId={projectId}
-          sprintId={selectedSprintId}
-          onClose={() => setSelectedSprintId(null)}
-          onUpdate={handleRefresh}
-        />
-      )}
-
-      <CreateSprintModal
-         isOpen={isSprintModalOpen}
-         onClose={() => setIsSprintModalOpen(false)}
-         onSuccess={handleRefresh}
-         projectId={projectId}
-      />
-
-      <CreateTaskModal
-        isOpen={isCreateTaskModalOpen}
-        onClose={() => setIsCreateTaskModalOpen(false)}
-        onSuccess={handleRefresh}
-        companyId={companyId!}
-        workspaceId={workspaceId}
-        projectId={projectId}
-        members={members}
-      />
-      <Chatbot />
-    </div>
-  );
+    );
 }

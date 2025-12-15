@@ -2,32 +2,53 @@
 
 import apiClient from "@/lib/apiClient";
 
-// --- DTOs dựa trên JSON mẫu ---
+// =============================================================================
+// 1. UTILS (Hàm tiện ích nội bộ)
+// =============================================================================
 
-export interface StatsStatus {
-  id: number;
-  name: string;
-  color: string;
-}
+/**
+ * Xây dựng params sạch cho API:
+ * - Loại bỏ null, undefined, chuỗi rỗng.
+ * - Tự động join mảng thành chuỗi ngăn cách bởi dấu phẩy (cho statusIds, epicIds...).
+ */
+const buildQueryParams = (params: any) => {
+  if (!params) return {};
+  
+  const clean: any = {};
+  
+  Object.keys(params).forEach((key) => {
+    const value = params[key];
+    
+    if (value !== null && value !== undefined && value !== "") {
+      if (Array.isArray(value)) {
+        // Backend Spring Boot thường nhận list qua chuỗi "1,2,3" hoặc lặp lại key
+        // Logic cũ của bạn join phẩy, nên giữ nguyên cách này
+        if (value.length > 0) {
+            clean[key] = value.join(","); 
+        }
+      } else {
+        clean[key] = value;
+      }
+    }
+  });
 
-export interface StatsAssignee {
-  id: number;
-  name: string;
-  avatarUrl: string;
-}
+  return clean;
+};
 
-export interface StatsEpic {
-  id: number;
-  name: string;
-  color: string;
-}
+// =============================================================================
+// 2. INTERFACES (Định nghĩa kiểu dữ liệu)
+// =============================================================================
 
+// --- Shared Sub-Interfaces ---
+export interface StatsStatus { id: number; name: string; color: string; }
+export interface StatsAssignee { id: number; name: string; avatarUrl: string; }
+export interface StatsEpic { id: number; name: string; color: string; }
 export interface StatsTask {
   id: number;
   taskCode: string;
   title: string;
-  taskType: string; // BUG, TASK, STORY...
-  priority: string; // URGENT, MEDIUM...
+  taskType: string;
+  priority: string;
   sprintId: number;
   storyPoints: number;
   startDate: string;
@@ -39,42 +60,47 @@ export interface StatsTask {
   tags?: { id: number; name: string; color: string }[];
 }
 
+// --- 2.1 Overview Module ---
 export interface OverviewParams {
   from?: string;        // YYYY-MM-DD
   to?: string;          // YYYY-MM-DD
   keyword?: string;
   assigneeId?: number;
-  priority?: string;    // LOW, MEDIUM, HIGH, URGENT
-  taskType?: string;    // STORY, TASK, BUG...
-  statusIds?: number[]; // Array ID
+  priority?: string;
+  taskType?: string;
+  statusIds?: number[];
 }
 
-// Response tổng thể
 export interface WeeklyOverviewData {
   fromDate: string;
   toDate: string;
-  
   dueSoonCount: number;
   dueSoonTasks: StatsTask[];
-
   createdCount: number;
   createdTasks: StatsTask[];
-
   completedCount: number;
   completedTasks: StatsTask[];
-
   updatedCount: number;
   updatedTasks: StatsTask[];
 }
 
-// Interface chuẩn cho biểu đồ (Dùng chung cho Status/Priority/Type)
+// --- 2.2 Distribution Charts ---
 export interface DistributionStat {
-  name: string;       // Map từ statusName
-  color: string; 
-  code?: string;     
-  taskCount: number;  // Giữ nguyên
-  percentage: number; // Giữ nguyên
+  name: string;      // Map từ statusName/typeName...
+  color: string;
+  code?: string;
+  taskCount: number;
+  percentage: number;
   [key: string]: any;
+}
+
+// --- 2.3 Epic Progress ---
+export interface EpicProgressParams {
+  sprintId?: number | null;
+  statusIds?: number[];
+  from?: string;
+  to?: string;
+  export?: boolean;
 }
 
 export interface EpicProgressStat {
@@ -82,31 +108,30 @@ export interface EpicProgressStat {
   epicName: string;
   epicCode: string;
   color: string;
-  
   totalTasks: number;
   completedTasks: number;
   taskProgressPercent: number;
-
   totalPoints: number;
   completedPoints: number;
   pointProgressPercent: number;
 }
 
-// Interface cho Params Lọc
-export interface EpicProgressParams {
-  sprintId?: number | null;
-  statusIds?: number[]; // Mảng ID
-  from?: string;        // YYYY-MM-DD
-  to?: string;          // YYYY-MM-DD
-  export?: boolean; 
+// --- 2.4 Workload ---
+export interface WorkloadParams {
+  viewType?: "POINTS" | "HOURS";
+  groupBy?: "STATUS" | "PRIORITY";
+  sprintId?: number | "ALL" | null;
+  from?: string;
+  to?: string;
+  statusIds?: number[];
+  export?: boolean;
 }
 
-// Interface cho Workload
 export interface WorkloadBreakdown {
-  stackName: string; // Tên đoạn (vd: "In Progress", "High")
-  color: string;     // Mã màu
-  value: number;     // Giá trị (Points hoặc Hours)
-  taskCount: number; // Số lượng task trong đoạn này
+  stackName: string;
+  color: string;
+  value: number;
+  taskCount: number;
 }
 
 export interface WorkloadStat {
@@ -117,26 +142,12 @@ export interface WorkloadStat {
   breakdowns: WorkloadBreakdown[];
 }
 
-// Params
-export interface WorkloadParams {
-  viewType?: "POINTS" | "HOURS";
-  groupBy?: "STATUS" | "PRIORITY";
-  sprintId?: number | "ALL" | null;
-  from?: string;
-  to?: string;
-  statusIds?: number[];
-  export?: boolean;
-
-}
-
-// ✅ CẬP NHẬT: Interface Params đầy đủ
+// --- 2.5 Roadmap ---
 export interface RoadmapParams {
-  viewType?: "EPIC" | "SPRINT" | "ALL"; 
+  viewType?: "EPIC" | "SPRINT" | "ALL";
   keyword?: string;
   from?: string;
   to?: string;
-  
-  // Filter Mảng (Multi-select)
   epicIds?: number[];
   epicStatuses?: string[];
   sprintIds?: number[];
@@ -144,43 +155,23 @@ export interface RoadmapParams {
 }
 
 export interface RoadmapItemResponse {
-  id: string;        // "epic-1", "sprint-2"
+  id: string;
   originalId: number;
   title: string;
   type: "EPIC" | "SPRINT";
   startDate: string;
   endDate: string;
-  progress: number;  // 0-100
+  progress: number;
   status: string;
   color: string;
   totalTasks: number;
   completedTasks: number;
 }
 
-export interface CalendarEvent {
-  id: string;          // Ví dụ: "task-1", "sprint-2" (để render key trên lịch)
-  originalId: number;  // ID gốc trong DB (để gọi API detail khi click)
-  title: string;
-  start: string;       // ISO 8601 string (2025-09-01T00:00:00)
-  end: string;         // ISO 8601 string
-  allDay: boolean;
-  type: "TASK" | "SPRINT";
-  
-  // UI Properties
-  backgroundColor: string;
-  borderColor: string;
-  textColor: string;
-  
-  // Meta data
-  statusName: string;
-  priority: string | null;      // Chỉ có ở Task
-  assigneeName: string | null;  // Chỉ có ở Task
-  assigneeAvatar: string | null;// Chỉ có ở Task
-}
-
+// --- 2.6 Calendar ---
 export interface CalendarParams {
-  from: string; // YYYY-MM-DD (Bắt buộc)
-  to: string;   // YYYY-MM-DD (Bắt buộc)
+  from: string; // Required
+  to: string;   // Required
   keyword?: string;
   assigneeId?: number;
   priority?: string;
@@ -188,236 +179,231 @@ export interface CalendarParams {
   showSprints?: boolean;
 }
 
+export interface CalendarEvent {
+  id: string;
+  originalId: number;
+  title: string;
+  start: string;
+  end: string;
+  allDay: boolean;
+  type: "TASK" | "SPRINT";
+  backgroundColor: string;
+  borderColor: string;
+  textColor: string;
+  statusName: string;
+  priority: string | null;
+  assigneeName: string | null;
+  assigneeAvatar: string | null;
+}
 
-// --- API METHODS ---
+// =============================================================================
+// 3. API METHODS (Các hàm gọi API)
+// =============================================================================
 
-// 1. Lấy tổng quan (Hỗ trợ Filter & Date Range)
+/**
+ * 1. Lấy tổng quan (Weekly Overview)
+ */
 export const getWeeklyOverview = async (
-  projectId: number, 
+  projectId: number,
   params?: OverviewParams
 ): Promise<WeeklyOverviewData> => {
-  
-  const cleanParams: any = {};
+  try {
+    const res = await apiClient.get(`/statistics/projects/${projectId}`, {
+      params: buildQueryParams(params),
+    });
 
-  if (params?.from) cleanParams.from = params.from;
-  if (params?.to) cleanParams.to = params.to;
-  if (params?.keyword) cleanParams.keyword = params.keyword;
-  if (params?.assigneeId) cleanParams.assigneeId = params.assigneeId;
-  if (params?.priority) cleanParams.priority = params.priority;
-  if (params?.taskType) cleanParams.taskType = params.taskType;
-  
-  if (params?.statusIds && params.statusIds.length > 0) {
-      cleanParams.statusIds = params.statusIds.join(",");
+    const { success, message, data } = res.data;
+    if (!success) throw new Error(message || "Failed to load overview data.");
+    return data;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.message || "System error loading overview.");
   }
-
-  const res = await apiClient.get(`/statistics/projects/${projectId}`, { 
-    params: cleanParams 
-  });
-
-  if (!res.data.success) throw new Error(res.data.message);
-  return res.data.data;
 };
 
-// 2. Lấy phân bổ trạng thái (Status Distribution)
+/**
+ * 2. Lấy phân bổ trạng thái (Status Distribution)
+ */
 export const getStatusDistribution = async (projectId: number): Promise<DistributionStat[]> => {
-  const res = await apiClient.get(`/statistics/projects/${projectId}/status-distribution`);
-  
-  if (!res.data.success) throw new Error(res.data.message);
-  
-  // Map dữ liệu từ Backend về chuẩn Frontend
-  return res.data.data.map((item: any) => ({
-      name: item.statusName,   // Backend trả về statusName -> Đổi thành name
+  try {
+    const res = await apiClient.get(`/statistics/projects/${projectId}/status-distribution`);
+    const { success, message, data } = res.data;
+
+    if (!success) throw new Error(message || "Failed to load status distribution.");
+
+    // Map dữ liệu từ Backend về chuẩn Frontend
+    return data.map((item: any) => ({
+      name: item.statusName,
       color: item.color,
       taskCount: item.taskCount,
-      percentage: item.percentage
-  }));
+      percentage: item.percentage,
+    }));
+  } catch (error: any) {
+    throw new Error(error.response?.data?.message || "System error loading status distribution.");
+  }
 };
 
-// 3. Lấy phân bổ mức độ ưu tiên (Priority Distribution)
+/**
+ * 3. Lấy phân bổ mức độ ưu tiên (Priority Distribution)
+ */
 export const getPriorityDistribution = async (projectId: number): Promise<DistributionStat[]> => {
-  const res = await apiClient.get(`/statistics/projects/${projectId}/priority-distribution`);
-  
-  if (!res.data.success) throw new Error(res.data.message);
-  
-  // Map dữ liệu từ Backend về chuẩn Frontend
-  // Backend: priorityName, priorityCode
-  // Frontend Interface: name, code
-  return res.data.data.map((item: any) => ({
-      name: item.priorityName, 
+  try {
+    const res = await apiClient.get(`/statistics/projects/${projectId}/priority-distribution`);
+    const { success, message, data } = res.data;
+
+    if (!success) throw new Error(message || "Failed to load priority distribution.");
+
+    return data.map((item: any) => ({
+      name: item.priorityName,
       code: item.priorityCode,
       color: item.color,
       taskCount: item.taskCount,
-      percentage: item.percentage
-  }));
+      percentage: item.percentage,
+    }));
+  } catch (error: any) {
+    throw new Error(error.response?.data?.message || "System error loading priority distribution.");
+  }
 };
 
-// 4. Lấy phân bổ loại công việc (Type Distribution)
+/**
+ * 4. Lấy phân bổ loại công việc (Type Distribution)
+ */
 export const getTypeDistribution = async (projectId: number): Promise<DistributionStat[]> => {
-  const res = await apiClient.get(`/statistics/projects/${projectId}/type-distribution`);
-  
-  if (!res.data.success) throw new Error(res.data.message);
-  
-  // Map dữ liệu
-  return res.data.data.map((item: any) => ({
-      name: item.typeName, 
-      code: item.typeCode, 
+  try {
+    const res = await apiClient.get(`/statistics/projects/${projectId}/type-distribution`);
+    const { success, message, data } = res.data;
+
+    if (!success) throw new Error(message || "Failed to load type distribution.");
+
+    return data.map((item: any) => ({
+      name: item.typeName,
+      code: item.typeCode,
       color: item.color,
       taskCount: item.taskCount,
-      percentage: item.percentage
-  }));
+      percentage: item.percentage,
+    }));
+  } catch (error: any) {
+    throw new Error(error.response?.data?.message || "System error loading type distribution.");
+  }
 };
 
-// 5. Lấy tiến độ theo Epic với các tham số lọc
+/**
+ * 5. Lấy tiến độ theo Epic (Epic Progress)
+ */
 export const getEpicProgress = async (
-  projectId: number, 
+  projectId: number,
   params?: EpicProgressParams
 ): Promise<EpicProgressStat[]> => {
-  
-  // Clean params
-  const cleanParams: any = {};
-  if (params?.sprintId) cleanParams.sprintId = params.sprintId;
-  if (params?.from) cleanParams.from = params.from;
-  if (params?.to) cleanParams.to = params.to;
-  
-  // Xử lý mảng statusIds (axios cần format: statusIds=1&statusIds=2...)
-  // Hoặc gửi dạng chuỗi "1,2,3" tùy backend quy định. 
-  // Ở đây giả định backend nhận array params chuẩn.
-  if (params?.statusIds && params.statusIds.length > 0) {
-      cleanParams.statusIds = params.statusIds.join(","); // Chuyển về chuỗi "1,2,3" cho an toàn
+  try {
+    const res = await apiClient.get(`/statistics/projects/${projectId}/epic-progress`, {
+      params: buildQueryParams(params),
+    });
+
+    const { success, message, data } = res.data;
+    if (!success) throw new Error(message || "Failed to load epic progress.");
+    return data;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.message || "System error loading epic progress.");
   }
-
-  const res = await apiClient.get(`/statistics/projects/${projectId}/epic-progress`, { 
-    params: cleanParams 
-  });
-
-  if (!res.data.success) throw new Error(res.data.message);
-  return res.data.data;
 };
 
-// Hàm Export Excel cho Epic (Trả về Blob)
+/**
+ * 5.1 Export Excel cho Epic Progress
+ */
 export const exportEpicProgress = async (
   projectId: number,
   params?: EpicProgressParams
 ): Promise<Blob> => {
-  
-  // 1. Clean params (Logic giống hệt hàm getEpicProgress)
-  const cleanParams: any = {};
-  if (params?.sprintId) cleanParams.sprintId = params.sprintId;
-  if (params?.from) cleanParams.from = params.from;
-  if (params?.to) cleanParams.to = params.to;
-  
-  if (params?.statusIds && params.statusIds.length > 0) {
-      cleanParams.statusIds = params.statusIds.join(",");
+  try {
+    const queryParams = buildQueryParams(params);
+    const res = await apiClient.get(`/statistics/projects/${projectId}/epic-progress`, {
+      params: { ...queryParams, export: true },
+      responseType: "blob",
+    });
+    return res.data;
+  } catch (error: any) {
+    // Với Blob, xử lý lỗi hơi khác (thường backend trả về JSON lỗi thay vì Blob)
+    // Nhưng để đơn giản ta vẫn ném lỗi chuẩn
+    throw new Error("Failed to export epic progress report.");
   }
-
-  // 2. Gọi API với export=true và responseType='blob'
-  const res = await apiClient.get(`/statistics/projects/${projectId}/epic-progress`, {
-    params: { ...cleanParams, export: true },
-    responseType: "blob", 
-  });
-
-  return res.data;
 };
 
-// 6. Lấy tải công việc (Workload) với các tham số lọc
-// 1. Hàm lấy dữ liệu JSON 
-// 1. Hàm lấy dữ liệu JSON
+/**
+ * 6. Lấy tải công việc (Workload)
+ */
 export const getProjectWorkload = async (
-  projectId: number, 
+  projectId: number,
   params?: WorkloadParams
 ): Promise<WorkloadStat[]> => {
-  const cleanParams = buildCleanParams(params); 
-  
-  const res = await apiClient.get(`/statistics/${projectId}/workload`, { 
-    params: { ...cleanParams, export: false } 
-  });
+  try {
+    const queryParams = buildQueryParams(params);
+    const res = await apiClient.get(`/statistics/${projectId}/workload`, {
+      params: { ...queryParams, export: false },
+    });
 
-  if (!res.data.success) throw new Error(res.data.message);
-  return res.data.data;
+    const { success, message, data } = res.data;
+    if (!success) throw new Error(message || "Failed to load workload.");
+    return data;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.message || "System error loading workload.");
+  }
 };
 
-// 2. Hàm Export Excel
+/**
+ * 6.1 Export Excel cho Workload
+ */
 export const exportWorkloadReport = async (
   projectId: number,
   params?: WorkloadParams
 ): Promise<Blob> => {
-  const cleanParams = buildCleanParams(params);
-  
-  const res = await apiClient.get(`/statistics/${projectId}/workload`, {
-    params: { ...cleanParams, export: true },
-    responseType: "blob", 
-  });
-
-  return res.data;
-};
-
-// Helper function để tái sử dụng logic clean params
-const buildCleanParams = (params?: WorkloadParams) => {
-  const cleanParams: any = {};
-  if (params?.viewType) cleanParams.viewType = params.viewType;
-  if (params?.groupBy) cleanParams.groupBy = params.groupBy;
-  if (params?.sprintId && params.sprintId !== "ALL") cleanParams.sprintId = params.sprintId;
-  if (params?.from) cleanParams.from = params.from;
-  if (params?.to) cleanParams.to = params.to;
-  
-  if (params?.statusIds && params.statusIds.length > 0) {
-      cleanParams.statusIds = params.statusIds.join(",");
+  try {
+    const queryParams = buildQueryParams(params);
+    const res = await apiClient.get(`/statistics/${projectId}/workload`, {
+      params: { ...queryParams, export: true },
+      responseType: "blob",
+    });
+    return res.data;
+  } catch (error: any) {
+    throw new Error("Failed to export workload report.");
   }
-  return cleanParams;
 };
 
-// 7. Lấy dữ liệu Roadmap với các tham số lọc
+/**
+ * 7. Lấy dữ liệu Roadmap
+ */
 export const getProjectRoadmap = async (
-  projectId: number, 
+  projectId: number,
   params?: RoadmapParams
 ): Promise<RoadmapItemResponse[]> => {
-  
-  const cleanParams: any = {};
-  
-  if (params?.viewType) cleanParams.viewType = params.viewType;
-  if (params?.keyword) cleanParams.keyword = params.keyword;
-  if (params?.from) cleanParams.from = params.from;
-  if (params?.to) cleanParams.to = params.to;
+  try {
+    // Hàm buildQueryParams đã tự động xử lý join mảng epicIds, sprintIds...
+    const res = await apiClient.get(`/statistics/projects/${projectId}/roadmap`, {
+      params: buildQueryParams(params),
+    });
 
-  // Xử lý mảng: Axios mặc định gửi mảng dạng key[]=val, 
-  // nhưng Spring Boot thường thích dạng key=val1,val2 hoặc lặp lại key=val1&key=val2
-  // Ở đây ta join thành chuỗi "1,2,3" để an toàn nhất với nhiều loại backend
-  if (params?.epicIds?.length) cleanParams.epicIds = params.epicIds.join(",");
-  if (params?.sprintIds?.length) cleanParams.sprintIds = params.sprintIds.join(",");
-  if (params?.epicStatuses?.length) cleanParams.epicStatuses = params.epicStatuses.join(",");
-  if (params?.sprintStatuses?.length) cleanParams.sprintStatuses = params.sprintStatuses.join(",");
-
-  const res = await apiClient.get(`/statistics/projects/${projectId}/roadmap`, { 
-    params: cleanParams 
-  });
-
-  if (!res.data.success) throw new Error(res.data.message);
-  return res.data.data;
+    const { success, message, data } = res.data;
+    if (!success) throw new Error(message || "Failed to load roadmap.");
+    return data;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.message || "System error loading roadmap.");
+  }
 };
 
-// 8. Lấy dữ liệu Lịch dự án (Calendar)
+/**
+ * 8. Lấy dữ liệu Lịch dự án (Calendar)
+ */
 export const getProjectCalendar = async (
-  projectId: number, 
+  projectId: number,
   params: CalendarParams
 ): Promise<CalendarEvent[]> => {
-  
-  const cleanParams: any = {
-    from: params.from,
-    to: params.to
-  };
+  try {
+    const res = await apiClient.get(`/statistics/projects/${projectId}/calendar`, {
+      params: buildQueryParams(params),
+    });
 
-  if (params.keyword) cleanParams.keyword = params.keyword;
-  if (params.assigneeId) cleanParams.assigneeId = params.assigneeId;
-  if (params.priority) cleanParams.priority = params.priority;
-  if (params.taskType) cleanParams.taskType = params.taskType;
-  
-  // Kiểm tra boolean để tránh lỗi khi giá trị là false
-  if (params.showSprints !== undefined) cleanParams.showSprints = params.showSprints;
-
-  const res = await apiClient.get(`/statistics/projects/${projectId}/calendar`, { 
-    params: cleanParams 
-  });
-
-  if (!res.data.success) throw new Error(res.data.message);
-  return res.data.data;
+    const { success, message, data } = res.data;
+    if (!success) throw new Error(message || "Failed to load calendar events.");
+    return data;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.message || "System error loading calendar.");
+  }
 };

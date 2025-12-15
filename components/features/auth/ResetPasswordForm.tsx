@@ -1,89 +1,105 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { KeyRound, CheckCircle2, AlertCircle } from "lucide-react";
+
 import PasswordField from "./PasswordField";
 import LoadingButton from "@/components/ui/LoadingButton";
-// 1. Import Component đánh giá mật khẩu
 import PasswordStrengthMeter from "@/components/ui/PasswordStrengthMeter";
 import { resetPassword } from "@/services/apiAuth";
 
+// =============================================================================
+// 1. MAIN COMPONENT
+// =============================================================================
+
 export default function ResetPasswordForm() {
+  // --- HOOKS ---
   const router = useRouter();
   const searchParams = useSearchParams();
 
+  // --- STATE ---
   const [token, setToken] = useState<string | null>(null);
+  
+  // Form State
   const [newPassword, setNewPassword] = useState("");
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
-
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-  const [isError, setIsError] = useState(false);
-
+  
+  // Visibility State
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
-  // 1. Tự động đọc token từ URL khi trang tải
+  // Status State
+  const [loading, setLoading] = useState(false);
+  const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
+
+  // --- EFFECT: READ TOKEN ---
   useEffect(() => {
     const tokenFromUrl = searchParams.get("token");
     if (tokenFromUrl) {
       setToken(tokenFromUrl);
     } else {
-      setMessage("Invalid or expired token.");
-      setIsError(true);
+      setFeedback({ type: "error", message: "Invalid or missing reset token." });
     }
   }, [searchParams]);
 
-  // 2. Xử lý submit
+  // --- HANDLER: SUBMIT ---
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setFeedback(null);
+
+    // 1. Validate Basic
     if (!token) {
-      setMessage("Invalid token.");
-      setIsError(true);
+      setFeedback({ type: "error", message: "Token is missing." });
       return;
     }
     if (newPassword.length < 6) {
-      setMessage("Password must be at least 6 characters.");
-      setIsError(true);
+      setFeedback({ type: "error", message: "Password must be at least 6 characters." });
       return;
     }
     if (newPassword !== confirmNewPassword) {
-      setMessage("Passwords do not match.");
-      setIsError(true);
+      setFeedback({ type: "error", message: "Passwords do not match." });
       return;
     }
 
+    // 2. Call API
+    setLoading(true);
     try {
-      setMessage(null);
-      setIsError(false);
-      setLoading(true);
-
       const res = await resetPassword({
-        token: token,
-        newPassword: newPassword,
+        token,
+        newPassword,
       });
 
-      setMessage(res?.message || "Password reset successfully!");
-      setIsError(false);
-      // Chuyển về trang đăng nhập sau 2 giây
+      // 3. Success
+      setFeedback({ 
+        type: "success", 
+        message: res?.message || "Password has been reset successfully!" 
+      });
+
+      // Tự động chuyển về trang login sau 2s
       setTimeout(() => router.push("/"), 2000);
+
     } catch (error: any) {
-      setMessage(error.message || "Token invalid or expired.");
-      setIsError(true);
+      // 4. Error
+      setFeedback({ 
+        type: "error", 
+        message: error.message || "Failed to reset password. Token may be expired." 
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  if (!token && !message) {
+  // --- RENDER: LOADING TOKEN ---
+  if (!token && !feedback) {
     return (
-      <div className="p-8 text-center text-slate-500 text-sm font-medium">
-        Verifying token...
+      <div className="p-8 text-center text-slate-500 text-sm font-medium animate-pulse">
+        Verifying security token...
       </div>
     );
   }
 
+  // --- RENDER: MAIN FORM ---
   return (
     <>
       {/* Header Minimalist */}
@@ -101,7 +117,8 @@ export default function ResetPasswordForm() {
 
       {/* Form Content */}
       <form className="p-6 space-y-5" onSubmit={handleSubmit}>
-        {/* Nhóm Mật khẩu mới & Thanh đánh giá */}
+        
+        {/* Field: New Password + Strength Meter */}
         <div className="space-y-3">
           <PasswordField
             label="New Password"
@@ -111,11 +128,10 @@ export default function ResetPasswordForm() {
             onChange={(e) => setNewPassword(e.target.value)}
             placeholder="Enter new password"
           />
-
-          {/* 2. 🔥 Chèn component đánh giá vào đây */}
           <PasswordStrengthMeter password={newPassword} />
         </div>
 
+        {/* Field: Confirm Password */}
         <PasswordField
           label="Confirm Password"
           value={confirmNewPassword}
@@ -125,6 +141,7 @@ export default function ResetPasswordForm() {
           placeholder="Re-enter password"
         />
 
+        {/* Submit Button */}
         <div className="pt-2">
           <LoadingButton
             type="submit"
@@ -135,21 +152,21 @@ export default function ResetPasswordForm() {
           />
         </div>
 
-        {/* Hiển thị thông báo (Alert Style) */}
-        {message && (
+        {/* Feedback Alert */}
+        {feedback && (
           <div
-            className={`mt-4 p-3 rounded-md flex items-start gap-3 text-sm font-medium border ${
-              isError
+            className={`mt-4 p-3 rounded-md flex items-start gap-3 text-sm font-medium border animate-in fade-in slide-in-from-top-1 ${
+              feedback.type === "error"
                 ? "bg-red-50 text-red-700 border-red-100"
                 : "bg-green-50 text-green-700 border-green-100"
             }`}
           >
-            {isError ? (
+            {feedback.type === "error" ? (
               <AlertCircle className="w-5 h-5 shrink-0" />
             ) : (
               <CheckCircle2 className="w-5 h-5 shrink-0" />
             )}
-            <span>{message}</span>
+            <span>{feedback.message}</span>
           </div>
         )}
       </form>
