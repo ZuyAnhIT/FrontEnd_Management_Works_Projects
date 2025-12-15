@@ -431,11 +431,7 @@ export default function ImportTaskModal(props: ImportTaskModalProps) {
                                 >
                                   <option value="">Unassigned</option>
                                   {props.members.map((m) => (
-                                    <option
-                                      key={m.userId}
-                                      value={m.email}
-                                      title={m.fullName}
-                                    >
+                                    <option key={m.userId} value={m.email} title={m.fullName}>
                                       {m.email} ({m.fullName})
                                     </option>
                                   ))}
