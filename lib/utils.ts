@@ -16,7 +16,7 @@ export function getImageUrl(path: string | null | undefined): string | null {
 
   // 2. Lấy Domain Backend từ biến môi trường (hoặc hardcode tạm thời)
   // Khuyên dùng: process.env.NEXT_PUBLIC_API_URL || "http://localhost:8082"
-  const baseUrl = "http://localhost:8082"; 
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8082"; 
 
   // 3. Xử lý dấu gạch chéo để tránh bị 2 dấu // (ví dụ: base/ + /uploads)
   const cleanPath = path.startsWith("/") ? path.slice(1) : path;
