@@ -1,22 +1,31 @@
 "use client";
 
 import { useState } from "react";
-import { Mail, Lock } from "lucide-react"; // Import thêm icon Lock
+import { Mail } from "lucide-react";
+
 import InputField from "./InputField";
 import PasswordField from "./PasswordField";
 import LoadingButton from "@/components/ui/LoadingButton";
+
+// =============================================================================
+// 1. INTERFACES & TYPES
+// =============================================================================
+
+type AuthTab = "login" | "register" | "verify" | "forgot";
 
 interface AuthFormLoginProps {
   form: {
     email: string;
     password: string;
   };
-  handleChange: (
-    field: keyof AuthFormLoginProps["form"]
-  ) => (e: React.ChangeEvent<HTMLInputElement>) => void;
+  handleChange: (field: "email" | "password") => (e: React.ChangeEvent<HTMLInputElement>) => void;
   isLoading: boolean;
-  setTab: (tab: "login" | "register" | "verify" | "forgot") => void;
+  setTab: (tab: AuthTab) => void;
 }
+
+// =============================================================================
+// 2. MAIN COMPONENT
+// =============================================================================
 
 export default function AuthFormLogin({
   form,
@@ -24,11 +33,14 @@ export default function AuthFormLogin({
   isLoading,
   setTab,
 }: AuthFormLoginProps) {
+  // --- STATE ---
   const [showPassword, setShowPassword] = useState(false);
 
+  // --- RENDER ---
   return (
-    <div className="space-y-4">
-      {/* 📨 Email Field */}
+    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+      
+      {/* --- Field: Email --- */}
       <InputField
         label="Email Address"
         icon={<Mail className="w-4 h-4 text-gray-400" />}
@@ -39,39 +51,49 @@ export default function AuthFormLogin({
         required
       />
 
-      {/* 🔒 Password Field */}
+      {/* --- Field: Password --- */}
       <PasswordField
         label="Password"
         value={form.password}
         show={showPassword}
         toggle={() => setShowPassword((prev) => !prev)}
         onChange={handleChange("password")}
+        placeholder="Enter your password"
       />
 
-      {/* ⚙️ Options: Remember & Forgot Password */}
+      {/* --- Options: Remember & Forgot --- */}
       <div className="flex justify-between items-center text-sm">
-        <label className="flex items-center gap-2 cursor-pointer text-gray-600 hover:text-gray-900">
+        
+        {/* Checkbox Remember Me (Uncontrolled để giữ nguyên logic cũ) */}
+        <div className="flex items-center gap-2">
           <input
+            id="remember-me"
             type="checkbox"
-            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
           />
-          <span className="text-xs sm:text-sm">Remember me</span>
-        </label>
+          <label 
+            htmlFor="remember-me" 
+            className="text-xs sm:text-sm text-gray-600 hover:text-gray-900 cursor-pointer select-none"
+          >
+            Remember me
+          </label>
+        </div>
 
+        {/* Link Forgot Password */}
         <button
           type="button"
           onClick={() => setTab("forgot")}
-          className="text-xs sm:text-sm font-medium text-blue-600 hover:text-blue-500 hover:underline"
+          className="text-xs sm:text-sm font-medium text-blue-600 hover:text-blue-500 hover:underline transition-colors"
         >
           Forgot password?
         </button>
       </div>
 
-      {/* ✅ Submit Button */}
+      {/* --- Submit Action --- */}
       <LoadingButton
-        text="Sign in to your account"
+        text="Sign In"
         isLoading={isLoading}
-        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-lg transition-all shadow-sm hover:shadow"
+        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-lg transition-all shadow-sm hover:shadow-md"
       />
     </div>
   );

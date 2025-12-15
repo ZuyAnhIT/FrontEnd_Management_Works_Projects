@@ -4,33 +4,34 @@ import {
   LayoutDashboard,
   ListTodo,
   Menu as MenuIcon,
-  GitBranch,
+  GitBranch, // Sử dụng cho List View
   Archive,
-  Calendar,
-  CalendarDays, 
-  BarChart3,
+  Calendar, // Sử dụng cho Timeline
+  CalendarDays, // Sử dụng cho Calendar View
 } from 'lucide-react'
 import { usePathname, useParams } from 'next/navigation'
 import Link from 'next/link'
+
+// =============================================================================
+// 1. INTERFACES
+// =============================================================================
 
 interface ProjectNavTabsProps {
   projectId: string
   onMenuToggle?: () => void
 }
 
-export default function ProjectNavTabs({
-  projectId,
-  onMenuToggle,
-}: ProjectNavTabsProps) {
-  const pathname = usePathname()
-  const { workspaceId } = useParams() as { workspaceId: string }
+// =============================================================================
+// 2. CONFIGURATION
+// =============================================================================
 
-  const navTabs = [
+const getNavTabs = (workspaceId: string, projectId: string) => [
     {
       id: 'dashboard',
       icon: LayoutDashboard,
       label: 'Dashboard',
       path: `/core/workspace/${workspaceId}/project/${projectId}`,
+      isBasePath: true, // Đánh dấu đây là path gốc (base path)
     },
     {
       id: 'board',
@@ -39,10 +40,10 @@ export default function ProjectNavTabs({
       path: `/core/workspace/${workspaceId}/project/${projectId}/board`,
     },
     {
-      id: 'sprints',
+      id: 'list',
       icon: GitBranch,
       label: 'List',
-      path: `/core/workspace/${workspaceId}/project/${projectId}/sprints`,
+      path: `/core/workspace/${workspaceId}/project/${projectId}/list`,
     },
     {
       id: 'backlog',
@@ -68,28 +69,51 @@ export default function ProjectNavTabs({
       label: 'Archived',
       path: `/core/workspace/${workspaceId}/project/${projectId}/archived`,
     },
-  ]
+];
 
+// =============================================================================
+// 3. MAIN COMPONENT
+// =============================================================================
+
+export default function ProjectNavTabs({
+  projectId,
+  onMenuToggle,
+}: ProjectNavTabsProps) {
+  // --- HOOKS ---
+  const pathname = usePathname();
+  const { workspaceId } = useParams() as { workspaceId: string };
+  const navTabs = getNavTabs(workspaceId, projectId);
+
+  // --- RENDER ---
   return (
     <div className="bg-white border-b border-slate-200 sticky top-14 z-30">
       <div className="flex items-center h-12 px-4 lg:px-6 gap-4">
         
-        {/* Menu button for mobile */}
-        <button
-          onClick={onMenuToggle}
-          className="lg:hidden p-2 rounded-md hover:bg-slate-100 text-slate-500 transition-colors"
-        >
-          <MenuIcon className="w-5 h-5" />
-        </button>
+        {/* Mobile Menu Toggle Button */}
+        {onMenuToggle && (
+          <button
+            onClick={onMenuToggle}
+            className="lg:hidden p-2 rounded-md hover:bg-slate-100 text-slate-500 transition-colors"
+            title="Toggle Menu"
+          >
+            <MenuIcon className="w-5 h-5" />
+          </button>
+        )}
 
         {/* Navigation Tabs Container */}
         <div className="flex-1 overflow-x-auto scrollbar-hide">
           <div className="flex gap-6 h-full">
             {navTabs.map((tab) => {
-              // Logic check active path chính xác hơn
+              
+              // Logic check active path:
+              // 1. Path hiện tại trùng khớp hoàn toàn với tab path.
+              // 2. Nếu là Dashboard (base path), kiểm tra xem path có kết thúc bằng project ID không.
+              const isBaseUrl = `/core/workspace/${workspaceId}/project/${projectId}`;
               const isActive = 
                 pathname === tab.path || 
-                (tab.id === 'dashboard' && pathname?.endsWith(`/project/${projectId}`));
+                (tab.isBasePath && pathname === isBaseUrl);
+
+              const TabIcon = tab.icon;
 
               return (
                 <Link key={tab.id} href={tab.path} className="relative flex items-center h-full group">
@@ -97,20 +121,21 @@ export default function ProjectNavTabs({
                     className={`
                       flex items-center gap-2 py-3 text-sm font-medium transition-colors whitespace-nowrap
                       ${isActive 
-                        ? 'text-blue-600' // Active: Chữ xanh
-                        : 'text-slate-600 hover:text-slate-900' // Inactive: Chữ xám
+                        ? 'text-blue-600'
+                        : 'text-slate-600 hover:text-slate-900'
                       }
                     `}
                   >
-                    {/* Icon ẩn trên mobile nhỏ để tiết kiệm chỗ, hiện trên tablet trở lên */}
-                    <tab.icon className={`w-4 h-4 ${isActive ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-600'}`} />
+                    
+                    {/* Icon */}
+                    <TabIcon className={`w-4 h-4 ${isActive ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-600'}`} />
                     
                     <span>{tab.label}</span>
                   </button>
 
                   {/* Active Indicator Bar (Gạch chân xanh) */}
                   {isActive && (
-                    <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-blue-600 rounded-t-full animate-in fade-in zoom-in-x duration-200"></div>
+                    <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-blue-600 rounded-t-full animate-in fade-in duration-200"></div>
                   )}
                 </Link>
               )
@@ -119,6 +144,7 @@ export default function ProjectNavTabs({
         </div>
       </div>
 
+      {/* Custom CSS for hiding scrollbar (giữ lại style gốc) */}
       <style jsx>{`
         .scrollbar-hide::-webkit-scrollbar {
           display: none;

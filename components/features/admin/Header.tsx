@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { 
-  Menu, Bell, Crown, ArrowLeft, 
+  Menu, Bell, Crown, 
   LayoutGrid, Layers, FolderKanban 
 } from "lucide-react";
 import { usePathname, useRouter, useParams } from "next/navigation";
@@ -10,102 +10,140 @@ import UserMenu from "@/components/ui/UserMenu";
 import { useAuth } from "@/context/AuthContext";
 import NotificationPopover from "@/components/features/admin/NotificationPopover";
 
+// =============================================================================
+// 1. TYPES & INTERFACES
+// =============================================================================
+
 interface HeaderProps {
   onMenuToggle: () => void;
 }
 
+// Định nghĩa các chế độ hiển thị của Header
+type HeaderMode = "PORTAL" | "PROJECT" | "WORKSPACE" | "ADMIN";
+
+// =============================================================================
+// 2. MAIN COMPONENT
+// =============================================================================
+
 export default function AdminHeader({ onMenuToggle }: HeaderProps) {
+  // --- STATE & HOOKS ---
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
 
   const pathname = usePathname();
   const router = useRouter();
-  const params = useParams(); // ✅ Lấy params để check ID
+  const params = useParams();
   
   const { user, logout, activeCompany } = useAuth();
 
-  // --- 1. DETECT CONTEXT ---
-  const isPortal = pathname?.startsWith("/portal");
-  
-  // Kiểm tra Project trước (vì đường dẫn project cũng chứa /core)
-  const isProject = pathname?.includes("/project/") && !!params.projectId;
-  
-  // Core là các trang workspace nhưng không phải project
-  const isCore = pathname?.startsWith("/core") && !isProject; 
-  
-  // const isCompanyAdminPage = pathname?.startsWith("/admin/company");
+  // =========================================================================
+  // 3. LOGIC: CONTEXT DETECTION (XÁC ĐỊNH NGỮ CẢNH)
+  // =========================================================================
 
-  // --- 2. DATA LOOKUP (Tìm tên dự án hiện tại) ---
+  /**
+   * Xác định xem người dùng đang ở đâu: Portal, Project, Workspace hay Admin
+   */
+  const currentMode: HeaderMode = useMemo(() => {
+    if (pathname?.startsWith("/portal")) return "PORTAL";
+    if (pathname?.includes("/project/") && params.projectId) return "PROJECT";
+    if (pathname?.startsWith("/core") && !params.projectId) return "WORKSPACE";
+    return "ADMIN";
+  }, [pathname, params]);
+
+  /**
+   * Tìm dự án hiện tại từ danh sách membership của user (nếu đang ở chế độ Project)
+   */
   const currentProject = useMemo(() => {
-    if (!isProject || !user?.projectMemberships) return null;
+    if (currentMode !== "PROJECT" || !user?.projectMemberships) return null;
     const pId = Number(params.projectId);
     return user.projectMemberships.find((p) => p.projectId === pId);
-  }, [isProject, params.projectId, user?.projectMemberships]);
+  }, [currentMode, params.projectId, user?.projectMemberships]);
 
-  // --- 3. HANDLERS ---
-  const handleLogoClick = () => {
-    if (isPortal) {
-      router.push("/portal");
-    } else if (isProject) {
-      // Nếu đang ở Project -> Click về trang tổng quan Project đó
-      router.push(`/core/workspace/${params.workspaceId}/project/${params.projectId}`);
-    } else if (isCore) {
-      // Nếu đang ở Workspace -> Click về trang tổng quan Workspace
-      router.push(`/core/workspace/${params.workspaceId}`);
-    } else {
-      // Mặc định về Admin
-      router.push("/admin");
+  // =========================================================================
+  // 4. LOGIC: UI CONFIGURATION (CẤU HÌNH GIAO DIỆN)
+  // =========================================================================
+
+  /**
+   * Cấu hình hiển thị (Icon, Màu, Text, Link) dựa trên `currentMode`
+   * Giúp tách biệt logic render ra khỏi JSX
+   */
+  const headerConfig = useMemo(() => {
+    switch (currentMode) {
+      case "PORTAL":
+        return {
+          icon: <LayoutGrid className="w-4 h-4 text-white" />,
+          label: "Member Portal",
+          title: activeCompany ? activeCompany.companyName : "My Portal",
+          bgColor: "bg-blue-600",
+          href: "/portal",
+        };
+
+      case "PROJECT":
+        return {
+          icon: <FolderKanban className="w-4 h-4 text-white" />,
+          label: "Project Workspace",
+          title: currentProject?.projectName || "Project",
+          bgColor: "bg-emerald-600", // Màu xanh lá đặc trưng cho Project
+          href: `/core/workspace/${params.workspaceId}/project/${params.projectId}`,
+        };
+
+      case "WORKSPACE":
+        return {
+          icon: <Layers className="w-4 h-4 text-white" />,
+          label: "Workspace Core",
+          // Hiển thị tên công ty để giữ ngữ cảnh lớn (hoặc tên workspace nếu fetch được)
+          title: activeCompany ? activeCompany.companyName : "Workspace",
+          bgColor: "bg-indigo-600",
+          href: `/core/workspace/${params.workspaceId}`,
+        };
+
+      case "ADMIN":
+      default:
+        return {
+          icon: <Crown className="w-4 h-4 text-yellow-400" />,
+          label: "Admin Panel",
+          title: "WorkNet",
+          bgColor: "bg-slate-900",
+          href: "/admin",
+        };
     }
-  };
+  }, [currentMode, activeCompany, currentProject, params]);
 
+  // Safe user data để tránh lỗi null
   const safeUser = {
     name: user?.fullName || "User",
     email: user?.email || "user@worknet.com",
   };
 
-  // --- 4. RENDER HELPERS (Logo, Text, Color) ---
+  // =========================================================================
+  // 5. HANDLERS
+  // =========================================================================
 
-  // Helper render Logo Icon
-  const renderLogoIcon = () => {
-    if (isPortal) return <LayoutGrid className="w-4 h-4 text-white" />;
-    if (isProject) return <FolderKanban className="w-4 h-4 text-white" />; // ✅ Icon Project
-    if (isCore) return <Layers className="w-4 h-4 text-white" />;
-    return <Crown className="w-4 h-4 text-yellow-400" />; // Admin
+  const handleLogoClick = () => {
+    router.push(headerConfig.href);
   };
 
-  // Helper render Logo Text
-  const renderLogoText = () => {
-    if (isProject) return currentProject?.projectName || "Project"; // ✅ Tên Dự án
-    if (isCore) {
-        // Tìm tên Workspace trong list (nếu cần chính xác), hoặc hiển thị tên Cty
-        // Ở đây hiển thị tên Cty để giữ ngữ cảnh lớn, hoặc có thể fetch workspaceName
-        return activeCompany ? activeCompany.companyName : "Workspace"; 
-    }
-    if (isPortal) return activeCompany ? activeCompany.companyName : "My Portal";
-    return "WorkNet";
+  const toggleUserMenu = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setUserMenuOpen(!userMenuOpen);
+    setNotifOpen(false);
   };
 
-  // Helper render Label (Sub-text)
-  const renderLogoLabel = () => {
-    if (isPortal) return "Member Portal";
-    if (isProject) return "Project "; // ✅ Label Project
-    if (isCore) return "Workspace Core";
-    return "Admin Panel";
+  const toggleNotifications = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setNotifOpen(!notifOpen);
+    setUserMenuOpen(false);
   };
 
-  // Helper Background Color
-  const getLogoBg = () => {
-    if (isPortal) return "bg-blue-600";
-    if (isProject) return "bg-emerald-600"; // ✅ Màu xanh lá cho Project
-    if (isCore) return "bg-indigo-600";     // Màu tím cho Workspace
-    return "bg-slate-900";                  // Màu đen cho Admin
-  };
+  // =========================================================================
+  // 6. RENDER
+  // =========================================================================
 
   return (
     <header className="sticky top-0 z-40 bg-white border-b border-slate-200 h-14 flex items-center shadow-sm">
       <div className="w-full px-4 flex items-center justify-between">
         
-        {/* LEFT SECTION */}
+        {/* --- LEFT SECTION (Logo & Toggle) --- */}
         <div className="flex items-center gap-4">
           
           {/* Mobile Menu Toggle */}
@@ -116,41 +154,38 @@ export default function AdminHeader({ onMenuToggle }: HeaderProps) {
             <Menu className="w-5 h-5" />
           </button>
 
-          {/* Logo / Context Name Area */}
+          {/* Context Logo Area */}
           <div
             className="flex items-center gap-2 cursor-pointer group select-none"
             onClick={handleLogoClick}
+            title={`Go to ${headerConfig.label}`}
           >
-            {/* Logo Icon */}
+            {/* Logo Icon Box */}
             <div
-              className={`w-8 h-8 rounded-md flex items-center justify-center shadow-sm transition-transform group-hover:scale-105 ${getLogoBg()}`}
+              className={`w-8 h-8 rounded-md flex items-center justify-center shadow-sm transition-transform group-hover:scale-105 ${headerConfig.bgColor}`}
             >
-              {renderLogoIcon()}
+              {headerConfig.icon}
             </div>
 
             {/* Text Info */}
             <div className="hidden sm:block">
               <span className="font-bold text-lg text-slate-900 tracking-tight block leading-none max-w-[200px] truncate">
-                {renderLogoText()}
+                {headerConfig.title}
               </span>
               <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
-                {renderLogoLabel()}
+                {headerConfig.label}
               </span>
             </div>
           </div>
         </div>
 
-        {/* RIGHT SECTION */}
+        {/* --- RIGHT SECTION (User & Tools) --- */}
         <div className="flex items-center gap-2">
           
           {/* Notification Bell */}
           <div className="relative">
             <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setNotifOpen(!notifOpen);
-                setUserMenuOpen(false);
-              }}
+              onClick={toggleNotifications}
               className={`p-2 rounded-full transition-colors relative ${
                 notifOpen
                   ? "bg-blue-50 text-blue-600"
@@ -158,6 +193,7 @@ export default function AdminHeader({ onMenuToggle }: HeaderProps) {
               }`}
             >
               <Bell className="w-5 h-5" />
+              {/* Dot thông báo giả lập */}
               <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white pointer-events-none"></span>
             </button>
 
@@ -167,19 +203,16 @@ export default function AdminHeader({ onMenuToggle }: HeaderProps) {
             />
           </div>
 
+          {/* Separator */}
           <div className="w-px h-6 bg-slate-200 mx-1 hidden sm:block"></div>
 
           {/* User Menu */}
           <div className="relative ml-1">
             <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setUserMenuOpen(!userMenuOpen);
-                setNotifOpen(false);
-              }}
+              onClick={toggleUserMenu}
               className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-white text-xs font-bold hover:bg-slate-900 transition-colors ring-2 ring-white shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
             >
-              {safeUser.name?.charAt(0)?.toUpperCase() || "U"}
+              {safeUser.name.charAt(0).toUpperCase()}
             </button>
 
             {userMenuOpen && (

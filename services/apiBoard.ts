@@ -1,11 +1,15 @@
 "use client";
 
 import apiClient from "@/lib/apiClient";
-import { TaskSummary } from "./apiProject"; // Import TaskSummary từ apiProject để tái sử dụng
+import { TaskSummary } from "./apiProject";
 
-// ===================================================
-// 🔹 1. INTERFACES (Đã cập nhật để khớp JSON thực tế)
-// ===================================================
+// =============================================================================
+// 1. INTERFACES & TYPES (Định nghĩa kiểu dữ liệu)
+// =============================================================================
+
+// -----------------------------------------------------------------------------
+// Response Types (Dữ liệu trả về từ API)
+// -----------------------------------------------------------------------------
 
 // Dữ liệu thô từ API Board (GET /board)
 export interface RawBoardColumn {
@@ -31,20 +35,24 @@ export interface RawStatusColumn {
 export interface BoardColumnResponse {
   id: number;
   name: string;
-  color: string; 
+  color: string;
   position: number;
   isCompletedStatus: boolean;
   tasks: TaskSummary[]; // Luôn đảm bảo là mảng (kể cả rỗng)
 }
 
+// -----------------------------------------------------------------------------
+// Filter & Payload Types (Dữ liệu gửi đi)
+// -----------------------------------------------------------------------------
+
 // Bộ lọc cho Board
 export interface BoardFilterParams {
   // 0 = Backlog, > 0 = Sprint cụ thể, null = Tự động lấy Active Sprint
-  sprintId?: number | null; 
+  sprintId?: number | null;
   
-  keyword?: string;             // Tìm kiếm theo tên/code
-  assigneeId?: number;          // Lọc theo người được gán
-  priority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT'; 
+  keyword?: string;           // Tìm kiếm theo tên/code
+  assigneeId?: number;        // Lọc theo người được gán
+  priority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
   taskType?: 'TASK' | 'BUG' | 'STORY';
 }
 
@@ -61,9 +69,9 @@ export interface MoveTaskInBoardPayload {
   newSortOrder?: number | null; // Index mới trong cột (nếu null thì xuống cuối)
 }
 
-// ===================================================
-// 🔹 2. API: LẤY DỮ LIỆU BOARD (QUAN TRỌNG NHẤT)
-// ===================================================
+// =============================================================================
+// 2. BOARD VIEW APIs (Hiển thị dữ liệu Board)
+// =============================================================================
 
 /**
  * 🔹 Lấy dữ liệu Board (Tasks grouped by Status)
@@ -71,32 +79,40 @@ export interface MoveTaskInBoardPayload {
  * GET /companies/{companyId}/workspaces/{workspaceId}/projects/{projectId}/board
  */
 export const getProjectBoardData = async (
-  companyId: number,    
-  workspaceId: number,  
+  companyId: number,
+  workspaceId: number,
   projectId: number,
   params: BoardFilterParams
-): Promise<RawBoardColumn[]> => { // Trả về Raw Data trước
+): Promise<RawBoardColumn[]> => {
   
   // Clean params: Xóa các key có value undefined/null/rỗng
   const cleanParams = Object.fromEntries(
     Object.entries(params).filter(([_, v]) => v !== null && v !== undefined && v !== "")
   );
 
-  const res = await apiClient.get(
-    `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/board`, 
-    { params: cleanParams }
-  );
+  try {
+    const res = await apiClient.get(
+      `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/board`,
+      { params: cleanParams }
+    );
 
-  if (!res.data.success) {
-    throw new Error(res.data.message || "Không thể tải dữ liệu Board.");
+    const { success, message, data } = res.data;
+
+    if (!success) {
+      throw new Error(message || "Failed to load board data.");
+    }
+
+    return data as RawBoardColumn[];
+
+  } catch (error: any) {
+    // Re-throw lỗi với message chuẩn để UI hiển thị
+    throw new Error(error.response?.data?.message || error.message || "System error loading board.");
   }
-
-  return res.data.data as RawBoardColumn[]; 
 };
 
-// ===================================================
-// 🔹 3. API: THAO TÁC TASK TRÊN BOARD
-// ===================================================
+// =============================================================================
+// 3. TASK ACTION APIs (Thao tác Task trên Board)
+// =============================================================================
 
 /**
  * 🔹 Di chuyển Task giữa các cột (Kéo thả ngang & dọc)
@@ -106,21 +122,24 @@ export const moveTaskToStatus = async (
   taskId: number,
   payload: MoveTaskInBoardPayload
 ) => {
-  const res = await apiClient.put(
-    `/tasks/${taskId}/move`,
-    payload
-  );
+  try {
+    const res = await apiClient.put(`/tasks/${taskId}/move`, payload);
+    const { success, message, data } = res.data;
 
-  if (!res.data.success) {
-    throw new Error(res.data.message || "Không thể di chuyển task.");
+    if (!success) {
+      throw new Error(message || "Failed to move task.");
+    }
+
+    return res.data; // Trả về { success, message }
+
+  } catch (error: any) {
+    throw new Error(error.response?.data?.message || "System error moving task.");
   }
-
-  return res.data; // { success, message }
 };
 
-// ===================================================
-// 🔹 4. API: QUẢN LÝ CỘT (STATUS CRUD)
-// ===================================================
+// =============================================================================
+// 4. STATUS MANAGEMENT APIs (Quản lý Cột/Trạng thái)
+// =============================================================================
 
 /**
  * 🔹 Lấy danh sách trạng thái (cột) đơn thuần (không kèm task)
@@ -129,8 +148,10 @@ export const moveTaskToStatus = async (
  */
 export const getProjectStatuses = async (projectId: number): Promise<RawStatusColumn[]> => {
   const res = await apiClient.get(`/projects/${projectId}/statuses`);
-  if (!res.data.success) throw new Error(res.data.message);
-  return res.data.data as RawStatusColumn[]; 
+  const { success, message, data } = res.data;
+
+  if (!success) throw new Error(message || "Failed to fetch statuses.");
+  return data as RawStatusColumn[];
 };
 
 /**
@@ -141,12 +162,11 @@ export const createProjectStatus = async (
   projectId: number,
   payload: StatusPayload
 ) => {
-  const res = await apiClient.post(
-    `/projects/${projectId}/statuses`,
-    payload
-  );
-  if (!res.data.success) throw new Error(res.data.message);
-  return res.data.data; // Trả về cột mới tạo
+  const res = await apiClient.post(`/projects/${projectId}/statuses`, payload);
+  const { success, message, data } = res.data;
+
+  if (!success) throw new Error(message || "Failed to create status.");
+  return data; // Trả về cột mới tạo
 };
 
 /**
@@ -158,12 +178,11 @@ export const updateProjectStatus = async (
   statusId: number,
   payload: Partial<StatusPayload> // Cho phép update từng phần
 ) => {
-  const res = await apiClient.put(
-    `/projects/${projectId}/statuses/${statusId}`,
-    payload
-  );
-  if (!res.data.success) throw new Error(res.data.message);
-  return res.data.data;
+  const res = await apiClient.put(`/projects/${projectId}/statuses/${statusId}`, payload);
+  const { success, message, data } = res.data;
+
+  if (!success) throw new Error(message || "Failed to update status.");
+  return data;
 };
 
 /**
@@ -174,10 +193,10 @@ export const deleteProjectStatus = async (
   projectId: number,
   statusId: number
 ) => {
-  const res = await apiClient.delete(
-    `/projects/${projectId}/statuses/${statusId}`
-  );
-  if (!res.data.success) throw new Error(res.data.message);
+  const res = await apiClient.delete(`/projects/${projectId}/statuses/${statusId}`);
+  const { success, message } = res.data;
+
+  if (!success) throw new Error(message || "Failed to delete status.");
   return res.data;
 };
 
@@ -193,6 +212,8 @@ export const reorderProjectStatuses = async (
     `/projects/${projectId}/statuses/reorder`,
     { orderedStatusIds }
   );
-  if (!res.data.success) throw new Error(res.data.message);
+  const { success, message } = res.data;
+
+  if (!success) throw new Error(message || "Failed to reorder statuses.");
   return res.data;
 };

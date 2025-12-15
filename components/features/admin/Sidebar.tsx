@@ -1,5 +1,8 @@
 "use client";
 
+import { useState, useMemo } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   Building2,
   Users,
@@ -14,18 +17,23 @@ import {
   LayoutGrid,
   Home
 } from "lucide-react";
-import { useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
-import Link from "next/link";
+
+// =============================================================================
+// 1. INTERFACES
+// =============================================================================
 
 interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
   activeMenu: string;
   setActiveMenu: (id: string) => void;
-  workspaces: any[]; // Giữ lại để không lỗi type, dù portal không dùng
+  workspaces: any[]; // Giữ lại để tránh lỗi type ở Parent
   loadingWs: boolean;
 }
+
+// =============================================================================
+// 2. MAIN COMPONENT
+// =============================================================================
 
 export default function AdminSidebar({
   isOpen,
@@ -33,67 +41,95 @@ export default function AdminSidebar({
   activeMenu,
   setActiveMenu,
 }: SidebarProps) {
+  // --- STATE & HOOKS ---
   const [collapsed, setCollapsed] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
 
-  // 🔍 Detect Context
+  // =========================================================================
+  // 3. LOGIC: CONTEXT DETECTION (Xác định ngữ cảnh)
+  // =========================================================================
   const isPortal = pathname?.startsWith("/portal");
   const isCompanyContext = pathname?.startsWith("/admin/company");
 
-  // --- MENU CONFIG ---
+  // =========================================================================
+  // 4. LOGIC: MENU CONFIGURATION (Cấu hình Menu)
+  // =========================================================================
 
-  // 1. Menu cho Portal (User/Guest)
-  const portalMenu = [
+  // Menu cho Portal (User/Guest)
+  const portalMenuItems = useMemo(() => [
     { 
       id: "portal-home", 
       icon: Home, 
       label: "Portal Home", 
       path: "/portal" 
     },
-    // Có thể thêm "My Tasks", "Profile" v.v...
-  ];
+  ], []);
 
-  // 2. Menu cho Admin Hub (Danh sách công ty)
-  const rootMenu = [
+  // Menu cho Admin Hub (Danh sách công ty)
+  const rootMenuItems = useMemo(() => [
     { 
       id: "companies", 
       icon: LayoutGrid, 
       label: "My Companies", 
       path: "/admin" 
     },
-  ];
+  ], []);
   
-  // 3. Menu cho Company Admin (Chi tiết công ty)
-  const companyMenu = [
+  // Menu cho Company Admin (Quản trị công ty)
+  const companyMenuItems = useMemo(() => [
     { id: "dashboard", icon: LayoutDashboard, label: "Overview", path: "/admin/company/dashboard" },
     { id: "info", icon: Building2, label: "Company Info", path: "/admin/company/companyinfo" },
     { id: "members", icon: Users, label: "Members", path: "/admin/company/members" },
     { id: "workspaces", icon: FolderKanban, label: "Workspaces", path: "/admin/company/workspaces" },
     { id: "billing", icon: CreditCard, label: "Billing", path: "/admin/company/billing" },
-  ];
+  ], []);
 
-  // 👉 Logic chọn Menu
-  let menuItems = rootMenu;
-  if (isPortal) {
-      menuItems = portalMenu;
-  } else if (isCompanyContext) {
-      menuItems = companyMenu;
-  }
+  // Xác định danh sách menu cần hiển thị dựa trên ngữ cảnh
+  const currentMenuItems = useMemo(() => {
+    if (isPortal) return portalMenuItems;
+    if (isCompanyContext) return companyMenuItems;
+    return rootMenuItems;
+  }, [isPortal, isCompanyContext, portalMenuItems, rootMenuItems, companyMenuItems]);
 
-  // 👉 Logic hiển thị Header Sidebar
-  const getSidebarHeader = () => {
-      if (isPortal) return { title: "My Workspace", subtitle: "User Portal", icon: FolderKanban, color: "bg-indigo-600" };
-      if (isCompanyContext) return { title: "Company Admin", subtitle: "Management", icon: Building2, color: "bg-blue-600" };
-      return { title: "Admin Hub", subtitle: "Select Company", icon: Briefcase, color: "bg-slate-900" };
-  };
+  // =========================================================================
+  // 5. LOGIC: HEADER CONFIGURATION (Cấu hình Header Sidebar)
+  // =========================================================================
+  
+  const headerConfig = useMemo(() => {
+    if (isPortal) {
+      return { 
+        title: "My Workspace", 
+        subtitle: "User Portal", 
+        icon: FolderKanban, 
+        color: "bg-indigo-600" 
+      };
+    }
+    if (isCompanyContext) {
+      return { 
+        title: "Company Admin", 
+        subtitle: "Management", 
+        icon: Building2, 
+        color: "bg-blue-600" 
+      };
+    }
+    return { 
+      title: "Admin Hub", 
+      subtitle: "Select Company", 
+      icon: Briefcase, 
+      color: "bg-slate-900" 
+    };
+  }, [isPortal, isCompanyContext]);
 
-  const headerInfo = getSidebarHeader();
-  const HeaderIcon = headerInfo.icon;
+  const HeaderIcon = headerConfig.icon;
+
+  // =========================================================================
+  // 6. RENDER
+  // =========================================================================
 
   return (
     <>
-      {/* Mobile Overlay */}
+      {/* --- Mobile Overlay --- */}
       {isOpen && (
         <div
           className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 lg:hidden animate-in fade-in"
@@ -101,7 +137,7 @@ export default function AdminSidebar({
         />
       )}
 
-      {/* SIDEBAR CONTAINER */}
+      {/* --- SIDEBAR CONTAINER --- */}
       <aside
         className={`
           fixed top-0 bottom-0 left-0 z-50
@@ -111,22 +147,22 @@ export default function AdminSidebar({
           ${isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
         `}
       >
-        {/* ===== HEADER ===== */}
+        {/* ===== HEADER SECTION ===== */}
         <div className="h-16 flex items-center justify-between px-4 border-b border-slate-100 shrink-0">
           <div className={`flex items-center gap-3 overflow-hidden transition-all ${collapsed ? 'justify-center w-full' : ''}`}>
             
             {/* Logo Context */}
-            <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-sm transition-colors text-white ${headerInfo.color}`}>
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-sm transition-colors text-white ${headerConfig.color}`}>
                <HeaderIcon className="w-5 h-5" />
             </div>
 
             {!collapsed && (
               <div className="min-w-0 flex-1 animate-in fade-in duration-300">
                 <span className="block text-slate-900 font-bold text-sm truncate leading-tight">
-                    {headerInfo.title}
+                    {headerConfig.title}
                 </span>
                 <span className="block text-slate-400 text-[10px] font-semibold uppercase tracking-wide mt-0.5">
-                    {headerInfo.subtitle}
+                    {headerConfig.subtitle}
                 </span>
               </div>
             )}
@@ -137,18 +173,21 @@ export default function AdminSidebar({
           </button>
         </div>
 
-        {/* ===== NAVIGATION ===== */}
+        {/* ===== NAVIGATION SECTION ===== */}
         <nav className="flex-1 overflow-y-auto py-6 px-3 space-y-1 custom-scrollbar">
           
-          {/* Label (Chỉ hiện ở Admin Context) */}
+          {/* Label Group (Chỉ hiện ở Admin Context) */}
           {!collapsed && isCompanyContext && (
              <div className="px-3 mb-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                Management
              </div>
           )}
 
-          {menuItems.map((item) => {
-            const isActive = item.path === "/admin" || item.path === "/portal"
+          {currentMenuItems.map((item) => {
+            // Logic check Active: 
+            // Nếu là root path (/admin hoặc /portal) thì check exact match
+            // Nếu là sub path thì check startsWith
+            const isActive = (item.path === "/admin" || item.path === "/portal")
                 ? pathname === item.path 
                 : pathname?.startsWith(item.path);
 
@@ -157,6 +196,7 @@ export default function AdminSidebar({
                 <div
                   onClick={() => { 
                       setActiveMenu(item.id);
+                      // Đóng menu trên mobile khi click
                       if(window.innerWidth < 1024) onClose(); 
                   }}
                   className={`
@@ -190,7 +230,7 @@ export default function AdminSidebar({
           {/* Dòng kẻ phân cách */}
           {isCompanyContext && <div className="my-4 border-t border-slate-100 mx-2" />}
 
-          {/* Nút Back (Chỉ hiện khi ở Company Admin) */}
+          {/* Nút Back to Hub (Chỉ hiện khi ở Company Admin) */}
           {isCompanyContext && !isPortal && (
             <Link href="/admin" className="block">
                 <div 
@@ -208,9 +248,9 @@ export default function AdminSidebar({
 
         </nav>
 
-        {/* ===== FOOTER ===== */}
+        {/* ===== FOOTER SECTION ===== */}
         <div className="p-3 border-t border-slate-100 bg-white space-y-1">
-           {/* Settings */}
+           {/* Settings Link */}
            <button 
              onClick={() => router.push("/settings/profile")}
              className={`
@@ -223,7 +263,7 @@ export default function AdminSidebar({
              {!collapsed && <span className="text-sm font-medium">Settings</span>}
            </button>
 
-           {/* Collapse Toggle */}
+           {/* Collapse Toggle Button */}
            <button
              onClick={() => setCollapsed(!collapsed)}
              className={`
@@ -236,7 +276,7 @@ export default function AdminSidebar({
         </div>
       </aside>
 
-      {/* Spacer */}
+      {/* Spacer để đẩy content bên phải (Layout Shift Fix) */}
       <div className={`hidden lg:block transition-all duration-300 ease-in-out ${collapsed ? "w-[70px]" : "w-64"}`} />
 
       <style jsx>{`

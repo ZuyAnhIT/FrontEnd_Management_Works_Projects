@@ -8,7 +8,6 @@ import { useTheme } from "@/context/ThemeContext";
 
 export default function LanguageThemeButton() {
   // 2. Lấy state và hàm toggle từ Context toàn cục
-  // KHÔNG dùng useState cho theme ở đây nữa
   const { theme, toggleTheme } = useTheme(); 
   
   const [open, setOpen] = useState(false);

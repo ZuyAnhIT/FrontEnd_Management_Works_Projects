@@ -5,11 +5,16 @@ import * as TooltipPrimitive from "@radix-ui/react-tooltip"
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 
-// Helper function để merge class
+// =============================================================================
+// 1. UTILS
+// =============================================================================
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+// =============================================================================
+// 2. TOOLTIP COMPONENTS
+// =============================================================================
 const TooltipProvider = TooltipPrimitive.Provider
 
 const Tooltip = TooltipPrimitive.Root
@@ -32,4 +37,7 @@ const TooltipContent = React.forwardRef<
 ))
 TooltipContent.displayName = TooltipPrimitive.Content.displayName
 
+// =============================================================================
+// 3. EXPORTS
+// =============================================================================
 export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider }

@@ -1,8 +1,71 @@
 "use client";
 
-import { Search, X, Filter, ChevronDown } from "lucide-react";
+import React, { useMemo } from "react";
+import { Search, X, Filter, ChevronDown, LucideIcon } from "lucide-react";
 import { BoardFilterParams } from "@/services/apiBoard";
 import { ProjectMember } from "@/services/apiProject";
+
+// =============================================================================
+// 1. CONSTANTS & CONFIGURATION
+// =============================================================================
+
+const PRIORITY_OPTIONS = [
+  { label: "Urgent", value: "URGENT" },
+  { label: "High", value: "HIGH" },
+  { label: "Medium", value: "MEDIUM" },
+  { label: "Low", value: "LOW" },
+];
+
+const TYPE_OPTIONS = [
+  { label: "Story", value: "STORY" },
+  { label: "Task", value: "TASK" },
+  { label: "Bug", value: "BUG" },
+];
+
+// =============================================================================
+// 2. SUB-COMPONENTS
+// =============================================================================
+
+interface FilterDropdownProps {
+  value: string | undefined;
+  onChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
+  options: { label: string; value: string }[];
+  placeholder: string;
+  icon: LucideIcon;
+  activeColorClass?: string;
+}
+
+/**
+ * Component Dropdown tái sử dụng cho Priority và Task Type
+ */
+const FilterDropdown = ({ 
+  value, 
+  onChange, 
+  options, 
+  placeholder, 
+  icon: Icon,
+  activeColorClass = "text-blue-500"
+}: FilterDropdownProps) => (
+  <div className="relative">
+    <select 
+      className={`h-9 pl-3 pr-8 text-sm border rounded-lg appearance-none cursor-pointer outline-none focus:ring-2 focus:ring-blue-100 transition-all font-medium
+        ${value ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}
+      `}
+      value={value || ""}
+      onChange={onChange}
+    >
+      <option value="">{placeholder}</option>
+      {options.map((opt) => (
+        <option key={opt.value} value={opt.value}>{opt.label}</option>
+      ))}
+    </select>
+    <Icon className={`w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none ${value ? activeColorClass : 'text-slate-400'}`} />
+  </div>
+);
+
+// =============================================================================
+// 3. MAIN COMPONENT
+// =============================================================================
 
 interface BoardHeaderProps {
   filters: BoardFilterParams;
@@ -18,52 +81,46 @@ export default function BoardHeader({
   totalTasks = 0 
 }: BoardHeaderProps) {
 
-  // --- HANDLERS ---
+  // --- HANDLERS (LOGIC) ---
 
+  /**
+   * Helper cập nhật filter chung.
+   * Nếu giá trị rỗng/null -> xóa key khỏi object filter.
+   */
+  const updateFilter = (key: keyof BoardFilterParams, value: any) => {
+    if (!value) {
+        const newFilters = { ...filters };
+        // Xóa key tương ứng (giữ nguyên logic gốc của bạn)
+        // Lưu ý: BoardFilterParams có thể yêu cầu undefined thay vì delete, 
+        // nhưng ở đây tôi giữ logic 'delete' như code cũ để an toàn.
+        delete newFilters[key as keyof typeof newFilters]; 
+        setFilters(newFilters);
+    } else {
+        setFilters({ ...filters, [key]: value });
+    }
+  };
+
+  // 1. Xử lý Search
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFilters({ ...filters, keyword: e.target.value });
   };
 
+  // 2. Xử lý chọn Member (Toggle)
   const toggleAssignee = (memberId: number) => {
-    if (filters.assigneeId === memberId) {
-        const newFilters = { ...filters };
-        delete newFilters.assigneeId;
-        setFilters(newFilters);
-    } else {
-        setFilters({ ...filters, assigneeId: memberId });
-    }
+    const newValue = filters.assigneeId === memberId ? undefined : memberId;
+    updateFilter("assigneeId", newValue);
   };
 
-  // ✅ ĐÃ SỬA: Ép kiểu val thành BoardFilterParams['priority']
+  // 3. Xử lý Priority & Task Type (Sử dụng helper)
   const handlePriorityChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const val = e.target.value;
-    if (!val) {
-        const newFilters = { ...filters };
-        delete newFilters.priority;
-        setFilters(newFilters);
-    } else {
-        setFilters({ 
-            ...filters, 
-            priority: val as BoardFilterParams['priority'] // Fix lỗi Type 'string'
-        });
-    }
+    updateFilter("priority", e.target.value);
   };
 
-  // ✅ ĐÃ SỬA: Ép kiểu val thành BoardFilterParams['taskType']
   const handleTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const val = e.target.value;
-    if (!val) {
-        const newFilters = { ...filters };
-        delete newFilters.taskType;
-        setFilters(newFilters);
-    } else {
-        setFilters({ 
-            ...filters, 
-            taskType: val as BoardFilterParams['taskType'] // Fix lỗi Type 'string'
-        });
-    }
+    updateFilter("taskType", e.target.value);
   };
 
+  // 4. Reset Filters (Giữ lại sprintId)
   const clearFilters = () => {
     setFilters({ 
         keyword: "", 
@@ -74,10 +131,14 @@ export default function BoardHeader({
     });
   };
 
-  const hasActiveFilters = !!filters.keyword || !!filters.assigneeId || !!filters.priority || !!filters.taskType;
+  // Kiểm tra xem có filter nào đang active không
+  const hasActiveFilters = useMemo(() => {
+    return !!filters.keyword || !!filters.assigneeId || !!filters.priority || !!filters.taskType;
+  }, [filters]);
 
+  // --- RENDER ---
   return (
-    <div className="h-16 px-6 border-b border-slate-200 bg-white flex items-center justify-between shrink-0 shadow-sm  relative ">
+    <div className="h-16 px-6 border-b border-slate-200 bg-white flex items-center justify-between shrink-0 shadow-sm relative">
         
         {/* --- LEFT: TITLE & STATS --- */}
         <div className="flex items-center gap-4">
@@ -110,11 +171,10 @@ export default function BoardHeader({
                 )}
             </div>
 
-            {/* 2. MEMBER FILTER */}
+            {/* 2. MEMBER FILTER (Avatar Stack) */}
             <div className="flex items-center -space-x-2 mr-1">
                 {members.slice(0, 5).map((member) => {
                     const idToUse = member.userId || member.memberId;
-                    // Fix lỗi logic isActive (nếu id undefined thì không active)
                     const isActive = filters.assigneeId !== undefined && filters.assigneeId === idToUse;
                     
                     return (
@@ -141,6 +201,8 @@ export default function BoardHeader({
                         </div>
                     );
                 })}
+                
+                {/* Hiển thị số lượng user còn lại nếu > 5 */}
                 {members.length > 5 && (
                     <div className="w-8 h-8 rounded-full bg-slate-50 border-2 border-white flex items-center justify-center text-xs font-medium text-slate-500">
                         +{members.length - 5}
@@ -149,43 +211,26 @@ export default function BoardHeader({
             </div>
 
             {/* 3. PRIORITY FILTER */}
-            <div className="relative">
-                <select 
-                    className={`h-9 pl-3 pr-8 text-sm border rounded-lg appearance-none cursor-pointer outline-none focus:ring-2 focus:ring-blue-100 transition-all font-medium
-                        ${filters.priority ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}
-                    `}
-                    value={filters.priority || ""}
-                    onChange={handlePriorityChange}
-                >
-                    <option value="">Priority</option>
-                    <option value="URGENT">Urgent</option>
-                    <option value="HIGH">High</option>
-                    <option value="MEDIUM">Medium</option>
-                    <option value="LOW">Low</option>
-                </select>
-                <ChevronDown className={`w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none ${filters.priority ? 'text-blue-500' : 'text-slate-400'}`} />
-            </div>
+            <FilterDropdown 
+                value={filters.priority}
+                onChange={handlePriorityChange}
+                options={PRIORITY_OPTIONS}
+                placeholder="Priority"
+                icon={ChevronDown}
+            />
 
             {/* 4. TASK TYPE FILTER */}
-            <div className="relative">
-                <select 
-                    className={`h-9 pl-3 pr-8 text-sm border rounded-lg appearance-none cursor-pointer outline-none focus:ring-2 focus:ring-blue-100 transition-all font-medium
-                        ${filters.taskType ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}
-                    `}
-                    value={filters.taskType || ""}
-                    onChange={handleTypeChange}
-                >
-                    <option value="">Type</option>
-                    <option value="STORY">Story</option>
-                    <option value="TASK">Task</option>
-                    <option value="BUG">Bug</option>
-                </select>
-                <Filter className={`w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none ${filters.taskType ? 'text-blue-500' : 'text-slate-400'}`} />
-            </div>
+            <FilterDropdown 
+                value={filters.taskType}
+                onChange={handleTypeChange}
+                options={TYPE_OPTIONS}
+                placeholder="Type"
+                icon={Filter}
+            />
 
+            {/* 5. SEPARATOR & CLEAR BUTTON */}
             <div className="h-6 w-[1px] bg-slate-200 mx-1"></div>
 
-            {/* 5. CLEAR BUTTON */}
             <button 
                 onClick={clearFilters}
                 disabled={!hasActiveFilters}

@@ -2,84 +2,126 @@
 
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Mail, AlertCircle, CheckCircle2 } from "lucide-react";
 
 import InputField from "./InputField";
-import { Mail } from "lucide-react";
 import LoadingButton from "@/components/ui/LoadingButton";
 import { forgotPassword } from "@/services/apiAuth";
 
+// =============================================================================
+// 1. INTERFACES
+// =============================================================================
+
 interface AuthFormForgotProps {
   form: { email: string };
-  handleChange: (
-    field: "email"
-  ) => (e: React.ChangeEvent<HTMLInputElement>) => void;
-  isLoading: boolean;
+  handleChange: (field: "email") => (e: React.ChangeEvent<HTMLInputElement>) => void;
+  isLoading: boolean; // Loading từ parent (nếu có)
   setTab: (tab: string) => void;
 }
+
+// =============================================================================
+// 2. MAIN COMPONENT
+// =============================================================================
 
 export default function AuthFormForgot({
   form,
   handleChange,
-  isLoading,
+  isLoading: parentLoading,
   setTab,
 }: AuthFormForgotProps) {
   const { t } = useTranslation();
 
-  const [message, setMessage] = useState<string | null>(null);
-  const [isError, setIsError] = useState(false);
+  // --- STATE ---
+  const [isSubmitting, setIsSubmitting] = useState(false); // Loading cục bộ
+  const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
+
+  // --- HANDLERS ---
 
   const handleSendEmail = async () => {
+    // 1. Validate đơn giản
     if (!form.email.trim()) {
-      setMessage(t("forgot.errorInvalidEmail"));
-      setIsError(true);
+      setFeedback({
+        type: "error",
+        message: "Please enter your email address.",
+      });
       return;
     }
 
-    try {
-      setMessage(null);
-      setIsError(false);
+    // 2. Bắt đầu gọi API
+    setIsSubmitting(true);
+    setFeedback(null);
 
+    try {
       const res = await forgotPassword(form.email);
 
-      setMessage(
-        res?.message || t("forgot.successMessage")
-      );
-      setIsError(false);
+      // 3. Thành công: Lấy message từ API hoặc fallback tiếng Anh
+      setFeedback({
+        type: "success",
+        message: res?.message || "Password reset link sent! Please check your inbox.",
+      });
+      
     } catch (error: any) {
-      setMessage(error.message || t("forgot.failedMessage"));
-      setIsError(true);
+      // 4. Thất bại: Lấy message lỗi từ API
+      setFeedback({
+        type: "error",
+        message: error.message || "Failed to send reset link. Please try again.",
+      });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
+  // --- RENDER ---
   return (
-    <div>
+    <div className="space-y-4">
+      
+      {/* Input Email */}
       <InputField
-        label={t("forgot.email")}
+        label="Email Address"
         icon={<Mail className="w-4 h-4 text-gray-400" />}
         type="email"
         value={form.email}
         onChange={handleChange("email")}
-        placeholder={t("forgot.emailPlaceholder")}
+        placeholder="name@company.com"
         required
       />
 
+      {/* Submit Button */}
       <LoadingButton
         type="button"
-        isLoading={isLoading}
+        isLoading={isSubmitting || parentLoading}
         onClick={handleSendEmail}
-        className="w-full mt-4"
-        text={t("forgot.sendButton")}
+        className="w-full mt-2"
+        text="Send Reset Link"
       />
 
-      {message && (
+      {/* Feedback Message Area */}
+      {feedback && (
         <div
-          className={`mt-3 text-sm text-center p-3 rounded-lg ${
-            isError ? "bg-red-50 text-red-700" : "bg-blue-50 text-blue-700"
+          className={`flex items-start gap-2 text-sm p-3 rounded-lg animate-in fade-in slide-in-from-top-1 ${
+            feedback.type === "error"
+              ? "bg-red-50 text-red-700 border border-red-100"
+              : "bg-blue-50 text-blue-700 border border-blue-100"
           }`}
         >
-          {message}
+          {feedback.type === "error" ? (
+            <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+          ) : (
+            <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" />
+          )}
+          <span>{feedback.message}</span>
         </div>
       )}
+
+      {/* Navigation Link (Optional - Quay lại Login) */}
+      <div className="text-center mt-4">
+        <button
+          onClick={() => setTab("login")}
+          className="text-xs text-slate-500 hover:text-blue-600 hover:underline transition-colors"
+        >
+          Back to Login
+        </button>
+      </div>
     </div>
   );
 }

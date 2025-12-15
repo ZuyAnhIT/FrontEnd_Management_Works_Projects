@@ -1,4 +1,4 @@
-"use client"; // cần 'use client' vì dùng hook + framer motion
+"use client"; 
 
 import { Users, Zap, Shield } from "lucide-react";
 import { motion } from "framer-motion";
@@ -7,7 +7,7 @@ import { useTheme } from "@/context/ThemeContext";
 
 export default function FeaturesSection() {
   const { t } = useTranslation();
-  const { theme } = useTheme(); // lấy theme global (light/dark)
+  const { theme } = useTheme(); 
 
   const features = [
     {

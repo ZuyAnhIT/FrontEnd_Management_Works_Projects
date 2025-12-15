@@ -4,6 +4,17 @@ import { Search, X, Users, Layers, ChevronDown } from "lucide-react";
 import { ProjectTaskFilterParams } from "@/services/apiTask";
 import { ProjectMember } from "@/services/apiProject";
 
+// =============================================================================
+// 1. CONSTANTS & INTERFACES
+// =============================================================================
+
+const GROUP_BY_OPTIONS = [
+  { value: "none", label: "No Grouping" },
+  { value: "status", label: "Status" },
+  { value: "priority", label: "Priority" },
+  { value: "assignee", label: "Assignee" },
+];
+
 interface ListHeaderProps {
   filters: ProjectTaskFilterParams;
   setFilters: (f: ProjectTaskFilterParams) => void;
@@ -12,6 +23,10 @@ interface ListHeaderProps {
   members: ProjectMember[]; 
   totalTasks: number;
 }
+
+// =============================================================================
+// 2. MAIN COMPONENT
+// =============================================================================
 
 export default function ListHeader({ 
   filters, 
@@ -22,19 +37,28 @@ export default function ListHeader({
   totalTasks = 0 
 }: ListHeaderProps) {
 
-  // --- HANDLERS ---
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFilters({ ...filters, search: e.target.value });
-  };
+  // --- HANDLERS (LOGIC) ---
 
-  const toggleAssignee = (memberId: number) => {
-    if (filters.assigneeId === memberId) {
+  // Helper function để update filter chung
+  const updateFilter = (key: keyof ProjectTaskFilterParams, value: any) => {
+    if (value === "" || value === undefined) {
         const newFilters = { ...filters };
-        delete newFilters.assigneeId;
+        delete newFilters[key];
         setFilters(newFilters);
     } else {
-        setFilters({ ...filters, assigneeId: memberId });
+        setFilters({ ...filters, [key]: value });
     }
+  };
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    updateFilter("search", e.target.value);
+  };
+
+  const toggleAssignee = (memberId: number | string) => {
+    const idToUse = memberId;
+    const isCurrentlyActive = filters.assigneeId === idToUse;
+    const newValue = isCurrentlyActive ? undefined : idToUse;
+    updateFilter("assigneeId", newValue);
   };
 
   const handleGroupByChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -44,19 +68,20 @@ export default function ListHeader({
   const clearFilters = () => {
     setFilters({ 
         search: "", 
-        sprintId: filters.sprintId // Giữ lại sprint context
+        sprintId: filters.sprintId // Giữ lại sprint context (không xóa)
     });
     setGroupBy("none");
   };
 
   const hasActiveFilters = !!filters.search || !!filters.assigneeId || groupBy !== "none";
 
+  // --- RENDER ---
   return (
-    <div className="h-16 px-6 border-b border-slate-200 bg-white flex items-center justify-between shrink-0 shadow-sm  relative">
+    <div className="h-16 px-6 border-b border-slate-200 bg-white flex items-center justify-between shrink-0 shadow-sm relative">
         
         {/* --- LEFT: TITLE & STATS --- */}
         <div className="flex items-center gap-4">
-            <h1 className="text-xl font-bold text-slate-800 tracking-tight">List</h1>
+            <h1 className="text-xl font-bold text-slate-800 tracking-tight">List View</h1>
             <div className="h-6 w-[1px] bg-slate-200"></div>
             <span className="bg-slate-100 text-slate-600 px-2.5 py-0.5 rounded-md text-xs font-bold border border-slate-200">
                 {totalTasks} Issues
@@ -72,13 +97,14 @@ export default function ListHeader({
                 <input 
                     className="h-9 pl-9 pr-8 text-sm border border-slate-200 rounded-lg w-48 focus:w-64 transition-all outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 bg-slate-50 focus:bg-white placeholder:text-slate-400"
                     placeholder="Search issues..."
-                    value={filters?.search || ""}
+                    value={filters.search || ""}
                     onChange={handleSearchChange}
                 />
-                {filters?.search && (
+                {filters.search && (
                     <button 
-                        onClick={() => setFilters({...filters, search: ""})}
+                        onClick={() => updateFilter("search", "")}
                         className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded-full hover:bg-slate-200"
+                        title="Clear search"
                     >
                         <X className="w-3 h-3" />
                     </button>
@@ -88,8 +114,9 @@ export default function ListHeader({
             {/* 2. MEMBER FILTER (AVATAR GROUP) */}
             <div className="flex items-center -space-x-2 mr-1">
                 {members.slice(0, 5).map((member) => {
-                    const isActive = filters.assigneeId === (member.userId || member.memberId);
                     const idToUse = member.userId || member.memberId;
+                    const isActive = filters.assigneeId === idToUse;
+                    
                     return (
                         <div 
                             key={idToUse}
@@ -116,13 +143,13 @@ export default function ListHeader({
                     );
                 })}
                 {members.length > 5 && (
-                    <div className="w-8 h-8 rounded-full bg-slate-50 border-2 border-white flex items-center justify-center text-xs font-medium text-slate-500">
+                    <div className="w-8 h-8 rounded-full bg-slate-50 border-2 border-white flex items-center justify-center text-xs font-medium text-slate-500 cursor-default">
                         +{members.length - 5}
                     </div>
                 )}
             </div>
 
-            {/* 3. GROUP BY FILTER (Styled like Board Priority) */}
+            {/* 3. GROUP BY FILTER */}
             <div className="relative">
                 <select 
                     className={`h-9 pl-9 pr-8 text-sm border rounded-lg appearance-none cursor-pointer outline-none focus:ring-2 focus:ring-blue-100 transition-all font-medium
@@ -131,10 +158,9 @@ export default function ListHeader({
                     value={groupBy}
                     onChange={handleGroupByChange}
                 >
-                    <option value="none">No Grouping</option>
-                    <option value="status">Status</option>
-                    <option value="priority">Priority</option>
-                    <option value="assignee">Assignee</option>
+                    {GROUP_BY_OPTIONS.map(opt => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
                 </select>
                 {/* Icon Layers bên trái */}
                 <Layers className={`w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none ${groupBy !== "none" ? 'text-blue-600' : 'text-slate-400'}`} />

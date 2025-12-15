@@ -2,64 +2,94 @@
 
 import React from 'react';
 import { Layers } from 'lucide-react';
+import { EventContentArg } from '@fullcalendar/core';
 
-// Nhận props từ FullCalendar
-export default function CalendarEventContent(eventInfo: any) {
-  const { event } = eventInfo;
-  const props = event.extendedProps; // Dữ liệu custom từ API (type, status, assignee...)
+// =============================================================================
+// 1. INTERFACES
+// =============================================================================
 
-  // --- RENDER 1: SPRINT (Dải sự kiện All-Day) ---
-  if (props.type === 'SPRINT') {
-    return (
-      <div 
-        className="w-full h-full flex items-center px-2 py-0.5 overflow-hidden rounded text-[11px] font-bold tracking-wide border-l-4 shadow-sm opacity-90 hover:opacity-100 transition-opacity"
-        style={{
-          backgroundColor: event.backgroundColor, // Màu nền từ API (#f1f5f9)
-          borderColor: event.borderColor,         // Màu viền (#94a3b8)
-          color: event.textColor || '#333'
-        }}
-      >
-        <Layers className="w-3 h-3 mr-1.5 opacity-60" />
-        <span className="truncate uppercase">{event.title}</span>
-      </div>
-    );
-  }
+// Định nghĩa cấu trúc dữ liệu mở rộng (extendedProps) từ API
+interface CustomEventProps {
+  type?: 'SPRINT' | 'TASK' | 'BUG' | 'STORY';
+  status?: string;
+  assigneeName?: string;
+  assigneeAvatar?: string;
+}
 
-  // --- RENDER 2: TASK (Sự kiện thường) ---
+// =============================================================================
+// 2. SUB-COMPONENTS
+// =============================================================================
+
+/**
+ * Render giao diện cho SPRINT (Thường là sự kiện kéo dài nhiều ngày)
+ */
+const SprintEventView = ({ event }: { event: EventContentArg['event'] }) => {
+  return (
+    <div 
+      className="w-full h-full flex items-center px-2 py-0.5 overflow-hidden rounded text-[11px] font-bold tracking-wide border-l-4 shadow-sm opacity-90 hover:opacity-100 transition-opacity"
+      style={{
+        backgroundColor: event.backgroundColor, // Màu nền từ API
+        borderColor: event.borderColor,         // Màu viền
+        color: event.textColor || '#333'
+      }}
+    >
+      <Layers className="w-3 h-3 mr-1.5 opacity-60 shrink-0" />
+      <span className="truncate uppercase">{event.title}</span>
+    </div>
+  );
+};
+
+/**
+ * Render giao diện cho TASK (Sự kiện hàng ngày)
+ */
+const TaskEventView = ({ event, props }: { event: EventContentArg['event']; props: CustomEventProps }) => {
+  
+  // Xử lý tách chuỗi an toàn: "CODE-123 - Title" -> Code: "CODE-123", Name: "Title"
+  const separatorIndex = event.title.indexOf(' - ');
+  const taskCode = separatorIndex > -1 ? event.title.substring(0, separatorIndex) : event.title;
+  const taskName = separatorIndex > -1 ? event.title.substring(separatorIndex + 3) : '';
+
   return (
     <div 
       className="flex flex-col justify-center px-1.5 py-1 w-full h-full overflow-hidden rounded-[3px] shadow-sm border-l-[3px] hover:brightness-95 transition-all cursor-pointer bg-opacity-15"
       style={{
-        // FullCalendar tự xử lý màu nền, ta dùng style này để override nhẹ nếu cần
         backgroundColor: event.backgroundColor, 
         borderColor: event.borderColor,
         color: event.textColor
       }}
     >
       <div className="flex items-center justify-between gap-1.5">
-        {/* Mã Task + Tiêu đề */}
+        
+        {/* Left: Task Code & Title */}
         <div className="flex items-center gap-1 overflow-hidden">
-           {/* Giả sử title là "ECOM-12 - Fix bug...", ta tách lấy mã ECOM-12 */}
+           {/* Mã Task (In đậm) */}
            <span className="font-bold text-[10px] whitespace-nowrap opacity-90">
-             {event.title.split(' - ')[0]}
+             {taskCode}
            </span>
-           <span className="text-[10px] truncate opacity-80">
-             {event.title.split(' - ')[1] || event.title}
-           </span>
+           
+           {/* Tên Task (Nếu có) */}
+           {taskName && (
+             <span className="text-[10px] truncate opacity-80">
+               {taskName}
+             </span>
+           )}
         </div>
         
-        {/* Avatar Assignee */}
+        {/* Right: Assignee Avatar */}
         <div className="shrink-0">
             {props.assigneeAvatar ? (
               <img
                 src={props.assigneeAvatar}
-                alt={props.assigneeName}
-                className="w-4 h-4 rounded-full border border-white shadow-sm"
+                alt={props.assigneeName || "Assignee"}
+                className="w-4 h-4 rounded-full border border-white shadow-sm object-cover"
                 title={props.assigneeName}
               />
             ) : (
-              // Fallback avatar nếu null
-              <div className="w-4 h-4 rounded-full bg-white/30 flex items-center justify-center text-[8px] font-bold border border-white/20">
+              // Fallback khi không có avatar
+              <div 
+                className="w-4 h-4 rounded-full bg-white/30 flex items-center justify-center text-[8px] font-bold border border-white/20"
+                title="Unassigned"
+              >
                 ?
               </div>
             )}
@@ -67,4 +97,22 @@ export default function CalendarEventContent(eventInfo: any) {
       </div>
     </div>
   );
+};
+
+// =============================================================================
+// 3. MAIN COMPONENT
+// =============================================================================
+
+export default function CalendarEventContent(eventInfo: EventContentArg) {
+  const { event } = eventInfo;
+  // Ép kiểu extendedProps về Interface đã định nghĩa
+  const props = event.extendedProps as CustomEventProps;
+
+  // --- CASE 1: SPRINT ---
+  if (props.type === 'SPRINT') {
+    return <SprintEventView event={event} />;
+  }
+
+  // --- CASE 2: TASK (Default) ---
+  return <TaskEventView event={event} props={props} />;
 }

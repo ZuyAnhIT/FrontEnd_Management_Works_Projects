@@ -1,18 +1,18 @@
-// services/apiDashboard.ts
 "use client";
-
 
 import apiClient from "@/lib/apiClient";
 
-// ===================================================
-// 🔹 Interface: Workspace trong Dashboard
-// ===================================================
+// =============================================================================
+// 1. INTERFACES (Định nghĩa kiểu dữ liệu)
+// =============================================================================
+
+// Interface: Workspace trong Dashboard
 export interface DashboardWorkspace {
   workspaceId: number;
   workspaceName: string;
   workspaceCode: string;
-  memberCount: number; // Thêm trường này nếu cần thống kê
-  projectCount: number; // Thêm trường này nếu cần thống kê
+  memberCount: number;
+  projectCount: number;
   workspaceDescription: string;
   workspaceCoverImage: string;
   workspaceColor: string;
@@ -26,10 +26,7 @@ export interface DashboardWorkspace {
   joinedAt: string;
 }
 
-
-// ===================================================
-// 🔹 Interface: Task của tôi
-// ===================================================
+// Interface: Task của tôi
 export interface DashboardMyTask {
   taskId: number;
   taskCode: string;
@@ -43,10 +40,7 @@ export interface DashboardMyTask {
   workspaceName: string;
 }
 
-
-// ===================================================
-// 🔹 Interface: Project của tôi
-// ===================================================
+// Interface: Project của tôi
 export interface DashboardMyProject {
   projectId: number;
   projectName: string;
@@ -60,10 +54,7 @@ export interface DashboardMyProject {
   myRoleName: string;
 }
 
-
-// ===================================================
-// 🔹 Interface: Company của tôi
-// ===================================================
+// Interface: Company của tôi
 export interface DashboardCompany {
   companyId: number;
   companyName: string;
@@ -77,56 +68,74 @@ export interface DashboardCompany {
   joinedAt: string;
 }
 
+// =============================================================================
+// 2. API METHODS (Các hàm gọi API)
+// =============================================================================
 
-// ===================================================
-// 1️⃣ GET – Lấy danh sách Workspace tôi tham gia
-// ===================================================
+/**
+ * 1️⃣ GET – Lấy danh sách Workspace tôi tham gia
+ */
 export const getDashboardWorkspaces = async (): Promise<DashboardWorkspace[]> => {
   try {
     const res = await apiClient.get('/dashboard/workspaces');
-    return res.data.data as DashboardWorkspace[];
+    const { success, message, data } = res.data;
+
+    if (!success) {
+      throw new Error(message || "Failed to load workspaces.");
+    }
+    return data as DashboardWorkspace[];
   } catch (err: any) {
-    console.error("❌ Lỗi tải danh sách workspace:", err.response?.data || err);
-    throw new Error(err.response?.data?.message || "Không thể tải danh sách Workspace của bạn.");
+    throw new Error(err.response?.data?.message || "Unable to fetch your workspaces.");
   }
 };
 
-// ===================================================
-// 2️⃣ GET – Lấy danh sách Task của tôi
-// ===================================================
+/**
+ * 2️⃣ GET – Lấy danh sách Task của tôi
+ */
 export const getDashboardMyTasks = async (): Promise<DashboardMyTask[]> => {
   try {
     const res = await apiClient.get('/dashboard/my-tasks');
-    return res.data.data as DashboardMyTask[];
+    const { success, message, data } = res.data;
+
+    if (!success) {
+      throw new Error(message || "Failed to load tasks.");
+    }
+    return data as DashboardMyTask[];
   } catch (err: any) {
-    console.error("❌ Lỗi tải công việc của tôi:", err.response?.data || err);
-    throw new Error(err.response?.data?.message || "Không thể tải công việc của bạn.");
+    throw new Error(err.response?.data?.message || "Unable to fetch your tasks.");
   }
 };
 
-// ===================================================
-// 3️⃣ GET – Lấy danh sách Project của tôi
-// ===================================================
-export const getDashboardMyProjects = async (): Promise<any[]> => { // Dùng any[] cho đơn giản
+/**
+ * 3️⃣ GET – Lấy danh sách Project của tôi
+ */
+export const getDashboardMyProjects = async (): Promise<DashboardMyProject[]> => {
   try {
     const res = await apiClient.get('/dashboard/my-projects');
-    return res.data.data;
+    const { success, message, data } = res.data;
+
+    if (!success) {
+      throw new Error(message || "Failed to load projects.");
+    }
+    return data as DashboardMyProject[];
   } catch (err: any) {
-    console.error("❌ Lỗi tải dự án của tôi:", err.response?.data || err);
-    throw new Error(err.response?.data?.message || "Lỗi hệ thống, không thể tải dự án của bạn.");
+    throw new Error(err.response?.data?.message || "Unable to fetch your projects.");
   }
 };
 
-// ===================================================
-// 4️⃣ GET – Lấy danh sách Company của tôi
-// ===================================================
+/**
+ * 4️⃣ GET – Lấy danh sách Company của tôi
+ */
 export const getDashboardCompanies = async (): Promise<DashboardCompany[]> => {
   try {
     const res = await apiClient.get('/dashboard/companies');
-    return res.data.data as DashboardCompany[];
+    const { success, message, data } = res.data;
+
+    if (!success) {
+      throw new Error(message || "Failed to load companies.");
+    }
+    return data as DashboardCompany[];
   } catch (err: any) {
-    console.error("❌ Lỗi tải danh sách công ty:", err.response?.data || err);
-    throw new Error(err.response?.data?.message || "Lỗi hệ thống, không thể tải danh sách công ty.");
+    throw new Error(err.response?.data?.message || "Unable to fetch your companies.");
   }
 };
-

@@ -13,7 +13,7 @@ interface LoadingButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
 
 export default function LoadingButton({
   text,
-  loadingText = "Processing...", // Translated from "Đang xử lý..."
+  loadingText = "Processing...", 
   icon,
   isLoading = false,
   type = "submit",
