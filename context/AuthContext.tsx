@@ -104,6 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (targetCompany) {
             setActiveCompany(targetCompany);
             setRole(targetCompany.roleCode as AppRole);
+            localStorage.setItem("current_company_id", targetId.toString());
           } else {
             // Nếu user không còn trong công ty cũ -> Xóa cache
             localStorage.removeItem("lastActiveCompanyId");
@@ -146,7 +147,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         // 2. Lưu cache
         localStorage.setItem("lastActiveCompanyId", companyId.toString());
-
+        //lưu vị trí của bạn cho chatbot
+        localStorage.setItem("current_company_id", companyId.toString());
         // 3. Điều hướng dựa trên Role (Logic nghiệp vụ cốt lõi)
         switch (selected.roleCode) {
           case "COMPANY_ADMIN":

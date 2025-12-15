@@ -1,7 +1,9 @@
 ﻿"use client";
 
-import React, { useEffect, useRef, useState, useCallback } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
+// 👇 1. IMPORT MỚI: Hooks của Next.js để lấy ID từ URL
+import { useParams, usePathname } from "next/navigation"; 
 import {
   MessageSquare,
   X,
@@ -13,10 +15,7 @@ import {
 import { Button } from "@/components/ui/Buttons";
 import { sendChatMessage, uploadChatFile } from "@/services/apiChat";
 
-// =============================================================================
-// 1. INTERFACES & TYPES
-// =============================================================================
-
+// ... (Phần Interfaces Message, ChatSession giữ nguyên) ...
 interface Message {
   id: string;
   role: "user" | "bot" | "system";
@@ -30,119 +29,55 @@ interface ChatSession {
   date: string;
 }
 
-// =============================================================================
-// 2. HELPER FUNCTIONS
-// =============================================================================
-
-/**
- * Chuẩn hóa phản hồi từ API (xử lý JSON, string, object, null)
- */
+// ... (Phần Helper normalizeBotResponse & useDraggableWindow giữ nguyên) ...
 const normalizeBotResponse = (data: any): string => {
   if (!data) return "No response received.";
-
-  // Ưu tiên các trường chuẩn
   const rawContent = data.response || data.detail || data.message;
-
   if (typeof rawContent === "string") return rawContent;
-
   if (typeof rawContent === "object") {
-    if (rawContent.text && typeof rawContent.text === "string")
-      return rawContent.text;
-    try {
-      return JSON.stringify(rawContent);
-    } catch {
-      return "Unsupported response format.";
-    }
+    if (rawContent.text && typeof rawContent.text === "string") return rawContent.text;
+    try { return JSON.stringify(rawContent); } catch { return "Unsupported response format."; }
   }
-
   return String(rawContent);
 };
 
-// =============================================================================
-// 3. CUSTOM HOOK: DRAGGABLE WINDOW
-// =============================================================================
-
 const useDraggableWindow = () => {
-  const [isDragging, setIsDragging] = useState(false);
-  const bubbleRef = useRef<HTMLDivElement>(null);
-  const dragRef = useRef<{
-    startX: number;
-    startY: number;
-    initialLeft: number;
-    initialTop: number;
-  } | null>(null);
+    // ... (Giữ nguyên code hook useDraggableWindow cũ của bạn) ...
+    // Để tiết kiệm diện tích tôi không paste lại đoạn này, bạn giữ nguyên nhé.
+    const [isDragging, setIsDragging] = useState(false);
+    const bubbleRef = useRef<HTMLDivElement>(null);
+    const dragRef = useRef<{ startX: number; startY: number; initialLeft: number; initialTop: number; } | null>(null);
 
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isDragging || !dragRef.current || !bubbleRef.current) return;
-
-      const deltaX = e.clientX - dragRef.current.startX;
-      const deltaY = e.clientY - dragRef.current.startY;
-
-      const newLeft = dragRef.current.initialLeft + deltaX;
-      const newTop = dragRef.current.initialTop + deltaY;
-
-      // Di chuyển tự do
-      bubbleRef.current.style.left = `${newLeft}px`;
-      bubbleRef.current.style.top = `${newTop}px`;
-      bubbleRef.current.style.right = "auto";
-      bubbleRef.current.style.bottom = "auto";
+    useEffect(() => {
+        const handleMouseMove = (e: MouseEvent) => {
+            if (!isDragging || !dragRef.current || !bubbleRef.current) return;
+            const deltaX = e.clientX - dragRef.current.startX;
+            const deltaY = e.clientY - dragRef.current.startY;
+            bubbleRef.current.style.left = `${dragRef.current.initialLeft + deltaX}px`;
+            bubbleRef.current.style.top = `${dragRef.current.initialTop + deltaY}px`;
+            bubbleRef.current.style.right = "auto"; bubbleRef.current.style.bottom = "auto";
+        };
+        const handleMouseUp = () => {
+            if (!isDragging || !bubbleRef.current) return;
+            setIsDragging(false);
+            // Snap logic (giữ nguyên)
+             const rect = bubbleRef.current.getBoundingClientRect();
+             if (rect.left < (window.innerWidth - rect.right)) { bubbleRef.current.style.left = "20px"; bubbleRef.current.style.right = "auto"; } 
+             else { bubbleRef.current.style.left = "auto"; bubbleRef.current.style.right = "20px"; }
+             let newTop = rect.top; if (newTop < 20) newTop = 20; if (newTop > window.innerHeight - rect.height - 20) newTop = window.innerHeight - rect.height - 20;
+             bubbleRef.current.style.top = `${newTop}px`;
+        };
+        if (isDragging) { window.addEventListener("mousemove", handleMouseMove); window.addEventListener("mouseup", handleMouseUp); }
+        return () => { window.removeEventListener("mousemove", handleMouseMove); window.removeEventListener("mouseup", handleMouseUp); };
+    }, [isDragging]);
+    
+    const handleMouseDown = (e: React.MouseEvent) => {
+        if (!bubbleRef.current) return;
+        const rect = bubbleRef.current.getBoundingClientRect();
+        setIsDragging(true);
+        dragRef.current = { startX: e.clientX, startY: e.clientY, initialLeft: rect.left, initialTop: rect.top };
     };
-
-    const handleMouseUp = () => {
-      if (!isDragging || !bubbleRef.current) return;
-      setIsDragging(false);
-
-      // Snap to nearest edge logic
-      const rect = bubbleRef.current.getBoundingClientRect();
-      const windowWidth = window.innerWidth;
-      const windowHeight = window.innerHeight;
-
-      const distLeft = rect.left;
-      const distRight = windowWidth - rect.right;
-
-      // Snap trái/phải
-      if (distLeft < distRight) {
-        bubbleRef.current.style.left = "20px";
-        bubbleRef.current.style.right = "auto";
-      } else {
-        bubbleRef.current.style.left = "auto";
-        bubbleRef.current.style.right = "20px";
-      }
-
-      // Giữ trong màn hình (Top/Bottom)
-      let newTop = rect.top;
-      if (newTop < 20) newTop = 20;
-      if (newTop > windowHeight - rect.height - 20)
-        newTop = windowHeight - rect.height - 20;
-
-      bubbleRef.current.style.top = `${newTop}px`;
-    };
-
-    if (isDragging) {
-      window.addEventListener("mousemove", handleMouseMove);
-      window.addEventListener("mouseup", handleMouseUp);
-    }
-
-    return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
-    };
-  }, [isDragging]);
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (!bubbleRef.current) return;
-    const rect = bubbleRef.current.getBoundingClientRect();
-    setIsDragging(true);
-    dragRef.current = {
-      startX: e.clientX,
-      startY: e.clientY,
-      initialLeft: rect.left,
-      initialTop: rect.top,
-    };
-  };
-
-  return { bubbleRef, isDragging, handleMouseDown };
+    return { bubbleRef, isDragging, handleMouseDown };
 };
 
 // =============================================================================
@@ -150,6 +85,13 @@ const useDraggableWindow = () => {
 // =============================================================================
 
 export function Chatbot() {
+  // 👇 2. LOGIC LẤY ID TỪ URL (Next.js App Router)
+  const params = useParams(); 
+  const pathname = usePathname();
+  
+  // State lưu CompanyID (Lấy từ LocalStorage)
+  const [companyId, setCompanyId] = useState<number | null>(null);
+
   // --- UI State ---
   const [isOpen, setIsOpen] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
@@ -164,12 +106,11 @@ export function Chatbot() {
     {
       id: "welcome",
       role: "bot",
-      text: "Chào bạn! Tôi có thể giúp gì hôm nay?",
+      text: "Chào bạn! Tôi có thể giúp gì cho dự án hôm nay?",
       timestamp: new Date(),
     },
   ]);
 
-  // Fake session history
   const [sessions] = useState<ChatSession[]>([
     { id: "h1", title: "Phiên mặc định", date: "Hôm nay" },
   ]);
@@ -180,13 +121,21 @@ export function Chatbot() {
 
   // --- Initialization ---
   useEffect(() => {
-    const stored = localStorage.getItem("chat_session_id");
-    if (stored) {
-      setThreadId(stored);
+    // 1. Lấy Session ID Chat
+    const storedThread = localStorage.getItem("chat_session_id");
+    if (storedThread) {
+      setThreadId(storedThread);
     } else {
       const newId = uuidv4();
       localStorage.setItem("chat_session_id", newId);
       setThreadId(newId);
+    }
+
+    // 👇 3. LẤY COMPANY ID TỪ LOCAL STORAGE
+    // (Giả sử logic Login của bạn đã lưu key này)
+    const storedCompany = localStorage.getItem("current_company_id");
+    if (storedCompany) {
+        setCompanyId(parseInt(storedCompany));
     }
   }, []);
 
@@ -210,7 +159,7 @@ export function Chatbot() {
     const currentInput = input;
     const currentFile = selectedFile;
 
-    // 1. Optimistic Update (Hiển thị tin nhắn user ngay lập tức)
+    // Optimistic Update
     const optimisticText = currentFile
       ? `File: ${currentFile.name}${currentInput ? `\n${currentInput}` : ""}`
       : currentInput;
@@ -223,26 +172,42 @@ export function Chatbot() {
     };
 
     setMessages((prev) => [...prev, userMsg]);
-
-    // 2. Reset Input
     setInput("");
     clearFile();
     setLoading(true);
 
-    // 3. Call API
     try {
       const safeThreadId = threadId || "default_session";
-      if (!threadId) setThreadId(safeThreadId); // Sync state if missing
+      if (!threadId) setThreadId(safeThreadId);
 
-      const payload = { message: currentInput, thread_id: safeThreadId };
+      // 👇 4. CHUẨN BỊ CONTEXT DATA ĐỂ GỬI CHO AI
+      // useParams trả về string | string[], cần ép kiểu về number
+      const workspaceId = params?.workspaceId ? Number(params.workspaceId) : null;
+      const projectId = params?.projectId ? Number(params.projectId) : null;
+
+      const contextData = {
+        company_id: companyId,       // Lấy từ LocalStorage
+        workspace_id: workspaceId,   // Lấy từ URL: /workspace/[workspaceId]
+        project_id: projectId,       // Lấy từ URL: /project/[projectId]
+        current_page: pathname       // Lấy URL hiện tại để AI biết user đang ở đâu
+      };
+
+      console.log("📤 Sending Context to AI:", contextData);
+
+      // 👇 5. GỬI PAYLOAD KÈM CONTEXT
+      // Lưu ý: Backend cần nhận trường 'context' trong body
+      const payload = { 
+          message: currentInput, 
+          thread_id: safeThreadId,
+          context: contextData // <--- Thêm cái này
+      };
 
       const data = currentFile
         ? await uploadChatFile(payload, currentFile)
         : await sendChatMessage(payload);
 
-      // 4. Handle Response
+      // Handle Response
       const botText = normalizeBotResponse(data);
-
       const botMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: "bot",
@@ -250,13 +215,10 @@ export function Chatbot() {
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, botMsg]);
+
     } catch (err) {
       console.error("Chat Error:", err);
-      const errText =
-        err instanceof Error
-          ? err.message
-          : "Connection error. Please try again.";
-
+      const errText = err instanceof Error ? err.message : "Connection error.";
       setMessages((prev) => [
         ...prev,
         {
@@ -271,21 +233,15 @@ export function Chatbot() {
     }
   };
 
-  // --- Render Helpers ---
+  // ... (Phần getMessageBubbleClass và Render Return giữ nguyên y hệt) ...
   const getMessageBubbleClass = (role: string) => {
     switch (role) {
-      case "user":
-        return "bg-blue-600 text-white rounded-br-none";
-      case "system":
-        return "bg-red-50 text-red-600 border border-red-200 rounded-bl-none";
-      default: // bot
-        return "bg-white text-slate-800 border border-slate-200 rounded-bl-none";
+      case "user": return "bg-blue-600 text-white rounded-br-none";
+      case "system": return "bg-red-50 text-red-600 border border-red-200 rounded-bl-none";
+      default: return "bg-white text-slate-800 border border-slate-200 rounded-bl-none";
     }
   };
 
-  // ===========================================================================
-  // RENDER
-  // ===========================================================================
   return (
     <div
       ref={bubbleRef}
@@ -294,7 +250,10 @@ export function Chatbot() {
       }`}
       style={{ bottom: "20px", right: "20px" }}
     >
-      {/* --- CHAT WINDOW --- */}
+        {/* --- Phần nội dung UI (Window chat, Input...) giữ nguyên không thay đổi --- */}
+        {/* Chỉ cần copy lại phần return từ code cũ của bạn vào đây */}
+        
+        {/* CHAT WINDOW */}
       <div
         className={`
           bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-200 mb-4
@@ -450,7 +409,7 @@ export function Chatbot() {
         </div>
       </div>
 
-      {/* --- FLOATING TRIGGER BUTTON --- */}
+      {/* FLOATING TRIGGER BUTTON */}
       <button
         onMouseDown={handleMouseDown}
         onClick={() => !isDragging && setIsOpen(true)}
