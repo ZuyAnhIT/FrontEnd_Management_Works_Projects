@@ -24,16 +24,16 @@ import {
   Minimize2,
   Archive,
 } from "lucide-react";
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
+import { Button } from "@/components/ui/Buttons";
+import { Input } from "@/components/ui/Inputs";
 import { Textarea } from "@/components/ui/TextAreas";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/Avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/Avatars";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "@/components/ui/ToolTip";
+} from "@/components/ui/Tooltips";
 
 import SubtaskDetailView from "./SubtaskDetailView";
 // API Services & Types

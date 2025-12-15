@@ -13,8 +13,8 @@ import {
   Loader2,
   AlertTriangle,
 } from "lucide-react";
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
+import { Button } from "@/components/ui/Buttons";
+import { Input } from "@/components/ui/Inputs";
 import { Textarea } from "@/components/ui/TextAreas";
 
 import { apiEpic, Epic, CreateEpicPayload } from "@/services/apiEpic";

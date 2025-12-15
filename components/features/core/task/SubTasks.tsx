@@ -16,16 +16,16 @@ import {
   Minus,
   AlertCircle,
 } from "lucide-react";
-import { Badge } from "@/components/ui/Badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/Avatar";
-import { Input } from "@/components/ui/Input";
+import { Badge } from "@/components/ui/Badges";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/Avatars";
+import { Input } from "@/components/ui/Inputs";
 import { Subtask } from "@/services/apiSubTask";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "@/components/ui/ToolTip";
+} from "@/components/ui/Tooltips";
 
 // =============================================================================
 // 1. HELPERS

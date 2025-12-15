@@ -17,7 +17,7 @@ import {
   Edit,
 } from "lucide-react";
 
-import { Button } from "@/components/ui/Button";
+import { Button } from "@/components/ui/Buttons";
 import { useToast } from "@/components/ui/ToastProvider";
 import { useAuth } from "@/context/AuthContext";
 

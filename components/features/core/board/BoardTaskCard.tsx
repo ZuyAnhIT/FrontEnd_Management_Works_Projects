@@ -20,7 +20,7 @@ import {
 import { TaskSummary } from "@/services/apiProject";
 import { updateTask } from "@/services/apiTask";
 import { useToast } from "@/components/ui/ToastProvider";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/Avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/Avatars";
 
 // =============================================================================
 // 1. INTERFACES & HELPERS

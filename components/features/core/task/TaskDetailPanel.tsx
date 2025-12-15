@@ -22,9 +22,9 @@ import {
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "@/components/ui/ToolTip";
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
+} from "@/components/ui/Tooltips";
+import { Button } from "@/components/ui/Buttons";
+import { Input } from "@/components/ui/Inputs";
 import { Textarea } from "@/components/ui/TextAreas";
 // API Services
 import {

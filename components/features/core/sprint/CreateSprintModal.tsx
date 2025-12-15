@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { X, Loader2, Calendar, Target } from "lucide-react";
-import { Button } from "@/components/ui/Button";
+import { Button } from "@/components/ui/Buttons";
 import { createSprint, SprintPayload } from "@/services/apiSprint";
 import { useToast } from "@/components/ui/ToastProvider";
 

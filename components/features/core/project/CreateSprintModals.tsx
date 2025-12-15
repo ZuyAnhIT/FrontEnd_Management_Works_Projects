@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { X, Calendar, Target, Rocket, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
+import { Button } from "@/components/ui/Buttons";
+import { Input } from "@/components/ui/Inputs";
 import { Textarea } from "@/components/ui/TextAreas";
 import {
   Card,
