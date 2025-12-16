@@ -229,6 +229,7 @@ export interface ProjectInvitation {
   invitedAt: string;
   inviterName: string;
   inviterAvatar: string;
+  invitationLink?: string; 
 }
 
 export interface InvitationSearchParams {
