@@ -9,9 +9,10 @@ import {
   X,
   LayoutGrid
 } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { usePathname, useParams } from 'next/navigation'
 import Link from 'next/link'
+import { useProjectRole } from '@/hooks/useProjectRole' // ✅ Import Hook phân quyền
 
 // =============================================================================
 // 1. CONFIGURATION & INTERFACES
@@ -19,31 +20,10 @@ import Link from 'next/link'
 
 interface ProjectCoreSidebarProps {
   projectId: string
-  projectName: string // Giữ lại prop nhưng không dùng trong UI này
+  projectName: string
   isOpen: boolean
   onClose: () => void
 }
-
-const getProjectMenu = (workspaceId: string, projectId: string) => [
-  {
-    id: 'general',
-    icon: FolderKanban,
-    label: 'General',
-    path: `/core/workspace/${workspaceId}/project/${projectId}`, // Dashboard/Overview
-  },
-  {
-    id: 'members',
-    icon: Users,
-    label: 'Members',
-    path: `/core/workspace/${workspaceId}/project/${projectId}/member`,
-  },
-  {
-    id: 'settings',
-    icon: Settings,
-    label: 'Settings',
-    path: `/core/workspace/${workspaceId}/project/${projectId}/settings`,
-  },
-];
 
 // =============================================================================
 // 2. MAIN COMPONENT
@@ -58,7 +38,38 @@ export default function ProjectCoreSidebar({
   const [collapsed, setCollapsed] = useState(false)
   const pathname = usePathname()
   const { workspaceId } = useParams() as { workspaceId: string }
-  const projectMenu = getProjectMenu(workspaceId, projectId);
+  
+  // ✅ Lấy role hiện tại
+  const { isGuest } = useProjectRole(Number(projectId));
+
+  // ✅ Tạo menu động dựa trên quyền hạn
+  const projectMenu = useMemo(() => {
+    const baseMenu = [
+      {
+        id: 'general',
+        icon: FolderKanban,
+        label: 'General', // Guest vẫn cần mục này để về Dashboard
+        path: `/core/workspace/${workspaceId}/project/${projectId}`,
+      },
+      // Chỉ hiện Members nếu KHÔNG phải là Guest
+      !isGuest && {
+        id: 'members',
+        icon: Users,
+        label: 'Members',
+        path: `/core/workspace/${workspaceId}/project/${projectId}/member`,
+      },
+      // Chỉ hiện Settings nếu KHÔNG phải là Guest
+      !isGuest && {
+        id: 'settings',
+        icon: Settings,
+        label: 'Settings',
+        path: `/core/workspace/${workspaceId}/project/${projectId}/settings`,
+      },
+    ];
+
+    // Lọc bỏ các giá trị false/undefined
+    return baseMenu.filter((item): item is { id: string; icon: any; label: string; path: string } => Boolean(item));
+  }, [workspaceId, projectId, isGuest]);
 
   // --- RENDER ---
   return (
@@ -81,16 +92,10 @@ export default function ProjectCoreSidebar({
           flex flex-col`}
       >
         
-        {/* =================================================
-            HEADER: MANAGE PROJECT (h-14 matches Admin Header height)
-        ================================================= */}
+        {/* HEADER: MANAGE PROJECT */}
         <div className="h-14 flex items-center justify-between px-4 border-b border-slate-200/50 bg-[#F4F5F7] shrink-0">
           <div className={`flex items-center gap-2 overflow-hidden transition-all text-slate-500 font-bold text-xs uppercase tracking-wider ${collapsed ? 'justify-center w-full' : ''}`}>
-            
-            {/* Icon Quản lý */}
             <LayoutGrid className="w-4 h-4" />
-
-            {/* Text Manage */}
             {!collapsed && (
               <span className="animate-in fade-in duration-200 whitespace-nowrap">
                 Manage Project
@@ -108,14 +113,10 @@ export default function ProjectCoreSidebar({
           </button>
         </div>
 
-        {/* =================================================
-            MENU LIST
-        ================================================= */}
+        {/* MENU LIST */}
         <nav className="flex-1 overflow-y-auto pt-2 px-3 pb-6 space-y-6 custom-scrollbar">
-          
           <div className="space-y-1">
             {projectMenu.map((item) => {
-              // Logic check active: path hiện tại trùng với item path
               const isActive = pathname === item.path
               return (
                 <Link key={item.id} href={item.path} className="block">
@@ -130,11 +131,10 @@ export default function ProjectCoreSidebar({
                     `}
                     title={collapsed ? item.label : undefined}
                     onClick={() => {
-                      // Đóng menu trên thiết bị mobile sau khi click
                       if (window.innerWidth < 1024) onClose()
                     }}
                   >
-                    {/* Active Indicator Bar (Thanh xanh bên trái) */}
+                    {/* Active Indicator Bar */}
                     {isActive && (
                         <div className="absolute left-0 top-1 bottom-1 w-1 bg-blue-600 rounded-r-full"></div>
                     )}
@@ -153,9 +153,7 @@ export default function ProjectCoreSidebar({
           </div>
         </nav>
 
-        {/* =================================================
-            FOOTER: Collapse Button (Desktop Only)
-        ================================================= */}
+        {/* FOOTER: Collapse Button */}
         <div className="p-4 border-t border-slate-200 bg-[#F4F5F7] shrink-0">
            <button
              onClick={() => setCollapsed(!collapsed)}
@@ -169,7 +167,6 @@ export default function ProjectCoreSidebar({
                <ChevronRight className="w-5 h-5" />
              ) : (
                <>
-                  {/* Icon Collapse */}
                   <div className="flex items-center justify-center w-6 h-6 rounded bg-slate-200 text-slate-500 group-hover:text-slate-700">
                     <ChevronLeft className="w-4 h-4" />
                   </div>
@@ -181,21 +178,11 @@ export default function ProjectCoreSidebar({
 
       </aside>
       
-      {/* Custom Scrollbar Styles (giữ nguyên styles gốc) */}
       <style jsx>{`
-        .custom-scrollbar::-webkit-scrollbar {
-          width: 4px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-track {
-          background: transparent;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: #cbd5e1;
-          border-radius: 4px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-          background: #94a3b8;
-        }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
       `}</style>
     </>
   )

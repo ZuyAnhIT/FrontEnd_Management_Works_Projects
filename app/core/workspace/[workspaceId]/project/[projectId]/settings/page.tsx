@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
+
 import {
     Settings,
     Loader2,
@@ -12,7 +13,6 @@ import {
     Image as ImageIcon,
     Camera,
     UploadCloud,
-    Check
 } from "lucide-react";
 
 import {
@@ -26,6 +26,7 @@ import { useToast } from "@/components/ui/ToastProvider";
 import LoadingButton from "@/components/ui/LoadingButton";
 import ConfirmationModal from "@/components/ui/ConfirmationModal";
 import { Chatbot } from "@/components/chatbot/chatbot";
+import { useProjectRole } from "@/hooks/useProjectRole"; // ✅ Import Hook
 
 // Helper URL ảnh (Giữ nguyên logic)
 const getFullImageUrl = (path: string | null | undefined) => {
@@ -47,6 +48,9 @@ export default function ProjectSettingsPage() {
 
     const { activeCompany, isLoading: isAuthLoading } = useAuth();
     const companyId = activeCompany?.companyId;
+
+    // ✅ Lấy role hiện tại
+    const { isGuest } = useProjectRole(projectId);
 
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -70,7 +74,16 @@ export default function ProjectSettingsPage() {
     });
 
     // ===================================================
-    // 1. LOAD DETAIL (Logic nghiệp vụ quan trọng)
+    // 1. ROUTE PROTECTION (Logic mới)
+    // ===================================================
+    useEffect(() => {
+        if (isGuest) {
+            router.replace(`/core/workspace/${workspaceId}/project/${projectId}`);
+        }
+    }, [isGuest, router, workspaceId, projectId]);
+
+    // ===================================================
+    // 2. LOAD DETAIL (Logic nghiệp vụ quan trọng)
     // ===================================================
     useEffect(() => {
         if (isAuthLoading) return;
@@ -78,6 +91,9 @@ export default function ProjectSettingsPage() {
             setLoading(false);
             return;
         }
+
+        // Nếu là Guest thì không fetch data (vì sẽ redirect)
+        if (isGuest) return;
 
         const fetchData = async () => {
             try {
@@ -104,7 +120,7 @@ export default function ProjectSettingsPage() {
             }
         };
         fetchData();
-    }, [companyId, workspaceId, projectId, isAuthLoading, showToast]);
+    }, [companyId, workspaceId, projectId, isAuthLoading, showToast, isGuest]);
 
     // Cleanup URL blob
     useEffect(() => {
@@ -116,7 +132,7 @@ export default function ProjectSettingsPage() {
     }, [coverPreview]);
 
     // ===================================================
-    // 2. HANDLERS (Logic nghiệp vụ quan trọng)
+    // 3. HANDLERS (Logic nghiệp vụ quan trọng)
     // ===================================================
     const handleChange = (field: string, value: string) => {
         setForm((prev) => ({ ...prev, [field]: value }));
@@ -185,8 +201,11 @@ export default function ProjectSettingsPage() {
     };
 
     // ===================================================
-    // 3. RENDER UI
+    // 4. RENDER UI
     // ===================================================
+
+    // ✅ Chặn render nếu là Guest (đang chờ redirect)
+    if (isGuest) return null;
 
     if (isAuthLoading || loading)
         return (
@@ -367,7 +386,7 @@ export default function ProjectSettingsPage() {
                         onClick={() => { if (form.name) setIsDeleteModalOpen(true); }}
                         isLoading={deleting}
                         text="Delete Project"
-                        className="bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-sm px-8 py-2.5 rounded-lg"
+                        className="bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-sm px-8 py-2.5 rounded-lg bg-red-600 hover:bg-red-700"
                         icon={<Trash2 className="w-4 h-4 mr-2" />}
                     />
                 </div>

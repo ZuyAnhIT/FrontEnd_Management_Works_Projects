@@ -7,7 +7,7 @@ import { useToast } from "@/components/ui/ToastProvider";
 // API & Types
 import { 
     getProjectWorkload, 
-    exportWorkloadReport, // Import hàm export
+    exportWorkloadReport, 
     WorkloadStat, 
     WorkloadParams 
 } from "@/services/apiStatistics";
@@ -23,22 +23,23 @@ import WorkloadKPI from "./WorkloadKPI";
 
 interface WorkloadOverviewProps {
     projectId: number;
+    hideExport?: boolean; // ✅ Prop mới
 }
 
 // =============================================================================
 // 2. MAIN COMPONENT
 // =============================================================================
 
-export default function WorkloadOverview({ projectId }: WorkloadOverviewProps) {
+export default function WorkloadOverview({ projectId, hideExport = false }: WorkloadOverviewProps) {
     // --- HOOKS ---
     const { showToast } = useToast();
     
     // --- STATE ---
     const [data, setData] = useState<WorkloadStat[]>([]);
     const [loading, setLoading] = useState(true);
-    const [isExporting, setIsExporting] = useState(false); // State loading cho export
+    const [isExporting, setIsExporting] = useState(false); 
     
-    // Filter State (Mặc định)
+    // Filter State
     const [filters, setFilters] = useState<WorkloadParams>({
         viewType: "POINTS",
         groupBy: "STATUS",
@@ -50,7 +51,6 @@ export default function WorkloadOverview({ projectId }: WorkloadOverviewProps) {
         if (!projectId) return;
 
         const fetchWorkload = async () => {
-            // Chỉ hiển thị loading overlay nếu chưa có data
             if (data.length === 0) setLoading(true); 
             
             try {
@@ -58,7 +58,6 @@ export default function WorkloadOverview({ projectId }: WorkloadOverviewProps) {
                 setData(res);
             } catch (error: any) {
                 console.error("Failed to load workload data", error);
-                // Sử dụng message từ API trả về
                 const message = error.message || error.response?.data?.message || "Failed to load workload data.";
                 showToast(message, "error");
             } finally {
@@ -66,32 +65,24 @@ export default function WorkloadOverview({ projectId }: WorkloadOverviewProps) {
             }
         };
 
-        // Debounce 300ms khi filters thay đổi
         const t = setTimeout(() => fetchWorkload(), 300);
         return () => clearTimeout(t);
     }, [projectId, filters]);
 
-    // --- HANDLE EXPORT LOGIC (Logic nghiệp vụ quan trọng) ---
+    // --- HANDLE EXPORT LOGIC ---
     const handleExport = async () => {
-        if (!projectId) return;
+        if (!projectId || hideExport) return; // ✅ Chặn export
         
         setIsExporting(true);
         try {
-            // 1. Gọi API nhận Blob
             const blobData = await exportWorkloadReport(projectId, filters);
-            
-            // 2. Tạo URL an toàn từ Blob
             const url = window.URL.createObjectURL(new Blob([blobData]));
-            
-            // 3. Tạo thẻ <a> ảo để kích hoạt tải xuống
             const link = document.createElement('a');
             link.href = url;
             
-            // Tạo tên file có ý nghĩa: workload_projectID_timestamp.xlsx
             const timestamp = new Date().toISOString().split('T')[0];
             link.setAttribute('download', `Workload_Report_P${projectId}_${timestamp}.xlsx`);
             
-            // 4. Kích hoạt và dọn dẹp
             document.body.appendChild(link);
             link.click();
             
@@ -120,9 +111,10 @@ export default function WorkloadOverview({ projectId }: WorkloadOverviewProps) {
                 setFilters={setFilters}
                 onExport={handleExport}
                 isExporting={isExporting}
+                hideExport={hideExport} // ✅ Truyền xuống con
             />
 
-            {/* LOADING STATE (Initial load / Filter changes when data is empty) */}
+            {/* LOADING STATE */}
             {loading && data.length === 0 ? (
                 <div className="h-[400px] flex items-center justify-center bg-white rounded-xl border border-slate-200">
                     <div className="flex flex-col items-center gap-3">
@@ -142,7 +134,7 @@ export default function WorkloadOverview({ projectId }: WorkloadOverviewProps) {
                     {/* 3. MAIN STACKED BAR CHART */}
                     <WorkloadChart 
                         data={data} 
-                        loading={loading} // Truyền loading để Chart hiển thị trạng thái Empty/Loading khi filter đổi
+                        loading={loading}
                         unit={filters.viewType || "POINTS"}
                     />
                 </div>

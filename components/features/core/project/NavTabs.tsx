@@ -4,13 +4,15 @@ import {
   LayoutDashboard,
   ListTodo,
   Menu as MenuIcon,
-  GitBranch, // Sử dụng cho List View
+  GitBranch,
   Archive,
-  Calendar, // Sử dụng cho Timeline
-  CalendarDays, // Sử dụng cho Calendar View
+  Calendar,
+  CalendarDays,
 } from 'lucide-react'
 import { usePathname, useParams } from 'next/navigation'
 import Link from 'next/link'
+import { useMemo } from 'react'
+import { useProjectRole } from '@/hooks/useProjectRole' // ✅ Import Hook phân quyền
 
 // =============================================================================
 // 1. INTERFACES
@@ -22,57 +24,7 @@ interface ProjectNavTabsProps {
 }
 
 // =============================================================================
-// 2. CONFIGURATION
-// =============================================================================
-
-const getNavTabs = (workspaceId: string, projectId: string) => [
-    {
-      id: 'dashboard',
-      icon: LayoutDashboard,
-      label: 'Dashboard',
-      path: `/core/workspace/${workspaceId}/project/${projectId}`,
-      isBasePath: true, // Đánh dấu đây là path gốc (base path)
-    },
-    {
-      id: 'board',
-      icon: ListTodo,
-      label: 'Board',
-      path: `/core/workspace/${workspaceId}/project/${projectId}/board`,
-    },
-    {
-      id: 'list',
-      icon: GitBranch,
-      label: 'List',
-      path: `/core/workspace/${workspaceId}/project/${projectId}/list`,
-    },
-    {
-      id: 'backlog',
-      icon: MenuIcon,
-      label: 'Backlog',
-      path: `/core/workspace/${workspaceId}/project/${projectId}/backlog`,
-    },
-    {
-      id: 'calendar',
-      icon: CalendarDays,
-      label: 'Calendar',
-      path: `/core/workspace/${workspaceId}/project/${projectId}/calendar`,
-    },
-    {
-      id: 'timeline',
-      icon: Calendar,
-      label: 'Timeline',
-      path: `/core/workspace/${workspaceId}/project/${projectId}/timeline`,
-    },
-    {
-      id: 'archived', 
-      icon: Archive,
-      label: 'Archived',
-      path: `/core/workspace/${workspaceId}/project/${projectId}/archived`,
-    },
-];
-
-// =============================================================================
-// 3. MAIN COMPONENT
+// 2. MAIN COMPONENT
 // =============================================================================
 
 export default function ProjectNavTabs({
@@ -82,7 +34,65 @@ export default function ProjectNavTabs({
   // --- HOOKS ---
   const pathname = usePathname();
   const { workspaceId } = useParams() as { workspaceId: string };
-  const navTabs = getNavTabs(workspaceId, projectId);
+  
+  // ✅ Lấy quyền guest
+  const { isGuest } = useProjectRole(Number(projectId));
+
+  // ✅ Tạo danh sách Tabs động dựa trên quyền
+  const navTabs = useMemo(() => {
+    const tabs = [
+      {
+        id: 'dashboard',
+        icon: LayoutDashboard,
+        label: 'Dashboard',
+        path: `/core/workspace/${workspaceId}/project/${projectId}`,
+        isBasePath: true,
+      },
+      {
+        id: 'board',
+        icon: ListTodo,
+        label: 'Board',
+        path: `/core/workspace/${workspaceId}/project/${projectId}/board`,
+      },
+      // Ẩn List với Guest
+      !isGuest && {
+        id: 'list',
+        icon: GitBranch,
+        label: 'List',
+        path: `/core/workspace/${workspaceId}/project/${projectId}/list`,
+      },
+      // Ẩn Backlog với Guest
+      !isGuest && {
+        id: 'backlog',
+        icon: MenuIcon,
+        label: 'Backlog',
+        path: `/core/workspace/${workspaceId}/project/${projectId}/backlog`,
+      },
+      {
+        id: 'calendar',
+        icon: CalendarDays,
+        label: 'Calendar',
+        path: `/core/workspace/${workspaceId}/project/${projectId}/calendar`,
+      },
+      // Ẩn Timeline với Guest
+      !isGuest && {
+        id: 'timeline',
+        icon: Calendar,
+        label: 'Timeline',
+        path: `/core/workspace/${workspaceId}/project/${projectId}/timeline`,
+      },
+      // Ẩn Archived với Guest
+      !isGuest && {
+        id: 'archived', 
+        icon: Archive,
+        label: 'Archived',
+        path: `/core/workspace/${workspaceId}/project/${projectId}/archived`,
+      },
+    ];
+
+    // Lọc bỏ các mục false/undefined
+    return tabs.filter((tab): tab is { id: string; icon: any; label: string; path: string; isBasePath?: boolean } => Boolean(tab));
+  }, [workspaceId, projectId, isGuest]);
 
   // --- RENDER ---
   return (
@@ -105,9 +115,6 @@ export default function ProjectNavTabs({
           <div className="flex gap-6 h-full">
             {navTabs.map((tab) => {
               
-              // Logic check active path:
-              // 1. Path hiện tại trùng khớp hoàn toàn với tab path.
-              // 2. Nếu là Dashboard (base path), kiểm tra xem path có kết thúc bằng project ID không.
               const isBaseUrl = `/core/workspace/${workspaceId}/project/${projectId}`;
               const isActive = 
                 pathname === tab.path || 
@@ -126,14 +133,11 @@ export default function ProjectNavTabs({
                       }
                     `}
                   >
-                    
-                    {/* Icon */}
                     <TabIcon className={`w-4 h-4 ${isActive ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-600'}`} />
-                    
                     <span>{tab.label}</span>
                   </button>
 
-                  {/* Active Indicator Bar (Gạch chân xanh) */}
+                  {/* Active Indicator Bar */}
                   {isActive && (
                     <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-blue-600 rounded-t-full animate-in fade-in duration-200"></div>
                   )}
@@ -144,15 +148,9 @@ export default function ProjectNavTabs({
         </div>
       </div>
 
-      {/* Custom CSS for hiding scrollbar (giữ lại style gốc) */}
       <style jsx>{`
-        .scrollbar-hide::-webkit-scrollbar {
-          display: none;
-        }
-        .scrollbar-hide {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
     </div>
   )

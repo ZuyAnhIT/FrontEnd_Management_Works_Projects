@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { 
     LayoutDashboard, 
@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/components/ui/ToastProvider"; 
 import { Chatbot } from "@/components/chatbot/chatbot";
+import { useProjectRole } from "@/hooks/useProjectRole"; // ✅ Import Hook phân quyền
 
 // API & Types
 import { 
@@ -37,6 +38,9 @@ export default function ProjectSummaryPage() {
     const { showToast } = useToast();
     const params = useParams();
     const projectId = Number(params.projectId);
+
+    // ✅ Lấy role hiện tại
+    const { isGuest } = useProjectRole(projectId);
 
     // --- STATE CHARTS ---
     const [loading, setLoading] = useState(true);
@@ -85,8 +89,7 @@ export default function ProjectSummaryPage() {
                 setEpicData(data);
             } catch (error: any) {
                 console.error("Failed to load epics", error);
-                const message = error.response?.data?.message || error.message || "Failed to load Epic progress";
-                // showToast(message, "error"); // Có thể chọn không show toast cho fetch epic nếu nó là secondary data
+                // Silent fail for secondary data or showToast if critical
             } finally {
                 setEpicLoading(false);
             }
@@ -95,16 +98,13 @@ export default function ProjectSummaryPage() {
         return () => clearTimeout(t);
     }, [projectId, epicFilters]);
 
-    // --- ✅ 3. HANDLE EXPORT EPIC (Logic nghiệp vụ quan trọng) ---
+    // --- 3. HANDLE EXPORT EPIC ---
     const handleExportEpic = async () => {
-        if (!projectId) return;
+        if (!projectId || isGuest) return; // ✅ Chặn export ở mức handler
         
         setIsExportingEpic(true);
         try {
-            // Lấy data dưới dạng Blob
             const blobData = await exportEpicProgress(projectId, epicFilters);
-            
-            // Tạo URL và link download
             const url = window.URL.createObjectURL(new Blob([blobData]));
             const link = document.createElement('a');
             link.href = url;
@@ -114,7 +114,6 @@ export default function ProjectSummaryPage() {
             document.body.appendChild(link);
             link.click();
             
-            // Cleanup
             link.parentNode?.removeChild(link);
             window.URL.revokeObjectURL(url);
 
@@ -145,10 +144,13 @@ export default function ProjectSummaryPage() {
                             Real-time overview of project performance and health.
                         </p>
                     </div>
-                    {/* Nút export chung cho cả trang (nếu cần) */}
-                    <button className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-blue-600 transition-all shadow-sm">
-                        <ArrowUpRight className="w-4 h-4" /> Global Report
-                    </button>
+                    
+                    {/* ✅ Ẩn nút Global Report nếu là Guest */}
+                    {!isGuest && (
+                        <button className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-blue-600 transition-all shadow-sm">
+                            <ArrowUpRight className="w-4 h-4" /> Global Report
+                        </button>
+                    )}
                 </div>
 
                 {/* SECTION 1: WEEKLY OVERVIEW */}
@@ -180,13 +182,14 @@ export default function ProjectSummaryPage() {
                         <h2 className="text-lg font-bold text-slate-800">Epic Progress & Roadmap</h2>
                     </div>
 
-                    {/* ✅ Truyền props Export xuống Toolbar */}
+                    {/* ✅ Truyền prop hideExport xuống Toolbar */}
                     <EpicFilterToolbar 
                         projectId={projectId}
                         filters={epicFilters}
                         setFilters={setEpicFilters}
                         onExport={handleExportEpic}
                         isExporting={isExportingEpic}
+                        hideExport={isGuest} // Ẩn nút nếu là Guest
                     />
 
                     <div className="w-full mt-4">
@@ -202,7 +205,8 @@ export default function ProjectSummaryPage() {
                         <Users className="w-5 h-5 text-slate-400" />
                         <h2 className="text-lg font-bold text-slate-800">Team Workload</h2>
                     </div>
-                    <WorkloadOverview projectId={projectId} />
+                    {/* ✅ Truyền prop hideExport xuống WorkloadOverview */}
+                    <WorkloadOverview projectId={projectId} hideExport={isGuest} />
                 </section>
 
                 <Chatbot />
