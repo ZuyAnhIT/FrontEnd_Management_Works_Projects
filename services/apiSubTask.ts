@@ -7,6 +7,7 @@ import apiClient from "@/lib/apiClient";
 // =============================================================================
 
 export interface Subtask {
+  assignee: any;
   id: number;
   parentTaskId: number;
   title: string;
