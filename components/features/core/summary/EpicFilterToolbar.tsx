@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Filter, Calendar as CalendarIcon, X, FileSpreadsheet, Loader2, LucideIcon } from "lucide-react";
+import { Filter, Calendar as CalendarIcon, X, FileSpreadsheet, Loader2 } from "lucide-react";
 import { EpicProgressParams } from "@/services/apiStatistics";
 import { getSprints, Sprint } from "@/services/apiSprint";
 import { getProjectStatuses, RawStatusColumn } from "@/services/apiBoard"; 
@@ -16,6 +16,7 @@ interface EpicFilterToolbarProps {
     setFilters: (f: EpicProgressParams) => void;
     onExport: () => void;
     isExporting: boolean;
+    hideExport?: boolean; // ✅ Prop mới
 }
 
 interface SelectFilterProps {
@@ -25,9 +26,6 @@ interface SelectFilterProps {
     placeholder: string;
 }
 
-/**
- * Component tái sử dụng cho các Dropdown Filter (Sprint, Status)
- */
 const SelectFilterWrapper = ({ value, onChange, options, placeholder }: SelectFilterProps) => (
     <select 
         className="h-9 px-3 border border-slate-200 rounded-lg text-sm bg-white text-slate-600 focus:border-blue-500 outline-none cursor-pointer hover:border-blue-300 transition-colors"
@@ -43,7 +41,6 @@ const SelectFilterWrapper = ({ value, onChange, options, placeholder }: SelectFi
     </select>
 );
 
-
 // =============================================================================
 // 2. MAIN COMPONENT
 // =============================================================================
@@ -53,7 +50,8 @@ export default function EpicFilterToolbar({
     filters, 
     setFilters,
     onExport,
-    isExporting
+    isExporting,
+    hideExport = false // ✅ Default false
 }: EpicFilterToolbarProps) {
     
     // --- STATE ---
@@ -73,7 +71,6 @@ export default function EpicFilterToolbar({
     }, [projectId]);
 
     // --- HANDLERS ---
-    
     const handleSprintChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         const val = e.target.value;
         setFilters({ ...filters, sprintId: val ? Number(val) : undefined });
@@ -81,7 +78,6 @@ export default function EpicFilterToolbar({
 
     const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         const val = e.target.value;
-        // Giữ nguyên logic cũ: chỉ chấp nhận filter 1 status tại 1 thời điểm
         setFilters({ 
             ...filters, 
             statusIds: val ? [Number(val)] : undefined 
@@ -143,20 +139,22 @@ export default function EpicFilterToolbar({
             {/* Spacer đẩy nút sang phải & Buttons Container */}
             <div className="ml-auto flex items-center gap-2">
                 
-                {/* 4. EXPORT BUTTON */}
-                <button
-                    onClick={onExport}
-                    disabled={isExporting}
-                    className="flex items-center gap-2 px-3 py-1.5 h-9 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow-sm transition-all text-xs font-bold disabled:opacity-70 disabled:cursor-not-allowed"
-                    title="Export Epic Progress to Excel"
-                >
-                    {isExporting ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                        <FileSpreadsheet className="w-3.5 h-3.5" />
-                    )}
-                    Export Report
-                </button>
+                {/* 4. EXPORT BUTTON (Ẩn nếu hideExport = true) */}
+                {!hideExport && (
+                    <button
+                        onClick={onExport}
+                        disabled={isExporting}
+                        className="flex items-center gap-2 px-3 py-1.5 h-9 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow-sm transition-all text-xs font-bold disabled:opacity-70 disabled:cursor-not-allowed"
+                        title="Export Epic Progress to Excel"
+                    >
+                        {isExporting ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                            <FileSpreadsheet className="w-3.5 h-3.5" />
+                        )}
+                        Export Report
+                    </button>
+                )}
 
                 {/* Clear Button */}
                 {hasFilters && (

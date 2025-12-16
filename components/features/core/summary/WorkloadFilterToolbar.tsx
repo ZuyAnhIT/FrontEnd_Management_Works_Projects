@@ -20,6 +20,7 @@ interface WorkloadFilterToolbarProps {
     setFilters: (f: WorkloadParams) => void;
     onExport: () => void;
     isExporting: boolean;
+    hideExport?: boolean; // ✅ Prop mới
 }
 
 // =============================================================================
@@ -31,7 +32,8 @@ export default function WorkloadFilterToolbar({
     filters, 
     setFilters, 
     onExport, 
-    isExporting 
+    isExporting,
+    hideExport = false // ✅ Default false
 }: WorkloadFilterToolbarProps) {
     
     // --- STATE ---
@@ -45,13 +47,9 @@ export default function WorkloadFilterToolbar({
     }, [projectId]);
 
     // --- HANDLERS ---
-    
-    // Xử lý thay đổi filter chung
     const handleChange = (key: keyof WorkloadParams, val: any) => {
-        // Nếu val là "ALL" hoặc rỗng, set về undefined để xóa khỏi query (trừ các field luôn phải có giá trị như viewType, groupBy)
         const newValue = (val === "ALL" || val === "") ? undefined : val;
         
-        // Kiểm tra riêng cho sprintId (cần ép kiểu Number)
         if (key === 'sprintId' && newValue !== undefined) {
              setFilters({ ...filters, [key]: Number(val) });
         } else {
@@ -59,21 +57,17 @@ export default function WorkloadFilterToolbar({
         }
     };
 
-    // Xử lý thay đổi ngày tháng
     const handleDateChange = (field: 'from' | 'to', val: string) => {
         setFilters({ ...filters, [field]: val || undefined });
     };
 
-    // Xóa hết filter (chỉ giữ lại viewType và groupBy mặc định)
     const clearFilters = () => {
         setFilters({ 
             viewType: filters.viewType || "POINTS", 
             groupBy: filters.groupBy || "STATUS" 
-            // Các filter khác (sprintId, from, to) sẽ là undefined
         });
     };
 
-    // Kiểm tra xem có đang filter không (chỉ kiểm tra filter optional)
     const hasFilters = !!filters.sprintId || !!filters.from || !!filters.to;
 
     // --- RENDER ---
@@ -153,20 +147,22 @@ export default function WorkloadFilterToolbar({
             {/* Spacer đẩy các nút action sang phải */}
             <div className="ml-auto flex items-center gap-2">
                 
-                {/* 5. EXPORT BUTTON */}
-                <button
-                    onClick={onExport}
-                    disabled={isExporting}
-                    className="flex items-center gap-2 px-3 py-1.5 h-9 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow-sm transition-all text-xs font-bold disabled:opacity-70 disabled:cursor-not-allowed"
-                    title="Export current view to Excel"
-                >
-                    {isExporting ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                        <FileSpreadsheet className="w-3.5 h-3.5" />
-                    )}
-                    Export Report
-                </button>
+                {/* 5. EXPORT BUTTON (Ẩn nếu hideExport = true) */}
+                {!hideExport && (
+                    <button
+                        onClick={onExport}
+                        disabled={isExporting}
+                        className="flex items-center gap-2 px-3 py-1.5 h-9 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow-sm transition-all text-xs font-bold disabled:opacity-70 disabled:cursor-not-allowed"
+                        title="Export current view to Excel"
+                    >
+                        {isExporting ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                            <FileSpreadsheet className="w-3.5 h-3.5" />
+                        )}
+                        Export Report
+                    </button>
+                )}
 
                 {/* 6. Clear Button */}
                 {hasFilters && (
