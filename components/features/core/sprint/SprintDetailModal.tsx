@@ -26,6 +26,7 @@ interface SprintDetailModalProps {
     sprintId: number;
     onClose: () => void;
     onUpdate: () => void; // Callback reload list
+    readOnly?: boolean;   // ✅ Prop mới để check quyền Guest
 }
 
 // Helper: Convert ISO Date to YYYY-MM-DDTHH:MM for datetime-local input
@@ -41,6 +42,7 @@ export default function SprintDetailModal({
     sprintId,
     onClose,
     onUpdate,
+    readOnly = false, // ✅ Mặc định là false (cho phép sửa) nếu không truyền
 }: SprintDetailModalProps) {
     // --- HOOKS ---
     const { showToast } = useToast();
@@ -77,7 +79,8 @@ export default function SprintDetailModal({
 
     // 2. Handle Update (Auto-save on Blur)
     const handleUpdate = async (field: keyof UpdateSprintPayload, value: any) => {
-        if (!sprint) return;
+        // ✅ Chặn nếu chưa có data hoặc là Guest (Read Only)
+        if (!sprint || readOnly) return;
 
         // Optimistic Update UI local
         setFormData((prev) => ({ ...prev, [field]: value }));
@@ -160,14 +163,14 @@ export default function SprintDetailModal({
                             {/* 1. NAME & STATUS */}
                             <div>
                                 <input
-                                    className="w-full text-xl font-bold text-slate-800 border-none outline-none focus:ring-0 bg-transparent placeholder:text-slate-300 p-0"
+                                    className={`w-full text-xl font-bold text-slate-800 border-none outline-none focus:ring-0 bg-transparent placeholder:text-slate-300 p-0 ${readOnly ? 'cursor-not-allowed' : ''}`}
                                     value={formData.name || ""}
                                     onChange={(e) =>
                                         setFormData({ ...formData, name: e.target.value })
                                     }
                                     onBlur={(e) => handleUpdate("name", e.target.value)}
                                     placeholder="Sprint Name"
-                                    disabled={isSaving}
+                                    disabled={isSaving || readOnly} // ✅ Disable input
                                 />
                                 <div className="mt-2">
                                     <span
@@ -222,14 +225,14 @@ export default function SprintDetailModal({
                                     <Target className="w-3 h-3" /> Sprint Goal
                                 </label>
                                 <textarea
-                                    className="w-full min-h-[80px] text-sm text-slate-700 p-3 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all resize-none"
+                                    className={`w-full min-h-[80px] text-sm text-slate-700 p-3 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all resize-none ${readOnly ? 'cursor-not-allowed' : ''}`}
                                     placeholder="What is the goal of this sprint?"
                                     value={formData.goal || ""}
                                     onChange={(e) =>
                                         setFormData({ ...formData, goal: e.target.value })
                                     }
                                     onBlur={(e) => handleUpdate("goal", e.target.value)}
-                                    disabled={isSaving}
+                                    disabled={isSaving || readOnly} // ✅ Disable input
                                 />
                             </div>
 
@@ -246,13 +249,13 @@ export default function SprintDetailModal({
                                         </span>
                                         <input
                                             type="datetime-local"
-                                            className="w-full text-sm p-2 border border-slate-200 rounded-md bg-white text-slate-700 focus:border-blue-500 outline-none shadow-sm"
+                                            className={`w-full text-sm p-2 border border-slate-200 rounded-md bg-white text-slate-700 focus:border-blue-500 outline-none shadow-sm ${readOnly ? 'cursor-not-allowed bg-slate-50' : ''}`}
                                             value={toInputDate(formData.startDate)}
                                             onChange={(e) =>
                                                 setFormData({ ...formData, startDate: e.target.value })
                                             }
                                             onBlur={(e) => handleUpdate("startDate", e.target.value)}
-                                            disabled={isSaving}
+                                            disabled={isSaving || readOnly} // ✅ Disable input
                                         />
                                     </div>
                                     <div className="space-y-1">
@@ -261,11 +264,11 @@ export default function SprintDetailModal({
                                         </span>
                                         <input
                                             type="datetime-local"
-                                            className="w-full text-sm p-2 border border-slate-200 rounded-md bg-white text-slate-700 focus:border-blue-500 outline-none shadow-sm"
+                                            className={`w-full text-sm p-2 border border-slate-200 rounded-md bg-white text-slate-700 focus:border-blue-500 outline-none shadow-sm ${readOnly ? 'cursor-not-allowed bg-slate-50' : ''}`}
                                             value={toInputDate(formData.endDate)}
                                             onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
                                             onBlur={(e) => handleUpdate("endDate", e.target.value)}
-                                            disabled={isSaving}
+                                            disabled={isSaving || readOnly} // ✅ Disable input
                                         />
                                     </div>
                                 </div>

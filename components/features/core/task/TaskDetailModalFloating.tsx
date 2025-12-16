@@ -84,7 +84,7 @@ const getInitials = (name?: string) =>
 const PrioritySelect = ({
     value,
     onChange,
-    disabled = false // ✅ Disabled prop
+    disabled = false
 }: {
     value: string;
     onChange: (val: string) => void;
@@ -153,7 +153,7 @@ interface TaskDetailModalProps {
     workspaceId: number;
     projectId: number;
     
-    readOnly?: boolean; // ✅ Prop mới
+    readOnly?: boolean;
 }
 
 export default function TaskDetailModalFloating({
@@ -168,7 +168,7 @@ export default function TaskDetailModalFloating({
     companyId,
     workspaceId,
     projectId,
-    readOnly = false // ✅ Default false
+    readOnly = false
 }: TaskDetailModalProps) {
     const { showToast } = useToast();
     const [task, setTask] = useState<TaskDetail | null>(null);
@@ -341,7 +341,7 @@ export default function TaskDetailModalFloating({
 
     // Main Task Update
     const handleUpdate = async (field: keyof UpdateTaskData, value: any) => {
-        if (!task || !taskId || readOnly) return; // ✅ Block
+        if (!task || !taskId || readOnly) return; 
         setFormData((prev) => ({ ...prev, [field]: value }));
 
         // Optimistic UI: Assignee
@@ -408,11 +408,11 @@ export default function TaskDetailModalFloating({
     // --- ARCHIVE HANDLER ---
     const onClickArchive = async (e: React.MouseEvent) => {
         e.stopPropagation();
-        if (readOnly) return; // ✅ Block
+        if (readOnly) return; 
         setIsArchiveConfirmOpen(true);
     };
     const onConfirmArchive = async () => {
-        if (!taskId || readOnly) return; // ✅ Block
+        if (!taskId || readOnly) return; 
 
         try {
             setIsSaving(true);
@@ -430,7 +430,7 @@ export default function TaskDetailModalFloating({
 
     // --- EPIC HANDLERS ---
     const handleSelectEpic = async (epic: any | null) => {
-        if (readOnly) return; // ✅ Block
+        if (readOnly) return; 
         setTask((prev) =>
             prev ? {
                 ...prev,
@@ -444,7 +444,7 @@ export default function TaskDetailModalFloating({
 
     // --- SPRINT HANDLERS ---
     const handleSelectSprint = async (sprintId: number) => {
-        if (readOnly) return; // ✅ Block
+        if (readOnly) return; 
         setFormData((prev) => ({ ...prev, sprintId: sprintId }));
         setIsSprintPopoverOpen(false);
         await handleUpdate("sprintId", sprintId);
@@ -459,7 +459,7 @@ export default function TaskDetailModalFloating({
     }, [allProjectTags, tagSearch]);
 
     const handleAddTag = async (tag: Tag) => {
-        if (!taskId || !task || readOnly) return; // ✅ Block
+        if (!taskId || !task || readOnly) return; 
         const currentTags = (task.tags as unknown as Tag[]) || [];
         if (currentTags.find((t) => t.id === tag.id)) return;
 
@@ -478,7 +478,7 @@ export default function TaskDetailModalFloating({
     };
 
     const handleRemoveTag = async (tagId: number) => {
-        if (!taskId || !task || readOnly) return; // ✅ Block
+        if (!taskId || !task || readOnly) return; 
         const currentTags = (task.tags as unknown as Tag[]) || [];
         const newTags = currentTags.filter((t) => t.id !== tagId);
 
@@ -494,7 +494,7 @@ export default function TaskDetailModalFloating({
     };
 
     const handleCreateNewTag = async () => {
-        if (!taskId || !tagSearch.trim() || readOnly) return; // ✅ Block
+        if (!taskId || !tagSearch.trim() || readOnly) return; 
 
         try {
             const newTag = await apiTag.createTag(companyId, workspaceId, projectId, {
@@ -511,7 +511,7 @@ export default function TaskDetailModalFloating({
 
     // --- SUBTASK & DESCRIPTION HANDLERS ---
     const handleSaveDescription = async () => {
-        if (!taskId || readOnly) return; // ✅ Block
+        if (!taskId || readOnly) return; 
         await handleUpdate("description", formData.description);
         setIsEditingDescription(false);
         showToast("Description updated successfully", "success");
@@ -522,7 +522,7 @@ export default function TaskDetailModalFloating({
     };
 
     const handleCreateSubtask = async () => {
-        if (!newSubtaskTitle.trim() || !taskId || readOnly) return; // ✅ Block
+        if (!newSubtaskTitle.trim() || !taskId || readOnly) return; 
         try {
             await createSubtask(companyId, workspaceId, projectId, taskId, { title: newSubtaskTitle });
             setNewSubtaskTitle("");
@@ -536,7 +536,7 @@ export default function TaskDetailModalFloating({
     };
 
     const handleToggleSubtask = async (subtask: Subtask) => {
-        if (!taskId || readOnly) return; // ✅ Block
+        if (!taskId || readOnly) return; 
         const newStatus = subtask.status === "DONE" ? "TO_DO" : "DONE";
         setSubtasks((prev) => prev.map((s) => (s.id === subtask.id ? { ...s, status: newStatus } : s)));
         try {
@@ -549,13 +549,13 @@ export default function TaskDetailModalFloating({
     };
 
     const onClickDeleteSubtask = (subTaskId: number) => {
-        if (readOnly) return; // ✅ Block
+        if (readOnly) return; 
         setSubtaskToDelete(subTaskId);
         setIsDeleteConfirmOpen(true);
     };
 
     const onConfirmDeleteSubtask = async () => {
-        if (!taskId || !subtaskToDelete || readOnly) return; // ✅ Block
+        if (!taskId || !subtaskToDelete || readOnly) return; 
 
         setIsDeletingSubtask(true);
         try {
@@ -566,7 +566,7 @@ export default function TaskDetailModalFloating({
         } catch (error: any) {
             const message = error.message || error.response?.data?.message || "Failed to delete subtask";
             showToast(message, "error");
-            fetchSubtasks(taskId); // Revert UI on error
+            fetchSubtasks(taskId); 
         } finally {
             setIsDeletingSubtask(false);
             setSubtaskToDelete(null);
@@ -574,7 +574,7 @@ export default function TaskDetailModalFloating({
     };
 
     const handleUpdateSubtask = async (subTaskId: number, data: any) => {
-        if (!taskId || readOnly) return; // ✅ Block
+        if (!taskId || readOnly) return; 
 
         setSubtasks((prev) => prev.map((s) => {
             if (s.id === subTaskId) {
@@ -722,8 +722,11 @@ export default function TaskDetailModalFloating({
                                     <Loader2 className="w-10 h-10 text-blue-500 animate-spin" />
                                 </div>
                             ) : task ? (
-                                <div className="flex flex-col min-h-full w-full">
-                                    <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr] flex-1">
+                                /* Sửa lỗi cuộn: Đổi min-h-full thành h-full để con bên trong biết giới hạn height */
+                                <div className="flex flex-col h-full w-full">
+                                    {/* Sửa lỗi cuộn: Thêm h-full và min-h-0 cho grid */}
+                                    <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr] h-full min-h-0">
+                                        
                                         {/* --- LEFT COLUMN (65%) --- */}
                                         <div className="p-8 border-r border-slate-100 overflow-y-auto custom-scrollbar">
                                             <input
@@ -732,14 +735,13 @@ export default function TaskDetailModalFloating({
                                                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                                                 onBlur={(e) => handleUpdate("title", e.target.value)}
                                                 placeholder="Task Title"
-                                                disabled={isSaving || readOnly} // ✅
+                                                disabled={isSaving || readOnly} 
                                             />
 
                                             <div className="flex gap-2">
                                                 <Button variant="outline" className="h-8 bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100">
                                                     <LinkIcon className="w-3 h-3 mr-1.5" /> Attach
                                                 </Button>
-                                                {/* ✅ Hide Add Child if ReadOnly */}
                                                 {!readOnly && (
                                                     <Button variant="outline" className="h-8 bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100" onClick={() => setIsAddingSubtask(true)} disabled={isSaving}>
                                                         <Plus className="w-3 h-3 mr-1.5" /> Add child
@@ -788,7 +790,7 @@ export default function TaskDetailModalFloating({
                                                 onAssigneeChange={(subTaskId, userId) => handleUpdateSubtask(subTaskId, { assigneeId: userId })}
                                                 onEditContent={(subTaskId, data) => handleUpdateSubtask(subTaskId, data)}
                                                 onViewDetail={(subId) => setSelectedSubtaskId(subId)}
-                                                isReadOnly={readOnly} // ✅ Pass prop
+                                                isReadOnly={readOnly}
                                             />
 
                                             {isAddingSubtask && !readOnly && (
@@ -829,7 +831,7 @@ export default function TaskDetailModalFloating({
                                                                 borderLeftWidth: "4px",
                                                                 borderLeftColor: task.status?.color || "transparent",
                                                             }}
-                                                            disabled={isSaving || readOnly} // ✅
+                                                            disabled={isSaving || readOnly} 
                                                         >
                                                             {statuses.length > 0 ? (
                                                                 statuses.map((st) => (
@@ -853,21 +855,23 @@ export default function TaskDetailModalFloating({
                                                         <div className="relative group min-w-[140px]">
                                                             <div className={`flex items-center justify-end gap-2 px-2 py-1.5 rounded transition-all ${readOnly ? '' : 'cursor-pointer hover:bg-slate-200'}`}>
                                                                 <div className="w-6 h-6 rounded-full overflow-hidden bg-slate-200 flex items-center justify-center border border-white shadow-sm shrink-0">
-                                                                    {task.assigneeAvatar ? (
-                                                                        <img src={task.assigneeAvatar} className="w-full h-full object-cover" alt="Avatar" />
+                                                                    {/* ✅ Hiển thị avatar chính xác */}
+                                                                    {task.assignee?.avatarUrl ? (
+                                                                        <img src={task.assignee.avatarUrl} className="w-full h-full object-cover" alt="Avatar" />
                                                                     ) : (
                                                                         <User className="w-3.5 h-3.5 text-slate-400" />
                                                                     )}
                                                                 </div>
-                                                                <span className={`text-sm font-medium truncate max-w-[120px] ${!task.assigneeName ? "text-slate-400 italic" : "text-slate-700"}`}>
-                                                                    {task.assigneeName || "Unassigned"}
+                                                                <span className={`text-sm font-medium truncate max-w-[120px] ${!task.assignee?.name ? "text-slate-400 italic" : "text-slate-700"}`}>
+                                                                    {/* ✅ Hiển thị tên chính xác */}
+                                                                    {task.assignee?.name || "Unassigned"}
                                                                 </span>
                                                             </div>
                                                             <select
                                                                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
                                                                 value={formData.assigneeId ? String(formData.assigneeId) : "0"}
                                                                 onChange={(e) => handleUpdate("assigneeId", Number(e.target.value))}
-                                                                disabled={isSaving || readOnly} // ✅
+                                                                disabled={isSaving || readOnly} 
                                                             >
                                                                 <option value="0">Unassigned</option>
                                                                 {members.map((m) => (
@@ -891,7 +895,6 @@ export default function TaskDetailModalFloating({
                                                             <TagIcon className="w-3 h-3 text-slate-400" />
                                                             <label className="text-[11px] font-bold text-slate-400 uppercase">Tags</label>
                                                         </div>
-                                                        {/* ✅ Hide Add button if ReadOnly */}
                                                         {!readOnly && (
                                                             <button
                                                                 ref={tagButtonRef}
@@ -910,7 +913,6 @@ export default function TaskDetailModalFloating({
                                                                 <div key={tag.id} className={`flex items-center gap-1 px-2 py-1 rounded bg-white border border-slate-200 shadow-sm text-xs font-medium text-slate-700 transition-all ${readOnly ? '' : 'group cursor-pointer hover:bg-slate-50 hover:border-slate-300'}`} onClick={() => !readOnly && setEditingTag(tag)}>
                                                                     <div className="w-2 h-2 rounded-full" style={{ backgroundColor: tag.color || "#cbd5e1" }}></div>
                                                                     {tag.name}
-                                                                    {/* ✅ Hide Remove button if ReadOnly */}
                                                                     {!readOnly && (
                                                                         <button onClick={(e) => { e.stopPropagation(); handleRemoveTag(tag.id); }} className="opacity-0 group-hover:opacity-100 hover:text-red-500 transition-opacity ml-1 p-0.5 rounded-full hover:bg-slate-200" title="Remove Tag" disabled={isSaving}>
                                                                             <X className="w-3 h-3" />
@@ -922,7 +924,6 @@ export default function TaskDetailModalFloating({
                                                             <span className="text-xs text-slate-400 italic">No tags</span>
                                                         )}
                                                     </div>
-                                                    {/* Tag Popover (Hidden button but logic kept for safety) */}
                                                     {isTagPopoverOpen && !readOnly && (
                                                         <div className="absolute right-0 top-8 z-20 w-56 bg-white rounded-md shadow-xl border border-slate-200 p-2 animate-in fade-in zoom-in-95 duration-100">
                                                             <Input
@@ -978,7 +979,7 @@ export default function TaskDetailModalFloating({
                                                     <div className="flex items-center justify-between">
                                                         <div className="flex items-center gap-2 text-sm text-slate-600"><Layers className="w-4 h-4" /> Epic</div>
                                                         <button 
-                                                            onClick={() => !readOnly && setIsEpicModalOpen(true)} // ✅
+                                                            onClick={() => !readOnly && setIsEpicModalOpen(true)} 
                                                             className={`max-w-[160px] px-2 py-1 rounded text-xs font-bold truncate transition-colors border ${task?.epic ? "bg-white border-slate-200 text-slate-700 hover:border-blue-300" : "bg-slate-100 border-transparent text-slate-400 hover:bg-slate-200"} ${readOnly ? 'cursor-default opacity-80' : ''}`}
                                                             style={task?.epic ? { borderLeftColor: task.epic.color || "#ccc", borderLeftWidth: "3px" } : {}}
                                                             disabled={isSaving}
@@ -995,7 +996,7 @@ export default function TaskDetailModalFloating({
                                                                 className="w-full text-sm text-right bg-transparent border-none outline-none text-slate-700 hover:text-blue-600 font-medium cursor-pointer truncate transition-colors hover:bg-slate-100 rounded px-2 py-1 appearance-none disabled:cursor-not-allowed"
                                                                 value={Number(formData.sprintId) || 0}
                                                                 onChange={(e) => handleUpdate("sprintId", Number(e.target.value))}
-                                                                disabled={isSaving || readOnly} // ✅
+                                                                disabled={isSaving || readOnly} 
                                                             >
                                                                 <option value={0}>Backlog</option>
                                                                 {localSprints.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}

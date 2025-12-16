@@ -5,6 +5,7 @@ import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
+import listPlugin from '@fullcalendar/list';
 import { useParams } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 
@@ -25,6 +26,10 @@ import SprintDetailModal from "@/components/features/core/sprint/SprintDetailMod
 import TaskDetailPanel from "@/components/features/core/task/TaskDetailPanel"; 
 import TaskDetailModalFloating from "@/components/features/core/task/TaskDetailModalFloating";
 
+// ✅ Import Hook phân quyền
+import { useProjectRole } from "@/hooks/useProjectRole"; 
+import { updateTask } from "@/services/apiTask"; // Cần import thêm updateTask để hàm handleEventDrop hoạt động (như logic cũ)
+
 // ===================================================
 // 1. MAIN COMPONENT
 // ===================================================
@@ -37,6 +42,9 @@ export default function ProjectCalendarPage() {
     const paramCompanyId = Number(params.companyId);
     const companyId = !isNaN(paramCompanyId) ? paramCompanyId : 1; 
     const { showToast } = useToast();
+
+    // ✅ Lấy quyền Guest
+    const { isGuest } = useProjectRole(projectId);
 
     // --- STATE ---
     const [loading, setLoading] = useState(false);
@@ -175,11 +183,43 @@ export default function ProjectCalendarPage() {
         
         if (props.type === 'SPRINT') {
             setSelectedSprintId(props.originalId);
+            // setIsSprintModalOpen(true); // Biến này chưa khai báo trong code gốc của bạn, dùng selectedSprintId check là đủ hoặc thêm state nếu cần
         } else if (props.type === 'TASK') {
             setSelectedTaskId(props.originalId); 
             setIsModalOpen(true); // <--- Mở Modal chi tiết Task
         }
     };
+
+    // ✅ Bổ sung hàm xử lý kéo thả (Dựa trên logic calendar thông thường)
+    const handleEventDrop = async (info: any) => {
+        // Chặn nếu là Guest
+        if (isGuest) {
+            info.revert();
+            return;
+        }
+
+        const { type, originalId } = info.event.extendedProps;
+        if (type === 'TASK') {
+            // Logic update task date
+            const newStart = info.event.start?.toISOString();
+            const newEnd = info.event.end?.toISOString() || newStart; 
+            try {
+                await updateTask(originalId, { startDate: newStart, dueDate: newEnd });
+                showToast("Task updated", "success");
+            } catch (err) {
+                info.revert();
+                showToast("Update failed", "error");
+            }
+        } else {
+            info.revert();
+        }
+    };
+
+    const handleDateClick = (info: any) => {
+        if (isGuest) return;
+        // Logic create task (nếu có)
+    };
+
 
     if (!projectId) return null;
 
@@ -214,15 +254,22 @@ export default function ProjectCalendarPage() {
                 <div className="bg-white p-1 rounded-xl shadow-sm border border-slate-200 h-full relative">
                     <FullCalendar
                         ref={calendarRef}
-                        plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+                        plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, listPlugin]}
                         initialView="dayGridMonth"
                         headerToolbar={false} 
                         events={events}
                         datesSet={handleDatesSet}
                         eventContent={CalendarEventContent}
                         eventClick={handleEventClick}
-                        editable={false}
-                        selectable={true}
+                        
+                        // ✅ CONFIG QUYỀN HẠN
+                        editable={!isGuest}      
+                        selectable={!isGuest}    
+                        droppable={!isGuest} 
+                        eventDrop={handleEventDrop}
+                        eventResize={handleEventDrop}
+                        dateClick={handleDateClick}
+
                         height="100%"
                         dayMaxEvents={4}
                         firstDay={1}
@@ -233,16 +280,20 @@ export default function ProjectCalendarPage() {
                 </div>
             </div>
 
-            {/* MODAL: SPRINT DETAIL */}
-            {selectedSprintId && (
-                    <SprintDetailModal 
-                        projectId={projectId}
-                        sprintId={selectedSprintId}
-                        onClose={() => setSelectedSprintId(null)}
-                        onUpdate={fetchEvents} 
-                    />
-            )}
+            {/* --- MODALS --- */}
 
+            {/* Sprint Modal - Read Only if Guest */}
+            {selectedSprintId && (
+                <SprintDetailModal 
+                    projectId={projectId}
+                    sprintId={selectedSprintId}
+                    // isOpen={true} // Code gốc bạn ko có biến state này, dùng selectedSprintId && ... để render
+                    onClose={() => setSelectedSprintId(null)}
+                    onUpdate={fetchEvents} 
+                    readOnly={isGuest} // ✅ Truyền quyền
+                />
+            )}
+            
             {/* ✅ RENDER MODAL CHI TIẾT TASK */}
             
             {/* TRƯỜNG HỢP 1: HIỆN PANEL DỌC (View Mode = 'panel') */}
@@ -267,6 +318,8 @@ export default function ProjectCalendarPage() {
                     companyId={companyId!}
                     workspaceId={workspaceId}
                     projectId={projectId}
+
+                    readOnly={isGuest} // ✅ Truyền quyền
                 />
             )}
 
@@ -281,7 +334,7 @@ export default function ProjectCalendarPage() {
                     // Chuyển về Panel
                     onSwitchToPanel={() => setViewMode('panel')} 
                     
-                    onUpdate={handleTaskUpdate}
+                    onUpdate={handleTaskUpdate} 
                     
                     // Data Props (Giống hệt Panel)
                     members={members}
@@ -293,6 +346,8 @@ export default function ProjectCalendarPage() {
                     companyId={companyId!}
                     workspaceId={workspaceId}
                     projectId={projectId}
+
+                    readOnly={isGuest} // ✅ Truyền quyền
                 />
             )}
             <Chatbot />
