@@ -1,9 +1,10 @@
 "use client";
 
 import React from "react";
-import { Mail, Trash2, Clock, Shield, User } from "lucide-react";
+import { Mail, Trash2, Clock, Shield, User, Copy } from "lucide-react"; // 1. Thêm icon Copy
 import { ProjectInvitation } from "@/services/apiProject";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/Avatars";
+import { useToast } from "@/components/ui/ToastProvider"; // 2. Thêm hook Toast
 
 // =============================================================================
 // 1. INTERFACES
@@ -24,15 +25,26 @@ export default function ProjectInvitationTable({
   onCancel,
   formatDateTime,
 }: ProjectInvitationTableProps) {
-  // Helper: Render role name (Logic nghiệp vụ quan trọng: xóa tiền tố)
+  const { showToast } = useToast(); // 3. Khởi tạo Toast
+
+  // 4. Logic Copy Link
+  const copyLink = (link?: string) => {
+    if (!link) {
+      showToast("Invitation link not found", "error");
+      return;
+    }
+    navigator.clipboard.writeText(link);
+    showToast("Copied invitation link!", "success");
+  };
+
+  // Helper: Render role name (Logic cũ giữ nguyên)
   const renderRoleName = (roleCode: string) => {
-    // Chuyển PROJECT_ADMIN -> ADMIN, GUEST_PROJECT -> GUEST
     return roleCode
       .replace("PROJECT_", "")
       .replace("GUEST_", "")
-      .replace(/_/g, " ") // Thay dấu gạch dưới bằng khoảng trắng
+      .replace(/_/g, " ")
       .toLowerCase()
-      .split(" ") // Viết hoa chữ cái đầu
+      .split(" ")
       .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
       .join(" ");
   };
@@ -93,7 +105,6 @@ export default function ProjectInvitationTable({
                     </div>
                     <div className="flex items-center gap-1.5 text-xs text-slate-500 mt-1">
                       <Shield className="w-3 h-3 text-blue-500" />
-                      {/* Sử dụng helper function để hiển thị role */}
                       {renderRoleName(inv.roleCode)}
                     </div>
                   </div>
@@ -103,7 +114,6 @@ export default function ProjectInvitationTable({
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2">
                     <Avatar className="w-6 h-6 border border-slate-200">
-                      {/* inv.inviterAvatar có thể là null, sử dụng AvatarImage/Fallback an toàn */}
                       <AvatarImage src={inv.inviterAvatar || undefined} />
                       <AvatarFallback className="text-[10px] bg-slate-200 text-slate-600">
                         {inv.inviterName?.charAt(0) || (
@@ -117,7 +127,7 @@ export default function ProjectInvitationTable({
                   </div>
                 </td>
 
-                {/* Status (Hardcoded to Pending for display) */}
+                {/* Status */}
                 <td className="px-4 py-3">
                   <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
                     <Clock className="w-3 h-3" /> Pending
@@ -132,6 +142,17 @@ export default function ProjectInvitationTable({
                 {/* Actions */}
                 <td className="px-4 py-3 text-right">
                   <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {/* 5. Nút Copy Link */}
+                    <button
+                      // Lưu ý: Đảm bảo trong interface ProjectInvitation có trường `invitationLink` hoặc tương tự
+                      onClick={() => copyLink((inv as any).invitationLink)} 
+                      className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+                      title="Copy Link"
+                    >
+                      <Copy className="w-4 h-4" />
+                    </button>
+                    
+                    {/* Nút Cancel (Cũ) */}
                     <button
                       onClick={() => onCancel(inv)}
                       className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
