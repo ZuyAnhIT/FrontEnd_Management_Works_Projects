@@ -1,25 +1,20 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
-import { useParams, useRouter } from "next/navigation"; // Added useRouter
-import { useAuth } from "@/context/AuthContext";
-import { useToast } from "@/components/ui/ToastProvider";
-import { Loader2, AlertCircle } from "lucide-react";
-import { Chatbot } from "@/components/chatbot/chatbot";
-
-// --- DND KIT IMPORTS ---
+import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { useParams, useRouter } from "next/navigation";
 import {
     DndContext,
     DragOverlay,
+    closestCorners,
+    KeyboardSensor,
+    PointerSensor,
     useSensor,
     useSensors,
-    PointerSensor,
-    KeyboardSensor,
     DragStartEvent,
+    DragOverEvent,
     DragEndEvent,
     pointerWithin,
     rectIntersection,
-    closestCorners,
     defaultDropAnimationSideEffects,
     DropAnimation,
     CollisionDetection,
@@ -28,9 +23,11 @@ import {
     SortableContext,
     horizontalListSortingStrategy,
     arrayMove,
+    sortableKeyboardCoordinates,
 } from "@dnd-kit/sortable";
+import { Loader2, AlertCircle } from "lucide-react";
 
-// API
+// Services & Hooks
 import {
     getProjectBoardData,
     getProjectStatuses,
@@ -42,15 +39,18 @@ import {
     reorderProjectStatuses,
 } from "@/services/apiBoard";
 import { getProjectMembers, ProjectMember, TaskSummary } from "@/services/apiProject";
+import { useAuth } from "@/context/AuthContext";
+import { useToast } from "@/components/ui/ToastProvider";
+import { useProjectRole } from "@/hooks/useProjectRole"; // ✅ Import Hook
 
 // Components
 import BoardHeader from "@/components/features/core/board/BoardHeader";
 import BoardColumn from "@/components/features/core/board/BoardColumn";
 import CreateColumnButton from "@/components/features/core/board/CreateColumnButton";
 import BoardTaskCard from "@/components/features/core/board/BoardTaskCard";
-// ✅ IMPORT MODAL CHI TIẾT TASK
 import TaskDetailModalFloating from "@/components/features/core/task/TaskDetailModalFloating";
 import TaskDetailPanel from "@/components/features/core/task/TaskDetailPanel";
+import { Chatbot } from "@/components/chatbot/chatbot";
 
 export default function BoardPage() {
     const params = useParams();
@@ -58,12 +58,16 @@ export default function BoardPage() {
     const { showToast } = useToast();
     const { activeCompany, isLoading: isAuthLoading } = useAuth();
 
-    // Lấy IDs, ưu tiên từ URL (params) nếu có
+    // Lấy IDs
     const paramCompanyId = Number(params.companyId);
     const companyId = !isNaN(paramCompanyId) ? paramCompanyId : activeCompany?.companyId;
     const workspaceId = Number(params.workspaceId);
     const projectId = Number(params.projectId);
 
+    // ✅ 1. Lấy quyền Guest
+    const { isGuest } = useProjectRole(projectId);
+
+    // --- STATE ---
     const [columns, setColumns] = useState<BoardColumnResponse[]>([]);
     const [members, setMembers] = useState<ProjectMember[]>([]);
     const [loading, setLoading] = useState(true);
@@ -72,8 +76,8 @@ export default function BoardPage() {
     const [activeColumn, setActiveColumn] = useState<BoardColumnResponse | null>(null);
     const [activeTask, setActiveTask] = useState<TaskSummary | null>(null);
 
-    // ✅ STATE CHO MODAL CHI TIẾT TASK
-    const [viewMode, setViewMode] = useState<'panel' | 'floating'>('floating');
+    // Task Detail Modal State
+    const [viewMode, setViewMode] = useState<'panel' | 'floating'>('panel'); 
     const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -85,15 +89,24 @@ export default function BoardPage() {
         taskType: undefined,
     });
 
+    // --- SENSORS CONFIGURATION (Logic nghiệp vụ quan trọng) ---
+    // ✅ 2. Disable sensors nếu là Guest để chặn kéo thả
     const sensors = useSensors(
-        useSensor(PointerSensor, { activationConstraint: { distance: 10 } }),
-        useSensor(KeyboardSensor)
+        useSensor(PointerSensor, { 
+            activationConstraint: { distance: 5 }, 
+            disabled: isGuest // ⛔ DISABLE IF GUEST
+        }),
+        useSensor(KeyboardSensor, {
+            coordinateGetter: sortableKeyboardCoordinates,
+            disabled: isGuest // ⛔ DISABLE IF GUEST
+        })
     );
 
     // --- HELPER NORMALIZE DATA ---
     const normalizeData = (boardData: RawBoardColumn[], statusList: RawStatusColumn[]): BoardColumnResponse[] => {
         const columnMap = new Map<number, BoardColumnResponse>();
-        // 1. Khởi tạo columns từ Status List (đảm bảo thứ tự và tồn tại)
+        
+        // 1. Init from Status List
         if (Array.isArray(statusList)) {
             statusList.forEach((st) => {
                 columnMap.set(st.id, { 
@@ -106,15 +119,14 @@ export default function BoardPage() {
                 });
             });
         }
-        // 2. Điền Task vào Columns
+        
+        // 2. Fill Tasks
         if (Array.isArray(boardData)) {
             boardData.forEach((bd) => {
                 const existingCol = columnMap.get(bd.statusId);
                 if (existingCol) { 
                     existingCol.tasks = bd.tasks || []; 
-                } 
-                // Xử lý trường hợp Status tồn tại trong board data nhưng không có trong list status (nên không xảy ra)
-                else {
+                } else {
                     columnMap.set(bd.statusId, { 
                         id: bd.statusId, 
                         name: bd.statusName, 
@@ -129,17 +141,21 @@ export default function BoardPage() {
         return Array.from(columnMap.values()).sort((a, b) => a.position - b.position);
     };
 
-    // --- FETCH BOARD DATA (Logic nghiệp vụ quan trọng) ---
+    // --- FETCH BOARD DATA ---
     const fetchBoardData = useCallback(async () => {
         if (isAuthLoading) return;
         if (!companyId || !workspaceId || !projectId) return;
-        setLoading(true); setError(null);
+        
+        setLoading(true); 
+        setError(null);
+        
         try {
             const [rawBoardData, rawStatusList, membersRes] = await Promise.all([
                 getProjectBoardData(companyId, workspaceId, projectId, filters),
                 getProjectStatuses(projectId),
                 getProjectMembers(companyId, workspaceId, projectId, { size: 100 }),
             ]);
+            
             setMembers(membersRes.content || []);
             const normalizedColumns = normalizeData(rawBoardData, rawStatusList);
             setColumns(normalizedColumns);
@@ -148,10 +164,11 @@ export default function BoardPage() {
             const message = err.response?.data?.message || err.message || "Failed to load board data";
             setError(message); 
             showToast(message, "error");
-        } finally { setLoading(false); }
+        } finally { 
+            setLoading(false); 
+        }
     }, [companyId, workspaceId, projectId, filters, showToast, isAuthLoading]);
 
-    // Debounce Fetch
     useEffect(() => {
         const t = setTimeout(() => { if (!isAuthLoading && companyId) fetchBoardData(); }, 300);
         return () => clearTimeout(t);
@@ -159,45 +176,53 @@ export default function BoardPage() {
 
     // --- COLUMN & TASK HANDLERS ---
     const handleColumnCreated = (newStatusData: any) => {
-        const newColumn: BoardColumnResponse = { id: newStatusData.id, name: newStatusData.name, color: newStatusData.color, position: newStatusData.sortOrder, isCompletedStatus: newStatusData.isCompletedStatus, tasks: [], };
-        setColumns((prev) => [...prev, newColumn]); showToast("Column created successfully", "success");
+        const newColumn: BoardColumnResponse = { 
+            id: newStatusData.id, 
+            name: newStatusData.name, 
+            color: newStatusData.color, 
+            position: newStatusData.sortOrder, 
+            isCompletedStatus: newStatusData.isCompletedStatus, 
+            tasks: [], 
+        };
+        setColumns((prev) => [...prev, newColumn]); 
+        showToast("Column created successfully", "success");
     };
+
     const handleColumnDeleted = (columnId: string) => { 
         setColumns((prev) => prev.filter((col) => String(col.id) !== columnId)); 
         showToast("Column deleted successfully", "success");
     };
     
-    // ✅ HÀM XỬ LÝ KHI CLICK VÀO TASK CARD
-    const handleTaskClick = (taskData: TaskSummary) => {
-        setSelectedTaskId(Number(taskData.id));
+    const handleTaskClick = (task: TaskSummary) => {
+        setSelectedTaskId(task.id);
         setIsModalOpen(true);
     };
 
-    // Callback khi update task xong -> Refresh board data
     const handleTaskUpdate = () => {
-        fetchBoardData(); // Reload data board để cập nhật UI bên ngoài
+        fetchBoardData(); // Reload board data
     };
 
     // --- DND LOGIC ---
-
     const customCollisionDetection: CollisionDetection = useCallback((args) => {
         const pointerCollisions = pointerWithin(args);
         if (pointerCollisions.length > 0) return pointerCollisions;
-        // Fallback to rectIntersection if no pointer collisions
         return rectIntersection(args);
     }, []);
 
     const onDragStart = (event: DragStartEvent) => {
+        if (isGuest) return; // Block logic
         if (event.active.data.current?.type === "Column") { setActiveColumn(event.active.data.current.column); return; }
         if (event.active.data.current?.type === "Task") { setActiveTask(event.active.data.current.task); return; }
     };
 
     const onDragEnd = async (event: DragEndEvent) => {
+        if (isGuest) return; // Block logic
+        
         const { active, over } = event;
         setActiveColumn(null); setActiveTask(null);
         if (!over) return;
 
-        // 1. COLUMN DRAG/DROP (Reorder)
+        // 1. COLUMN REORDER
         if (active.data.current?.type === "Column") {
             if (active.id === over.id) return;
 
@@ -209,58 +234,50 @@ export default function BoardPage() {
 
             try {
                 const orderedStatusIds = newColumns.map(col => Number(col.id));
-                // Call API reorder
                 await reorderProjectStatuses(projectId, orderedStatusIds);
                 showToast("Column reordered successfully", "success");
             } catch (error: any) {
-                console.error("Reorder column failed:", error);
-                const message = error.response?.data?.message || error.message || "Column reorder failed. Reverting...";
+                console.error("Reorder failed:", error);
+                const message = error.response?.data?.message || error.message || "Reorder failed. Reverting...";
                 showToast(message, "error");
-                fetchBoardData(); // Revert bằng cách fetch lại
+                fetchBoardData();
             }
             return;
         }
 
-        // 2. TASK DRAG/DROP (Move Status/Reorder inside column)
+        // 2. TASK MOVE/REORDER
         if (active.data.current?.type === "Task") {
             const activeId = active.id; const overId = over.id;
             const sourceCol = columns.find((col) => col.tasks.some((t) => t.id.toString() === activeId));
-            let destCol = columns.find((col) => col.id.toString() === overId);
-            // Trường hợp over Task thay vì Column
-            if (!destCol) { destCol = columns.find((col) => col.tasks.some((t) => t.id.toString() === overId)); }
+            let destCol = columns.find((col) => col.id.toString() === over.id);
+            
+            if (!destCol) { destCol = columns.find((col) => col.tasks.some((t) => t.id.toString() === over.id)); }
             if (!sourceCol || !destCol) return;
-            // Nếu không thay đổi cột và không thay đổi vị trí
-            if (sourceCol.id === destCol.id && activeId === overId) return;
+            if (sourceCol.id === destCol.id && activeId === over.id) return;
 
-            // --- Optimistic Update ---
+            // Optimistic Update
             const sourceColIndex = columns.findIndex((c) => c.id === sourceCol.id);
             const destColIndex = columns.findIndex((c) => c.id === destCol.id);
-            const newColumns = JSON.parse(JSON.stringify(columns)); // Deep copy columns
+            const newColumns = JSON.parse(JSON.stringify(columns)); // Deep copy
             const newSourceCol = newColumns[sourceColIndex];
             const newDestCol = newColumns[destColIndex];
             const oldIndex = newSourceCol.tasks.findIndex((t: TaskSummary) => t.id.toString() === activeId);
             
             let newIndex;
             if (over.data.current?.type === "Column") { 
-                // Thả vào khoảng trống của Column
                 newIndex = newDestCol.tasks.length; 
-            } 
-            else {
-                // Thả đè lên Task khác
-                const overTaskIndex = newDestCol.tasks.findIndex((t: TaskSummary) => t.id.toString() === overId);
-                // Xác định vị trí thả: trên hay dưới task bị đè (dựa vào vị trí y của chuột)
-                const isBelowOverItem = over && active.rect.current.translated && active.rect.current.translated.top > over.rect.top + over.rect.height / 2; // Sửa logic tính toán
+            } else {
+                const overTaskIndex = newDestCol.tasks.findIndex((t: TaskSummary) => t.id.toString() === over.id);
+                const isBelowOverItem = over && active.rect.current.translated && active.rect.current.translated.top > over.rect.top + over.rect.height / 2;
                 const modifier = isBelowOverItem ? 1 : 0;
                 newIndex = overTaskIndex >= 0 ? overTaskIndex + modifier : newDestCol.tasks.length;
             }
 
-            // Di chuyển task trong state
             const [movedTask] = newSourceCol.tasks.splice(oldIndex, 1);
             movedTask.statusId = newDestCol.id;
             newDestCol.tasks.splice(newIndex, 0, movedTask);
             setColumns(newColumns);
 
-            // Call API
             try {
                 await moveTaskToStatus(Number(activeId), { 
                     newStatusId: Number(newDestCol.id), 
@@ -268,10 +285,10 @@ export default function BoardPage() {
                 });
                 showToast("Task moved successfully", "success");
             } catch (error: any) {
-                console.error("Move task failed:", error); 
+                console.error("Move failed:", error); 
                 const message = error.response?.data?.message || error.message || "Move failed. Reverting...";
                 showToast(message, "error"); 
-                fetchBoardData(); // Revert bằng cách fetch lại
+                fetchBoardData();
             }
         }
     };
@@ -281,19 +298,40 @@ export default function BoardPage() {
     };
     const columnIds = useMemo(() => columns.map((col) => col.id.toString()), [columns]);
 
+    // --- RENDER UI ---
     if (isAuthLoading) return <div className="h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-blue-600" /></div>;
 
     return (
         <div className="h-[calc(100vh-64px)] flex flex-col bg-white overflow-hidden">
-            <BoardHeader filters={filters} setFilters={setFilters} members={members} totalTasks={columns.reduce((acc, col) => acc + (col.tasks?.length || 0), 0)} />
+            {/* Header & Filter (Guest vẫn dùng được) */}
+            <BoardHeader 
+                filters={filters} 
+                setFilters={setFilters} 
+                members={members} 
+                totalTasks={columns.reduce((acc, col) => acc + (col.tasks?.length || 0), 0)} 
+            />
 
             <div className="flex-1 overflow-x-auto overflow-y-hidden bg-white">
                 {loading && columns.length === 0 ? (
-                    <div className="h-full flex flex-col items-center justify-center gap-3"><Loader2 className="w-10 h-10 animate-spin text-blue-600" /><p className="text-sm text-slate-500 font-medium">Loading board...</p></div>
+                    <div className="h-full flex flex-col items-center justify-center gap-3">
+                        <Loader2 className="w-10 h-10 animate-spin text-blue-600" />
+                        <p className="text-sm text-slate-500 font-medium">Loading board...</p>
+                    </div>
                 ) : error ? (
-                    <div className="h-full flex flex-col items-center justify-center text-red-500 gap-3"><AlertCircle className="w-10 h-10 opacity-80" /><p className="font-medium">{error}</p><button onClick={fetchBoardData} className="px-4 py-2 bg-white border border-red-200 text-red-600 rounded-md shadow-sm hover:bg-red-50 font-semibold text-sm">Try Again</button></div>
+                    <div className="h-full flex flex-col items-center justify-center text-red-500 gap-3">
+                        <AlertCircle className="w-10 h-10 opacity-80" />
+                        <p className="font-medium">{error}</p>
+                        <button onClick={fetchBoardData} className="px-4 py-2 bg-white border border-red-200 text-red-600 rounded-md shadow-sm hover:bg-red-50 font-semibold text-sm">
+                            Try Again
+                        </button>
+                    </div>
                 ) : (
-                    <DndContext sensors={sensors} collisionDetection={customCollisionDetection} onDragStart={onDragStart} onDragEnd={onDragEnd}>
+                    <DndContext 
+                        sensors={sensors} // ✅ Disabled if Guest
+                        collisionDetection={customCollisionDetection} 
+                        onDragStart={onDragStart} 
+                        onDragEnd={onDragEnd}
+                    >
                         <div className="h-full flex px-6 pt-6 pb-4 gap-4 items-start min-w-max">
                             <SortableContext items={columnIds} strategy={horizontalListSortingStrategy}>
                                 {columns.map((col, index) => (
@@ -304,20 +342,27 @@ export default function BoardPage() {
                                         projectId={projectId} 
                                         members={members} 
                                         onDeleteColumn={handleColumnDeleted} 
-                                        onTaskClick={handleTaskClick} // ✅ TRUYỀN HÀM CLICK XUỐNG
+                                        // ✅ Truyền hàm click task (cho phép xem chi tiết)
+                                        onTaskClick={handleTaskClick}
+                                        // ✅ Truyền quyền readOnly để ẩn nút "Add Task" và chặn edit cột
+                                        isReadOnly={isGuest} 
                                     />
                                 ))}
                             </SortableContext>
-                            <CreateColumnButton projectId={projectId} onSuccess={handleColumnCreated} />
+                            
+                            {/* ✅ 3. Ẩn nút tạo cột nếu là Guest */}
+                            {!isGuest && (
+                                <CreateColumnButton projectId={projectId} onSuccess={handleColumnCreated} />
+                            )}
                         </div>
                         
                         <DragOverlay dropAnimation={dropAnimation}>
                             {activeColumn && (
-                                    <div className="h-full cursor-grabbing opacity-90 scale-[1.02] shadow-2xl rounded-xl bg-transparent">
+                                <div className="h-full cursor-grabbing opacity-90 scale-[1.02] shadow-2xl rounded-xl bg-transparent">
                                     <div className="h-full bg-[#F4F5F7] rounded-xl border-2 border-blue-500">
                                         <BoardColumn column={activeColumn} index={0} projectId={projectId} members={members} /> 
                                     </div>
-                                    </div>
+                                </div>
                             )}
                             {activeTask && (
                                 <BoardTaskCard task={activeTask} index={0} users={members} /> 
@@ -327,25 +372,18 @@ export default function BoardPage() {
                 )}
             </div>
 
-            {/* ✅ RENDER MODAL CHI TIẾT */}
-            {/* TRƯỜNG HỢP 1: HIỆN PANEL DỌC (Panel cố định) */}
+            {/* ✅ RENDER MODAL CHI TIẾT VỚI CHẾ ĐỘ READ-ONLY */}
+            {/* TRƯỜNG HỢP 1: HIỆN PANEL DỌC */}
             {isModalOpen && selectedTaskId && viewMode === 'panel' && (
                 <TaskDetailPanel
                     taskId={selectedTaskId}
                     onClose={() => setIsModalOpen(false)}
-                    // 👇 Nút "Phóng to" -> Chuyển sang Floating
                     onSwitchToFloating={() => setViewMode('floating')} 
-                    
-                    onUpdate={handleTaskUpdate} // Refresh board khi sửa xong
+                    onUpdate={handleTaskUpdate} 
                     
                     // Data Props
                     members={members}
-                    // Map column thành status list để dropdown status hoạt động đúng
-                    statuses={columns.map(c => ({ 
-                         id: c.id, 
-                         name: c.name, 
-                         color: c.color 
-                    }))} 
+                    statuses={columns.map(c => ({ id: c.id, name: c.name, color: c.color }))} 
                     sprints={[]} 
                     epics={[]} 
                     
@@ -353,34 +391,32 @@ export default function BoardPage() {
                     companyId={companyId!}
                     workspaceId={workspaceId}
                     projectId={projectId}
+
+                    // ✅ 4. Bật chế độ chỉ xem (Cho phép comment/upload)
+                    readOnly={isGuest} 
                 />
             )}
 
-            {/* TRƯỜNG HỢP 2: HIỆN MODAL NỔI (Kéo thả được - Maximized) */}
+            {/* TRƯỜNG HỢP 2: HIỆN MODAL NỔI */}
             {isModalOpen && selectedTaskId && viewMode === 'floating' && (
                 <TaskDetailModalFloating
                     taskId={selectedTaskId}
                     isOpen={true}
                     onClose={() => setIsModalOpen(false)}
-                    // 👇 Nút "Thu nhỏ" -> Chuyển về Panel
                     onSwitchToPanel={() => setViewMode('panel')} 
-                    
                     onUpdate={handleTaskUpdate}
                     
-                    // Data Props (Phải giống hệt Panel)
                     members={members}
-                    statuses={columns.map(c => ({ 
-                         id: c.id, 
-                         name: c.name, 
-                         color: c.color 
-                    }))}
+                    statuses={columns.map(c => ({ id: c.id, name: c.name, color: c.color }))}
                     sprints={[]} 
                     epics={[]}
                     
-                    // Context IDs
                     companyId={companyId!}
                     workspaceId={workspaceId}
                     projectId={projectId}
+
+                    // ✅ 4. Bật chế độ chỉ xem
+                    readOnly={isGuest}
                 />
             )}
             <Chatbot />
