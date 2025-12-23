@@ -952,7 +952,7 @@ export default function TaskDetailPanel({
                                                     />
                                                 </div>
                                                 <div className="bg-white p-2.5 rounded border border-slate-200">
-                                                    <label className="text-[10px] text-slate-400 font-bold uppercase block mb-1">Est. Hours</label>
+                                                    <label className="text-[10px] text-slate-400 font-bold uppercase block mb-1">Action. Hours</label>
                                                     <div className="flex items-center gap-1">
                                                         <input
                                                             type="number"
