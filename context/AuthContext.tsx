@@ -149,6 +149,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.setItem("lastActiveCompanyId", companyId.toString());
         //lưu vị trí của bạn cho chatbot
         localStorage.setItem("current_company_id", companyId.toString());
+        
         // 3. Điều hướng dựa trên Role (Logic nghiệp vụ cốt lõi)
         switch (selected.roleCode) {
           case "COMPANY_ADMIN":
@@ -197,6 +198,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const isAuthPage = AUTH_ROUTES.some((route) => pathname === route || pathname.startsWith(route + "/"));
     // Trang chủ "/" vừa là Auth page (nếu chưa login) vừa là Public
     const isHomePage = pathname === "/"; 
+    const isSuperAdminPage = pathname.startsWith("/super-admin");
 
     // CASE A: Chưa đăng nhập
     if (!user) {
@@ -208,13 +210,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     // CASE B: Đã đăng nhập
-    // 1. Nếu đang ở trang Auth (Login/Register) -> Vào Admin Hub
+    const isSystemAdmin = user.systemRoles?.includes("SYSTEM_ADMIN");
+
+    // 1. Nếu đang ở trang Auth (Login/Register) -> Điều hướng theo quyền
     if (isAuthPage || isHomePage) {
+      if (isSystemAdmin) {
+        router.push("/super-admin"); // ✨ LOGIC MỚI: Đẩy System Admin về Super Admin
+      } else {
+        router.push("/admin"); // Các user bình thường vào Admin Hub
+      }
+      return;
+    }
+
+    // 2. Bảo vệ route /super-admin: Chặn user bình thường truy cập
+    if (isSuperAdminPage && !isSystemAdmin) {
+      showToast("Access Denied. You are not a System Administrator.", "error");
       router.push("/admin");
       return;
     }
 
-    // 2. Phân quyền theo Role (Ngăn chặn truy cập trái phép)
+    // 3. Phân quyền theo Role (Ngăn chặn truy cập trái phép)
     if (role === "GUEST") {
       const isProjectDetail = pathname.includes("/project/");
       const isPortal = pathname.startsWith("/portal");
@@ -233,7 +248,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
        }
     }
 
-  }, [user, role, pathname, isLoading, router]);
+  }, [user, role, pathname, isLoading, router, showToast]);
 
   // =========================================================================
   // 6. ACTIONS (LOGIN, LOGOUT...)
@@ -246,7 +261,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
     setUser(userData);
-    router.push("/admin");
+    
+    // ✨ LOGIC MỚI: Kiểm tra role ngay lúc đăng nhập xong
+    if (userData.systemRoles?.includes("SYSTEM_ADMIN")) {
+      router.push("/super-admin");
+    } else {
+      router.push("/admin");
+    }
   };
 
   const login = async (email: string, password: string) => {
