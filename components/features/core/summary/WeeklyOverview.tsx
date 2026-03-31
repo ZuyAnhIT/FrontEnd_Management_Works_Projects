@@ -1,32 +1,38 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { 
-    getWeeklyOverview, 
-    WeeklyOverviewData, 
-    StatsTask, 
-    OverviewParams
-} from "@/services/apiStatistics";
-import { 
-    getProjectMembers, 
-    ProjectMember 
-} from "@/services/apiProject"; 
+// =============================================================================
+// 1. IMPORT
+// =============================================================================
+
+import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { 
     Loader2, PlusCircle, CheckCircle2, RefreshCw, AlertTriangle, CalendarDays 
 } from "lucide-react";
 
-// Components
+// Internal Services & Types
+import { 
+    getWeeklyOverview, 
+    WeeklyOverviewData, 
+    StatsTask, 
+    OverviewParams 
+} from "@/services/apiStatistics";
+import { getProjectMembers, ProjectMember } from "@/services/apiProject"; 
+
+// Internal Components & Utils
 import WeeklyStatCard from "./WeeklyStatCard";
 import StatsTaskItem from "./StatsTaskItem";
 import OverviewFilterToolbar from "./OverviewFilterToolbar"; 
+import { cn } from "@/lib/utils";
 
 // =============================================================================
-// 1. CONSTANTS & INTERFACES
+// 2. CONSTANTS & INTERFACES
 // =============================================================================
 
 type ActiveTab = "created" | "completed" | "updated" | "due";
 
-// Default filter state (Last 7 days)
+/**
+ * Khởi tạo bộ lọc mặc định: Lấy dữ liệu trong vòng 7 ngày qua.
+ */
 const getDefaultFilters = (): OverviewParams => {
     const end = new Date();
     const start = new Date();
@@ -38,114 +44,129 @@ const getDefaultFilters = (): OverviewParams => {
 };
 
 // =============================================================================
-// 2. MAIN COMPONENT
+// 3. MAIN COMPONENT
 // =============================================================================
 
+/**
+ * Thành phần Thống kê Tuần (Weekly Overview).
+ * Hiển thị các chỉ số biến động công việc và danh sách chi tiết theo từng loại sự kiện.
+ */
 export default function WeeklyOverview({ projectId }: { projectId: number }) {
-    // --- STATE ---
-    const [data, setData] = useState<WeeklyOverviewData | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [members, setMembers] = useState<ProjectMember[]>([]);
     
-    // State cho Tab hiển thị bên dưới
+    // ---------------------------------------------------------------------------
+    // 4. STATE & HOOKS
+    // ---------------------------------------------------------------------------
+    
+    const [data, setData] = useState<WeeklyOverviewData | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [members, setMembers] = useState<ProjectMember[]>([]);
     const [activeTab, setActiveTab] = useState<ActiveTab>("updated");
-
-    // State Filters (Mặc định: 7 ngày qua)
     const [filters, setFilters] = useState<OverviewParams>(getDefaultFilters);
 
-    // 1. Load Members (Chỉ 1 lần)
+    // ---------------------------------------------------------------------------
+    // 5. EFFECTS: DATA FETCHING
+    // ---------------------------------------------------------------------------
+
+    /**
+     * Tải danh sách thành viên dự án để phục vụ bộ lọc.
+     */
     useEffect(() => {
-        if (projectId) {
-            // LƯU Ý: API getProjectMembers thường yêu cầu companyId/workspaceId. 
-            // Nếu bạn đã sửa API, code này sẽ hoạt động. Nếu chưa, cần truyền thêm IDs từ page cha.
-            // Tạm thời gọi API với giả định logic bên trong đã được handle.
-            getProjectMembers(0, 0, projectId, { size: 100 })
-                .then(res => setMembers(res.content))
-                .catch(err => console.warn("Members load failed", err)); 
-        }
+        if (!projectId) return;
+        
+        // Lưu ý: WorkspaceId và CompanyId được giả định là 0 nếu API đã được fix 
+        // để chỉ nhận ProjectId. Nếu chưa, hãy truyền từ Page cha vào.
+        getProjectMembers(0, 0, projectId, { size: 100 })
+            .then(res => setMembers(res.content))
+            .catch(err => console.warn("Failed to load project members for filters", err));
     }, [projectId]);
 
-    // 2. Load Overview Data (Khi filters đổi)
+    /**
+     * Tải dữ liệu tổng quan khi bộ lọc thay đổi (Có Debounce 300ms).
+     */
     useEffect(() => {
         if (!projectId) return;
 
-        const fetch = async () => {
-            setLoading(true);
+        const fetchData = async () => {
+            setIsLoading(true);
             try {
                 const res = await getWeeklyOverview(projectId, filters);
                 setData(res);
                 
-                // Logic auto-switch tab (Giữ nguyên logic gốc)
+                // Tự động chuyển tab nếu tab "Due Soon" hiện tại không có dữ liệu
                 if (activeTab === "due" && res.dueSoonCount === 0 && res.updatedCount > 0) {
                     setActiveTab("updated");
                 }
             } catch (error) {
-                console.error("Failed to fetch weekly overview:", error);
-                setData(null); // Reset data on error
+                console.error("Critical error fetching weekly overview:", error);
+                setData(null);
             } finally {
-                setLoading(false);
+                setIsLoading(false);
             }
         };
 
-        // Debounce: Giảm tần suất gọi API khi filter thay đổi liên tục
-        const t = setTimeout(() => fetch(), 300);
-        return () => clearTimeout(t);
+        const timer = setTimeout(fetchData, 300);
+        return () => clearTimeout(timer);
     }, [projectId, filters, activeTab]);
 
-    // --- Logic Render ---
-    
-    // Format Date Range cho UI
-    const displayDateRange = filters.from && filters.to 
-        ? `${new Date(filters.from).toLocaleDateString('en-GB', {day: 'numeric', month: 'short'})} - ${new Date(filters.to).toLocaleDateString('en-GB', {day: 'numeric', month: 'short'})}`
-        : "Custom Range";
+    // ---------------------------------------------------------------------------
+    // 6. MEMOIZED DATA
+    // ---------------------------------------------------------------------------
 
-    // Xác định danh sách task và tiêu đề hiện tại
-    let currentTasks: StatsTask[] = [];
-    let currentTitle = "";
-    
-    if (data) {
-        switch (activeTab) {
-            case "created": 
-                currentTasks = data.createdTasks; 
-                currentTitle = "Created Tasks";
-                break;
-            case "completed": 
-                currentTasks = data.completedTasks; 
-                currentTitle = "Completed Tasks";
-                break;
-            case "updated": 
-                currentTasks = data.updatedTasks; 
-                currentTitle = "Updated Tasks";
-                break;
-            case "due": 
-                currentTasks = data.dueSoonTasks; 
-                currentTitle = "Tasks Due Soon";
-                break;
-        }
-    }
+    /**
+     * Xác định danh sách Task cần hiển thị dựa trên Tab đang chọn.
+     */
+    const { currentTasks, currentTitle } = useMemo(() => {
+        if (!data) return { currentTasks: [], currentTitle: "" };
 
-    // --- RENDER UI ---
+        const mapping: Record<ActiveTab, { list: StatsTask[], title: string }> = {
+            created: { list: data.createdTasks, title: "Recently Created" },
+            completed: { list: data.completedTasks, title: "Recently Completed" },
+            updated: { list: data.updatedTasks, title: "Recently Updated" },
+            due: { list: data.dueSoonTasks, title: "Due Soon" }
+        };
+
+        return {
+            currentTasks: mapping[activeTab].list,
+            currentTitle: mapping[activeTab].title
+        };
+    }, [data, activeTab]);
+
+    const dateRangeLabel = useMemo(() => {
+        if (!filters.from || !filters.to) return "Custom Range";
+        const options: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short' };
+        return `${new Date(filters.from).toLocaleDateString('en-GB', options)} - ${new Date(filters.to).toLocaleDateString('en-GB', options)}`;
+    }, [filters]);
+
+    // ---------------------------------------------------------------------------
+    // 7. RENDER LOGIC
+    // ---------------------------------------------------------------------------
+
     return (
         <div className="space-y-6">
             
-            {/* 1. Filter Toolbar */}
+            {/* THANH CÔNG CỤ LỌC (Toolbar) */}
             <OverviewFilterToolbar 
                 filters={filters}
                 setFilters={setFilters}
                 members={members}
             />
 
-            {/* Header nhỏ */}
-            <div className="flex items-center gap-2 text-slate-500 text-sm">
-                <CalendarDays className="w-4 h-4" />
-                <span className="font-medium">Data period: <span className="text-slate-800">{displayDateRange}</span></span>
+            {/* CHỈ BÁO KHOẢNG THỜI GIAN (Period Indicator) */}
+            <div className="flex items-center gap-2.5 px-1 text-slate-500">
+                <CalendarDays className="w-3.5 h-3.5 text-slate-400" />
+                <span className="text-[11px] font-bold uppercase tracking-widest">
+                    Reporting Period: <span className="text-[#0052CC]">{dateRangeLabel}</span>
+                </span>
             </div>
 
-            {loading && !data ? (
-                <div className="py-20 flex justify-center"><Loader2 className="w-10 h-10 animate-spin text-blue-600 opacity-50"/></div>
+            {isLoading && !data ? (
+                <div className="py-24 flex flex-col items-center justify-center gap-4">
+                    <Loader2 className="w-10 h-10 animate-spin text-[#0052CC] opacity-60" />
+                    <span className="text-[12px] font-bold text-slate-400 uppercase tracking-widest">Aggregating project data...</span>
+                </div>
             ) : data ? (
                 <>
-                    {/* 2. Cards Row */}
+                    {/* DÃY THẺ CHỈ SỐ (Stat Cards Grid) */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                         <WeeklyStatCard 
                             title="Created" 
@@ -181,32 +202,39 @@ export default function WeeklyOverview({ projectId }: { projectId: number }) {
                         />
                     </div>
 
-                    {/* 3. Detail List */}
-                    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-300">
+                    {/* DANH SÁCH CHI TIẾT THEO TAB (Detail Section) */}
+                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-400 transition-all">
+                        
                         <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
-                            <h3 className="font-bold text-slate-800">{currentTitle}</h3>
-                            <span className="text-xs font-medium text-slate-500 bg-white px-2 py-1 rounded border">{currentTasks.length} tasks</span>
+                            <div className="flex items-center gap-2">
+                                <h3 className="text-[11px] font-black text-slate-500 uppercase tracking-[0.2em]">
+                                    {currentTitle}
+                                </h3>
+                            </div>
+                            <span className="bg-white border border-slate-200 px-2.5 py-1 rounded-md text-[10px] font-bold text-slate-600 shadow-sm">
+                                {currentTasks.length} Issues Found
+                            </span>
                         </div>
                         
-                        <div className="p-4 bg-slate-50/30 min-h-[200px]">
+                        <div className="p-5 bg-white min-h-[250px]">
                             {currentTasks.length > 0 ? (
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                                     {currentTasks.map((task) => (
                                         <StatsTaskItem key={task.id} task={task} />
                                     ))}
                                 </div>
                             ) : (
-                                <div className="flex flex-col items-center justify-center h-40 text-slate-400">
-                                    <p className="text-sm">No tasks found for this filter.</p>
+                                <div className="flex flex-col items-center justify-center py-16 text-slate-400 opacity-60">
+                                    <AlertTriangle className="w-10 h-10 mb-3 stroke-[1.5]" />
+                                    <p className="text-[12px] font-bold uppercase tracking-widest">No issues to display for this category</p>
                                 </div>
                             )}
                         </div>
                     </div>
                 </>
             ) : (
-                // Trường hợp không có dữ liệu sau khi loading xong
-                <div className="py-20 flex justify-center">
-                    <p className="text-slate-500">No data available for this period and filter.</p>
+                <div className="py-24 flex flex-col items-center justify-center text-slate-400">
+                    <p className="text-[12px] font-bold uppercase tracking-widest">Unable to retrieve data for the selected criteria</p>
                 </div>
             )}
         </div>

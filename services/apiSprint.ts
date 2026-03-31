@@ -3,23 +3,27 @@
 import apiClient from "@/lib/apiClient";
 
 // =============================================================================
-// 1. INTERFACES & DTOs (Định nghĩa kiểu dữ liệu)
+// INTERFACES & TYPES
 // =============================================================================
 
 // -----------------------------------------------------------------------------
-// Payloads (Dữ liệu gửi đi)
+// Dữ liệu yêu cầu (Payloads)
 // -----------------------------------------------------------------------------
 
-// Payload tạo mới Sprint (Create)
+/**
+ * Dữ liệu để khởi tạo một Sprint mới
+ */
 export interface SprintPayload {
   name?: string;      
   goal?: string;
-  startDate?: string; // ISO String
-  endDate?: string;   // ISO String
-  taskIds?: number[]; // Mảng ID task
+  startDate?: string;
+  endDate?: string;
+  taskIds?: number[];
 }
 
-// Payload cập nhật Sprint (Update)
+/**
+ * Dữ liệu để cập nhật thông tin Sprint hiện có
+ */
 export interface UpdateSprintPayload {
   name?: string;
   goal?: string;
@@ -28,15 +32,17 @@ export interface UpdateSprintPayload {
 }
 
 // -----------------------------------------------------------------------------
-// Responses (Dữ liệu trả về)
+// Dữ liệu phản hồi (Responses)
 // -----------------------------------------------------------------------------
 
-// Object Task rút gọn hiển thị trong Sprint Detail
+/**
+ * Thông tin tóm tắt của công việc hiển thị trong Sprint
+ */
 export interface TaskSummary {
   id: number;
   taskCode: string;
   title: string;
-  taskType: string; // 'TASK', 'BUG', 'STORY'...
+  taskType: string;
   statusId: number;
   statusName: string;
   statusColor: string;
@@ -44,10 +50,11 @@ export interface TaskSummary {
   assigneeAvatarUrl?: string;
   storyPoints?: number;
   sortOrder: number; 
-  // Các trường khác nếu cần
 }
 
-// Object Sprint cơ bản (cho danh sách bên ngoài)
+/**
+ * Cấu trúc dữ liệu Sprint cơ bản
+ */
 export interface Sprint {
   id: number;
   name: string;
@@ -60,64 +67,70 @@ export interface Sprint {
   tasks: TaskSummary[];
 }
 
-// Object Sprint Chi Tiết (cho Panel/Modal) - Bao gồm thống kê và list Task
+/**
+ * Thông tin chi tiết đầy đủ của Sprint bao gồm thống kê và danh sách công việc
+ */
 export interface SprintDetails extends Sprint {
-  totalStoryPoints: number; // Tổng điểm
-  taskCount: number;        // Tổng số task
-  tasks: TaskSummary[];     // Danh sách task chi tiết
+  totalStoryPoints: number;
+  taskCount: number;
+  tasks: TaskSummary[];
 }
 
 // =============================================================================
-// 2. API METHODS (Các hàm gọi API)
+// API METHODS
 // =============================================================================
 
 /**
- * 1️⃣ GET – Lấy danh sách Sprint (List View)
- * URL: /api/projects/{projectId}/sprints
+ * Truy vấn danh sách các Sprint thuộc dự án
  */
 export const getSprints = async (
   projectId: number,
   status?: string
 ): Promise<Sprint[]> => {
   try {
-    const res = await apiClient.get(
-      `/projects/${projectId}/sprints`, 
-      { params: status ? { status } : {} }
-    );
+    const url = `/projects/${projectId}/sprints`;
+    const res = await apiClient.get(url, { 
+      params: status ? { status } : {} 
+    });
+    
     const { success, message, data } = res.data;
 
-    if (!success) throw new Error(message || "Failed to fetch sprints.");
+    if (!success) {
+      throw new Error(message || "Failed to fetch sprints");
+    }
+    
     return data;
   } catch (error: any) {
-    throw new Error(error.response?.data?.message || "System error loading sprints.");
+    const errorMsg = error.response?.data?.message || "An error occurred while loading sprints";
+    throw new Error(errorMsg);
   }
 };
 
 /**
- * 2️⃣ POST – Tạo Sprint
- * URL: /api/projects/{projectId}/sprints
+ * Khởi tạo một Sprint mới trong dự án
  */
 export const createSprint = async (
   projectId: number,
   payload: SprintPayload = {} 
 ): Promise<Sprint> => {
   try {
-    const res = await apiClient.post(
-      `/projects/${projectId}/sprints`,
-      payload
-    );
+    const url = `/projects/${projectId}/sprints`;
+    const res = await apiClient.post(url, payload);
     const { success, message, data } = res.data;
 
-    if (!success) throw new Error(message || "Failed to create sprint.");
+    if (!success) {
+      throw new Error(message || "Failed to create sprint");
+    }
+    
     return data;
   } catch (error: any) {
-    throw new Error(error.response?.data?.message || "System error creating sprint.");
+    const errorMsg = error.response?.data?.message || "An error occurred while creating sprint";
+    throw new Error(errorMsg);
   }
 };
 
 /**
- * 3️⃣ PUT – Cập nhật Sprint
- * URL: /api/projects/{projectId}/sprints/{sprintId}
+ * Cập nhật thông tin chi tiết của một Sprint
  */
 export const updateSprint = async (
   projectId: number,
@@ -125,81 +138,100 @@ export const updateSprint = async (
   payload: UpdateSprintPayload
 ): Promise<SprintDetails> => { 
   try {
-    const res = await apiClient.put(
-      `/projects/${projectId}/sprints/${sprintId}`,
-      payload
-    );
+    const url = `/projects/${projectId}/sprints/${sprintId}`;
+    const res = await apiClient.put(url, payload);
     const { success, message, data } = res.data;
 
-    if (!success) throw new Error(message || "Failed to update sprint.");
-    return data; // Trả về chi tiết để update UI
+    if (!success) {
+      throw new Error(message || "Failed to update sprint");
+    }
+    
+    return data;
   } catch (error: any) {
-    throw new Error(error.response?.data?.message || "System error updating sprint.");
+    const errorMsg = error.response?.data?.message || "An error occurred while updating sprint";
+    throw new Error(errorMsg);
   }
 };
 
 /**
- * 4️⃣ GET – Xem chi tiết Sprint 
- * URL: /api/projects/{projectId}/sprints/{sprintId}
+ * Truy vấn thông tin chi tiết của một Sprint cụ thể
  */
 export const getSprintDetails = async (
   projectId: number,
   sprintId: number
 ): Promise<SprintDetails> => {
   try {
-    const res = await apiClient.get(
-      `/projects/${projectId}/sprints/${sprintId}`
-    );
+    const url = `/projects/${projectId}/sprints/${sprintId}`;
+    const res = await apiClient.get(url);
     const { success, message, data } = res.data;
 
-    if (!success) throw new Error(message || "Failed to fetch sprint details.");
+    if (!success) {
+      throw new Error(message || "Failed to fetch sprint details");
+    }
+    
     return data; 
   } catch (error: any) {
-    throw new Error(error.response?.data?.message || "System error fetching sprint details.");
+    const errorMsg = error.response?.data?.message || "An error occurred while fetching sprint details";
+    throw new Error(errorMsg);
   }
 };
 
 /**
- * 5️⃣ POST – Start Sprint (Bắt đầu Sprint)
+ * Kích hoạt trạng thái bắt đầu cho một Sprint
  */
 export const startSprint = async (projectId: number, sprintId: number) => {
   try {
-    const res = await apiClient.post(`/projects/${projectId}/sprints/${sprintId}/start`);
+    const url = `/projects/${projectId}/sprints/${sprintId}/start`;
+    const res = await apiClient.post(url);
     const { success, message, data } = res.data;
 
-    if (!success) throw new Error(message || "Failed to start sprint.");
+    if (!success) {
+      throw new Error(message || "Failed to start sprint");
+    }
+    
     return data;
   } catch (error: any) {
-    throw new Error(error.response?.data?.message || "System error starting sprint.");
+    const errorMsg = error.response?.data?.message || "An error occurred while starting sprint";
+    throw new Error(errorMsg);
   }
 };
 
 /**
- * 6️⃣ POST – Complete Sprint (Hoàn thành Sprint)
+ * Đánh dấu Sprint đã hoàn thành
  */
 export const completeSprint = async (projectId: number, sprintId: number) => {
   try {
-    const res = await apiClient.post(`/projects/${projectId}/sprints/${sprintId}/complete`);
+    const url = `/projects/${projectId}/sprints/${sprintId}/complete`;
+    const res = await apiClient.post(url);
     const { success, message, data } = res.data;
 
-    if (!success) throw new Error(message || "Failed to complete sprint.");
+    if (!success) {
+      throw new Error(message || "Failed to complete sprint");
+    }
+    
     return data;
   } catch (error: any) {
-    throw new Error(error.response?.data?.message || "System error completing sprint.");
+    const errorMsg = error.response?.data?.message || "An error occurred while completing sprint";
+    throw new Error(errorMsg);
   }
 };
 
 /**
- * 7️⃣ DELETE – Xóa/Hủy Sprint
+ * Xóa bỏ hoặc hủy bỏ một Sprint khỏi dự án
  */
 export const deleteSprint = async (projectId: number, sprintId: number) => {
   try {
-    const res = await apiClient.delete(`/projects/${projectId}/sprints/${sprintId}`);
+    const url = `/projects/${projectId}/sprints/${sprintId}`;
+    const res = await apiClient.delete(url);
     const { success, message } = res.data;
 
-    if (!success) throw new Error(message || "Failed to delete sprint.");
+    if (!success) {
+      throw new Error(message || "Failed to delete sprint");
+    }
+    
     return res.data; 
   } catch (error: any) {
-    throw new Error(error.response?.data?.message || "System error deleting sprint.");
+    const errorMsg = error.response?.data?.message || "An error occurred while deleting sprint";
+    throw new Error(errorMsg);
   }
 };

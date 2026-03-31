@@ -1,110 +1,134 @@
 "use client";
 
-import { Check, X } from "lucide-react";
-import { useMemo } from "react";
+import React, { useMemo } from "react";
+import { Check, ShieldCheck, ShieldAlert } from "lucide-react";
+
+// Internal Utils
+import { cn } from "@/lib/utils";
 
 // =============================================================================
-// 1. INTERFACES & CONFIG
+// CONFIGURATIONS & CONSTANTS
 // =============================================================================
 
-interface PasswordStrengthMeterProps {
-    password: string;
-}
-
-// Các tiêu chí đánh giá (Requirements)
-const requirementsConfig = [
-    { regex: /.{6,}/, label: "At least 6 characters" },
-    { regex: /[A-Z]/, label: "Uppercase letters (A-Z)" },
-    { regex: /[a-z]/, label: "Lowercase letters (a-z)" },
-    { regex: /[0-9]/, label: "Numbers (0-9)" },
-    { regex: /[^A-Za-z0-9]/, label: "Special characters (!@#...)" },
+/**
+ * Danh sách các tiêu chí đánh giá mật khẩu (Requirements)
+ */
+const STRENGTH_REQUIREMENTS = [
+  { id: "length", regex: /.{6,}/, label: "At least 6 characters" },
+  { id: "upper", regex: /[A-Z]/, label: "Uppercase letters (A-Z)" },
+  { id: "lower", regex: /[a-z]/, label: "Lowercase letters (a-z)" },
+  { id: "number", regex: /[0-9]/, label: "Numbers (0-9)" },
+  { id: "special", regex: /[^A-Za-z0-9]/, label: "Special characters (!@#...)" },
 ];
 
-// Cấu hình màu sắc và text dựa trên điểm số (0 - 5)
-const getStrengthStyles = (score: number) => {
-    if (score === 0) return { color: "bg-slate-200", label: "Empty", text: "text-slate-400" };
-    if (score <= 2) return { color: "bg-red-500", label: "Weak", text: "text-red-600" };
-    if (score <= 3) return { color: "bg-orange-500", label: "Medium", text: "text-orange-600" };
-    if (score <= 4) return { color: "bg-blue-500", label: "Good", text: "text-blue-600" };
-    return { color: "bg-green-500", label: "Very Strong", text: "text-green-600" };
+/**
+ * Cấu hình hiển thị dựa trên điểm số độ mạnh (0 - 5)
+ */
+const getStrengthConfig = (score: number) => {
+  if (score === 0) {
+    return { color: "bg-slate-200", label: "Empty", text: "text-slate-400", icon: <ShieldAlert className="w-3.5 h-3.5" /> };
+  }
+  if (score <= 2) {
+    return { color: "bg-red-500", label: "Weak", text: "text-red-600", icon: <ShieldAlert className="w-3.5 h-3.5" /> };
+  }
+  if (score <= 3) {
+    return { color: "bg-orange-500", label: "Fair", text: "text-orange-600", icon: <ShieldAlert className="w-3.5 h-3.5" /> };
+  }
+  if (score <= 4) {
+    return { color: "bg-blue-500", label: "Good", text: "text-blue-600", icon: <ShieldCheck className="w-3.5 h-3.5" /> };
+  }
+  return { color: "bg-green-500", label: "Very Strong", text: "text-green-600", icon: <ShieldCheck className="w-3.5 h-3.5" /> };
 };
 
 // =============================================================================
-// 2. MAIN COMPONENT
+// MAIN COMPONENT
 // =============================================================================
 
+interface PasswordStrengthMeterProps {
+  password: string;
+}
+
+/**
+ * Thành phần đo lường và hiển thị độ mạnh của mật khẩu theo thời gian thực.
+ * Cung cấp phản hồi trực quan qua thanh tiến trình và danh sách tiêu chí.
+ */
 export default function PasswordStrengthMeter({ password }: PasswordStrengthMeterProps) {
-    
-    // Tính toán điểm số (0 - 5)
-    const strength = useMemo(() => {
-        if (!password) return 0;
-        let score = 0;
-        requirementsConfig.forEach((req) => {
-            if (req.regex.test(password)) score++;
-        });
-        return score;
-    }, [password]);
+  // ---------------------------------------------------------------------------
+  // 1. LOGIC CALCULATION
+  // ---------------------------------------------------------------------------
 
-    const style = getStrengthStyles(strength);
+  // Tính toán điểm số dựa trên số lượng tiêu chí thỏa mãn
+  const score = useMemo(() => {
+    if (!password) return 0;
+    return STRENGTH_REQUIREMENTS.reduce((acc, req) => (req.regex.test(password) ? acc + 1 : acc), 0);
+  }, [password]);
 
-    // Tính toán số vạch cần tô màu (từ 0 đến 4)
-    const activeSteps = useMemo(() => {
-        if (strength === 5) return 4;
-        if (strength === 4) return 3;
-        if (strength === 3) return 2;
-        if (strength >= 1) return 1;
-        return 0;
-    }, [strength]);
+  const config = getStrengthConfig(score);
 
+  // Xác định số lượng vạch tiến trình cần được tô màu (thanh 4 đoạn)
+  const strengthLevel = useMemo(() => {
+    if (score >= 5) return 4;
+    if (score >= 4) return 3;
+    if (score >= 3) return 2;
+    if (score >= 1) return 1;
+    return 0;
+  }, [score]);
 
-    return (
-        <div className="space-y-3 mt-2">
-            {/* Thanh Progress (Dạng 4 đoạn) */}
-            <div className="flex gap-1 h-1.5">
-                {[1, 2, 3, 4].map((step) => (
-                    <div
-                        key={step}
-                        className={`flex-1 rounded-full transition-all duration-300 ${
-                            // Tô màu nếu step hiện tại nhỏ hơn hoặc bằng số vạch cần tô
-                            step <= activeSteps
-                                ? style.color
-                                : "bg-slate-200"
-                        }`}
-                    />
-                ))}
-            </div>
+  // ---------------------------------------------------------------------------
+  // 2. RENDER
+  // ---------------------------------------------------------------------------
+  return (
+    <div className="space-y-3 mt-3 animate-in fade-in slide-in-from-top-1 duration-300">
+      
+      {/* Thanh tiến trình phân đoạn (Visual Meter) */}
+      <div className="flex gap-1.5 h-1.5">
+        {[1, 2, 3, 4].map((step) => (
+          <div
+            key={step}
+            className={cn(
+              "flex-1 rounded-full transition-all duration-500",
+              step <= strengthLevel ? config.color : "bg-slate-200 dark:bg-slate-800"
+            )}
+          />
+        ))}
+      </div>
 
-            {/* Label độ mạnh */}
-            <div className="flex justify-between items-center">
-                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
-                    Password Strength
-                </span>
-                <span className={`text-xs font-bold ${style.text}`}>
-                    {style.label}
-                </span>
-            </div>
-
-            {/* Checklist yêu cầu */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {requirementsConfig.map((req, index) => {
-                    const isMet = req.regex.test(password);
-                    return (
-                        <div
-                            key={index}
-                            className={`flex items-center gap-2 text-xs transition-colors duration-200 ${
-                                isMet ? "text-green-600" : "text-slate-400"
-                            }`}
-                        >
-                            {isMet ? (
-                                <Check className="w-3.5 h-3.5 shrink-0" />
-                            ) : (
-                                <div className="w-3.5 h-3.5 rounded-full border border-slate-300 shrink-0" />
-                            )}
-                            <span>{req.label}</span>
-                        </div>
-                    );
-                })}
-            </div>
+      {/* Nhãn trạng thái và mô tả */}
+      <div className="flex justify-between items-center px-0.5">
+        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+          Security Strength
+        </span>
+        <div className={cn("flex items-center gap-1.5 text-xs font-bold transition-colors", config.text)}>
+          {config.icon}
+          <span>{config.label}</span>
         </div>
-    );
+      </div>
+
+      {/* Danh sách kiểm tra tiêu chí (Requirements Checklist) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 pt-1">
+        {STRENGTH_REQUIREMENTS.map((req) => {
+          const isMet = req.regex.test(password);
+          
+          return (
+            <div
+              key={req.id}
+              className={cn(
+                "flex items-center gap-2 text-xs transition-all duration-300",
+                isMet ? "text-green-600 font-medium" : "text-slate-400"
+              )}
+            >
+              {isMet ? (
+                <div className="flex items-center justify-center w-3.5 h-3.5 rounded-full bg-green-50 border border-green-200 shadow-sm">
+                  <Check className="w-2.5 h-2.5 stroke-[3px]" />
+                </div>
+              ) : (
+                <div className="w-3.5 h-3.5 rounded-full border border-slate-200 dark:border-slate-800 shrink-0" />
+              )}
+              <span className="truncate">{req.label}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 }

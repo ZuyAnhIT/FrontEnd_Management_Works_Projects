@@ -1,48 +1,71 @@
 "use client";
 
 // =============================================================================
-// 1. INTERFACES & TYPES
+// 1. IMPORT
 // =============================================================================
 
-// Định nghĩa các chế độ tab được phép trong component này
-type AuthTabMode = "login" | "register";
+import React from "react";
+
+// Internal Utils & Types
+import { cn } from "@/lib/utils";
+import { AuthTab } from "./AuthHeader";
+
+// =============================================================================
+// 2. INTERFACES & CONSTANTS
+// =============================================================================
 
 interface AuthTabsProps {
-  tab: string; // Nhận string chung từ parent (có thể là verify/forgot)
-  setTab: (t: any) => void; // Hàm setTab từ parent
+  /**
+   * Trạng thái tab hiện tại từ component cha
+   */
+  tab: AuthTab;
+  /**
+   * Hàm chuyển đổi tab
+   */
+  setTab: (tab: AuthTab) => void;
 }
 
-// Cấu hình danh sách các tab hiển thị
-const TAB_ITEMS = [
+/**
+ * Danh sách cấu hình các mục chuyển đổi
+ */
+const TAB_ITEMS: { id: AuthTab; label: string }[] = [
   { id: "login", label: "Log In" },
   { id: "register", label: "Sign Up" },
-] as const;
+];
 
 // =============================================================================
-// 2. MAIN COMPONENT
+// 3. MAIN COMPONENT
 // =============================================================================
 
+/**
+ * Thành phần chuyển đổi giữa Đăng nhập và Đăng ký (Segmented Control).
+ * Thiết kế theo phong cách tối giản, cung cấp phản hồi thị giác rõ ràng.
+ */
 export default function AuthTabs({ tab, setTab }: AuthTabsProps) {
   return (
-    // Container chứa các tab (Nền xám nhạt, bo góc)
-    <div className="flex gap-1 mb-6 bg-slate-100 rounded-lg p-1">
+    <div 
+      className="flex gap-1 mb-6 bg-slate-100 rounded-xl p-1 shadow-inner border border-slate-200/50"
+      role="tablist"
+    >
       {TAB_ITEMS.map((item) => {
-        // Kiểm tra tab nào đang active
         const isActive = tab === item.id;
 
         return (
           <button
             key={item.id}
             type="button"
+            role="tab"
+            aria-selected={isActive}
             onClick={() => setTab(item.id)}
-            className={`
-              flex-1 py-2 rounded-md text-sm font-medium transition-all duration-200
-              ${
-                isActive
-                  ? "bg-white text-blue-600 shadow-sm font-semibold" // Style khi Active (Nền trắng, chữ xanh)
-                  : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50" // Style khi Inactive (Chữ xám)
-              }
-            `}
+            className={cn(
+              // Cấu hình cơ bản
+              "flex-1 py-2 rounded-lg text-xs font-bold uppercase tracking-widest transition-all duration-300 outline-none",
+              
+              // Trạng thái hoạt động (Active)
+              isActive
+                ? "bg-white text-blue-600 shadow-sm transform scale-[1.02]"
+                : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50 active:scale-95"
+            )}
           >
             {item.label}
           </button>

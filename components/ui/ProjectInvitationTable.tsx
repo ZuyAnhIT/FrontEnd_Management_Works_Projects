@@ -1,13 +1,16 @@
 "use client";
 
-import React from "react";
-import { Mail, Trash2, Clock, Shield, User, Copy } from "lucide-react"; // 1. Thêm icon Copy
+import React, { useCallback } from "react";
+import { Mail, Trash2, Clock, Shield, User, Copy } from "lucide-react";
+
+// Internal Components & Services
 import { ProjectInvitation } from "@/services/apiProject";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/Avatars";
-import { useToast } from "@/components/ui/ToastProvider"; // 2. Thêm hook Toast
+import { useToast } from "@/components/ui/ToastProvider";
+import { cn } from "@/lib/utils";
 
 // =============================================================================
-// 1. INTERFACES
+// INTERFACES
 // =============================================================================
 
 interface ProjectInvitationTableProps {
@@ -17,28 +20,28 @@ interface ProjectInvitationTableProps {
 }
 
 // =============================================================================
-// 2. MAIN COMPONENT
+// MAIN COMPONENT
 // =============================================================================
 
+/**
+ * Thành phần bảng hiển thị các lời mời đang chờ xử lý trong dự án.
+ * Hỗ trợ sao chép liên kết mời và thu hồi lời mời từ phía quản trị viên.
+ */
 export default function ProjectInvitationTable({
   invitations,
   onCancel,
   formatDateTime,
 }: ProjectInvitationTableProps) {
-  const { showToast } = useToast(); // 3. Khởi tạo Toast
+  const { showToast } = useToast();
 
-  // 4. Logic Copy Link
-  const copyLink = (link?: string) => {
-    if (!link) {
-      showToast("Invitation link not found", "error");
-      return;
-    }
-    navigator.clipboard.writeText(link);
-    showToast("Copied invitation link!", "success");
-  };
+  // ---------------------------------------------------------------------------
+  // LOGIC HANDLERS
+  // ---------------------------------------------------------------------------
 
-  // Helper: Render role name (Logic cũ giữ nguyên)
-  const renderRoleName = (roleCode: string) => {
+  /**
+   * Chuyển đổi mã vai trò (Role Code) sang định dạng hiển thị dễ đọc
+   */
+  const formatRoleName = useCallback((roleCode: string) => {
     return roleCode
       .replace("PROJECT_", "")
       .replace("GUEST_", "")
@@ -47,18 +50,39 @@ export default function ProjectInvitationTable({
       .split(" ")
       .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
       .join(" ");
-  };
+  }, []);
+
+  /**
+   * Sao chép liên kết mời vào bộ nhớ tạm (Clipboard)
+   */
+  const handleCopyLink = useCallback((link?: string) => {
+    if (!link) {
+      showToast("Invitation link is not available", "error");
+      return;
+    }
+    
+    navigator.clipboard.writeText(link);
+    showToast("Copied invitation link to clipboard", "success");
+  }, [showToast]);
+
+  // ---------------------------------------------------------------------------
+  // RENDER: EMPTY STATE
+  // ---------------------------------------------------------------------------
 
   if (invitations.length === 0) {
     return (
       <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-10 text-center text-slate-500">
         <p className="text-sm font-medium">
-          No pending invitations found for this project.
+          No pending invitations found for this project
         </p>
-        <p className="text-xs mt-1">Send a new invitation to see it here.</p>
+        <p className="text-xs mt-1">Send a new invitation to see it here</p>
       </div>
     );
   }
+
+  // ---------------------------------------------------------------------------
+  // RENDER: MAIN TABLE
+  // ---------------------------------------------------------------------------
 
   return (
     <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden animate-in fade-in duration-300">
@@ -66,97 +90,83 @@ export default function ProjectInvitationTable({
         <table className="w-full text-sm text-left">
           <thead className="bg-slate-50/80 border-b border-slate-200">
             <tr>
-              <th className="px-4 py-3 font-semibold text-slate-500 uppercase text-[11px] w-12">
-                #
-              </th>
-              <th className="px-4 py-3 font-semibold text-slate-500 uppercase text-[11px]">
-                Email / Role
-              </th>
-              <th className="px-4 py-3 font-semibold text-slate-500 uppercase text-[11px]">
-                Invited By
-              </th>
-              <th className="px-4 py-3 font-semibold text-slate-500 uppercase text-[11px]">
-                Status
-              </th>
-              <th className="px-4 py-3 font-semibold text-slate-500 uppercase text-[11px]">
-                Invited At
-              </th>
-              <th className="px-4 py-3 font-semibold text-slate-500 uppercase text-[11px] text-right">
-                Actions
-              </th>
+              <th className="px-4 py-3 font-semibold text-slate-500 uppercase text-[11px] w-12 text-center">#</th>
+              <th className="px-4 py-3 font-semibold text-slate-500 uppercase text-[11px]">Email / Role</th>
+              <th className="px-4 py-3 font-semibold text-slate-500 uppercase text-[11px]">Invited By</th>
+              <th className="px-4 py-3 font-semibold text-slate-500 uppercase text-[11px]">Status</th>
+              <th className="px-4 py-3 font-semibold text-slate-500 uppercase text-[11px]">Invited At</th>
+              <th className="px-4 py-3 font-semibold text-slate-500 uppercase text-[11px] text-right">Actions</th>
             </tr>
           </thead>
+          
           <tbody className="divide-y divide-slate-100">
-            {invitations.map((inv, index) => (
+            {invitations.map((invitation, index) => (
               <tr
-                key={inv.id}
+                key={invitation.id}
                 className="group hover:bg-slate-50/50 transition-colors"
               >
-                <td className="px-4 py-3 text-slate-400 font-mono text-xs">
+                {/* Số thứ tự */}
+                <td className="px-4 py-3 text-slate-400 font-mono text-xs text-center">
                   {index + 1}
                 </td>
 
-                {/* Email & Role */}
+                {/* Thông tin Email và Vai trò */}
                 <td className="px-4 py-3">
                   <div className="flex flex-col">
                     <div className="flex items-center gap-2 font-medium text-slate-900">
-                      <Mail className="w-3.5 h-3.5 text-slate-400" />{" "}
-                      {inv.email}
+                      <Mail className="w-3.5 h-3.5 text-slate-400" />
+                      {invitation.email}
                     </div>
                     <div className="flex items-center gap-1.5 text-xs text-slate-500 mt-1">
                       <Shield className="w-3 h-3 text-blue-500" />
-                      {renderRoleName(inv.roleCode)}
+                      {formatRoleName(invitation.roleCode)}
                     </div>
                   </div>
                 </td>
 
-                {/* Inviter Info */}
+                {/* Thông tin người mời (Avatar + Name) */}
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2">
                     <Avatar className="w-6 h-6 border border-slate-200">
-                      <AvatarImage src={inv.inviterAvatar || undefined} />
-                      <AvatarFallback className="text-[10px] bg-slate-200 text-slate-600">
-                        {inv.inviterName?.charAt(0) || (
-                          <User className="w-3 h-3" />
-                        )}
+                      <AvatarImage src={invitation.inviterAvatar || undefined} />
+                      <AvatarFallback className="text-[10px] bg-slate-200 text-slate-600 font-bold uppercase">
+                        {invitation.inviterName?.charAt(0) || <User className="w-3 h-3" />}
                       </AvatarFallback>
                     </Avatar>
                     <span className="text-slate-600 text-xs">
-                      {inv.inviterName}
+                      {invitation.inviterName}
                     </span>
                   </div>
                 </td>
 
-                {/* Status */}
+                {/* Trạng thái lời mời */}
                 <td className="px-4 py-3">
                   <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-                    <Clock className="w-3 h-3" /> Pending
+                    <Clock className="w-3 h-3" /> 
+                    Pending
                   </div>
                 </td>
 
-                {/* Date */}
+                {/* Thời gian gửi lời mời */}
                 <td className="px-4 py-3 text-slate-500 text-xs font-medium">
-                  {formatDateTime(inv.invitedAt)}
+                  {formatDateTime(invitation.invitedAt)}
                 </td>
 
-                {/* Actions */}
+                {/* Các nút hành động */}
                 <td className="px-4 py-3 text-right">
                   <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    {/* 5. Nút Copy Link */}
                     <button
-                      // Lưu ý: Đảm bảo trong interface ProjectInvitation có trường `invitationLink` hoặc tương tự
-                      onClick={() => copyLink((inv as any).invitationLink)} 
+                      onClick={() => handleCopyLink((invitation as any).invitationLink)} 
                       className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
-                      title="Copy Link"
+                      title="Copy Invitation Link"
                     >
                       <Copy className="w-4 h-4" />
                     </button>
                     
-                    {/* Nút Cancel (Cũ) */}
                     <button
-                      onClick={() => onCancel(inv)}
+                      onClick={() => onCancel(invitation)}
                       className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
-                      title="Cancel Invitation"
+                      title="Revoke Invitation"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>

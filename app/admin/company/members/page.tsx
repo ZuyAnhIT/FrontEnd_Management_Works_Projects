@@ -1,57 +1,38 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+// =============================================================================
+// 1. IMPORT (Libraries -> Internal -> Components)
+// =============================================================================
+
+import React, { useEffect, useState, useCallback } from "react";
 import {
-  Search,
-  Users,
-  CheckCircle,
-  Clock,
-  Save,
-  Loader2,
-  UserPlus,
-  Crown,
-  Shield,
-  ChevronsLeft,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsRight,
-  XCircle as CloseIcon,
-  Mail,
-  Trash2,
-  AlertCircle,
-  Copy,
+  Search, Users, CheckCircle, Clock, Save, Loader2, UserPlus,
+  Crown, Shield, ChevronsLeft, ChevronLeft, ChevronRight,
+  ChevronsRight, XCircle, Mail, AlertCircle, Filter
 } from "lucide-react";
 
+// Services & Types
 import {
-  getCompanyMembers,
-  getCompanyInvitations,
-  cancelCompanyInvitation,
-  inviteMemberToCompany,
-  removeCompanyMember,
-  updateCompanyMemberStatus,
-  updateCompanyMemberRole,
-  searchCompanyMembers,
-  PageResponse,
-  CompanyMember,
-  CompanyInvitation,
-  InvitationSearchParams,
+  getCompanyMembers, getCompanyInvitations, cancelCompanyInvitation,
+  inviteMemberToCompany, removeCompanyMember, updateCompanyMemberStatus,
+  updateCompanyMemberRole, searchCompanyMembers, PageResponse,
+  CompanyMember, CompanyInvitation, InvitationSearchParams,
 } from "@/services/apiCompany";
 
+// Context & UI Components
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/components/ui/ToastProvider";
 import { Button } from "@/components/ui/Buttons";
-
-// --- Components ---
-// Giả định MemberDetailModal được truyền type 'any' để tránh xung đột
 import MemberDetailModal from "@/components/features/admin/MemberDetailModal";
 import MemberTable from "@/components/ui/MemberTable";
 import InvitationTable from "@/components/ui/InvitationTable";
 import InviteMemberModal from "@/components/ui/InviteMemberModal";
 import ConfirmationModal from "@/components/ui/ConfirmationModal";
+import { cn } from "@/lib/utils";
 
-// ===================================================
-// 🛠️ Interfaces & Constants
-// ===================================================
+// =============================================================================
+// 2. INTERFACES & CONSTANTS
+// =============================================================================
 
 type TabType = "MEMBERS" | "INVITATIONS";
 
@@ -71,25 +52,31 @@ const DEFAULT_PAGE_SIZE = 10;
 const DEFAULT_SORT_BY = "joinedAt";
 const DEFAULT_SORT_DIR = "desc";
 
-// ===================================================
-// 🖥️ Component Chính
-// ===================================================
+// =============================================================================
+// 3. MAIN COMPONENT
+// =============================================================================
 
 export default function MembersPage() {
+  
+  // ---------------------------------------------------------------------------
+  // 4. HOOKS & CONTEXT
+  // ---------------------------------------------------------------------------
+  
   const { showToast } = useToast();
   const { user, activeCompany, isLoading: isAuthLoading } = useAuth();
-
-  // Data State
-  const [members, setMembers] = useState<CompanyMember[]>([]);
-  const [invitations, setInvitations] = useState<CompanyInvitation[]>([]);
-  const [loading, setLoading] = useState(true);
-
   const companyId = activeCompany?.companyId || null;
 
-  // --- States UI ---
+  // ---------------------------------------------------------------------------
+  // 5. STATE MANAGEMENT
+  // ---------------------------------------------------------------------------
+
+  // Data States
+  const [members, setMembers] = useState<CompanyMember[]>([]);
+  const [invitations, setInvitations] = useState<CompanyInvitation[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabType>("MEMBERS");
 
-  // --- States Phân trang & Tìm kiếm ---
+  // Pagination & Search States
   const [pagination, setPagination] = useState({
     pageNumber: 0,
     pageSize: DEFAULT_PAGE_SIZE,
@@ -109,69 +96,59 @@ export default function MembersPage() {
   const [searchValue, setSearchValue] = useState("");
   const [searchBy, setSearchBy] = useState("name");
 
-  // --- States Modals ---
+  // Modal States
   const [showInviteModal, setShowInviteModal] = useState(false);
-  const [email, setEmail] = useState("");
+  const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRoleCode, setInviteRoleCode] = useState("COMPANY_MEMBER");
 
   const [showEditModal, setShowEditModal] = useState(false);
-  const [selectedMember, setSelectedMember] = useState<CompanyMember | null>(
-    null
-  );
+  const [selectedMember, setSelectedMember] = useState<CompanyMember | null>(null);
   const [newStatus, setNewStatus] = useState("");
   const [newRoleCode, setNewRoleCode] = useState("");
   const [isUpdating, setIsUpdating] = useState(false);
 
-  // Delete / Cancel Modal (Dùng chung cho cả xóa member và hủy lời mời)
+  // Common Confirmation Modal
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [isProcessingAction, setIsProcessingAction] = useState(false);
-  const [confirmTitle, setConfirmTitle] = useState("");
-  const [confirmDesc, setConfirmDesc] = useState("");
-  const [confirmAction, setConfirmAction] = useState<() => Promise<void>>(() =>
-    Promise.resolve()
-  );
+  const [confirmContent, setConfirmContent] = useState({ title: "", desc: "", variant: "danger" as any });
+  const [onConfirmAction, setOnConfirmAction] = useState<() => Promise<void>>(() => Promise.resolve());
 
+  // Detail Modal
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [detailMember, setDetailMember] = useState<CompanyMember | null>(null);
-  const [loadingDetail, setLoadingDetail] = useState(false); // Giữ nguyên, giả định dùng khi load detail
+  const [loadingDetail] = useState(false); 
 
-  // ===================================================
-  // 🔄 Fetch Data Logic (Logic nghiệp vụ quan trọng)
-  // ===================================================
+  // ---------------------------------------------------------------------------
+  // 6. DATA FETCHING (Handlers)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Tai du lieu thanh vien hoac loi moi dua tren Tab va Bo loc hien tai
+   */
   const fetchData = useCallback(async () => {
     if (!companyId) return;
-    setLoading(true);
+    setIsLoading(true);
 
     try {
       if (activeTab === "MEMBERS") {
-        // --- FETCH MEMBERS ---
         const { name, email, roleName, status, ...apiParams } = searchParams;
         const useSearchApi = name || email || roleName || status;
-        let data: PageResponse<CompanyMember>;
+        let response: PageResponse<CompanyMember>;
 
-        // Cập nhật params dựa trên searchValue hiện tại nếu cần đồng bộ
+        // Uu tien logic tim kiem neu co gia tri search
         if (searchValue && searchBy) {
           const searchPayload: any = { ...apiParams };
           searchPayload[searchBy] = searchValue;
-          data = await searchCompanyMembers(companyId, searchPayload);
+          response = await searchCompanyMembers(companyId, searchPayload);
         } else if (useSearchApi) {
-          // Fallback nếu dùng filter object trực tiếp
-          data = await searchCompanyMembers(companyId, searchParams);
+          response = await searchCompanyMembers(companyId, searchParams);
         } else {
-          data = await getCompanyMembers(companyId, apiParams);
+          response = await getCompanyMembers(companyId, apiParams);
         }
 
-        setMembers(data.content || []);
-        setPagination({
-          pageNumber: data.pageNumber,
-          pageSize: data.pageSize,
-          totalElements: data.totalElements,
-          totalPages: data.totalPages,
-          first: data.first,
-          last: data.last,
-        });
+        setMembers(response.content || []);
+        updatePaginationState(response);
       } else {
-        // --- FETCH INVITATIONS ---
         const invParams: InvitationSearchParams = {
           page: searchParams.page,
           size: searchParams.size,
@@ -183,174 +160,162 @@ export default function MembersPage() {
 
         const res = await getCompanyInvitations(companyId, invParams);
         setInvitations(res.content || []);
-        setPagination({
-          pageNumber: res.pageNumber,
-          pageSize: res.pageSize,
-          totalElements: res.totalElements,
-          totalPages: res.totalPages,
-          first: res.first,
-          last: res.last,
-        });
+        updatePaginationState(res);
       }
     } catch (err: any) {
-      console.error("Fetch error:", err);
-      const message =
-        err.response?.data?.message || err.message || "Failed to load data";
+      const message = err.response?.data?.message || err.message || "Failed to load directory data";
       showToast(message, "error");
       setMembers([]);
       setInvitations([]);
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   }, [companyId, activeTab, searchParams, searchValue, searchBy, showToast]);
 
-  // Debounce Fetch
+  const updatePaginationState = (data: PageResponse<any>) => {
+    setPagination({
+      pageNumber: data.pageNumber,
+      pageSize: data.pageSize,
+      totalElements: data.totalElements,
+      totalPages: data.totalPages,
+      first: data.first,
+      last: data.last,
+    });
+  };
+
+  // Debounce hieu ung tai du lieu
   useEffect(() => {
     if (!companyId || isAuthLoading) return;
-    const t = setTimeout(() => fetchData(), 300);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => fetchData(), 300);
+    return () => clearTimeout(timer);
   }, [fetchData, companyId, isAuthLoading]);
 
-  // ===================================================
-  // ⚙️ Handlers (Giữ nguyên logic chức năng)
-  // ===================================================
+  // ---------------------------------------------------------------------------
+  // 7. EVENT HANDLERS (Business Logic)
+  // ---------------------------------------------------------------------------
 
-  // Chuyển Tab
   const handleTabChange = (tab: TabType) => {
     setActiveTab(tab);
-    setSearchValue(""); // Reset search text
-    setSearchParams((prev) => ({ ...prev, page: 0 })); // Reset page
+    setSearchValue("");
+    setSearchParams((prev) => ({ ...prev, page: 0 }));
   };
 
   const handlePageChange = (newPage: number) => {
     setSearchParams((prev) => ({ ...prev, page: newPage }));
   };
 
-  const handleSort = (newSortBy: string) => {
+  const handleSort = (field: string) => {
     setSearchParams((prev) => ({
       ...prev,
-      sortBy: newSortBy,
-      sortDir:
-        prev.sortBy === newSortBy && prev.sortDir === "desc" ? "asc" : "desc",
+      sortBy: field,
+      sortDir: prev.sortBy === field && prev.sortDir === "desc" ? "asc" : "desc",
       page: 0,
     }));
   };
 
   const handleSearchChange = (text: string) => {
     setSearchValue(text);
-    // Logic cập nhật searchParams để trigger fetch
     setSearchParams((prev) => ({
       ...prev,
       page: 0,
-      // Reset các field cũ
-      name: undefined,
-      email: undefined,
-      phone: undefined,
-      roleName: undefined,
-      status: undefined,
-      // Set field mới
+      name: undefined, email: undefined, phone: undefined, roleName: undefined, status: undefined,
       [searchBy]: text,
     }));
   };
 
   const handleSearchByChange = (field: string) => {
     setSearchBy(field);
-    // Giữ nguyên text, đổi field
     setSearchParams((prev) => ({
       ...prev,
       page: 0,
-      name: undefined,
-      email: undefined,
-      phone: undefined,
-      roleName: undefined,
-      status: undefined,
+      name: undefined, email: undefined, phone: undefined, roleName: undefined, status: undefined,
       [field]: searchValue,
     }));
   };
 
-  // --- ACTIONS ---
-
-  const handleInvite = async () => {
-    if (!email.trim() || !companyId || !inviteRoleCode) {
+  /**
+   * Gui loi moi thanh vien moi vao to chuc
+   */
+  const handleSendInvite = async () => {
+    if (!inviteEmail.trim() || !companyId || !inviteRoleCode) {
       showToast("Please enter a valid email address.", "warning");
       return;
     }
-    setLoading(true);
+    setIsLoading(true);
     try {
-      await inviteMemberToCompany(companyId, {
-        email,
-        roleCode: inviteRoleCode,
-      });
-      showToast("Invitation sent successfully!", "success");
-      setEmail("");
+      await inviteMemberToCompany(companyId, { email: inviteEmail, roleCode: inviteRoleCode });
+      showToast("Invitation dispatched successfully!", "success");
+      setInviteEmail("");
       setInviteRoleCode("COMPANY_MEMBER");
       setShowInviteModal(false);
-
-      // Chuyển sang tab Invitations để xem kết quả
+      
       if (activeTab !== "INVITATIONS") {
         setActiveTab("INVITATIONS");
       } else {
         fetchData();
       }
     } catch (err: any) {
-      const message =
-        err.response?.data?.message || err.message || "Invite failed";
-      showToast(message, "error");
+      showToast(err.response?.data?.message || err.message || "Invitation failed", "error");
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
-  // Mở modal xóa thành viên
+  /**
+   * Xoa vinh vien mot thanh vien khoi cong ty
+   */
   const openDeleteMemberConfirm = (member: CompanyMember) => {
     if (member.userId === user?.id) {
-      showToast("You cannot remove yourself.", "error");
+      showToast("Self-removal is not permitted.", "error");
       return;
     }
-    setConfirmTitle("Remove Member?");
-    setConfirmDesc(
-      `Are you sure you want to remove ${member.fullName}? They will lose access immediately.`
-    );
-    setConfirmAction(() => async () => {
+    setConfirmContent({
+      title: "Remove Team Member",
+      desc: `Are you sure you want to remove ${member.fullName}? Access will be revoked immediately.`,
+      variant: "danger"
+    });
+    setOnConfirmAction(() => async () => {
       if (!companyId) return;
       await removeCompanyMember(companyId, member.userId);
-      showToast("Member removed successfully", "success");
+      showToast("Member successfully removed.", "success");
       fetchData();
     });
     setIsConfirmOpen(true);
   };
 
-  // Mở modal hủy lời mời (Mới)
+  /**
+   * Thu hoi loi moi da gui
+   */
   const openCancelInvitationConfirm = (inv: CompanyInvitation) => {
-    setConfirmTitle("Revoke Invitation?");
-    setConfirmDesc(
-      `Cancel invitation for ${inv.email}? The link will become invalid.`
-    );
-    setConfirmAction(() => async () => {
+    setConfirmContent({
+      title: "Revoke Invitation",
+      desc: `Cancel pending invitation for ${inv.email}? The secure link will be invalidated.`,
+      variant: "warning"
+    });
+    setOnConfirmAction(() => async () => {
       if (!companyId) return;
       await cancelCompanyInvitation(companyId, inv.id);
-      showToast("Invitation revoked successfully", "success");
+      showToast("Invitation revoked successfully.", "success");
       fetchData();
     });
     setIsConfirmOpen(true);
   };
 
-  // Xử lý xác nhận chung
+  /**
+   * Xu ly luong Confirm Action chung
+   */
   const handleConfirmAction = async () => {
     setIsProcessingAction(true);
     try {
-      await confirmAction();
+      await onConfirmAction();
       setIsConfirmOpen(false);
     } catch (err: any) {
-      const message =
-        err.response?.data?.message || err.message || "Action failed";
-      showToast(message, "error");
+      showToast(err.response?.data?.message || err.message || "Action failed", "error");
     } finally {
       setIsProcessingAction(false);
     }
   };
 
-  // Các hàm cũ (View Detail, Edit Role...) giữ nguyên logic
   const handleViewDetails = (member: CompanyMember) => {
     setDetailMember(member);
     setShowDetailModal(true);
@@ -363,468 +328,343 @@ export default function MembersPage() {
     setShowEditModal(true);
   };
 
-  const handleUpdateMember = async () => {
+  /**
+   * Cap nhat vai tro hoac trang thai cua nhan vien
+   */
+  const handleUpdateMemberAction = async () => {
     if (!companyId || !selectedMember) return;
     setIsUpdating(true);
     try {
-      const promises = [];
-      if (newStatus !== "")
-        promises.push(
-          updateCompanyMemberStatus(
-            companyId,
-            selectedMember.memberId,
-            newStatus
-          )
-        );
-      if (newRoleCode !== "")
-        promises.push(
-          updateCompanyMemberRole(
-            companyId,
-            selectedMember.memberId,
-            newRoleCode
-          )
-        );
-
-      await Promise.all(promises);
-      fetchData();
-      showToast("Member updated successfully", "success");
+      const tasks = [];
+      if (newStatus !== "") tasks.push(updateCompanyMemberStatus(companyId, selectedMember.memberId, newStatus));
+      if (newRoleCode !== "") tasks.push(updateCompanyMemberRole(companyId, selectedMember.memberId, newRoleCode));
+      
+      await Promise.all(tasks);
+      showToast("Member configuration updated.", "success");
       setShowEditModal(false);
+      fetchData();
     } catch (err: any) {
-      const message =
-        err.response?.data?.message || err.message || "Update failed";
-      showToast(message, "error");
+      showToast(err.response?.data?.message || err.message || "Update failed", "error");
     } finally {
       setIsUpdating(false);
     }
   };
 
-  // ===================================================
-  // 🎨 Helpers Render
-  // ===================================================
-
-  const renderStatusBadge = (status: string) => {
-    switch (status) {
-      case "ACTIVE":
-        return (
-          <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
-            <CheckCircle className="w-3 h-3" /> Active
-          </div>
-        );
-      case "SUSPENDED":
-        return (
-          <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200">
-            <CloseIcon className="w-3 h-3" /> Suspended
-          </div>
-        );
-      case "PENDING":
-        return (
-          <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-            <Clock className="w-3 h-3" /> Pending
-          </div>
-        );
-      default:
-        return (
-          <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-50 text-slate-500 border border-slate-200">
-            {status}
-          </div>
-        );
-    }
-  };
-
-  const renderRoleBadge = (m: CompanyMember) => {
-    const isAdmin = m.roleName?.toUpperCase().includes("ADMIN");
-    const Icon = isAdmin ? Crown : Shield;
-    const style = isAdmin
-      ? "bg-amber-50 text-amber-800 border-2 border-amber-500"
-      : "bg-blue-50 text-blue-700 border border-blue-300";
-    return (
-      <div
-        className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${style}`}
-      >
-        <Icon className="w-3 h-3" />
-        {m.roleName || "Member"}
-      </div>
-    );
-  };
+  // ---------------------------------------------------------------------------
+  // 8. UI HELPERS (Renderers)
+  // ---------------------------------------------------------------------------
 
   const formatDateTime = (date?: string | null): string => {
     if (!date) return "—";
     try {
       return new Date(date).toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
+        month: "short", day: "numeric", year: "numeric",
       });
     } catch {
       return "—";
     }
   };
 
-  // ===================================================
-  // 🖥️ RENDER MAIN
-  // ===================================================
-
-  if (isAuthLoading)
+  const renderStatusBadge = (status: string) => {
+    const configs: any = {
+      ACTIVE: { class: "bg-emerald-50 text-emerald-700 border-emerald-200", icon: CheckCircle, label: "Active" },
+      SUSPENDED: { class: "bg-slate-100 text-slate-600 border-slate-200", icon: XCircle, label: "Suspended" },
+      PENDING: { class: "bg-amber-50 text-amber-700 border-amber-200", icon: Clock, label: "Pending" },
+    };
+    const config = configs[status] || { class: "bg-slate-50 text-slate-500", icon: AlertCircle, label: status };
+    const Icon = config.icon;
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+      <div className={cn("inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-black uppercase tracking-wider border shadow-sm", config.class)}>
+        <Icon className="w-3 h-3" /> {config.label}
       </div>
     );
-  if (!companyId)
-    return <div className="p-10 text-center">No Active Company</div>;
+  };
+
+  const renderRoleBadge = (m: CompanyMember) => {
+    const isAdmin = m.roleName?.toUpperCase().includes("ADMIN");
+    const Icon = isAdmin ? Crown : Shield;
+    return (
+      <div className={cn(
+        "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-black uppercase tracking-widest border shadow-sm",
+        isAdmin ? "bg-amber-50 text-amber-700 border-amber-200" : "bg-blue-50 text-[#0052CC] border-blue-100"
+      )}>
+        <Icon className="w-3 h-3" /> {m.roleName || "Member"}
+      </div>
+    );
+  };
+
+  // ---------------------------------------------------------------------------
+  // 9. RENDER LOGIC
+  // ---------------------------------------------------------------------------
+
+  if (isAuthLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#F4F5F7]">
+        <Loader2 className="w-10 h-10 text-[#0052CC] animate-spin" />
+      </div>
+    );
+  }
+
+  if (!companyId) {
+    return (
+      <div className="p-20 text-center font-black uppercase tracking-widest text-slate-400">
+        No Active Workspace
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-slate-50/50 font-sans text-slate-900 p-6 sm:p-8">
-      <div className="max-w-[1600px] mx-auto space-y-6">
-        {/* HEADER */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="min-h-screen bg-[#F4F5F7] font-sans text-[#172B4D] p-8">
+      <div className="max-w-[1600px] mx-auto space-y-8">
+        
+        {/* HEADER SECTION */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">
-              Team Management
-            </h1>
-            <p className="text-sm text-slate-500 mt-1">
-              Manage users and pending invitations for{" "}
-              <span className="font-semibold text-blue-600">
-                {activeCompany?.companyName}
-              </span>
-              .
+            <h1 className="text-2xl font-black text-[#172B4D] tracking-tight uppercase">Team Directory</h1>
+            <p className="text-[14px] text-[#42526E] font-medium mt-1">
+              Manage workforce access and pending invites for <span className="text-[#0052CC] font-bold">{activeCompany?.companyName}</span>
             </p>
           </div>
           <Button
             onClick={() => setShowInviteModal(true)}
-            className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm font-bold h-10 px-5 rounded-[3px] flex items-center gap-2"
+            className="bg-[#0052CC] hover:bg-[#0747A6] text-white font-black text-[12px] uppercase tracking-widest h-11 px-8 rounded-lg shadow-md active:scale-95 transition-all flex items-center gap-2"
           >
-            <UserPlus className="w-4 h-4" /> Invite People
+            <UserPlus className="w-4 h-4 stroke-[3]" /> Invite Teammates
           </Button>
         </div>
 
         {/* TABS NAVIGATION */}
         <div className="border-b border-slate-200">
-          <nav className="-mb-px flex gap-6" aria-label="Tabs">
-            <button
-              onClick={() => handleTabChange("MEMBERS")}
-              className={`py-3 px-1 border-b-2 font-medium text-sm flex items-center gap-2 transition-colors ${
-                activeTab === "MEMBERS"
-                  ? "border-blue-500 text-blue-600"
-                  : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300"
-              }`}
-            >
-              <Users className="w-4 h-4" />
-              Members{" "}
-              <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full text-xs ml-1">
-                {activeTab === "MEMBERS" ? pagination.totalElements : ""}
-              </span>
-            </button>
-
-            <button
-              onClick={() => handleTabChange("INVITATIONS")}
-              className={`py-3 px-1 border-b-2 font-medium text-sm flex items-center gap-2 transition-colors ${
-                activeTab === "INVITATIONS"
-                  ? "border-blue-500 text-blue-600"
-                  : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300"
-              }`}
-            >
-              <Mail className="w-4 h-4" />
-              Invitations{" "}
-              <span className="bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full text-xs ml-1">
-                {activeTab === "INVITATIONS" ? pagination.totalElements : ""}
-              </span>
-            </button>
+          <nav className="-mb-px flex gap-8">
+            {(["MEMBERS", "INVITATIONS"] as TabType[]).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => handleTabChange(tab)}
+                className={cn(
+                  "pb-4 px-1 border-b-2 font-black text-[12px] uppercase tracking-[0.2em] flex items-center gap-2.5 transition-all",
+                  activeTab === tab 
+                    ? "border-[#0052CC] text-[#0052CC]" 
+                    : "border-transparent text-[#6B778C] hover:text-[#172B4D] hover:border-slate-300"
+                )}
+              >
+                {tab === "MEMBERS" ? <Users className="w-4 h-4" /> : <Mail className="w-4 h-4" />}
+                {tab}
+                <span className={cn(
+                  "px-2 py-0.5 rounded-md text-[10px] shadow-sm border",
+                  activeTab === tab ? "bg-[#0052CC] text-white border-[#0052CC]" : "bg-white text-slate-500 border-slate-200"
+                )}>
+                  {activeTab === tab ? pagination.totalElements : "—"}
+                </span>
+              </button>
+            ))}
           </nav>
         </div>
 
-        {/* TOOLBAR & SEARCH */}
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-3 items-center">
-          {/* Select Field (Chỉ hiện ở Tab Members) */}
+        {/* TOOLBAR: SEARCH & FILTER */}
+        <div className="bg-white p-5 rounded-2xl border border-[#DFE1E6] shadow-sm flex flex-col md:flex-row gap-4 items-center">
           {activeTab === "MEMBERS" && (
-            <div className="relative w-full md:w-40">
+            <div className="relative w-full md:w-48">
               <select
                 value={searchBy}
                 onChange={(e) => handleSearchByChange(e.target.value)}
-                className="w-full h-10 pl-3 pr-8 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-500 bg-slate-50 cursor-pointer"
+                className="w-full h-11 pl-4 pr-10 border border-[#DFE1E6] rounded-xl text-[12px] font-black uppercase tracking-widest bg-[#F4F5F7] cursor-pointer outline-none focus:ring-2 focus:ring-blue-100 appearance-none"
               >
-                <option value="name">Name</option>
-                <option value="email">Email</option>
-                <option value="phone">Phone</option>
-                <option value="roleName">Role</option>
+                <option value="name">Full Name</option>
+                <option value="email">Email Addr</option>
+                <option value="phone">Mobile No</option>
+                <option value="roleName">Auth Role</option>
                 <option value="status">Status</option>
               </select>
+              <Filter className="absolute right-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
             </div>
           )}
 
-          {/* Search Input */}
-          <div className="relative w-full md:w-96 group">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
+          <div className="relative w-full md:w-[450px] group">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-400 group-focus-within:text-[#0052CC] transition-colors" />
             <input
               type="text"
               value={searchValue}
               onChange={(e) => handleSearchChange(e.target.value)}
-              placeholder={
-                activeTab === "MEMBERS"
-                  ? `Search by ${searchBy}...`
-                  : "Search email..."
-              }
-              className="w-full pl-9 pr-4 h-10 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition-all"
+              placeholder={activeTab === "MEMBERS" ? `Lookup member by ${searchBy}...` : "Filter by email address..."}
+              className="w-full pl-12 pr-4 h-11 bg-white border border-[#DFE1E6] rounded-xl text-[14px] font-medium focus:outline-none focus:ring-2 focus:ring-blue-50 focus:border-[#2684FF] transition-all placeholder:text-slate-400"
             />
           </div>
         </div>
 
-        {/* CONTENT AREA */}
-        {loading ? (
-          <div className="flex justify-center py-20 bg-white rounded-xl border border-slate-200 shadow-sm">
-            <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
-          </div>
-        ) : (
-          <>
-            {/* 1. MEMBERS VIEW */}
-            {activeTab === "MEMBERS" &&
-              (members.length > 0 ? (
-                <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                  <MemberTable
-                    members={members}
-                    renderStatus={renderStatusBadge}
-                    renderRole={renderRoleBadge}
-                    formatDateTime={formatDateTime}
-                    onViewDetail={handleViewDetails}
-                    onEdit={openEditModal}
-                    onDelete={openDeleteMemberConfirm}
-                    onSort={handleSort}
-                    currentSortBy={searchParams.sortBy}
-                    currentSortDir={searchParams.sortDir}
-                    disableEdit={(m) => m.userId === user?.id}
-                    disableDelete={(m) => m.userId === user?.id}
-                  />
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center py-20 bg-white rounded-xl border-2 border-dashed border-slate-200">
-                  <Users className="w-10 h-10 text-slate-300 mb-3" />
-                  <p className="text-slate-500">No members found.</p>
-                </div>
-              ))}
+        {/* CONTENT DATA AREA */}
+        <div className="relative">
+          {isLoading ? (
+            <div className="flex flex-col justify-center items-center py-24 bg-white rounded-2xl border border-slate-200 shadow-sm gap-3">
+              <Loader2 className="w-8 h-8 text-[#0052CC] animate-spin opacity-60" />
+              <span className="text-[11px] font-black uppercase tracking-widest text-slate-400">Syncing directory...</span>
+            </div>
+          ) : (
+            <div className="animate-in fade-in duration-500">
+              
+              {/* === VIEW 1: MEMBERS === */}
+              {activeTab === "MEMBERS" && (
+                members.length > 0 ? (
+                  <div className="bg-white rounded-2xl border border-[#DFE1E6] shadow-sm overflow-hidden">
+                    <MemberTable
+                      members={members}
+                      renderStatus={renderStatusBadge}
+                      renderRole={renderRoleBadge}
+                      formatDateTime={formatDateTime}
+                      onViewDetail={handleViewDetails}
+                      onEdit={openEditModal}
+                      onDelete={openDeleteMemberConfirm}
+                      onSort={handleSort}
+                      currentSortBy={searchParams.sortBy}
+                      currentSortDir={searchParams.sortDir}
+                      disableEdit={(m) => m.userId === user?.id}
+                      disableDelete={(m) => m.userId === user?.id}
+                    />
+                  </div>
+                ) : (
+                  <EmptyState icon={Users} message="No team members found." />
+                )
+              )}
 
-            {/* 2. INVITATIONS VIEW */}
-            {activeTab === "INVITATIONS" &&
-              (invitations.length > 0 ? (
-                <InvitationTable
-                  invitations={invitations}
-                  onCancel={openCancelInvitationConfirm}
-                  formatDateTime={formatDateTime}
-                />
-              ) : (
-                <div className="flex flex-col items-center justify-center py-20 bg-white rounded-xl border-2 border-dashed border-slate-200">
-                  <Mail className="w-10 h-10 text-slate-300 mb-3" />
-                  <p className="text-slate-500">No pending invitations.</p>
-                  <Button
-                    variant="link"
-                    onClick={() => setShowInviteModal(true)}
-                  >
-                    Invite someone now
-                  </Button>
-                </div>
-              ))}
+              {/* === VIEW 2: INVITATIONS === */}
+              {activeTab === "INVITATIONS" && (
+                invitations.length > 0 ? (
+                  <div className="bg-white rounded-2xl border border-[#DFE1E6] shadow-sm overflow-hidden">
+                    <InvitationTable 
+                      invitations={invitations} 
+                      onCancel={openCancelInvitationConfirm} 
+                      formatDateTime={formatDateTime} 
+                    />
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-24 bg-white rounded-2xl border-2 border-dashed border-[#DFE1E6]">
+                    <Mail className="w-12 h-12 text-slate-200 mb-4 stroke-[1.5]" />
+                    <p className="text-[14px] font-bold text-slate-400 uppercase tracking-widest mb-4">No pending invitations.</p>
+                    <Button variant="link" onClick={() => setShowInviteModal(true)} className="text-[#0052CC] font-bold">
+                      Invite someone now
+                    </Button>
+                  </div>
+                )
+              )}
 
-            {/* PAGINATION */}
-            {(activeTab === "MEMBERS"
-              ? members.length > 0
-              : invitations.length > 0) && (
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2">
-                <p className="text-sm text-slate-500">
-                  Showing{" "}
-                  <span className="font-semibold text-slate-900">
-                    {pagination.pageNumber * pagination.pageSize + 1}
-                  </span>{" "}
-                  to{" "}
-                  <span className="font-semibold text-slate-900">
-                    {Math.min(
-                      (pagination.pageNumber + 1) * pagination.pageSize,
-                      pagination.totalElements
-                    )}
-                  </span>{" "}
-                  of{" "}
-                  <span className="font-semibold text-slate-900">
-                    {pagination.totalElements}
-                  </span>{" "}
-                  results
-                </p>
+              {/* PAGINATION FOOTER */}
+              <PaginationFooter pagination={pagination} onPageChange={handlePageChange} />
+            </div>
+          )}
+        </div>
+      </div>
 
-                <div className="flex items-center gap-1">
-                  <Button
-                    onClick={() => handlePageChange(0)}
-                    disabled={pagination.first}
-                    variant="outline"
-                    size="icon"
-                    className="h-8 w-8"
-                    title="First Page"
-                  >
-                    <ChevronsLeft className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    onClick={() => handlePageChange(pagination.pageNumber - 1)}
-                    disabled={pagination.first}
-                    variant="outline"
-                    size="icon"
-                    className="h-8 w-8"
-                    title="Previous Page"
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                  </Button>
-                  <span className="mx-2 text-sm font-medium text-slate-700">
-                    Page {pagination.pageNumber + 1} of {pagination.totalPages}
-                  </span>
-                  <Button
-                    onClick={() => handlePageChange(pagination.pageNumber + 1)}
-                    disabled={pagination.last}
-                    variant="outline"
-                    size="icon"
-                    className="h-8 w-8"
-                    title="Next Page"
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    onClick={() => handlePageChange(pagination.totalPages - 1)}
-                    disabled={pagination.last}
-                    variant="outline"
-                    size="icon"
-                    className="h-8 w-8"
-                    title="Last Page"
-                  >
-                    <ChevronsRight className="w-4 h-4" />
-                  </Button>
-                </div>
+      {/* MODALS SECTION */}
+      <InviteMemberModal
+        isOpen={showInviteModal}
+        onClose={() => setShowInviteModal(false)}
+        onInvite={handleSendInvite}
+        isLoading={isLoading}
+        email={inviteEmail}
+        setEmail={setInviteEmail}
+        roleCode={inviteRoleCode}
+        setRoleCode={setInviteRoleCode}
+        contextType="company"
+      />
+
+      <MemberDetailModal
+        isOpen={showDetailModal}
+        onClose={() => setShowDetailModal(false)}
+        member={detailMember as any}
+        loading={loadingDetail}
+      />
+
+      <ConfirmationModal
+        isOpen={isConfirmOpen}
+        onClose={() => setIsConfirmOpen(false)}
+        onConfirm={handleConfirmAction}
+        isLoading={isProcessingAction}
+        title={confirmContent.title}
+        description={confirmContent.desc}
+        confirmText="Execute Action"
+        modalVariant={confirmContent.variant}
+      />
+
+      {/* EDIT ROLE & STATUS MODAL (Inline Refactored) */}
+      {showEditModal && selectedMember && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-[#091E42]/60 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="w-full max-w-md bg-white rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.3)] overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="px-8 py-5 border-b border-slate-100 flex justify-between items-center bg-[#FAFBFC]">
+              <h3 className="text-[13px] font-black uppercase tracking-[0.2em] text-[#172B4D]">Modify Member Permissions</h3>
+              <button onClick={() => setShowEditModal(false)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 transition-all"><XCircle className="w-5 h-5" /></button>
+            </div>
+            <div className="p-8 space-y-6">
+              <div className="flex items-center gap-4 p-4 bg-[#F4F5F7] rounded-xl border border-slate-100">
+                <div className="h-12 w-12 rounded-xl bg-[#0052CC] flex items-center justify-center text-white text-lg font-black shadow-md">{selectedMember.fullName.charAt(0)}</div>
+                <div className="min-w-0"><p className="font-black text-[#172B4D] truncate">{selectedMember.fullName}</p><p className="text-[12px] font-medium text-slate-500 truncate">{selectedMember.email}</p></div>
               </div>
-            )}
-          </>
-        )}
-
-        {/* --- MODALS --- */}
-        <InviteMemberModal
-          isOpen={showInviteModal}
-          onClose={() => setShowInviteModal(false)}
-          onInvite={handleInvite}
-          isLoading={loading}
-          email={email}
-          setEmail={setEmail}
-          roleCode={inviteRoleCode}
-          setRoleCode={setInviteRoleCode}
-          contextType="company"
-        />
-
-        {/* FIX: Ép kiểu Member cho Modal Detail nếu cần thiết, hoặc sử dụng type 'any' */}
-        <MemberDetailModal
-          isOpen={showDetailModal}
-          onClose={() => setShowDetailModal(false)}
-          member={detailMember as any}
-          loading={loadingDetail}
-        />
-
-        {/* Confirmation Modal (Dùng chung cho Delete & Cancel) */}
-        <ConfirmationModal
-          isOpen={isConfirmOpen}
-          onClose={() => setIsConfirmOpen(false)}
-          onConfirm={handleConfirmAction}
-          isLoading={isProcessingAction}
-          title={confirmTitle}
-          description={confirmDesc}
-          confirmText="Confirm"
-          modalVariant={confirmTitle.includes("Revoke") ? "warning" : "danger"} // Dựa vào title để chọn variant
-        />
-
-        {/* EDIT MODAL */}
-        {showEditModal && selectedMember && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in">
-            <div className="w-full max-w-md bg-white rounded-xl shadow-2xl overflow-hidden animate-in zoom-in-95">
-              <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                <h3 className="font-bold text-slate-900">Edit Member</h3>
-                <button
-                  onClick={() => setShowEditModal(false)}
-                  className="text-slate-400 hover:text-slate-600 transition-colors"
-                  title="Close"
-                >
-                  <CloseIcon className="w-5 h-5" />
-                </button>
-              </div>
-
-              <div className="p-6 space-y-5">
-                <div className="p-3 bg-slate-50 rounded-lg border border-slate-100 flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold">
-                    {selectedMember.fullName.charAt(0)}
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold text-slate-900">
-                      {selectedMember.fullName}
-                    </p>
-                    <p className="text-xs text-slate-500">
-                      {selectedMember.email}
-                    </p>
-                  </div>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest px-1">Authority Role</label>
+                  <div className="relative"><select value={newRoleCode} onChange={(e) => setNewRoleCode(e.target.value)} className="w-full h-11 pl-4 pr-10 border border-slate-200 rounded-xl text-[14px] font-bold text-[#172B4D] bg-white focus:ring-2 focus:ring-blue-100 appearance-none outline-none">
+                    <option value="">Current: {selectedMember.roleName}</option>
+                    <option value="COMPANY_MEMBER">Member</option>
+                    <option value="COMPANY_ADMIN">Administrator</option>
+                  </select><Shield className="w-4 h-4 text-slate-400 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" /></div>
                 </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-sm font-semibold text-slate-900 block">
-                    Role
-                  </label>
-                  <div className="relative">
-                    <select
-                      value={newRoleCode}
-                      onChange={(e) => setNewRoleCode(e.target.value)}
-                      className="w-full h-10 pl-3 pr-8 border border-slate-300 rounded-lg text-sm font-medium text-slate-900 bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-500 appearance-none"
-                    >
-                      <option value="">
-                        {selectedMember.roleName || "No Change"}
-                      </option>
-                      <option value="COMPANY_MEMBER">Member</option>
-                      <option value="COMPANY_ADMIN">Administrator</option>
-                    </select>
-                    <Shield className="w-4 h-4 text-slate-400 absolute right-3 top-3 pointer-events-none" />
-                  </div>
+                <div className="space-y-2">
+                  <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest px-1">Operating Status</label>
+                  <div className="relative"><select value={newStatus} onChange={(e) => setNewStatus(e.target.value)} className="w-full h-11 pl-4 pr-10 border border-slate-200 rounded-xl text-[14px] font-bold text-[#172B4D] bg-white focus:ring-2 focus:ring-blue-100 appearance-none outline-none">
+                    <option value="">Current: {selectedMember.status}</option>
+                    <option value="ACTIVE">Active</option>
+                    <option value="SUSPENDED">Suspended</option>
+                  </select><CheckCircle className="w-4 h-4 text-slate-400 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" /></div>
                 </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-sm font-semibold text-slate-900 block">
-                    Account Status
-                  </label>
-                  <div className="relative">
-                    <select
-                      value={newStatus}
-                      onChange={(e) => setNewStatus(e.target.value)}
-                      className="w-full h-10 pl-3 pr-8 border border-slate-300 rounded-lg text-sm font-medium text-slate-900 bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-500 appearance-none"
-                    >
-                      <option value="">
-                        {selectedMember.status || "No Change"}
-                      </option>
-                      <option value="ACTIVE">Active</option>
-                      <option value="SUSPENDED">Suspended</option>
-                    </select>
-                    <CheckCircle className="w-4 h-4 text-slate-400 absolute right-3 top-3 pointer-events-none" />
-                  </div>
-                </div>
-              </div>
-
-              <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
-                <Button
-                  variant="outline"
-                  onClick={() => setShowEditModal(false)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleUpdateMember}
-                  disabled={isUpdating}
-                  className="bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-sm"
-                >
-                  {isUpdating ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : (
-                    <Save className="w-4 h-4 mr-2" />
-                  )}
-                  Save Changes
-                </Button>
               </div>
             </div>
+            <div className="px-8 py-5 bg-[#FAFBFC] border-t border-slate-100 flex justify-end gap-3">
+              <Button variant="outline" onClick={() => setShowEditModal(false)} className="h-10 px-6 rounded-lg text-[12px] font-black uppercase tracking-widest border-slate-200">Cancel</Button>
+              <Button onClick={handleUpdateMemberAction} disabled={isUpdating} className="h-10 px-8 bg-[#0052CC] hover:bg-[#0747A6] text-white font-black text-[12px] uppercase tracking-widest rounded-lg shadow-md active:scale-95 transition-all">
+                {isUpdating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />} Save Snapshot
+              </Button>
+            </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
+
+// =============================================================================
+// SUB-COMPONENTS (Refactored for Cleanliness)
+// =============================================================================
+
+const EmptyState = ({ icon: Icon, message }: { icon: any, message: string }) => (
+  <div className="flex flex-col items-center justify-center py-24 bg-white rounded-2xl border-2 border-dashed border-[#DFE1E6]">
+    <Icon className="w-12 h-12 text-slate-200 mb-4 stroke-[1.5]" />
+    <p className="text-[14px] font-bold text-slate-400 uppercase tracking-widest">{message}</p>
+  </div>
+);
+
+const PaginationFooter = ({ pagination, onPageChange }: any) => {
+  if (pagination.totalElements === 0) return null;
+  return (
+    <div className="flex flex-col sm:flex-row items-center justify-between gap-6 mt-8 px-2">
+      <p className="text-[12px] font-bold text-slate-500 uppercase tracking-widest">
+        Displaying <span className="text-[#172B4D]">{pagination.pageNumber * pagination.pageSize + 1}</span> 
+        {" "}to <span className="text-[#172B4D]">{Math.min((pagination.pageNumber + 1) * pagination.pageSize, pagination.totalElements)}</span> 
+        {" "}of <span className="text-[#172B4D]">{pagination.totalElements}</span> entries
+      </p>
+
+      <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-[#DFE1E6] shadow-sm">
+        <PaginationBtn onClick={() => onPageChange(0)} disabled={pagination.first} icon={ChevronsLeft} />
+        <PaginationBtn onClick={() => onPageChange(pagination.pageNumber - 1)} disabled={pagination.first} icon={ChevronLeft} />
+        <div className="px-4 text-[11px] font-black uppercase tracking-widest text-[#0052CC]">
+          Page {pagination.pageNumber + 1} / {pagination.totalPages}
+        </div>
+        <PaginationBtn onClick={() => onPageChange(pagination.pageNumber + 1)} disabled={pagination.last} icon={ChevronRight} />
+        <PaginationBtn onClick={() => onPageChange(pagination.totalPages - 1)} disabled={pagination.last} icon={ChevronsRight} />
+      </div>
+    </div>
+  );
+};
+
+const PaginationBtn = ({ onClick, disabled, icon: Icon }: any) => (
+  <Button onClick={onClick} disabled={disabled} variant="outline" size="icon" className="h-9 w-9 rounded-lg border-transparent hover:bg-[#F4F5F7] disabled:opacity-30 active:scale-90 transition-all">
+    <Icon className="w-4 h-4" />
+  </Button>
+);

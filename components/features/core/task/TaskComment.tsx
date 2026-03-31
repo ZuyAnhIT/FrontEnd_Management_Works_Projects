@@ -1,39 +1,33 @@
 "use client";
 
+// =============================================================================
+// 1. IMPORT
+// =============================================================================
+
 import React, { useState, useEffect, useRef } from "react";
 import {
-  Bold,
-  Italic,
-  List,
-  ListOrdered,
-  Image as ImageIcon,
-  AtSign,
-  Smile,
-  Link as LinkIcon,
-  Loader2,
-  Paperclip,
-  FileText,
-  Download,
-  Trash2,
-  AlignLeft,
-  AlignCenter,
-  AlignRight,
-  Heading1,
-  Heading2,
-  File,
+  Bold, Italic, List, ListOrdered, Image as ImageIcon,
+  Loader2, Paperclip, FileText, Download,
+  AlignLeft, AlignCenter, AlignRight, Heading1, Heading2, File,
+  Activity
 } from "lucide-react";
+
+// Internal Components & Utils
 import { Button } from "@/components/ui/Buttons";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/Avatars";
+import { useToast } from "@/components/ui/ToastProvider";
+import { cn } from "@/lib/utils";
+
+// Internal Services
 import {
   getTaskComments,
   addTaskComment,
   getTaskAttachments,
   uploadTaskAttachment,
 } from "@/services/apiTask";
-import { useToast } from "@/components/ui/ToastProvider";
 
 // =============================================================================
-// 1. INTERFACES & HELPERS
+// 2. INTERFACES & HELPERS
 // =============================================================================
 
 interface Comment {
@@ -63,8 +57,10 @@ interface TaskCommentProps {
   taskId: number;
 }
 
-// Helper để format dung lượng file
-const formatFileSize = (bytes: number) => {
+/**
+ * Định dạng dung lượng file (B, KB, MB, GB)
+ */
+const formatFileSize = (bytes: number): string => {
   if (bytes === 0) return "0 B";
   const k = 1024;
   const sizes = ["B", "KB", "MB", "GB"];
@@ -72,383 +68,318 @@ const formatFileSize = (bytes: number) => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
 };
 
+/**
+ * Định dạng ngày giờ hiển thị (VD: Oct 24, 2023 at 10:30 AM)
+ */
+const formatDateTime = (isoString: string): string => {
+  return new Date(isoString).toLocaleString("en-US", {
+    month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit"
+  });
+};
+
 // =============================================================================
-// 2. MAIN COMPONENT
+// 3. MAIN COMPONENT
 // =============================================================================
 
+/**
+ * Thành phần quản lý Bình luận và File đính kèm của một Công việc (Issue Activity).
+ */
 export default function TaskComment({ taskId }: TaskCommentProps) {
+  
+  // ---------------------------------------------------------------------------
+  // 4. HOOKS & REFS
+  // ---------------------------------------------------------------------------
+  
   const { showToast } = useToast();
-
-  // --- STATE DATA ---
-  const [comments, setComments] = useState<Comment[]>([]);
-  const [attachments, setAttachments] = useState<Attachment[]>([]);
-
-  // --- STATE UI ---
-  const [commentHtml, setCommentHtml] = useState("");
-  const [loadingData, setLoadingData] = useState(false);
-  const [sendingComment, setSendingComment] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
-  const [isCommentInputFocused, setIsCommentInputFocused] = useState(false);
-  const [activeTab, setActiveTab] = useState<"COMMENTS" | "ATTACHMENTS">(
-    "COMMENTS"
-  );
-
-  // --- REFS ---
+  
   const editorRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // --- FETCH DATA (Logic nghiệp vụ quan trọng) ---
+  // ---------------------------------------------------------------------------
+  // 5. STATE
+  // ---------------------------------------------------------------------------
+  
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [commentHtml, setCommentHtml] = useState("");
+  
+  const [isLoadingData, setIsLoadingData] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [isEditorActive, setIsEditorActive] = useState(false);
+  const [activeTab, setActiveTab] = useState<"COMMENTS" | "ATTACHMENTS">("COMMENTS");
+
+  // ---------------------------------------------------------------------------
+  // 6. EFFECTS: DATA FETCHING
+  // ---------------------------------------------------------------------------
+
   useEffect(() => {
-    if (taskId) {
-      fetchData(taskId);
-    }
+    if (!taskId) return;
+
+    const fetchActivityData = async () => {
+      setIsLoadingData(true);
+      try {
+        const [resComments, resAttachments] = await Promise.all([
+          getTaskComments(taskId),
+          getTaskAttachments(taskId),
+        ]);
+
+        if (resComments.success && Array.isArray(resComments.data)) {
+          setComments(resComments.data);
+        }
+        if (resAttachments.success && Array.isArray(resAttachments.data)) {
+          setAttachments(resAttachments.data);
+        }
+      } catch (error) {
+        console.error("Failed to load task activity:", error);
+      } finally {
+        setIsLoadingData(false);
+      }
+    };
+
+    fetchActivityData();
   }, [taskId]);
 
-  const fetchData = async (id: number) => {
-    setLoadingData(true);
-    try {
-      // Gọi song song cả comment và attachment
-      const [resComments, resAttachments] = await Promise.all([
-        getTaskComments(id),
-        getTaskAttachments(id),
-      ]);
+  // ---------------------------------------------------------------------------
+  // 7. HANDLERS: RICH TEXT EDITOR
+  // ---------------------------------------------------------------------------
 
-      if (resComments.success && Array.isArray(resComments.data)) {
-        setComments(resComments.data);
-      }
-      if (resAttachments.success && Array.isArray(resAttachments.data)) {
-        setAttachments(resAttachments.data);
-      }
-    } catch (error) {
-      console.error("Failed to load task data", error);
-      // Không showToast ở đây vì đây là initial load, chỉ cần console log
-    } finally {
-      setLoadingData(false);
-    }
-  };
-
-  // --- RICH TEXT HANDLERS ---
-  const execCommand = (
-    command: string,
-    value: string | undefined = undefined
-  ) => {
+  const executeCommand = (command: string, value: string | undefined = undefined) => {
     document.execCommand(command, false, value);
-    // Focus lại vào editor để người dùng gõ tiếp được ngay
     if (editorRef.current) {
       editorRef.current.focus();
     }
   };
 
-  const handleEditorChange = (e: React.FormEvent<HTMLDivElement>) => {
+  const handleEditorInput = (e: React.FormEvent<HTMLDivElement>) => {
     setCommentHtml(e.currentTarget.innerHTML);
   };
 
-  // --- COMMENT HANDLERS (Logic nghiệp vụ quan trọng) ---
-  const handleSendComment = async () => {
-    // Kiểm tra nếu chỉ có tag rỗng
+  // ---------------------------------------------------------------------------
+  // 8. HANDLERS: API ACTIONS
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Xử lý gửi bình luận lên server.
+   */
+  const handleSubmitComment = async () => {
     const strippedContent = commentHtml.replace(/<[^>]+>/g, "").trim();
     if (!strippedContent && !commentHtml.includes("<img")) return;
 
-    setSendingComment(true);
+    setIsSending(true);
     try {
-      // Gửi nguyên HTML lên server
       const res = await addTaskComment(taskId, commentHtml);
 
       if (res.success) {
-        if (editorRef.current) editorRef.current.innerHTML = ""; // Clear visual
+        // Reset Editor
+        if (editorRef.current) editorRef.current.innerHTML = ""; 
         setCommentHtml("");
-        setIsCommentInputFocused(false);
+        setIsEditorActive(false);
 
-        // Refresh comments only
+        // Fetch lại dữ liệu mới nhất
         const resNew = await getTaskComments(taskId);
         if (resNew.success) setComments(resNew.data);
 
-        showToast("Comment added successfully", "success");
+        showToast("Comment posted successfully", "success");
       } else {
-        // Xử lý lỗi từ API
-        const message = res.message || "Failed to add comment.";
+        const message = res.message || "Failed to post comment.";
         showToast(message, "error");
       }
     } catch (error: any) {
-      console.error("Failed to add comment", error);
-      const message =
-        error.message ||
-        error.response?.data?.message ||
-        "Failed to add comment";
+      const message = error.response?.data?.message || error.message || "Failed to post comment.";
       showToast(message, "error");
     } finally {
-      setSendingComment(false);
+      setIsSending(false);
     }
   };
 
-  // --- ATTACHMENT HANDLERS ---
-  const handleUploadClick = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  /**
+   * Xử lý tải lên file đính kèm.
+   */
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setIsUploading(true);
     try {
       const res = await uploadTaskAttachment(taskId, file);
+      
       if (res.success) {
-        showToast("File uploaded successfully", "success");
-
-        // Refresh attachments
+        showToast("Attachment uploaded successfully", "success");
+        
         const resAtt = await getTaskAttachments(taskId);
         if (resAtt.success) setAttachments(resAtt.data);
-
-        // Switch tab to show the file
+        
         setActiveTab("ATTACHMENTS");
       } else {
-        const message = res.message || "Upload failed.";
+        const message = res.message || "Failed to upload attachment.";
         showToast(message, "error");
       }
     } catch (error: any) {
-      console.error(error);
-      const message =
-        error.message ||
-        error.response?.data?.message ||
-        "Error uploading file";
+      const message = error.response?.data?.message || error.message || "Failed to upload attachment.";
       showToast(message, "error");
     } finally {
       setIsUploading(false);
-      // Reset input để chọn lại file cũ được
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
-  // --- RENDER UI ---
+  // ---------------------------------------------------------------------------
+  // 9. RENDER LOGIC
+  // ---------------------------------------------------------------------------
+
   return (
-    <div className="pt-6 border-t border-slate-200 mt-6">
-      {/* 1. Header Section & Tabs */}
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-          Activity
+    <div className="pt-8 mt-8 border-t border-slate-200">
+      
+      {/* ==================== HEADER & TABS ==================== */}
+      <div className="flex items-center justify-between mb-6">
+        <h3 className="text-[13px] font-bold text-[#172B4D] flex items-center gap-2">
+          <Activity className="w-4 h-4 text-slate-400" /> Activity
         </h3>
-        <div className="flex gap-1 bg-slate-100 p-0.5 rounded-md">
+        
+        {/* Toggle Tabs */}
+        <div className="flex p-0.5 bg-[#091E420A] rounded-lg">
           <button
             onClick={() => setActiveTab("COMMENTS")}
-            className={`px-3 py-1 text-[11px] rounded font-medium transition-all ${
-              activeTab === "COMMENTS"
-                ? "bg-white text-blue-700 shadow-sm"
-                : "text-slate-500 hover:text-slate-900"
-            }`}
+            className={cn(
+              "px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest rounded-md transition-all",
+              activeTab === "COMMENTS" 
+                ? "bg-white text-[#0052CC] shadow-sm" 
+                : "text-[#42526E] hover:text-[#172B4D] hover:bg-[#091E420A]"
+            )}
           >
-            Comments ({comments.length})
+            Comments <span className="opacity-70 ml-1">({comments.length})</span>
           </button>
           <button
             onClick={() => setActiveTab("ATTACHMENTS")}
-            className={`px-3 py-1 text-[11px] rounded font-medium transition-all ${
-              activeTab === "ATTACHMENTS"
-                ? "bg-white text-blue-700 shadow-sm"
-                : "text-slate-500 hover:text-slate-900"
-            }`}
+            className={cn(
+              "px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest rounded-md transition-all",
+              activeTab === "ATTACHMENTS" 
+                ? "bg-white text-[#0052CC] shadow-sm" 
+                : "text-[#42526E] hover:text-[#172B4D] hover:bg-[#091E420A]"
+            )}
           >
-            Attachments ({attachments.length})
+            Attachments <span className="opacity-70 ml-1">({attachments.length})</span>
           </button>
         </div>
       </div>
 
-      {/* 2. INPUT AREA (Chỉ hiện khi ở tab Comments) */}
+      {/* ==================== COMMENT INPUT AREA ==================== */}
       {activeTab === "COMMENTS" && (
-        <div className="flex gap-3 mb-8">
-          <Avatar className="w-8 h-8 mt-1">
-            <AvatarFallback className="bg-orange-500 text-white text-xs">
-              ME
-            </AvatarFallback>
+        <div className="flex gap-4 mb-10">
+          <Avatar className="w-8 h-8 mt-0.5 shrink-0 border border-white shadow-sm">
+            <AvatarFallback className="bg-[#0052CC] text-white text-[10px] font-bold">ME</AvatarFallback>
           </Avatar>
-          <div className="flex-1">
-            {isCommentInputFocused ? (
-              // RICH EDITOR STATE
-              <div className="border border-slate-300 rounded-md bg-white shadow-sm transition-all ring-1 ring-blue-100 animate-in fade-in duration-200">
-                {/* Toolbar */}
-                <div className="flex flex-wrap items-center gap-1 px-2 py-1.5 border-b border-slate-100 bg-slate-50/50 rounded-t-md">
-                  {/* Font Size */}
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => execCommand("formatBlock", "H3")}
-                    className="h-6 w-6 text-slate-500 hover:bg-slate-200 rounded"
-                    title="Large Text"
-                  >
+          
+          <div className="flex-1 min-w-0">
+            {isEditorActive ? (
+              /* --- TRẠNG THÁI: ĐANG SOẠN THẢO (ACTIVE EDITOR) --- */
+              <div className="border border-slate-300 rounded-xl bg-white shadow-sm overflow-hidden focus-within:ring-2 focus-within:ring-blue-100 focus-within:border-[#2684FF] transition-all animate-in fade-in zoom-in-95 duration-200">
+                
+                {/* Thanh công cụ định dạng (Toolbar) */}
+                <div className="flex flex-wrap items-center gap-1 px-3 py-2 border-b border-slate-100 bg-[#F4F5F7]">
+                  
+                  <Button variant="ghost" size="icon" onClick={() => executeCommand("formatBlock", "H3")} className="h-7 w-7 text-slate-500 hover:bg-[#091E4214] hover:text-slate-800" title="Heading 1">
                     <Heading1 className="w-3.5 h-3.5" />
                   </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => execCommand("formatBlock", "P")}
-                    className="h-6 w-6 text-slate-500 hover:bg-slate-200 rounded"
-                    title="Normal Text"
-                  >
+                  <Button variant="ghost" size="icon" onClick={() => executeCommand("formatBlock", "P")} className="h-7 w-7 text-slate-500 hover:bg-[#091E4214] hover:text-slate-800" title="Normal Text">
                     <Heading2 className="w-3.5 h-3.5" />
                   </Button>
-
-                  <div className="w-px h-3 bg-slate-300 mx-1"></div>
-
-                  {/* Style */}
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => execCommand("bold")}
-                    className="h-6 w-6 text-slate-500 hover:bg-slate-200 rounded"
-                    title="Bold"
-                  >
+                  <div className="w-px h-4 bg-slate-300 mx-1" />
+                  <Button variant="ghost" size="icon" onClick={() => executeCommand("bold")} className="h-7 w-7 text-slate-500 hover:bg-[#091E4214] hover:text-slate-800" title="Bold">
                     <Bold className="w-3.5 h-3.5" />
                   </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => execCommand("italic")}
-                    className="h-6 w-6 text-slate-500 hover:bg-slate-200 rounded"
-                    title="Italic"
-                  >
+                  <Button variant="ghost" size="icon" onClick={() => executeCommand("italic")} className="h-7 w-7 text-slate-500 hover:bg-[#091E4214] hover:text-slate-800" title="Italic">
                     <Italic className="w-3.5 h-3.5" />
                   </Button>
-
-                  <div className="w-px h-3 bg-slate-300 mx-1"></div>
-
-                  {/* Alignment */}
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => execCommand("justifyLeft")}
-                    className="h-6 w-6 text-slate-500 hover:bg-slate-200 rounded"
-                    title="Align Left"
-                  >
+                  <div className="w-px h-4 bg-slate-300 mx-1" />
+                  <Button variant="ghost" size="icon" onClick={() => executeCommand("justifyLeft")} className="h-7 w-7 text-slate-500 hover:bg-[#091E4214] hover:text-slate-800" title="Align Left">
                     <AlignLeft className="w-3.5 h-3.5" />
                   </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => execCommand("justifyCenter")}
-                    className="h-6 w-6 text-slate-500 hover:bg-slate-200 rounded"
-                    title="Align Center"
-                  >
+                  <Button variant="ghost" size="icon" onClick={() => executeCommand("justifyCenter")} className="h-7 w-7 text-slate-500 hover:bg-[#091E4214] hover:text-slate-800" title="Align Center">
                     <AlignCenter className="w-3.5 h-3.5" />
                   </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => execCommand("justifyRight")}
-                    className="h-6 w-6 text-slate-500 hover:bg-slate-200 rounded"
-                    title="Align Right"
-                  >
-                    <AlignRight className="w-3.5 h-3.5" />
-                  </Button>
-
-                  <div className="w-px h-3 bg-slate-300 mx-1"></div>
-
-                  {/* Lists & Extras */}
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => execCommand("insertUnorderedList")}
-                    className="h-6 w-6 text-slate-500 hover:bg-slate-200 rounded"
-                    title="Unordered List"
-                  >
+                  <div className="w-px h-4 bg-slate-300 mx-1" />
+                  <Button variant="ghost" size="icon" onClick={() => executeCommand("insertUnorderedList")} className="h-7 w-7 text-slate-500 hover:bg-[#091E4214] hover:text-slate-800" title="Bullet List">
                     <List className="w-3.5 h-3.5" />
                   </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => execCommand("insertOrderedList")}
-                    className="h-6 w-6 text-slate-500 hover:bg-slate-200 rounded"
-                    title="Ordered List"
-                  >
+                  <Button variant="ghost" size="icon" onClick={() => executeCommand("insertOrderedList")} className="h-7 w-7 text-slate-500 hover:bg-[#091E4214] hover:text-slate-800" title="Numbered List">
                     <ListOrdered className="w-3.5 h-3.5" />
                   </Button>
-
-                  {/* Upload Button */}
+                  
+                  {/* Upload Phụ */}
                   <div className="ml-auto flex items-center gap-1">
-                    <input
-                      type="file"
-                      ref={fileInputRef}
-                      className="hidden"
-                      onChange={handleFileChange}
-                      disabled={isUploading}
-                    />
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded"
+                    <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} disabled={isUploading} />
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      onClick={() => fileInputRef.current?.click()} 
+                      disabled={isUploading || isSending}
+                      className="h-7 w-7 text-[#0052CC] bg-[#E3F2FD] hover:bg-blue-100 transition-colors" 
                       title="Attach File"
-                      onClick={handleUploadClick}
-                      disabled={isUploading || sendingComment}
                     >
-                      {isUploading ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      ) : (
-                        <Paperclip className="w-3.5 h-3.5" />
-                      )}
+                      {isUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Paperclip className="w-3.5 h-3.5" />}
                     </Button>
                   </div>
                 </div>
 
-                {/* Editable Area */}
+                {/* Vùng nhập liệu HTML (Editable Div) */}
                 <div
                   ref={editorRef}
                   contentEditable
-                  // Sửa lại class để hỗ trợ placeholder trong contentEditable
                   data-placeholder="Add a comment..."
-                  className="w-full min-h-[80px] max-h-[300px] overflow-y-auto p-3 text-sm text-slate-700 outline-none bg-transparent empty:before:content-[attr(data-placeholder)] empty:before:text-slate-400 cursor-text"
-                  onInput={handleEditorChange}
-                  onFocus={() => setIsCommentInputFocused(true)}
-                  // onBlur: không dùng onBlur để tránh đóng form ngay lập tức
+                  className={cn(
+                    "w-full min-h-[100px] max-h-[400px] overflow-y-auto p-4 text-[14px] text-[#172B4D] leading-relaxed outline-none bg-white cursor-text",
+                    "empty:before:content-[attr(data-placeholder)] empty:before:text-slate-400 empty:before:pointer-events-none prose prose-sm max-w-none"
+                  )}
+                  onInput={handleEditorInput}
                   style={{ whiteSpace: "pre-wrap" }}
                 />
 
-                <div className="flex justify-between items-center px-2 py-2 bg-white rounded-b-md border-t border-slate-50">
-                  <p className="text-[10px] text-slate-400 pl-1">
-                    Supports HTML rich text
+                {/* Footer Editor */}
+                <div className="flex justify-between items-center px-3 py-2 bg-white border-t border-slate-100">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">
+                    Supports rich text formatting
                   </p>
                   <div className="flex gap-2">
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-7 text-xs text-slate-600 font-medium hover:bg-slate-100"
+                      className="h-8 px-4 text-[11px] font-bold uppercase tracking-widest text-slate-500 hover:bg-slate-100"
                       onClick={() => {
-                        setIsCommentInputFocused(false);
+                        setIsEditorActive(false);
                         setCommentHtml("");
                         if (editorRef.current) editorRef.current.innerHTML = "";
                       }}
-                      disabled={sendingComment}
+                      disabled={isSending}
                     >
                       Cancel
                     </Button>
                     <Button
                       size="sm"
-                      className="h-7 text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 font-medium"
-                      disabled={
-                        !commentHtml.trim() || sendingComment || isUploading
-                      }
-                      onClick={handleSendComment}
+                      className="h-8 px-5 bg-[#0052CC] hover:bg-[#0047B3] text-white font-bold text-[11px] uppercase tracking-widest shadow-sm transition-all active:scale-95"
+                      disabled={!commentHtml.trim() || isSending || isUploading}
+                      onClick={handleSubmitComment}
                     >
-                      {sendingComment ? (
-                        <Loader2 className="w-3 h-3 animate-spin" />
-                      ) : (
-                        "Save"
-                      )}
+                      {isSending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Save"}
                     </Button>
                   </div>
                 </div>
               </div>
             ) : (
-              // COLLAPSED STATE
+              /* --- TRẠNG THÁI: CHỜ (IDLE) --- */
               <div
-                className="border border-slate-300 rounded-md bg-white p-1 flex items-center gap-2 cursor-text hover:border-slate-400 transition-colors group"
+                className="border border-slate-300 rounded-xl bg-white p-3 flex items-center justify-between cursor-text hover:bg-slate-50 transition-colors group shadow-sm"
                 onClick={() => {
-                  setIsCommentInputFocused(true);
+                  setIsEditorActive(true);
                   setTimeout(() => editorRef.current?.focus(), 0);
                 }}
               >
-                <div className="flex-1 px-3 py-2 text-sm text-slate-500 group-hover:text-slate-600 transition-colors">
+                <span className="text-[13px] text-slate-500 group-hover:text-slate-600 pl-1">
                   Add a comment...
-                </div>
-                <div className="flex items-center gap-1 pr-2 opacity-60 hover:opacity-100 transition-opacity">
-                  <Paperclip className="w-4 h-4 text-slate-400" />
+                </span>
+                <div className="p-1.5 rounded-md bg-slate-100 text-slate-400 group-hover:text-slate-600 transition-colors">
+                   <Paperclip className="w-3.5 h-3.5" />
                 </div>
               </div>
             )}
@@ -456,172 +387,118 @@ export default function TaskComment({ taskId }: TaskCommentProps) {
         </div>
       )}
 
-      {/* 3. CONTENT DISPLAY AREA */}
-      <div className="pl-0 md:pl-11 min-h-[200px]">
-        {loadingData ? (
-          <div className="text-xs text-slate-400 flex items-center gap-2 justify-center py-4">
-            <Loader2 className="w-4 h-4 animate-spin" /> Loading data...
+      {/* ==================== LIST DISPLAY AREA ==================== */}
+      <div className="min-h-[200px]">
+        {isLoadingData ? (
+          <div className="flex flex-col items-center justify-center py-10 gap-3 opacity-60">
+            <Loader2 className="w-6 h-6 animate-spin text-[#0052CC]" />
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Loading history...</span>
           </div>
         ) : (
           <>
-            {/* --- TAB: COMMENTS --- */}
+            {/* -------------------- TAB: COMMENTS LIST -------------------- */}
             {activeTab === "COMMENTS" && (
-              <div className="space-y-6">
+              <div className="space-y-8 pl-1">
                 {comments.length > 0 ? (
-                  comments.map((comment, index) => (
-                    <div
-                      key={`${comment.commentId || "c"}-${index}`}
-                      className="flex gap-3 group items-start animate-in fade-in slide-in-from-bottom-2 duration-300"
-                    >
-                      <Avatar className="w-8 h-8 mt-0.5 cursor-pointer hover:opacity-90 transition-opacity ring-2 ring-transparent hover:ring-slate-100">
+                  comments.map((comment) => (
+                    <div key={comment.commentId} className="flex gap-4 group items-start animate-in fade-in slide-in-from-bottom-2 duration-300">
+                      <Avatar className="w-8 h-8 mt-1 shrink-0 border border-white shadow-sm ring-1 ring-slate-100">
                         <AvatarImage src={comment.user?.avatarUrl} />
-                        <AvatarFallback className="bg-slate-600 text-white text-xs font-bold">
-                          {comment.user?.fullName
-                            ? comment.user.fullName
-                                .substring(0, 2)
-                                .toUpperCase()
-                            : "U"}
+                        <AvatarFallback className="bg-slate-100 text-slate-600 text-[10px] font-bold">
+                          {comment.user?.fullName ? comment.user.fullName.substring(0, 2).toUpperCase() : "U"}
                         </AvatarFallback>
                       </Avatar>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-0.5">
-                          <span className="font-bold text-sm text-slate-800 hover:underline cursor-pointer transition-colors hover:text-blue-700">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-3 mb-1">
+                          <span className="font-bold text-[13px] text-[#172B4D] hover:underline cursor-pointer transition-colors hover:text-[#0052CC]">
                             {comment.user?.fullName || "Unknown User"}
                           </span>
-                          <span
-                            className="text-[11px] text-slate-500 cursor-pointer hover:underline"
-                            title={new Date(comment.createdAt).toLocaleString()}
-                          >
-                            {/* Sửa format ngày tháng */}
-                            {new Date(comment.createdAt).toLocaleString(
-                              "en-US",
-                              { dateStyle: "short", timeStyle: "short" }
-                            )}
+                          <span className="text-[11px] font-medium text-slate-400 hover:text-slate-600 transition-colors cursor-default" title={comment.createdAt}>
+                            {formatDateTime(comment.createdAt)}
                           </span>
                         </div>
 
-                        {/* Render HTML Content */}
+                        {/* Render HTML Content an toàn bằng Tailwind Typography (Prose) */}
                         <div
-                          className="text-sm text-slate-800 leading-relaxed bg-slate-50/50 p-2.5 rounded-md hover:bg-slate-100 transition-colors border border-transparent hover:border-slate-200 prose prose-sm max-w-none"
+                          className="text-[14px] text-[#172B4D] leading-relaxed bg-white border border-slate-200 shadow-sm p-4 rounded-xl prose prose-sm max-w-none mt-1"
                           dangerouslySetInnerHTML={{ __html: comment.content }}
                         />
 
-                        <div className="flex gap-4 mt-1.5 opacity-0 group-hover:opacity-100 transition-opacity pl-1">
-                          <button className="text-[11px] font-medium text-slate-500 hover:underline hover:text-slate-800">
-                            Reply
-                          </button>
-                          <button className="text-[11px] font-medium text-slate-500 hover:underline hover:text-slate-800">
-                            Edit
-                          </button>
+                        <div className="flex gap-4 mt-2 opacity-0 group-hover:opacity-100 transition-opacity pl-2">
+                          <button className="text-[10px] font-bold uppercase tracking-widest text-slate-400 hover:text-[#0052CC] transition-colors">Edit</button>
+                          <button className="text-[10px] font-bold uppercase tracking-widest text-slate-400 hover:text-red-500 transition-colors">Delete</button>
                         </div>
                       </div>
                     </div>
                   ))
                 ) : (
-                  <div className="bg-slate-50 rounded-md p-6 text-center border border-slate-100 border-dashed">
-                    <p className="text-xs text-slate-400 italic">
-                      No comments yet. Be the first to start a discussion!
+                  <div className="bg-slate-50/50 rounded-xl p-8 text-center border border-slate-200 border-dashed">
+                    <p className="text-[12px] font-bold text-slate-400 uppercase tracking-widest">
+                      No comments yet
                     </p>
                   </div>
                 )}
               </div>
             )}
 
-            {/* --- TAB: ATTACHMENTS --- */}
+            {/* -------------------- TAB: ATTACHMENTS LIST -------------------- */}
             {activeTab === "ATTACHMENTS" && (
-              <div className="space-y-2">
-                {/* Nút Upload phụ cho Tab Attachments */}
-                <div className="flex justify-end mb-2">
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    className="hidden"
-                    onChange={handleFileChange}
-                    disabled={isUploading}
-                  />
+              <div className="space-y-4 animate-in fade-in duration-300">
+                
+                <div className="flex justify-between items-center mb-4">
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">
+                    Attached Files
+                  </span>
+                  <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} disabled={isUploading} />
                   <Button
                     variant="outline"
                     size="sm"
-                    className="h-8 text-xs gap-2"
-                    onClick={handleUploadClick}
+                    className="h-8 px-4 text-[11px] font-bold uppercase tracking-widest text-[#0052CC] border-[#2684FF]/30 hover:bg-[#E3F2FD] gap-2 transition-all active:scale-95"
+                    onClick={() => fileInputRef.current?.click()}
                     disabled={isUploading}
                   >
-                    {isUploading ? (
-                      <Loader2 className="w-3 h-3 animate-spin" />
-                    ) : (
-                      <Paperclip className="w-3 h-3" />
-                    )}
-                    Upload New File
+                    {isUploading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Paperclip className="w-3 h-3" />}
+                    Upload File
                   </Button>
                 </div>
 
                 {attachments.length > 0 ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {attachments.map((file) => (
-                      <div
-                        key={file.id}
-                        className="flex items-start gap-3 p-3 rounded-lg border border-slate-200 bg-white hover:shadow-sm hover:border-blue-300 transition-all group"
-                      >
-                        <div className="w-10 h-10 rounded bg-blue-50 flex items-center justify-center shrink-0 text-blue-600">
-                          {file.fileType.includes("image") ? (
-                            <ImageIcon className="w-5 h-5" />
-                          ) : (
-                            <FileText className="w-5 h-5" />
-                          )}
+                      <div key={file.id} className="flex items-center gap-3 p-3 rounded-xl border border-slate-200 bg-white hover:border-[#2684FF] hover:shadow-md transition-all group">
+                        <div className="w-10 h-10 rounded-lg bg-[#E3F2FD] flex items-center justify-center shrink-0 text-[#0052CC] shadow-sm">
+                          {file.fileType.includes("image") ? <ImageIcon className="w-5 h-5" /> : <FileText className="w-5 h-5" />}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p
-                            className="text-sm font-medium text-slate-700 truncate"
-                            title={file.fileName}
-                          >
+                          <p className="text-[13px] font-bold text-[#172B4D] truncate group-hover:text-[#0052CC] transition-colors" title={file.fileName}>
                             {file.fileName}
                           </p>
-                          <div className="flex items-center gap-2 text-[11px] text-slate-400 mt-0.5">
+                          <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1">
                             <span>{formatFileSize(file.fileSize)}</span>
-                            <span>•</span>
-                            {/* Sửa format ngày tháng */}
-                            <span>
-                              {new Date(file.uploadedAt).toLocaleDateString(
-                                "en-US"
-                              )}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2 text-[11px] text-slate-400">
-                            by {file.uploadedByName}
+                            <span className="text-slate-300">•</span>
+                            <span>{formatDateTime(file.uploadedAt)}</span>
                           </div>
                         </div>
-                        <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                        <div className="flex flex-col opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                           <a
                             href={file.fileUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="p-1.5 hover:bg-slate-100 rounded text-slate-500 hover:text-blue-600"
-                            title="Download/View"
+                            className="p-2 bg-slate-50 hover:bg-[#0052CC] rounded-lg text-slate-500 hover:text-white transition-all active:scale-95"
+                            title="Download File"
                           >
-                            <Download className="w-3.5 h-3.5" />
+                            <Download className="w-4 h-4" />
                           </a>
-                          {/* Nút xóa (chưa implement logic) */}
-                          {/* <button className="p-1.5 hover:bg-red-50 rounded text-slate-400 hover:text-red-500" title="Delete">
-                                                        <Trash2 className="w-3.5 h-3.5"/>
-                                                    </button> */}
                         </div>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="bg-slate-50 rounded-md p-8 text-center border border-slate-100 border-dashed flex flex-col items-center gap-2">
-                    <File className="w-8 h-8 text-slate-300" />
-                    <p className="text-xs text-slate-400 italic">
-                      No files attached to this task.
+                  <div className="bg-slate-50/50 rounded-xl p-10 text-center border border-slate-200 border-dashed flex flex-col items-center gap-3">
+                    <File className="w-10 h-10 text-slate-300" />
+                    <p className="text-[12px] font-bold text-slate-400 uppercase tracking-widest">
+                      No files attached
                     </p>
-                    <Button
-                      variant="link"
-                      size="sm"
-                      className="text-blue-600 h-auto p-0 text-xs"
-                      onClick={handleUploadClick}
-                    >
-                      Upload a file
-                    </Button>
                   </div>
                 )}
               </div>

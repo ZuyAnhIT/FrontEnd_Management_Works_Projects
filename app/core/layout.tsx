@@ -1,16 +1,24 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import AdminHeader from "@/components/features/admin/Header"; // Giả định AdminHeader là component dùng chung
-import Sidebar from "@/components/features/core/Sidebar"; // Giả định Sidebar Core
-import { useAuth } from "@/context/AuthContext";
-import { Loader2, ShieldAlert } from "lucide-react";
+// =============================================================================
+// 1. IMPORT (Thu vien -> Noi bo -> Component con)
+// =============================================================================
+
+import React, { useState, useEffect, useCallback } from "react";
 import { usePathname } from "next/navigation";
+import { Loader2, ShieldAlert } from "lucide-react";
+
+// Context & Services
+import { useAuth } from "@/context/AuthContext";
 import { getCompanyWorkspaces } from "@/services/apiWorkspace";
 
-// =================================================================
-// 1. INTERFACES
-// =================================================================
+// Internal Components
+import AdminHeader from "@/components/features/admin/Header"; 
+import Sidebar from "@/components/features/core/Sidebar"; 
+
+// =============================================================================
+// 2. INTERFACES & TYPES
+// =============================================================================
 
 interface CoreLayoutProps {
     children: React.ReactNode;
@@ -19,126 +27,173 @@ interface CoreLayoutProps {
 interface SidebarWorkspace {
     id: number;
     name: string;
-    // Thêm các field cần thiết cho Sidebar (như roleCode, v.v.)
+    roleCode?: string; 
 }
 
-// =================================================================
-// 2. MAIN COMPONENT
-// =================================================================
+// =============================================================================
+// 3. MAIN COMPONENT
+// =============================================================================
 
+/**
+ * Core Layout Wrapper.
+ * Cung cap bo khung cho cac trang cot loi, xu ly viec an/hien thanh dieu huong
+ * va tai danh sach khong gian lam viec dua tren quyen han nguoi dung.
+ */
 export default function CoreLayout({ children }: CoreLayoutProps) {
-    const [sidebarOpen, setSidebarOpen] = useState(false);
     
-    // ✅ Lấy đầy đủ thông tin từ AuthContext
-    const { user, isLoading: isAuthLoading, isAuthenticated, activeCompany, role } = useAuth();
-    
-    const [workspaces, setWorkspaces] = useState<SidebarWorkspace[]>([]);
+    // ---------------------------------------------------------------------------
+    // 4. HOOKS & STATE
+    // ---------------------------------------------------------------------------
     
     const pathname = usePathname();
-    const insideProject = pathname?.includes("/project/"); // Logic ẩn Sidebar/Header
+    const { user, isLoading: isAuthLoading, isAuthenticated, activeCompany, role } = useAuth();
+    
+    // UI States
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    
+    // Data States
+    const [workspaces, setWorkspaces] = useState<SidebarWorkspace[]>([]);
+    
+    // Kiem tra xem nguoi dung co dang o ben trong mot du an cu the khong
+    const isInsideProject = pathname?.includes("/project/");
 
-    // --- FETCH WORKSPACES LOGIC (Logic nghiệp vụ quan trọng) ---
-    useEffect(() => {
-        if (isAuthenticated && activeCompany?.companyId && user) {
-            
-            // 🟢 CASE 1: COMPANY_ADMIN (Quyền cao nhất)
-            if (role === "COMPANY_ADMIN") {
-                const fetchWorkspaces = async () => {
-                    try {
-                        const response = await getCompanyWorkspaces(activeCompany.companyId, {
-                            page: 0, size: 100, sortBy: "name", sortDir: "asc" 
-                        });
-                        const mappedWorkspaces = response.content?.map(w => ({
-                            id: w.workspaceId,
-                            name: w.workspaceName,
-                            // description: w.roleCode 
-                        })) || [];
-                        setWorkspaces(mappedWorkspaces);
-                    } catch (err: any) {
-                        console.error("Failed to load workspaces:", err);
-                    }
-                };
-                fetchWorkspaces();
-            } 
-            
-            // 🔵 CASE 2: MEMBER / WORKSPACE ADMIN (Lấy từ profile user)
-            else if (["COMPANY_MEMBER", "WORKSPACE_ADMIN", "WORKSPACE_MEMBER", "GUEST_WORKSPACE"].includes(role || "")) {
-                const myWorkspaces = user.workspaceMemberships
-                    ?.filter(w => w.companyId === activeCompany.companyId)
-                    .map(w => ({
-                        id: w.workspaceId,
-                        name: w.workspaceName,
-                        // description: w.roleCode 
-                    })) || [];
-                
-                setWorkspaces(myWorkspaces as SidebarWorkspace[]);
-            }
-            
-            // 🔴 CASE 3: Các trường hợp khác -> Không hiển thị workspace
-            else {
-                setWorkspaces([]);
-            }
+    // ---------------------------------------------------------------------------
+    // 5. DATA FETCHING (Handlers)
+    // ---------------------------------------------------------------------------
 
-        } else {
+    /**
+     * Tai danh sach khong gian lam viec hien thi tren Sidebar
+     * Logic duoc phan nhanh dua tren vai tro cua nguoi dung
+     */
+    const fetchWorkspaces = useCallback(async () => {
+        // Neu chua xac thuc hoac thieu du lieu co ban, xoa trang danh sach
+        if (!isAuthenticated || !activeCompany?.companyId || !user) {
             setWorkspaces([]);
+            return;
         }
-    }, [isAuthenticated, activeCompany, role, user]);
 
-    // --- RENDER SCREENS ---
+        // KICH BAN 1: Quan tri vien cong ty (Truy cap toan bo)
+        if (role === "COMPANY_ADMIN") {
+            try {
+                const response = await getCompanyWorkspaces(activeCompany.companyId, {
+                    page: 0, 
+                    size: 100, 
+                    sortBy: "name", 
+                    sortDir: "asc" 
+                });
+                
+                const mappedWorkspaces = response.content?.map(w => ({
+                    id: w.workspaceId,
+                    name: w.workspaceName,
+                })) || [];
+                
+                setWorkspaces(mappedWorkspaces);
+            } catch (err: any) {
+                console.error("[CoreLayout] Failed to load workspaces:", err.message);
+            }
+            return;
+        } 
+        
+        // KICH BAN 2: Cac vai tro thong thuong (Lay tu ho so nguoi dung)
+        const validMemberRoles = ["COMPANY_MEMBER", "WORKSPACE_ADMIN", "WORKSPACE_MEMBER", "GUEST_WORKSPACE"];
+        
+        if (role && validMemberRoles.includes(role)) {
+            const myWorkspaces = user.workspaceMemberships
+                ?.filter(w => w.companyId === activeCompany.companyId)
+                .map(w => ({
+                    id: w.workspaceId,
+                    name: w.workspaceName,
+                })) || [];
+            
+            setWorkspaces(myWorkspaces as SidebarWorkspace[]);
+            return;
+        }
+        
+        // KICH BAN 3: Cac truong hop ngoai le khac
+        setWorkspaces([]);
+        
+    }, [isAuthenticated, activeCompany, user, role]);
 
-    // 1. Màn hình chờ xác thực
+    // ---------------------------------------------------------------------------
+    // 6. SIDE EFFECTS
+    // ---------------------------------------------------------------------------
+
+    useEffect(() => {
+        fetchWorkspaces();
+    }, [fetchWorkspaces]);
+
+    // ---------------------------------------------------------------------------
+    // 7. RENDER LOGIC
+    // ---------------------------------------------------------------------------
+
+    // MAN HINH 1: Cho xac thuc (Loading Screen)
     if (isAuthLoading) {
         return (
-            <div className="flex flex-col items-center justify-center h-screen bg-slate-50 gap-3">
-                <Loader2 className="w-10 h-10 text-blue-600 animate-spin" />
-                <p className="text-sm text-slate-500 font-medium">Authenticating...</p>
+            <div className="flex flex-col items-center justify-center min-h-screen bg-[#F4F5F7] gap-4">
+                <Loader2 className="w-10 h-10 text-[#0052CC] animate-spin opacity-80" />
+                <p className="text-[12px] font-black text-[#6B778C] uppercase tracking-[0.2em]">
+                    Authenticating Session...
+                </p>
             </div>
         );
     }
 
-    // 2. Chưa đăng nhập (Fallback)
+    // MAN HINH 2: Loi xac thuc (Fallback Error)
     if (!user) {
         return (
-            <div className="flex flex-col items-center justify-center h-screen bg-slate-50 text-slate-500 gap-2">
-                <ShieldAlert className="w-10 h-10 text-red-500" />
-                <p>Session expired. Please log in again.</p>
+            <div className="flex flex-col items-center justify-center min-h-screen bg-[#F4F5F7] gap-4 animate-in fade-in duration-300">
+                <div className="p-4 bg-red-50 rounded-full border border-red-100 shadow-sm">
+                    <ShieldAlert className="w-12 h-12 text-[#FF5630]" />
+                </div>
+                <h2 className="text-lg font-black text-[#172B4D] uppercase tracking-tight">Access Denied</h2>
+                <p className="text-[14px] text-[#42526E] font-medium">Session expired or invalid. Please log in again.</p>
             </div>
         );
     }
 
+    // MAN HINH 3: Giao dien chinh (Main Layout)
     return (
-        <div className="h-screen flex flex-col bg-slate-50 font-sans text-slate-900 overflow-hidden">
+        <div className="h-screen w-full bg-[#F4F5F7] flex flex-col font-sans text-[#172B4D] overflow-hidden">
             
-            {/* 1) Core Header: Chỉ hiện khi KHÔNG ở trong Project */}
-            {!insideProject && (
+            {/* CORE HEADER: An di khi nguoi dung vao trong mot du an cu the */}
+            {!isInsideProject && (
                 <div className="flex-shrink-0 z-50">
                     <AdminHeader
-                        onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
+                        onMenuToggle={() => setIsSidebarOpen(!isSidebarOpen)}
                     />
                 </div>
             )}
 
+            {/* KHOI BO CUC CHINH */}
             <div className="flex flex-1 overflow-hidden">
                 
-                {/* 2) Core Sidebar: Chỉ hiện khi KHÔNG ở trong Project */}
-                {!insideProject && (
+                {/* CORE SIDEBAR: An di khi nguoi dung vao trong mot du an cu the */}
+                {!isInsideProject && (
                     <div className="flex-shrink-0 z-40">
                          <Sidebar
-                            isOpen={sidebarOpen}
-                            onClose={() => setSidebarOpen(false)}
-                            activeMenu={pathname} 
+                            isOpen={isSidebarOpen}
+                            onClose={() => setIsSidebarOpen(false)}
+                            activeMenu={pathname || ""} 
                             setActiveMenu={() => {}}
-                            // ✅ Truyền list workspace đã xử lý logic phân quyền ở trên
                             workspaces={workspaces} 
                         />
                     </div>
                 )}
 
-                {/* Nội dung chính */}
-                <main className="flex-1 overflow-y-auto scroll-smooth relative custom-scrollbar">
+                {/* KHU VUC NOI DUNG CHINH */}
+                <main className="flex-1 overflow-y-auto scroll-smooth relative custom-scrollbar bg-[#F4F5F7]">
                     {children}
                 </main>
+                
             </div>
+            
+            {/* CAU HINH THANH CUON GIAO DIEN (Global Scrollbar Styles) */}
+            <style jsx global>{`
+                .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+                .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+                .custom-scrollbar::-webkit-scrollbar-thumb { background: #DFE1E6; border-radius: 10px; }
+                .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #B3BAC5; }
+            `}</style>
         </div>
     );
 }

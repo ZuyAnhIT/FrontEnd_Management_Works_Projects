@@ -1,26 +1,28 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { useTranslation } from "react-i18next";
-import {
-  Loader2, User, Mail, FolderKanban, UserPlus, LogOut, CheckCircle2,
-  AlertTriangle
+import { 
+  User, Mail, FolderKanban, UserPlus, LogOut, CheckCircle2, 
+  AlertTriangle, Loader2 
 } from "lucide-react";
 
+// Internal Contexts & Services
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/components/ui/ToastProvider";
 import { getProjectInvitationDetails, acceptProjectInvitation } from "@/services/apiInvitation";
 import { registerFromProjectInvite } from "@/services/apiAuth";
 
+// UI Components
 import AuthFormLogin from "./AuthFormLogin";
 import InputField from "./InputField";
 import PasswordField from "./PasswordField";
-import LoadingButton from "@/components/ui/LoadingButton";
+import { LoadingButton } from "@/components/ui/LoadingButton";
 import PasswordStrengthMeter from "@/components/ui/PasswordStrengthMeter";
+import { cn } from "@/lib/utils";
 
 // =============================================================================
-// 1. INTERFACES
+// INTERFACES
 // =============================================================================
 
 interface ProjectInviteDetails {
@@ -36,17 +38,19 @@ interface FlowProps {
 }
 
 // =============================================================================
-// 2. SUB-COMPONENT: NEW USER FLOW (Người dùng mới chưa có tài khoản)
+// SUB-COMPONENT: NEW USER FLOW
 // =============================================================================
 
+/**
+ * Quy trình dành cho người dùng mới chưa có tài khoản hệ thống.
+ * Hỗ trợ tạo tài khoản và tự động gia nhập dự án sau khi đăng ký.
+ */
 function NewUserFlow({ details, token }: FlowProps) {
-  const { t } = useTranslation();
   const { showToast } = useToast();
   const { loginWithTokens } = useAuth();
   const router = useRouter();
 
-  // --- STATE ---
-  const [loading, setLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [form, setForm] = useState({
     fullName: "",
@@ -54,94 +58,78 @@ function NewUserFlow({ details, token }: FlowProps) {
     confirmPassword: "",
   });
 
-  // --- HANDLERS ---
-  const handleChange = (field: string) => (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (field: string) => (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm((prev) => ({ ...prev, [field]: e.target.value }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validate mật khẩu khớp nhau
     if (form.password !== form.confirmPassword) {
-      showToast("Passwords do not match.", "error");
+      showToast("Passwords do not match", "error");
       return;
     }
 
-    setLoading(true);
-
+    setIsLoading(true);
     try {
-      // 1. Đăng ký tài khoản kèm token lời mời Project
-      const data = await registerFromProjectInvite({
+      const response = await registerFromProjectInvite({
         fullName: form.fullName,
         password: form.password,
         invitationToken: token,
       });
 
-      showToast("Account created & Joined project successfully!", "success");
-
-      // 2. Tự động đăng nhập và chuyển hướng
+      showToast("Account created and joined project successfully!", "success");
+      
       if (loginWithTokens) {
-        await loginWithTokens(data.accessToken, data.refreshToken);
+        await loginWithTokens(response.accessToken, response.refreshToken);
         router.push("/");
       }
-
-    } catch (err: any) {
-      // Hiển thị message lỗi từ API
-      showToast(err.message || "Registration failed.", "error");
+    } catch (error: any) {
+      showToast(error.message || "Registration failed", "error");
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
-  // --- RENDER ---
   return (
-    <>
-      <div className="px-8 pt-8 pb-4 text-center">
-        <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-blue-100">
+    <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
+      <div className="px-8 pt-8 pb-6 text-center">
+        <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-blue-100 shadow-sm">
           <UserPlus className="w-8 h-8 text-blue-600" />
         </div>
-
-        <h2 className="text-xl font-bold text-slate-900">
-          Create Account
-        </h2>
-
-        <p className="text-sm text-slate-500 mt-2">
+        <h2 className="text-xl font-bold text-slate-900 tracking-tight">Create your account</h2>
+        <p className="text-sm text-slate-500 mt-2 leading-relaxed">
           Join project <strong>{details.projectName}</strong>
           {details.companyName && <span> at <strong>{details.companyName}</strong></span>}
         </p>
       </div>
 
-      <form className="px-8 pb-8 space-y-4" onSubmit={handleSubmit}>
-        {/* Read-only Email Field */}
-        <div className="p-3 bg-slate-50 rounded-lg border border-slate-100 flex items-center gap-3">
+      <form className="px-8 pb-8 space-y-5" onSubmit={handleRegister}>
+        {/* Email Display Only */}
+        <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 flex items-center gap-3">
           <div className="p-1.5 bg-white rounded-md shadow-sm">
             <Mail className="w-4 h-4 text-slate-400" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-xs text-slate-400 font-medium uppercase tracking-wider">
-              Email Address
-            </p>
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Email Address</p>
             <p className="text-sm font-semibold text-slate-700 truncate">{details.email}</p>
           </div>
         </div>
 
-        {/* Full Name */}
         <InputField
           label="Full Name"
           icon={<User className="w-4 h-4 text-slate-400" />}
           value={form.fullName}
-          onChange={handleChange("fullName")}
+          onChange={handleInputChange("fullName")}
           placeholder="e.g. John Doe"
           required
         />
 
-        {/* Password & Strength */}
         <div className="space-y-3">
           <PasswordField
             label="Create Password"
             value={form.password}
-            onChange={handleChange("password")}
+            onChange={handleInputChange("password")}
             show={showPassword}
             toggle={() => setShowPassword((prev) => !prev)}
             placeholder="Minimum 6 characters"
@@ -149,240 +137,217 @@ function NewUserFlow({ details, token }: FlowProps) {
           <PasswordStrengthMeter password={form.password} />
         </div>
 
-        {/* Confirm Password */}
         <PasswordField
           label="Confirm Password"
           value={form.confirmPassword}
           show={showPassword}
-          onChange={handleChange("confirmPassword")}
+          onChange={handleInputChange("confirmPassword")}
           toggle={() => setShowPassword((prev) => !prev)}
-          placeholder="Re-enter your password"
+          placeholder="Repeat your password"
         />
 
         <LoadingButton
           text="Create Account & Join Project"
-          isLoading={loading}
-          className="mt-6 w-full bg-blue-600 hover:bg-blue-700 shadow-md"
+          isLoading={isLoading}
+          className="mt-4 w-full h-11 bg-blue-600 hover:bg-blue-700 shadow-md font-bold"
         />
       </form>
-    </>
+    </div>
   );
 }
 
 // =============================================================================
-// 3. SUB-COMPONENT: EXISTING USER FLOW (Đã có tài khoản)
+// SUB-COMPONENT: EXISTING USER FLOW
 // =============================================================================
 
+/**
+ * Quy trình dành cho người dùng đã có tài khoản.
+ * Xử lý chấp nhận lời mời trực tiếp hoặc yêu cầu đăng nhập đúng tài khoản.
+ */
 function ExistingUserFlow({ details, token }: FlowProps) {
-  const { t } = useTranslation();
   const { showToast } = useToast();
   const router = useRouter();
-  const { user, isAuthenticated, login, isLoading, logout } = useAuth();
+  const { user, isAuthenticated, login, isLoading: authLoading, logout } = useAuth();
 
-  // --- STATE ---
-  const [isAccepting, setIsAccepting] = useState(false);
-  const [form, setForm] = useState({ email: "", password: "" });
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [loginForm, setLoginForm] = useState({ email: "", password: "" });
 
-  // --- HANDLERS ---
-  const handleChange = (field: "email" | "password") => (e: React.ChangeEvent<HTMLInputElement>) => {
-    setForm((prev) => ({ ...prev, [field]: e.target.value }));
+  const handleLoginChange = (field: "email" | "password") => (e: React.ChangeEvent<HTMLInputElement>) => {
+    setLoginForm((prev) => ({ ...prev, [field]: e.target.value }));
   };
 
-  // Chấp nhận lời mời (khi đã đăng nhập đúng tài khoản)
   const handleAccept = async () => {
-    setIsAccepting(true);
+    setIsProcessing(true);
     try {
       await acceptProjectInvitation(token);
-      showToast("Joined project successfully!", "success");
-      router.push("/"); // Về trang chủ
-    } catch (err: any) {
-      showToast(err.message || "Failed to join project.", "error");
-      setIsAccepting(false);
+      showToast("Successfully joined the project!", "success");
+      router.push("/");
+    } catch (error: any) {
+      showToast(error.message || "Failed to join project", "error");
+      setIsProcessing(false);
     }
   };
 
-  // Đăng nhập (khi chưa đăng nhập)
-  const handleSubmitLogin = async (e: React.FormEvent) => {
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await login(form.email, form.password);
-      // Sau khi login, component re-render -> lọt vào case Authenticated bên dưới
-    } catch (err: any) {
-      showToast(err.message || "Login failed.", "error");
+      await login(loginForm.email, loginForm.password);
+    } catch (error: any) {
+      showToast(error.message || "Login failed", "error");
     }
   };
 
-  // --- SCENARIO A: User ĐÃ đăng nhập ---
+  // SCENARIO: ĐÃ ĐĂNG NHẬP
   if (isAuthenticated && user) {
-
-    // A1: Tài khoản đăng nhập KHỚP với email được mời
+    // Trường hợp: Đúng tài khoản
     if (user.email === details.email) {
       return (
-        <div className="p-8 text-center">
-          <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-green-100">
+        <div className="p-8 text-center animate-in fade-in zoom-in-95 duration-300">
+          <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-green-100 shadow-sm">
             <CheckCircle2 className="w-8 h-8 text-green-600" />
           </div>
-
-          <h2 className="text-xl font-bold text-slate-900">
-            Accept Invitation
-          </h2>
-
-          <p className="text-sm text-slate-500 mt-2 mb-6">
-            You are logged in as <strong>{user.email}</strong>.<br/>
+          <h2 className="text-xl font-bold text-slate-900 tracking-tight">Project Invitation</h2>
+          <p className="text-sm text-slate-500 mt-2 mb-8 leading-relaxed">
+            You are logged in as <strong>{user.email}</strong>. <br/>
             Join project <strong>{details.projectName}</strong> now?
           </p>
-
           <LoadingButton
             text="Join Project"
-            isLoading={isAccepting}
+            isLoading={isProcessing}
             onClick={handleAccept}
-            className="w-full bg-blue-600 hover:bg-blue-700 shadow-md mb-3"
+            className="w-full h-11 bg-blue-600 hover:bg-blue-700 shadow-md font-bold mb-4"
           />
-
           <button
             onClick={() => logout()}
-            className="text-sm text-slate-400 hover:text-slate-600 hover:underline transition-all"
+            className="text-xs font-bold text-slate-400 hover:text-slate-600 uppercase tracking-widest transition-colors"
           >
-            Not you? Logout
+            Not you? Switch account
           </button>
         </div>
       );
     }
 
-    // A2: Tài khoản đăng nhập KHÁC với email được mời (Sai tài khoản)
+    // Trường hợp: Sai tài khoản
     return (
-      <div className="p-8 text-center">
-        <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-amber-100">
+      <div className="p-8 text-center animate-in fade-in zoom-in-95 duration-300">
+        <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-amber-100 shadow-sm">
           <AlertTriangle className="w-8 h-8 text-amber-500" />
         </div>
-
-        <h2 className="text-lg font-bold text-slate-900">
-          Wrong Account
-        </h2>
-
-        <div className="bg-amber-50 border border-amber-100 p-4 rounded-lg my-4 text-left text-sm text-amber-800">
-          <p><strong>Invitation sent to:</strong> {details.email}</p>
-          <p className="mt-1"><strong>Currently logged in:</strong> {user.email}</p>
+        <h2 className="text-xl font-bold text-slate-900 tracking-tight">Account Mismatch</h2>
+        <div className="bg-amber-50 border border-amber-100 p-4 rounded-xl my-6 text-left text-xs text-amber-800 leading-relaxed shadow-sm">
+          <p><strong>Invitation for:</strong> {details.email}</p>
+          <p className="mt-2"><strong>Active account:</strong> {user.email}</p>
         </div>
-
         <button
           onClick={() => logout()}
-          className="w-full py-2 px-4 bg-white border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 flex items-center justify-center gap-2 transition-all"
+          className="w-full py-3 px-4 bg-white border border-slate-300 text-slate-700 font-bold rounded-xl hover:bg-slate-50 flex items-center justify-center gap-2 transition-all shadow-sm"
         >
-          <LogOut className="w-4 h-4" /> Logout & Login Correctly
+          <LogOut className="w-4 h-4" /> Logout & Sign in correctly
         </button>
       </div>
     );
   }
 
-  // --- SCENARIO B: User CHƯA đăng nhập -> Hiện Form Login ---
+  // SCENARIO: CHƯA ĐĂNG NHẬP
   return (
-    <>
+    <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
       <div className="px-8 pt-8 pb-2 text-center">
-        <div className="w-14 h-14 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-3 border border-blue-100">
+        <div className="w-14 h-14 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-blue-100">
           <FolderKanban className="w-7 h-7 text-blue-600" />
         </div>
-
-        <h2 className="text-xl font-bold text-slate-900">
-          Welcome Back
-        </h2>
-
-        <p className="text-sm text-slate-500 mt-1">
-           Please login as <strong>{details.email}</strong> to join project <strong>{details.projectName}</strong>.
+        <h2 className="text-xl font-bold text-slate-900 tracking-tight">Welcome Back</h2>
+        <p className="text-sm text-slate-500 mt-2">
+          Please login as <strong>{details.email}</strong> to join project <strong>{details.projectName}</strong>.
         </p>
       </div>
 
-      <form className="p-8 space-y-4 pt-4" onSubmit={handleSubmitLogin}>
+      <form className="p-8 space-y-4" onSubmit={handleLoginSubmit}>
         <AuthFormLogin
-          form={form}
-          handleChange={handleChange as any}
-          isLoading={isLoading}
-          setTab={() => {}} // Không cần chuyển tab Register ở đây
+          form={loginForm}
+          handleChange={handleLoginChange as any}
+          isLoading={authLoading}
+          setTab={() => {}} 
         />
       </form>
-    </>
+    </div>
   );
 }
 
 // =============================================================================
-// 4. PARENT COMPONENT (Main Client)
+// MAIN PAGE COMPONENT
 // =============================================================================
 
 export default function AcceptProjectInvitationClient() {
-  const { t } = useTranslation();
   const searchParams = useSearchParams();
+  const [state, setState] = useState<{
+    isLoading: boolean;
+    error: string | null;
+    details: ProjectInviteDetails | null;
+    token: string | null;
+  }>({
+    isLoading: true,
+    error: null,
+    details: null,
+    token: null,
+  });
 
-  // --- STATE ---
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [details, setDetails] = useState<ProjectInviteDetails | null>(null);
-  const [token, setToken] = useState<string | null>(null);
+  /**
+   * Xác thực mã token và lấy thông tin chi tiết lời mời dự án
+   */
+  const validateInvitation = useCallback(async () => {
+    const token = searchParams.get("token");
 
-  // --- EFFECT: Validate Token & Fetch Details ---
-  useEffect(() => {
-    const tokenFromUrl = searchParams.get("token");
-
-    if (!tokenFromUrl) {
-      setError("Invalid invitation link.");
-      setLoading(false);
+    if (!token) {
+      setState((prev) => ({ ...prev, isLoading: false, error: "Missing invitation link" }));
       return;
     }
 
-    setToken(tokenFromUrl);
-
-    const fetchDetails = async () => {
-      try {
-        const data = await getProjectInvitationDetails(tokenFromUrl);
-        setDetails(data);
-      } catch (err: any) {
-        // Lỗi: Token hết hạn hoặc không tồn tại
-        setError(err.message || "This invitation is invalid or has expired.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchDetails();
+    try {
+      const data = await getProjectInvitationDetails(token);
+      setState({ isLoading: false, error: null, details: data, token });
+    } catch (error: any) {
+      setState({ isLoading: false, error: error.message || "Invitation is invalid or has expired", details: null, token: null });
+    }
   }, [searchParams]);
 
-  // --- RENDER STATES ---
+  useEffect(() => {
+    validateInvitation();
+  }, [validateInvitation]);
 
-  // 1. Loading
-  if (loading) {
+  // 1. Trạng thái Đang xác thực
+  if (state.isLoading) {
     return (
-      <div className="p-12 text-center flex flex-col items-center gap-3 text-slate-500">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-        <span className="text-sm font-medium">Checking project invitation...</span>
+      <div className="p-16 text-center flex flex-col items-center gap-4 text-slate-400">
+        <Loader2 className="w-10 h-10 animate-spin text-blue-600" />
+        <span className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-70">Validating...</span>
       </div>
     );
   }
 
-  // 2. Error
-  if (error) {
+  // 2. Trạng thái Lỗi (Token không hợp lệ)
+  if (state.error) {
     return (
-      <div className="p-10 text-center">
-        <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-100">
-          <AlertTriangle className="w-8 h-8 text-red-500" />
+      <div className="p-12 text-center animate-in fade-in duration-500">
+        <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6 border border-red-100">
+          <AlertTriangle className="w-10 h-10 text-red-500" />
         </div>
-
-        <h3 className="text-lg font-bold text-slate-900 mb-2">
-          Unable to Access
-        </h3>
-
-        <p className="text-slate-500 mb-6">{error}</p>
-
-        <a href="/" className="text-blue-600 font-medium hover:underline">
-          Back to Home
-        </a>
+        <h3 className="text-xl font-bold text-slate-900 mb-2">Access Denied</h3>
+        <p className="text-sm text-slate-500 mb-8 max-w-xs mx-auto leading-relaxed">{state.error}</p>
+        <button 
+          onClick={() => window.location.href = "/"}
+          className="text-xs font-bold text-blue-600 hover:text-blue-800 uppercase tracking-widest transition-colors"
+        >
+          Return to home
+        </button>
       </div>
     );
   }
 
-  // 3. Success -> Render Flow tương ứng
-  if (details && token) {
-    return details.accountExists
-      ? <ExistingUserFlow details={details} token={token} />
-      : <NewUserFlow details={details} token={token} />;
+  // 3. Hiển thị luồng tương ứng
+  if (state.details && state.token) {
+    return state.details.accountExists
+      ? <ExistingUserFlow details={state.details} token={state.token} />
+      : <NewUserFlow details={state.details} token={state.token} />;
   }
 
   return null;

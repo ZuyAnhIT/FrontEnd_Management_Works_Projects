@@ -1,12 +1,25 @@
 "use client";
 
-import React, { useMemo } from "react";
-import { Search, X, Filter, ChevronDown, LucideIcon } from "lucide-react";
+// =============================================================================
+// 1. IMPORT
+// =============================================================================
+
+import React, { useMemo, useCallback, Dispatch, SetStateAction } from "react";
+import { 
+  Search, 
+  X, 
+  Filter, 
+  ChevronDown, 
+  LucideIcon 
+} from "lucide-react";
+
+// Internal Services & Types
 import { BoardFilterParams } from "@/services/apiBoard";
 import { ProjectMember } from "@/services/apiProject";
+import { cn } from "@/lib/utils";
 
 // =============================================================================
-// 1. CONSTANTS & CONFIGURATION
+// 2. CONSTANTS & CONFIGURATION
 // =============================================================================
 
 const PRIORITY_OPTIONS = [
@@ -23,8 +36,16 @@ const TYPE_OPTIONS = [
 ];
 
 // =============================================================================
-// 2. SUB-COMPONENTS
+// 3. INTERFACES
 // =============================================================================
+
+interface BoardHeaderProps {
+  filters: BoardFilterParams;
+  // Khai báo kiểu Dispatch an toàn để hỗ trợ callback (prev) => newState
+  setFilters: Dispatch<SetStateAction<BoardFilterParams>>;
+  members: ProjectMember[]; 
+  totalTasks: number;
+}
 
 interface FilterDropdownProps {
   value: string | undefined;
@@ -35,8 +56,13 @@ interface FilterDropdownProps {
   activeColorClass?: string;
 }
 
+// =============================================================================
+// 4. SUB-COMPONENTS
+// =============================================================================
+
 /**
- * Component Dropdown tái sử dụng cho Priority và Task Type
+ * Thành phần ô chọn lọc dữ liệu (Dropdown Select) dùng chung.
+ * Đồng bộ phong cách với các thanh công cụ khác trong hệ thống.
  */
 const FilterDropdown = ({ 
   value, 
@@ -44,13 +70,16 @@ const FilterDropdown = ({
   options, 
   placeholder, 
   icon: Icon,
-  activeColorClass = "text-blue-500"
+  activeColorClass = "text-blue-600"
 }: FilterDropdownProps) => (
-  <div className="relative">
+  <div className="relative group">
     <select 
-      className={`h-9 pl-3 pr-8 text-sm border rounded-lg appearance-none cursor-pointer outline-none focus:ring-2 focus:ring-blue-100 transition-all font-medium
-        ${value ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}
-      `}
+      className={cn(
+        "h-9 pl-3 pr-8 text-[11px] font-bold uppercase tracking-widest border rounded-lg appearance-none cursor-pointer outline-none transition-all shadow-sm",
+        value 
+          ? "bg-blue-50 border-blue-200 text-blue-700" 
+          : "bg-white border-slate-200 text-slate-500 hover:bg-slate-50 focus:border-blue-500"
+      )}
       value={value || ""}
       onChange={onChange}
     >
@@ -59,21 +88,21 @@ const FilterDropdown = ({
         <option key={opt.value} value={opt.value}>{opt.label}</option>
       ))}
     </select>
-    <Icon className={`w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none ${value ? activeColorClass : 'text-slate-400'}`} />
+    <Icon className={cn(
+      "w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none transition-colors",
+      value ? activeColorClass : "text-slate-400 group-hover:text-slate-500"
+    )} />
   </div>
 );
 
 // =============================================================================
-// 3. MAIN COMPONENT
+// 5. MAIN COMPONENT
 // =============================================================================
 
-interface BoardHeaderProps {
-  filters: BoardFilterParams;
-  setFilters: (f: BoardFilterParams) => void;
-  members: ProjectMember[]; 
-  totalTasks: number;
-}
-
+/**
+ * Thanh tiêu đề và bộ lọc cho bảng Kanban (Board Header).
+ * Cung cấp công cụ tìm kiếm và lọc thẻ công việc trực tiếp trên bảng.
+ */
 export default function BoardHeader({ 
   filters = { keyword: "", sprintId: null, assigneeId: undefined, priority: undefined, taskType: undefined }, 
   setFilters, 
@@ -81,98 +110,100 @@ export default function BoardHeader({
   totalTasks = 0 
 }: BoardHeaderProps) {
 
-  // --- HANDLERS (LOGIC) ---
+  // ---------------------------------------------------------------------------
+  // 6. LOGIC & HANDLERS
+  // ---------------------------------------------------------------------------
 
   /**
-   * Helper cập nhật filter chung.
-   * Nếu giá trị rỗng/null -> xóa key khỏi object filter.
+   * Cập nhật tham số bộ lọc an toàn thông qua callback state
    */
-  const updateFilter = (key: keyof BoardFilterParams, value: any) => {
-    if (!value) {
-        const newFilters = { ...filters };
-        // Xóa key tương ứng (giữ nguyên logic gốc của bạn)
-        // Lưu ý: BoardFilterParams có thể yêu cầu undefined thay vì delete, 
-        // nhưng ở đây tôi giữ logic 'delete' như code cũ để an toàn.
+  const updateFilter = useCallback((key: keyof BoardFilterParams, value: any) => {
+    setFilters((prev) => {
+      const newFilters = { ...prev };
+      
+      // Nếu giá trị rỗng/null, xóa key để tránh gửi query rác lên API
+      if (!value) {
         delete newFilters[key as keyof typeof newFilters]; 
-        setFilters(newFilters);
-    } else {
-        setFilters({ ...filters, [key]: value });
-    }
-  };
+      } else {
+        newFilters[key] = value as never;
+      }
+      
+      return newFilters;
+    });
+  }, [setFilters]);
 
-  // 1. Xử lý Search
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFilters({ ...filters, keyword: e.target.value });
-  };
-
-  // 2. Xử lý chọn Member (Toggle)
-  const toggleAssignee = (memberId: number) => {
+  /**
+   * Bật/tắt trạng thái lọc theo một thành viên dự án
+   */
+  const toggleAssignee = useCallback((memberId: number) => {
     const newValue = filters.assigneeId === memberId ? undefined : memberId;
     updateFilter("assigneeId", newValue);
-  };
+  }, [filters.assigneeId, updateFilter]);
 
-  // 3. Xử lý Priority & Task Type (Sử dụng helper)
-  const handlePriorityChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    updateFilter("priority", e.target.value);
-  };
-
-  const handleTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    updateFilter("taskType", e.target.value);
-  };
-
-  // 4. Reset Filters (Giữ lại sprintId)
-  const clearFilters = () => {
+  /**
+   * Xóa toàn bộ các tham số lọc đang áp dụng (Bảo lưu sprintId hiện tại)
+   */
+  const clearFilters = useCallback(() => {
     setFilters({ 
-        keyword: "", 
-        sprintId: filters.sprintId,
-        assigneeId: undefined,
-        priority: undefined,
-        taskType: undefined
+      keyword: "", 
+      sprintId: filters.sprintId,
+      assigneeId: undefined,
+      priority: undefined,
+      taskType: undefined
     });
-  };
+  }, [filters.sprintId, setFilters]);
 
-  // Kiểm tra xem có filter nào đang active không
+  /**
+   * Kiểm tra xem có bộ lọc nào (trừ Sprint) đang kích hoạt không
+   */
   const hasActiveFilters = useMemo(() => {
-    return !!filters.keyword || !!filters.assigneeId || !!filters.priority || !!filters.taskType;
+    return !!(filters.keyword || filters.assigneeId || filters.priority || filters.taskType);
   }, [filters]);
 
-  // --- RENDER ---
+  // ---------------------------------------------------------------------------
+  // 7. RENDER
+  // ---------------------------------------------------------------------------
+
   return (
-    <div className="h-16 px-6 border-b border-slate-200 bg-white flex items-center justify-between shrink-0 shadow-sm relative">
+    <div className="h-16 px-6 border-b border-slate-200 bg-white flex items-center justify-between shrink-0 shadow-sm relative z-20">
         
-        {/* --- LEFT: TITLE & STATS --- */}
+        {/* KHỐI TRÁI: TIÊU ĐỀ VÀ THÔNG SỐ (TITLE & STATS) */}
         <div className="flex items-center gap-4">
-            <h1 className="text-xl font-bold text-slate-800 tracking-tight">Board</h1>
-            <div className="h-6 w-[1px] bg-slate-200"></div>
-            <span className="bg-slate-100 text-slate-600 px-2.5 py-0.5 rounded-md text-xs font-bold border border-slate-200">
+            <h1 className="text-xl font-bold text-slate-800 tracking-tight">Active Board</h1>
+            <div className="h-6 w-px bg-slate-200" />
+            <span className="bg-slate-50 text-slate-500 px-2.5 py-0.5 rounded-full text-[11px] font-bold border border-slate-200 uppercase tracking-widest">
                 {totalTasks} Issues
             </span>
         </div>
 
-        {/* --- RIGHT: FILTERS TOOLBAR --- */}
-        <div className="flex items-center gap-3">
+        {/* KHỐI PHẢI: THANH CÔNG CỤ BỘ LỌC (FILTERS TOOLBAR) */}
+        <div className="flex items-center gap-4">
             
-            {/* 1. SEARCH BOX */}
-            <div className="relative group">
-                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors"/>
+            {/* 1. Ô tìm kiếm từ khóa (Search Box) */}
+            <div className="relative group hidden md:block">
+                <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-600 transition-colors"/>
                 <input 
-                    className="h-9 pl-9 pr-8 text-sm border border-slate-200 rounded-lg w-48 focus:w-64 transition-all outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 bg-slate-50 focus:bg-white placeholder:text-slate-400"
-                    placeholder="Search..."
+                    className={cn(
+                      "h-9 pl-9 pr-8 text-sm border border-slate-200 rounded-lg w-48 transition-all outline-none bg-slate-50 shadow-sm",
+                      "focus:w-64 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:bg-white placeholder:text-slate-400"
+                    )}
+                    placeholder="Search board..."
                     value={filters?.keyword || ""}
-                    onChange={handleSearchChange}
+                    onChange={(e) => updateFilter("keyword", e.target.value)}
                 />
                 {filters?.keyword && (
                     <button 
-                        onClick={() => setFilters({...filters, keyword: ""})}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded-full hover:bg-slate-200"
+                        onClick={() => updateFilter("keyword", "")}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-500 p-0.5 rounded-full transition-colors"
+                        title="Clear search"
                     >
                         <X className="w-3 h-3" />
                     </button>
                 )}
             </div>
 
-            {/* 2. MEMBER FILTER (Avatar Stack) */}
-            <div className="flex items-center -space-x-2 mr-1">
+            {/* 2. Lọc nhanh theo thành viên (Avatar Stack) */}
+            <div className="flex items-center -space-x-2.5 mr-2">
                 {members.slice(0, 5).map((member) => {
                     const idToUse = member.userId || member.memberId;
                     const isActive = filters.assigneeId !== undefined && filters.assigneeId === idToUse;
@@ -181,10 +212,11 @@ export default function BoardHeader({
                         <div 
                             key={idToUse || Math.random()}
                             onClick={() => idToUse && toggleAssignee(idToUse)}
-                            className={`
-                                relative w-8 h-8 rounded-full border-2 cursor-pointer transition-all hover:z-10 hover:scale-105
-                                ${isActive ? 'border-blue-500 z-10 ring-2 ring-blue-200' : 'border-white'}
-                            `}
+                            className={cn(
+                              "relative w-8 h-8 rounded-full border-2 cursor-pointer transition-all hover:z-20 hover:scale-110 shadow-sm",
+                              isActive ? "border-blue-500 z-10 ring-2 ring-blue-100" : "border-white",
+                              !member.avatarUrl ? "bg-slate-100" : ""
+                            )}
                             title={member.fullName}
                         >
                             {member.avatarUrl ? (
@@ -194,7 +226,10 @@ export default function BoardHeader({
                                     className="w-full h-full rounded-full object-cover"
                                 />
                             ) : (
-                                <div className={`w-full h-full rounded-full flex items-center justify-center text-[10px] font-bold ${isActive ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'}`}>
+                                <div className={cn(
+                                  "w-full h-full rounded-full flex items-center justify-center text-[10px] font-bold",
+                                  isActive ? "text-blue-700 bg-blue-50" : "text-slate-500"
+                                )}>
                                     {member.fullName?.charAt(0).toUpperCase()}
                                 </div>
                             )}
@@ -202,46 +237,47 @@ export default function BoardHeader({
                     );
                 })}
                 
-                {/* Hiển thị số lượng user còn lại nếu > 5 */}
+                {/* Hiển thị số lượng thành viên ẩn nếu tổng số lượng > 5 */}
                 {members.length > 5 && (
-                    <div className="w-8 h-8 rounded-full bg-slate-50 border-2 border-white flex items-center justify-center text-xs font-medium text-slate-500">
+                    <div className="w-8 h-8 rounded-full bg-slate-50 border-2 border-white flex items-center justify-center text-[10px] font-bold text-slate-500 shadow-sm cursor-default z-0">
                         +{members.length - 5}
                     </div>
                 )}
             </div>
 
-            {/* 3. PRIORITY FILTER */}
+            {/* 3. Dropdown Lọc Mức độ ưu tiên (Priority) */}
             <FilterDropdown 
                 value={filters.priority}
-                onChange={handlePriorityChange}
+                onChange={(e) => updateFilter("priority", e.target.value)}
                 options={PRIORITY_OPTIONS}
                 placeholder="Priority"
                 icon={ChevronDown}
             />
 
-            {/* 4. TASK TYPE FILTER */}
+            {/* 4. Dropdown Lọc Loại công việc (Task Type) */}
             <FilterDropdown 
                 value={filters.taskType}
-                onChange={handleTypeChange}
+                onChange={(e) => updateFilter("taskType", e.target.value)}
                 options={TYPE_OPTIONS}
-                placeholder="Type"
+                placeholder="Task Type"
                 icon={Filter}
             />
 
-            {/* 5. SEPARATOR & CLEAR BUTTON */}
-            <div className="h-6 w-[1px] bg-slate-200 mx-1"></div>
+            {/* 5. Vạch ngăn cách và Nút xóa bộ lọc (Separator & Clear Button) */}
+            <div className="h-6 w-px bg-slate-200 mx-1"></div>
 
             <button 
                 onClick={clearFilters}
                 disabled={!hasActiveFilters}
-                className={`
-                    flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-lg transition-all
-                    ${hasActiveFilters 
-                        ? 'text-red-600 bg-red-50 hover:bg-red-100 cursor-pointer' 
-                        : 'text-slate-300 bg-transparent cursor-not-allowed'}
-                `}
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-1.5 text-[10px] uppercase tracking-widest font-bold rounded-lg transition-all",
+                  hasActiveFilters 
+                    ? "text-red-600 bg-red-50 hover:bg-red-100 cursor-pointer active:scale-95 shadow-sm border border-red-100" 
+                    : "text-slate-300 bg-transparent cursor-not-allowed"
+                )}
+                title="Clear all active filters"
             >
-                <X className="w-4 h-4" />
+                <X className="w-3.5 h-3.5" />
                 <span>Clear</span>
             </button>
         </div>

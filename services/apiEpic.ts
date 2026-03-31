@@ -3,21 +3,25 @@
 import apiClient from "@/lib/apiClient";
 
 // =============================================================================
-// 1. INTERFACES & TYPES (Định nghĩa kiểu dữ liệu)
+// INTERFACES & TYPES
 // =============================================================================
 
 // -----------------------------------------------------------------------------
-// Response Models (Dữ liệu trả về)
+// Dữ liệu phản hồi (Response Models)
 // -----------------------------------------------------------------------------
 
-// Wrapper Response chuẩn
+/**
+ * Cấu trúc phản hồi chuẩn từ API
+ */
 export interface ApiResponse<T> {
   success: boolean;
   message: string;
   data: T;
 }
 
-// Dữ liệu Epic trả về từ Backend
+/**
+ * Thông tin chi tiết về Epic và tiến độ liên quan
+ */
 export interface Epic {
   id: number;
   projectId: number;
@@ -26,21 +30,23 @@ export interface Epic {
   description: string;
   color: string;
   status: string;
-  startDate: string; // YYYY-MM-DD or ISO
-  dueDate: string;   // YYYY-MM-DD or ISO
+  startDate: string;
+  dueDate: string;
   createdAt: string;
   
-  // Thông tin thống kê tiến độ
+  // Thông tin thống kê công việc thuộc Epic
   totalTasks: number;
   tasksCompleted: number;
   progressPercentage: number;
 }
 
 // -----------------------------------------------------------------------------
-// Payload & Params (Dữ liệu gửi đi)
+// Dữ liệu yêu cầu (Payload & Params)
 // -----------------------------------------------------------------------------
 
-// Payload: Tạo Epic mới
+/**
+ * Dữ liệu yêu cầu để tạo một Epic mới
+ */
 export interface CreateEpicPayload {
   name: string;
   description?: string;
@@ -49,7 +55,9 @@ export interface CreateEpicPayload {
   dueDate?: string;
 }
 
-// Payload: Cập nhật Epic
+/**
+ * Dữ liệu yêu cầu để cập nhật thông tin Epic
+ */
 export interface UpdateEpicPayload {
   name: string;
   description?: string;
@@ -59,133 +67,124 @@ export interface UpdateEpicPayload {
   dueDate?: string;
 }
 
-// Params lọc danh sách Epic
+/**
+ * Các tham số dùng để lọc danh sách Epic
+ */
 export interface EpicFilterParams {
   keyword?: string;
 }
 
 // =============================================================================
-// 2. API SERVICE IMPLEMENTATION
+// API METHODS
 // =============================================================================
 
-export const apiEpic = {
+/**
+ * Truy vấn thông tin chi tiết của một Epic cụ thể
+ */
+export const getEpicDetail = async (
+  projectId: number | string,
+  epicId: number | string
+): Promise<Epic> => {
+  try {
+    const url = `/projects/${projectId}/epics/${epicId}`;
+    const res = await apiClient.get<ApiResponse<Epic>>(url);
+    const { success, message, data } = res.data;
 
-  /**
-   * 🔹 Lấy chi tiết Epic 
-   * GET /api/projects/{projectId}/epics/{epicId}
-   */
-  getEpicDetail: async (
-    projectId: number | string,
-    epicId: number | string
-  ): Promise<Epic> => {
-    try {
-      const res = await apiClient.get<ApiResponse<Epic>>(
-        `/projects/${projectId}/epics/${epicId}`
-      );
-      const { success, message, data } = res.data;
-
-      if (!success) {
-        throw new Error(message || "Failed to fetch epic details.");
-      }
-      return data;
-    } catch (error: any) {
-      throw new Error(error.response?.data?.message || "System error fetching epic details.");
+    if (!success) {
+      throw new Error(message || "Failed to fetch epic details");
     }
-  },
+    return data;
+  } catch (error: any) {
+    const errorMsg = error.response?.data?.message || "Unable to fetch epic details";
+    throw new Error(errorMsg);
+  }
+};
 
-  /**
-   * 🔹 Lấy danh sách Epics trong Project
-   * GET /api/projects/{projectId}/epics
-   */
-  getEpics: async (
-    projectId: number | string,
-    params?: EpicFilterParams
-  ): Promise<Epic[]> => {
-    try {
-      const res = await apiClient.get<ApiResponse<Epic[]>>(
-        `/projects/${projectId}/epics`,
-        { params }
-      );
-      const { success, message, data } = res.data;
+/**
+ * Lấy danh sách các Epic thuộc một dự án
+ */
+export const getEpics = async (
+  projectId: number | string,
+  params?: EpicFilterParams
+): Promise<Epic[]> => {
+  try {
+    const url = `/projects/${projectId}/epics`;
+    const res = await apiClient.get<ApiResponse<Epic[]>>(url, { params });
+    const { success, message, data } = res.data;
 
-      if (!success) {
-        throw new Error(message || "Failed to load epics.");
-      }
-      return data;
-    } catch (error: any) {
-      throw new Error(error.response?.data?.message || "System error loading epics.");
+    if (!success) {
+      throw new Error(message || "Failed to load epics");
     }
-  },
+    return data;
+  } catch (error: any) {
+    const errorMsg = error.response?.data?.message || "Unable to load epics";
+    throw new Error(errorMsg);
+  }
+};
 
-  /**
-   * 🔹 Tạo Epic mới
-   * POST /api/projects/{projectId}/epics
-   */
-  createEpic: async (
-    projectId: number | string,
-    payload: CreateEpicPayload
-  ): Promise<Epic> => {
-    try {
-      const res = await apiClient.post<ApiResponse<Epic>>(
-        `/projects/${projectId}/epics`,
-        payload
-      );
-      const { success, message, data } = res.data;
+/**
+ * Khởi tạo một Epic mới trong dự án
+ */
+export const createEpic = async (
+  projectId: number | string,
+  payload: CreateEpicPayload
+): Promise<Epic> => {
+  try {
+    const url = `/projects/${projectId}/epics`;
+    const res = await apiClient.post<ApiResponse<Epic>>(url, payload);
+    const { success, message, data } = res.data;
 
-      if (!success) {
-        throw new Error(message || "Failed to create epic.");
-      }
-      return data;
-    } catch (error: any) {
-      throw new Error(error.response?.data?.message || "System error creating epic.");
+    if (!success) {
+      throw new Error(message || "Failed to create epic");
     }
-  },
+    return data;
+  } catch (error: any) {
+    const errorMsg = error.response?.data?.message || "Unable to create epic";
+    throw new Error(errorMsg);
+  }
+};
 
-  /**
-   * 🔹 Cập nhật Epic
-   * PUT /api/projects/{projectId}/epics/{epicId}
-   */
-  updateEpic: async (
-    projectId: number | string,
-    epicId: number | string,
-    payload: UpdateEpicPayload
-  ): Promise<Epic> => {
-    try {
-      const res = await apiClient.put<ApiResponse<Epic>>(
-        `/projects/${projectId}/epics/${epicId}`,
-        payload
-      );
-      const { success, message, data } = res.data;
+/**
+ * Cập nhật thông tin hoặc trạng thái của một Epic
+ */
+export const updateEpic = async (
+  projectId: number | string,
+  epicId: number | string,
+  payload: UpdateEpicPayload
+): Promise<Epic> => {
+  try {
+    const url = `/projects/${projectId}/epics/${epicId}`;
+    const res = await apiClient.put<ApiResponse<Epic>>(url, payload);
+    const { success, message, data } = res.data;
 
-      if (!success) {
-        throw new Error(message || "Failed to update epic.");
-      }
-      return data;
-    } catch (error: any) {
-      throw new Error(error.response?.data?.message || "System error updating epic.");
+    if (!success) {
+      throw new Error(message || "Failed to update epic");
     }
-  },
+    return data;
+  } catch (error: any) {
+    const errorMsg = error.response?.data?.message || "Unable to update epic";
+    throw new Error(errorMsg);
+  }
+};
 
-  /**
-   * 🔹 Xóa Epic
-   * DELETE /api/projects/{projectId}/epics/{epicId}
-   */
-  deleteEpic: async (
-    projectId: number | string,
-    epicId: number | string
-  ): Promise<boolean> => {
-    try {
-      const res = await apiClient.delete<ApiResponse<{}>>(
-        `/projects/${projectId}/epics/${epicId}`
-      );
-      const { success, message } = res.data;
+/**
+ * Xóa một Epic khỏi dự án
+ */
+export const deleteEpic = async (
+  projectId: number | string,
+  epicId: number | string
+): Promise<boolean> => {
+  try {
+    const url = `/projects/${projectId}/epics/${epicId}`;
+    const res = await apiClient.delete<ApiResponse<{}>>(url);
+    const { success, message } = res.data;
 
-      if (!success) {
-        throw new Error(message || "Failed to delete epic.");
-      }
-      return true;
-    } catch (error: any) {
-      throw new Error(error.response?.data?.message || "System error deleting epic.");
+    if (!success) {
+      throw new Error(message || "Failed to delete epic");
     }
+    return true;
+  } catch (error: any) {
+    const errorMsg = error.response?.data?.message || "Unable to delete epic";
+    throw new Error(errorMsg);
   }
 };

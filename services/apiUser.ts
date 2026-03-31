@@ -3,11 +3,11 @@
 import apiClient from "@/lib/apiClient";
 
 // =============================================================================
-// 1. INTERFACES & TYPES (Định nghĩa kiểu dữ liệu)
+// INTERFACES & TYPES
 // =============================================================================
 
 // -----------------------------------------------------------------------------
-// Memberships (Quyền hạn trong hệ thống)
+// Quyền hạn hệ thống (Memberships)
 // -----------------------------------------------------------------------------
 
 export interface CompanyMembership {
@@ -31,9 +31,12 @@ export interface ProjectMembership {
 }
 
 // -----------------------------------------------------------------------------
-// User Models (Dữ liệu người dùng)
+// Người dùng (User Models)
 // -----------------------------------------------------------------------------
 
+/**
+ * Thông tin chi tiết hồ sơ người dùng
+ */
 export interface UserProfile {
   id: number;
   fullName: string;
@@ -45,24 +48,30 @@ export interface UserProfile {
   status: string | null;
   systemRoles: string[];
   
-  // ✅ QUAN TRỌNG: Giữ nguyên mảng để AuthContext xử lý logic Multi-Tenant
+  // Dữ liệu phục vụ cơ chế Multi-Tenant
   companyMemberships: CompanyMembership[];
   workspaceMemberships: WorkspaceMembership[];
   projectMemberships: ProjectMembership[];
 }
 
 // -----------------------------------------------------------------------------
-// Payloads (Dữ liệu gửi đi)
+// Dữ liệu yêu cầu (Payloads)
 // -----------------------------------------------------------------------------
 
+/**
+ * Dữ liệu yêu cầu để cập nhật hồ sơ cá nhân
+ */
 export interface UpdateProfilePayload {
   fullName?: string;
   phoneNumber?: string;
-  dateOfBirth?: string; // YYYY-MM-DD
+  dateOfBirth?: string; // Định dạng YYYY-MM-DD
   gender?: "MALE" | "FEMALE" | "OTHER" | string;
-  avatarFile?: File | null; // ✨ File ảnh thực tế từ máy tính
+  avatarFile?: File | null;
 }
 
+/**
+ * Dữ liệu yêu cầu khi thực hiện đổi mật khẩu
+ */
 export interface ChangePasswordPayload {
   oldPassword: string;
   newPassword: string;
@@ -70,26 +79,24 @@ export interface ChangePasswordPayload {
 }
 
 // =============================================================================
-// 2. API METHODS (Các hàm gọi API)
+// API METHODS
 // =============================================================================
 
 /**
- * 🧩 1. LẤY THÔNG TIN NGƯỜI DÙNG HIỆN TẠI (GET ME)
- * GET /api/users/me
+ * Truy vấn thông tin hồ sơ của người dùng hiện tại
  */
 export const getCurrentUser = async (): Promise<UserProfile | null> => {
   try {
-    // apiClient đã có interceptor tự động gắn Token vào Header
     const res = await apiClient.get("/users/me");
     const { success, message, data } = res.data;
 
     if (!success) {
-      throw new Error(message || "Failed to fetch user profile.");
+      throw new Error(message || "Failed to fetch user profile");
     }
 
     const user = data;
 
-    // ✅ TRẢ VỀ NGUYÊN BẢN DỮ LIỆU (Raw Data)
+    // Chuyển đổi và chuẩn hóa dữ liệu từ API
     return {
       id: user.id,
       fullName: user.fullName,
@@ -101,29 +108,27 @@ export const getCurrentUser = async (): Promise<UserProfile | null> => {
       status: user.status || null,
       systemRoles: user.systemRoles || [],
       
-      // Nếu API trả về null thì gán mảng rỗng [] để tránh lỗi khi map()
+      // Đảm bảo các mảng quyền hạn không bị null
       companyMemberships: user.companyMemberships || [],
       workspaceMemberships: user.workspaceMemberships || [],
       projectMemberships: user.projectMemberships || [],
     };
 
   } catch (err: any) {
-    // Chỉ log lỗi và trả về null để AuthContext biết user chưa login hoặc token hết hạn
-    console.warn("[UserAPI] Fetch user failed:", err.message);
+    // Ghi log cảnh báo phục vụ kiểm tra lỗi xác thực
+    console.warn("[User Service] Fetch user failed:", err.message);
     return null; 
   }
 };
 
 /**
- * 🧩 2. CẬP NHẬT THÔNG TIN CÁ NHÂN (MULTIPART/FORM-DATA)
- * PUT /api/users/me
+ * Cập nhật thông tin hồ sơ cá nhân (Hỗ trợ tải lên ảnh đại diện)
  */
 export const updateUserProfile = async (payload: UpdateProfilePayload) => {
   try {
     const formData = new FormData();
 
-    // --- XỬ LÝ DỮ LIỆU JSON (SPRING BOOT @RequestPart) ---
-    // Gom các trường text vào một object JSON và ép kiểu thành Blob
+    // Chuẩn bị phần dữ liệu văn bản dưới dạng JSON Blob cho Spring Boot
     const jsonPart = {
       fullName: payload.fullName,
       phoneNumber: payload.phoneNumber,
@@ -136,35 +141,33 @@ export const updateUserProfile = async (payload: UpdateProfilePayload) => {
     });
     formData.append("data", jsonBlob);
 
-    // --- XỬ LÝ FILE ẢNH ---
+    // Đính kèm tệp tin hình ảnh nếu người dùng có thay đổi
     if (payload.avatarFile) {
-      // Key "file" phải khớp với @RequestParam("file") bên Java
       formData.append("file", payload.avatarFile);
     }
 
-    // --- GỬI REQUEST ---
     const res = await apiClient.put("/users/me", formData, {
       headers: {
-        "Content-Type": "multipart/form-data", // Ghi đè header mặc định
+        "Content-Type": "multipart/form-data",
       },
     });
 
     const { success, message, data } = res.data;
 
     if (!success) {
-      throw new Error(message || "Failed to update profile.");
+      throw new Error(message || "Failed to update profile");
     }
 
     return data; 
   } catch (err: any) {
-    // Ưu tiên message lỗi từ server trả về
-    throw new Error(err.response?.data?.message || "System error updating profile.");
+    // Ưu tiên sử dụng thông báo lỗi trả về từ phía Backend
+    const errorMsg = err.response?.data?.message || "An error occurred while updating profile";
+    throw new Error(errorMsg);
   }
 };
 
 /**
- * 🔒 3. ĐỔI MẬT KHẨU
- * POST /api/users/me/change-password
+ * Thay đổi mật khẩu truy cập của người dùng
  */
 export const changeUserPassword = async (payload: ChangePasswordPayload) => {
   try {
@@ -172,11 +175,12 @@ export const changeUserPassword = async (payload: ChangePasswordPayload) => {
     const { success, message, data } = res.data;
 
     if (!success) {
-      throw new Error(message || "Failed to change password.");
+      throw new Error(message || "Failed to change password");
     }
 
     return data;
   } catch (err: any) {
-    throw new Error(err.response?.data?.message || "System error changing password.");
+    const errorMsg = err.response?.data?.message || "An error occurred while changing password";
+    throw new Error(errorMsg);
   }
 };

@@ -1,13 +1,16 @@
 import apiClient from "@/lib/apiClient";
 
 // =============================================================================
-// 1. INTERFACES & TYPES (Định nghĩa kiểu dữ liệu)
+// INTERFACES & TYPES
 // =============================================================================
 
 // -----------------------------------------------------------------------------
-// Data Models (Dữ liệu trả về)
+// Data Models
 // -----------------------------------------------------------------------------
 
+/**
+ * Thông tin chi tiết về công ty
+ */
 export interface Company {
   companyId: number;
   companyName: string;
@@ -20,6 +23,9 @@ export interface Company {
   website: string | null;
 }
 
+/**
+ * Thông tin thành viên trong công ty
+ */
 export interface CompanyMember {
   memberId: number;
   userId: number;
@@ -33,6 +39,9 @@ export interface CompanyMember {
   joinedAt: string | null;
 }
 
+/**
+ * Thông tin lời mời tham gia công ty
+ */
 export interface CompanyInvitation {
   id: number;
   email: string;
@@ -44,6 +53,9 @@ export interface CompanyInvitation {
   createdAt?: string;
 }
 
+/**
+ * Cấu trúc phản hồi phân trang chuẩn
+ */
 export interface PageResponse<T> {
   content: T[];
   pageNumber: number;
@@ -55,7 +67,7 @@ export interface PageResponse<T> {
 }
 
 // -----------------------------------------------------------------------------
-// Payload & Params (Dữ liệu gửi đi)
+// Payload & Params
 // -----------------------------------------------------------------------------
 
 export interface CreateCompanyPayload {
@@ -74,7 +86,7 @@ export interface UpdateCompanyPayload {
   phoneNumber?: string;
   email?: string;
   website?: string;
-  logoFile?: File | null; // ✨ File ảnh thực tế từ máy
+  logoFile?: File | null;
 }
 
 export interface InviteMemberPayload {
@@ -105,11 +117,11 @@ export interface MemberSearchParams {
 }
 
 // =============================================================================
-// 2. COMPANY MANAGEMENT APIs (Quản lý thông tin công ty)
+// COMPANY MANAGEMENT APIs
 // =============================================================================
 
 /**
- * Lấy thông tin chi tiết công ty theo ID
+ * Lấy thông tin chi tiết của một công ty
  */
 export const getCompanyById = async (companyId: number): Promise<Company> => {
   try {
@@ -117,16 +129,17 @@ export const getCompanyById = async (companyId: number): Promise<Company> => {
     const { success, message, data } = res.data;
 
     if (!success) {
-      throw new Error(message || "Failed to fetch company details.");
+      throw new Error(message || "Failed to fetch company details");
     }
     return data;
   } catch (err: any) {
-    throw new Error(err.response?.data?.message || "Unable to fetch company information.");
+    const errorMsg = err.response?.data?.message || "Unable to fetch company information";
+    throw new Error(errorMsg);
   }
 };
 
 /**
- * Tạo công ty mới
+ * Khởi tạo một công ty mới
  */
 export const createCompany = async (payload: CreateCompanyPayload): Promise<Company> => {
   try {
@@ -134,16 +147,17 @@ export const createCompany = async (payload: CreateCompanyPayload): Promise<Comp
     const { success, message, data } = res.data;
 
     if (!success) {
-      throw new Error(message || "Failed to create company.");
+      throw new Error(message || "Failed to create company");
     }
     return data;
   } catch (err: any) {
-    throw new Error(err.response?.data?.message || "Unable to create company.");
+    const errorMsg = err.response?.data?.message || "Unable to create company";
+    throw new Error(errorMsg);
   }
 };
 
 /**
- * Cập nhật thông tin công ty (Hỗ trợ Multipart/Form-data để upload logo)
+ * Cập nhật thông tin công ty (Hỗ trợ tải lên logo qua Multipart Form Data)
  */
 export const updateCompany = async (
   companyId: number,
@@ -152,8 +166,7 @@ export const updateCompany = async (
   try {
     const formData = new FormData();
 
-    // --- BƯỚC 1: Đóng gói dữ liệu JSON (Key: "data") ---
-    // Gom tất cả các trường text vào một object để gửi kèm file
+    // Chuẩn bị phần dữ liệu JSON để gửi kèm file
     const jsonPart = {
       companyName: payload.companyName,
       description: payload.description,
@@ -163,45 +176,43 @@ export const updateCompany = async (
       website: payload.website,
     };
 
-    // Ép kiểu JSON thành Blob với content-type application/json
-    // Đây là mấu chốt để Backend Spring Boot hiểu được @RequestPart("data")
+    // Đóng gói JSON thành Blob với content-type chuẩn để Backend xử lý
     const jsonBlob = new Blob([JSON.stringify(jsonPart)], {
       type: "application/json",
     });
     formData.append("data", jsonBlob);
 
-    // --- BƯỚC 2: Đóng gói File Ảnh (Key: "file") ---
+    // Đính kèm tệp tin logo nếu có
     if (payload.logoFile) {
       formData.append("file", payload.logoFile);
     }
 
-    // --- BƯỚC 3: Gửi Request ---
-    // Axios sẽ tự động thêm boundary vào Content-Type multipart/form-data
     const res = await apiClient.put(`/companies/${companyId}`, formData, {
       headers: {
-        "Content-Type": "multipart/form-data", // Đảm bảo header chính xác
+        "Content-Type": "multipart/form-data",
       },
     });
 
     const { success, message, data } = res.data;
 
     if (!success) {
-      throw new Error(message || "Failed to update company.");
+      throw new Error(message || "Failed to update company");
     }
     return data;
 
   } catch (err: any) {
-    console.error("Error updating company:", err); // Log để debug
-    throw new Error(err.response?.data?.message || "Unable to update company.");
+    const errorMsg = err.response?.data?.message || "Unable to update company";
+    console.error(`[Company Service] Update error: ${errorMsg}`);
+    throw new Error(errorMsg);
   }
 };
 
 // =============================================================================
-// 3. MEMBER MANAGEMENT APIs (Quản lý thành viên)
+// MEMBER MANAGEMENT APIs
 // =============================================================================
 
 /**
- * Lấy danh sách thành viên (Có phân trang)
+ * Lấy danh sách thành viên thuộc công ty
  */
 export const getCompanyMembers = async (
   companyId: number,
@@ -211,15 +222,18 @@ export const getCompanyMembers = async (
     const res = await apiClient.get(`/companies/${companyId}/members`, { params });
     const { success, message, data } = res.data;
 
-    if (!success) throw new Error(message || "Failed to load members.");
+    if (!success) {
+      throw new Error(message || "Failed to load members");
+    }
     return data;
   } catch (err: any) {
-    throw new Error(err.response?.data?.message || "Unable to load company members.");
+    const errorMsg = err.response?.data?.message || "Unable to load company members";
+    throw new Error(errorMsg);
   }
 };
 
 /**
- * Tìm kiếm thành viên nâng cao
+ * Tìm kiếm thành viên với các tiêu chí lọc nâng cao
  */
 export const searchCompanyMembers = async (
   companyId: number,
@@ -229,15 +243,18 @@ export const searchCompanyMembers = async (
     const res = await apiClient.get(`/companies/${companyId}/members/search`, { params });
     const { success, message, data } = res.data;
 
-    if (!success) throw new Error(message || "Failed to search members.");
+    if (!success) {
+      throw new Error(message || "Failed to search members");
+    }
     return data;
   } catch (err: any) {
-    throw new Error(err.response?.data?.message || "Unable to search company members.");
+    const errorMsg = err.response?.data?.message || "Unable to search company members";
+    throw new Error(errorMsg);
   }
 };
 
 /**
- * Lấy chi tiết một thành viên
+ * Truy vấn thông tin chi tiết của một thành viên cụ thể
  */
 export const getCompanyMemberDetail = async (
   companyId: number,
@@ -247,15 +264,18 @@ export const getCompanyMemberDetail = async (
     const res = await apiClient.get(`/companies/${companyId}/members/${memberId}`);
     const { success, message, data } = res.data;
 
-    if (!success) throw new Error(message || "Failed to fetch member detail.");
+    if (!success) {
+      throw new Error(message || "Failed to fetch member detail");
+    }
     return data;
   } catch (err: any) {
-    throw new Error(err.response?.data?.message || "Unable to fetch member detail.");
+    const errorMsg = err.response?.data?.message || "Unable to fetch member detail";
+    throw new Error(errorMsg);
   }
 };
 
 /**
- * Cập nhật trạng thái thành viên (Active/Inactive)
+ * Cập nhật trạng thái hoạt động của thành viên
  */
 export const updateCompanyMemberStatus = async (
   companyId: number,
@@ -266,15 +286,18 @@ export const updateCompanyMemberStatus = async (
     const res = await apiClient.put(`/companies/${companyId}/members/${memberId}/status`, { newStatus });
     const { success, message, data } = res.data;
 
-    if (!success) throw new Error(message || "Failed to update member status.");
+    if (!success) {
+      throw new Error(message || "Failed to update member status");
+    }
     return data;
   } catch (err: any) {
-    throw new Error(err.response?.data?.message || "Unable to update member status.");
+    const errorMsg = err.response?.data?.message || "Unable to update member status";
+    throw new Error(errorMsg);
   }
 };
 
 /**
- * Cập nhật vai trò (Role) của thành viên
+ * Thay đổi vai trò (Role) của thành viên trong công ty
  */
 export const updateCompanyMemberRole = async (
   companyId: number,
@@ -285,15 +308,18 @@ export const updateCompanyMemberRole = async (
     const res = await apiClient.put(`/companies/${companyId}/members/${memberId}/role`, { roleCode });
     const { success, message, data } = res.data;
 
-    if (!success) throw new Error(message || "Failed to update member role.");
+    if (!success) {
+      throw new Error(message || "Failed to update member role");
+    }
     return data;
   } catch (err: any) {
-    throw new Error(err.response?.data?.message || "Unable to update member role.");
+    const errorMsg = err.response?.data?.message || "Unable to update member role";
+    throw new Error(errorMsg);
   }
 };
 
 /**
- * Xóa thành viên khỏi công ty
+ * Loại bỏ thành viên ra khỏi công ty
  */
 export const removeCompanyMember = async (
   companyId: number,
@@ -303,19 +329,22 @@ export const removeCompanyMember = async (
     const res = await apiClient.delete(`/companies/${companyId}/members/${userId}`);
     const { success, message, data } = res.data;
 
-    if (!success) throw new Error(message || "Failed to remove member.");
+    if (!success) {
+      throw new Error(message || "Failed to remove member");
+    }
     return data;
   } catch (err: any) {
-    throw new Error(err.response?.data?.message || "Unable to remove company member.");
+    const errorMsg = err.response?.data?.message || "Unable to remove company member";
+    throw new Error(errorMsg);
   }
 };
 
 // =============================================================================
-// 4. INVITATION MANAGEMENT APIs (Quản lý lời mời)
+// INVITATION MANAGEMENT APIs
 // =============================================================================
 
 /**
- * Gửi lời mời tham gia công ty qua email
+ * Gửi lời mời gia nhập công ty qua Email
  */
 export const inviteMemberToCompany = async (
   companyId: number,
@@ -325,15 +354,18 @@ export const inviteMemberToCompany = async (
     const res = await apiClient.post(`/companies/${companyId}/invitations`, payload);
     const { success, message, data } = res.data;
 
-    if (!success) throw new Error(message || "Failed to send invitation.");
+    if (!success) {
+      throw new Error(message || "Failed to send invitation");
+    }
     return data;
   } catch (err: any) {
-    throw new Error(err.response?.data?.message || "Unable to send invitation.");
+    const errorMsg = err.response?.data?.message || "Unable to send invitation";
+    throw new Error(errorMsg);
   }
 };
 
 /**
- * Lấy danh sách lời mời (Có search & filter)
+ * Lấy danh sách toàn bộ lời mời đã gửi
  */
 export const getCompanyInvitations = async (
   companyId: number,
@@ -343,15 +375,18 @@ export const getCompanyInvitations = async (
     const res = await apiClient.get(`/companies/${companyId}/invitations`, { params });
     const { success, message, data } = res.data;
 
-    if (!success) throw new Error(message || "Failed to load invitations.");
+    if (!success) {
+      throw new Error(message || "Failed to load invitations");
+    }
     return data;
   } catch (err: any) {
-    throw new Error(err.response?.data?.message || "Unable to load invitations.");
+    const errorMsg = err.response?.data?.message || "Unable to load invitations";
+    throw new Error(errorMsg);
   }
 };
 
 /**
- * Lấy danh sách lời mời đang chờ (Pending) - API rút gọn
+ * Lấy danh sách các lời mời đang ở trạng thái chờ xác nhận
  */
 export const getPendingInvitations = async (
   companyId: number,
@@ -361,15 +396,18 @@ export const getPendingInvitations = async (
     const res = await apiClient.get(`/companies/${companyId}/invitations/pending`, { params });
     const { success, message, data } = res.data;
 
-    if (!success) throw new Error(message || "Failed to load pending invitations.");
+    if (!success) {
+      throw new Error(message || "Failed to load pending invitations");
+    }
     return data;
   } catch (err: any) {
-    throw new Error(err.response?.data?.message || "Unable to load pending invitations.");
+    const errorMsg = err.response?.data?.message || "Unable to load pending invitations";
+    throw new Error(errorMsg);
   }
 };
 
 /**
- * Hủy lời mời đã gửi
+ * Thu hồi/Hủy lời mời đã gửi trước đó
  */
 export const cancelCompanyInvitation = async (
   companyId: number,
@@ -379,9 +417,12 @@ export const cancelCompanyInvitation = async (
     const res = await apiClient.delete(`/companies/${companyId}/invitations/${invitationId}`);
     const { success, message, data } = res.data;
 
-    if (!success) throw new Error(message || "Failed to cancel invitation.");
+    if (!success) {
+      throw new Error(message || "Failed to cancel invitation");
+    }
     return data;
   } catch (err: any) {
-    throw new Error(err.response?.data?.message || "Unable to cancel invitation.");
+    const errorMsg = err.response?.data?.message || "Unable to cancel invitation";
+    throw new Error(errorMsg);
   }
 };

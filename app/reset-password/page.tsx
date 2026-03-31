@@ -1,39 +1,80 @@
 "use client";
 
-import { Suspense } from "react";
-import ResetPasswordForm from "@/components/features/auth/ResetPasswordForm";
+// =============================================================================
+// 1. IMPORT (Libraries -> Internal -> Utils)
+// =============================================================================
+
+import React, { Suspense } from "react";
 import Link from "next/link";
 import { LayoutDashboard, Loader2 } from "lucide-react";
 
-// =================================================================
-// 1. MAIN COMPONENT (LAYOUT)
-// =================================================================
+// Internal Components
+import ResetPasswordForm from "@/components/features/auth/ResetPasswordForm";
 
+// Utils
+import { cn } from "@/lib/utils";
+
+// =============================================================================
+// 2. MAIN COMPONENT
+// =============================================================================
+
+/**
+ * Trang dat lai mat khau (Reset Password Wrapper).
+ * Su dung Suspense de bao boc Client Component, cho phep xu ly an toan cac tham so tu URL.
+ */
 export default function ResetPasswordPage() {
+    
+    // ---------------------------------------------------------------------------
+    // 3. RENDER LOGIC
+    // ---------------------------------------------------------------------------
+
     return (
-        // Layout nền xám nhạt minimalist
-        <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-slate-50 font-sans text-slate-900">
-            
-            {/* Logo Branding */}
-            <Link
-                href="/"
-                className="flex items-center gap-3 mb-8 group"
+        <main 
+            className={cn(
+                "flex flex-col items-center justify-center min-h-screen p-4 transition-colors duration-300",
+                "bg-[#F4F5F7] font-sans text-[#172B4D]" // Mau nen trung tinh dac trung cua Jira
+            )}
+        >
+            {/* KHOI LOGO & THUONG HIEU */}
+            <Link 
+                href="/" 
+                className="flex items-center gap-3 mb-10 group outline-none"
             >
-                <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform">
-                    <LayoutDashboard className="w-5 h-5 text-white" />
+                <div 
+                    className={cn(
+                        "w-10 h-10 rounded-xl flex items-center justify-center shadow-sm transition-all duration-300",
+                        "bg-[#0052CC] group-hover:scale-105 group-hover:bg-[#0747A6]"
+                    )}
+                >
+                    <LayoutDashboard className="w-5 h-5 text-white stroke-[2.5]" />
                 </div>
-                <span className="font-bold text-2xl tracking-tight text-slate-900 group-hover:text-blue-600 transition-colors">
+                <span className="font-black text-[24px] tracking-tighter text-[#172B4D]">
                     WorkNet
                 </span>
             </Link>
 
-            {/* Thẻ Form chính: Nền trắng, shadow sâu, viền mỏng */}
-            <div className="w-full max-w-sm bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden">
+            {/* KHOI NOI DUNG CHINH (CARD WRAPPER) */}
+            <div 
+                className={cn(
+                    "w-full max-w-sm bg-white rounded-2xl shadow-[0_12px_40px_rgba(0,0,0,0.08)] border border-slate-200 overflow-hidden",
+                    "animate-in fade-in zoom-in-95 duration-500"
+                )}
+            >
                 <Suspense 
+                    // Giao dien cho thoi gian tai Form (Loading state)
                     fallback={
-                        <div className="p-12 flex flex-col items-center justify-center gap-3 text-slate-500">
-                            <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-                            <span className="text-sm font-medium">Loading form...</span>
+                        <div className="p-16 text-center flex flex-col items-center justify-center gap-4">
+                            <div className="p-3 bg-blue-50 rounded-full">
+                                <Loader2 className="w-8 h-8 animate-spin text-[#0052CC]" />
+                            </div>
+                            <div className="space-y-1">
+                                <p className="text-[14px] font-black uppercase tracking-widest text-[#172B4D]">
+                                    Loading Module
+                                </p>
+                                <p className="text-[12px] font-medium text-slate-400">
+                                    Preparing secure environment...
+                                </p>
+                            </div>
                         </div>
                     }
                 >
@@ -41,14 +82,17 @@ export default function ResetPasswordPage() {
                 </Suspense>
             </div>
 
-            {/* Footer Link (Optional) */}
-            <p className="mt-6 text-center text-sm text-slate-500">
+            {/* KHOI DIEU HUONG BO SUNG (FOOTER) */}
+            <p className="mt-8 text-center text-[13px] font-medium text-[#42526E]">
                 Remember your password?{" "}
-                <Link href="/" className="font-semibold text-blue-600 hover:underline transition-all">
-                    Log in
+                <Link 
+                    href="/" 
+                    className="font-black text-[#0052CC] hover:text-[#0747A6] hover:underline transition-all"
+                >
+                    Back to login
                 </Link>
             </p>
 
-        </div>
+        </main>
     );
 }

@@ -1,20 +1,24 @@
 "use client";
 
-import { useState } from "react";
-import { X, Calendar, Target, Rocket, Loader2 } from "lucide-react";
+// =============================================================================
+// 1. IMPORT
+// =============================================================================
+
+import React, { useState, useCallback } from "react";
+import { X, Calendar, Target, Rocket, Loader2, AlertTriangle } from "lucide-react";
+
+// Internal Services
+import { createSprint } from "@/services/apiSprint";
+
+// Internal UI Components & Utils
 import { Button } from "@/components/ui/Buttons";
 import { Input } from "@/components/ui/Inputs";
 import { Textarea } from "@/components/ui/TextAreas";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/Cards";
-import { createSprint } from "@/services/apiSprint";
+import { Card, CardHeader, CardTitle } from "@/components/ui/Cards";
+import { cn } from "@/lib/utils";
 
 // =============================================================================
-// 1. INTERFACES
+// 2. INTERFACES & CONSTANTS
 // =============================================================================
 
 interface CreateSprintModalProps {
@@ -39,82 +43,109 @@ const INITIAL_FORM_DATA: SprintFormData = {
 };
 
 // =============================================================================
-// 2. MAIN COMPONENT
+// 3. MAIN COMPONENT
 // =============================================================================
 
+/**
+ * Modal tạo Sprint mới (Create Sprint Modal).
+ * Giao diện nhập liệu cấu hình chu kỳ làm việc bao gồm Tên, Mục tiêu và Thời gian.
+ */
 export function CreateSprintModal({
   isOpen,
   onClose,
   projectId,
   onCreated,
 }: CreateSprintModalProps) {
-  // --- STATE ---
+  
+  // ---------------------------------------------------------------------------
+  // 4. STATE
+  // ---------------------------------------------------------------------------
+  
   const [formData, setFormData] = useState<SprintFormData>(INITIAL_FORM_DATA);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // --- HANDLERS ---
-  const handleCreate = async () => {
-    setError(null);
+  // ---------------------------------------------------------------------------
+  // 5. HANDLERS
+  // ---------------------------------------------------------------------------
 
-    // Validation logic (giữ nguyên logic gốc: kiểm tra tên, ngày bắt đầu và kết thúc)
-    if (!formData.name.trim()) return setError("Sprint name cannot be empty.");
-    if (!formData.startDate || !formData.endDate)
-      return setError("Start and end dates must be selected.");
+  /**
+   * Helper cập nhật Form State an toàn, đồng thời xóa lỗi hiển thị khi người dùng gõ lại
+   */
+  const handleUpdateForm = useCallback((field: keyof SprintFormData, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+    if (errorMsg) setErrorMsg(null);
+  }, [errorMsg]);
 
+  /**
+   * Xác thực và gọi API để khởi tạo Sprint
+   */
+  const handleCreateSprint = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setErrorMsg(null);
+
+    // Xác thực dữ liệu đầu vào (Client-side validation)
+    if (!formData.name.trim()) {
+      return setErrorMsg("Sprint name cannot be empty.");
+    }
+    if (!formData.startDate || !formData.endDate) {
+      return setErrorMsg("Start and end dates must be selected.");
+    }
+    if (new Date(formData.startDate) > new Date(formData.endDate)) {
+      return setErrorMsg("End date cannot be earlier than start date.");
+    }
+
+    setIsLoading(true);
     try {
-      setLoading(true);
-
-      // Payload API
       const payload = {
         name: formData.name.trim(),
         goal: formData.goal.trim(),
         startDate: formData.startDate,
         endDate: formData.endDate,
-        taskIds: [], // Dù không dùng Task IDs ở đây, vẫn thêm key theo yêu cầu của API nếu cần
+        taskIds: [], // API yêu cầu mảng rỗng nếu chưa có Task khởi tạo cùng lúc
       };
 
       await createSprint(projectId, payload);
 
-      // Thành công
+      // Kích hoạt callback tải lại dữ liệu bảng và đóng Modal
       onCreated();
       onClose();
-
-      // Reset form
       setFormData(INITIAL_FORM_DATA);
-    } catch (err: any) {
-      // Sử dụng message từ API trả về (nếu có)
-      const message =
-        err.message ||
-        err.response?.data?.message ||
-        "Failed to create Sprint.";
-      setError(message);
+    } catch (error: any) {
+      // Ưu tiên thông báo lỗi chi tiết từ Backend
+      const message = error.response?.data?.message || error.message || "Failed to initialize Sprint.";
+      setErrorMsg(message);
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
-  // --- RENDER GUARD ---
+  // ---------------------------------------------------------------------------
+  // 6. RENDER LOGIC
+  // ---------------------------------------------------------------------------
+
   if (!isOpen) return null;
 
-  // --- RENDER UI ---
   return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur-[2px] z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+      
+      {/* KHỐI MODAL */}
       <Card
-        className="w-full max-w-lg bg-white border border-slate-200 shadow-2xl rounded-xl overflow-hidden animate-in zoom-in-95 duration-200"
-        onClick={(e) => e.stopPropagation()} // Ngăn click vào backdrop đóng modal
+        className="w-full max-w-lg bg-white border border-slate-200 shadow-2xl rounded-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200"
+        onClick={(e) => e.stopPropagation()} 
       >
-        {/* HEADER */}
-        <CardHeader className="bg-white border-b border-slate-100 px-6 py-5 flex flex-row items-center justify-between sticky top-0 z-10">
+        
+        {/* ================= HEADER ================= */}
+        <CardHeader className="bg-white border-b border-slate-100 px-6 py-5 flex flex-row items-center justify-between shrink-0">
           <div className="flex items-center gap-4">
-            <div className="w-10 h-10 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center shadow-sm">
-              <Rocket className="w-5 h-5 text-blue-600" />
+            <div className="w-10 h-10 rounded-xl bg-[#E3F2FD] border border-[#2684FF]/20 flex items-center justify-center shadow-sm">
+              <Rocket className="w-5 h-5 text-[#0052CC]" />
             </div>
             <div>
-              <CardTitle className="text-xl text-slate-900 font-bold">
+              <CardTitle className="text-lg text-slate-800 font-bold tracking-tight">
                 Create Sprint
               </CardTitle>
-              <p className="text-slate-500 text-xs font-medium mt-0.5">
+              <p className="text-slate-400 text-[11px] font-bold uppercase tracking-widest mt-0.5">
                 Plan your next iteration
               </p>
             </div>
@@ -122,127 +153,126 @@ export function CreateSprintModal({
 
           <button
             onClick={onClose}
-            className="p-2 rounded-md hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-[#091E4214] transition-colors active:scale-95"
+            disabled={isLoading}
+            title="Cancel"
           >
             <X className="w-5 h-5" />
           </button>
         </CardHeader>
 
-        {/* BODY */}
-        <CardContent className="p-6 space-y-5">
-          {/* Error Message */}
-          {error && (
-            <div className="p-3 bg-red-50 border border-red-200 text-red-800 rounded-md text-sm font-semibold flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-red-600"></span>
-              {error}
-            </div>
-          )}
+        {/* ================= BODY FORM ================= */}
+        <div className="flex-1 overflow-y-auto px-8 py-6 bg-white custom-scrollbar">
+          <form onSubmit={handleCreateSprint} className="space-y-6">
+            
+            {/* Thông báo lỗi (Error Banner) */}
+            {errorMsg && (
+              <div className="p-3.5 bg-red-50 border border-red-100 text-red-700 rounded-lg text-[13px] font-medium flex items-start gap-2.5 animate-in fade-in duration-200">
+                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-red-600" />
+                <span className="leading-snug">{errorMsg}</span>
+              </div>
+            )}
 
-          {/* Sprint Name */}
-          <div className="space-y-1.5">
-            <label className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-              <Target className="w-4 h-4 text-blue-600" />
-              Sprint Name <span className="text-red-500">*</span>
-            </label>
-            <Input
-              value={formData.name}
-              onChange={(e) =>
-                setFormData({ ...formData, name: e.target.value })
-              }
-              placeholder="e.g., Sprint 3 - Core Features"
-              className="h-10 border-slate-300 rounded-md text-sm text-slate-900 font-medium focus:ring-2 focus:ring-blue-100 focus:border-blue-600 transition-all shadow-sm placeholder:text-slate-400"
-              disabled={loading}
-            />
-          </div>
-
-          {/* Sprint Goal */}
-          <div className="space-y-1.5">
-            <label className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-              <Target className="w-4 h-4 text-slate-500" />
-              Sprint Goal
-            </label>
-            <Textarea
-              value={formData.goal}
-              onChange={(e) =>
-                setFormData({ ...formData, goal: e.target.value })
-              }
-              placeholder="What do you want to achieve in this sprint?"
-              rows={3}
-              className="resize-none border-slate-300 rounded-md text-sm text-slate-900 font-medium focus:ring-2 focus:ring-blue-100 focus:border-blue-600 transition-all shadow-sm placeholder:text-slate-400"
-              disabled={loading}
-            />
-          </div>
-
-          {/* Dates */}
-          <div className="grid grid-cols-2 gap-5">
+            {/* Tên Sprint (Sprint Name) */}
             <div className="space-y-1.5">
-              <label className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-slate-500" />
-                Start Date <span className="text-red-500">*</span>
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                <Target className="w-3.5 h-3.5" />
+                Sprint Name <span className="text-red-500">*</span>
               </label>
               <Input
-                type="date"
-                value={formData.startDate}
-                onChange={(e) =>
-                  setFormData({ ...formData, startDate: e.target.value })
-                }
-                className="w-full h-10 px-3 py-2 border border-slate-300 rounded-md text-sm text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-600 transition-all shadow-sm"
-                disabled={loading}
+                value={formData.name}
+                onChange={(e) => handleUpdateForm("name", e.target.value)}
+                placeholder="e.g. Sprint 3 - Core Features"
+                className="h-11 border-slate-300 text-[13px] font-medium focus:ring-2 focus:ring-blue-100 focus:border-[#2684FF] transition-all shadow-sm bg-white"
+                autoFocus
+                disabled={isLoading}
               />
             </div>
 
+            {/* Mục tiêu Sprint (Sprint Goal) */}
             <div className="space-y-1.5">
-              <label className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-slate-500" />
-                End Date <span className="text-red-500">*</span>
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                <Target className="w-3.5 h-3.5" />
+                Sprint Goal
               </label>
-              <Input
-                type="date"
-                value={formData.endDate}
-                onChange={(e) =>
-                  setFormData({ ...formData, endDate: e.target.value })
-                }
-                className="w-full h-10 px-3 py-2 border border-slate-300 rounded-md text-sm text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-600 transition-all shadow-sm"
-                disabled={loading}
+              <Textarea
+                value={formData.goal}
+                onChange={(e) => handleUpdateForm("goal", e.target.value)}
+                placeholder="What is the main objective of this iteration?"
+                rows={3}
+                className="resize-none border-slate-300 text-[13px] focus:ring-2 focus:ring-blue-100 focus:border-[#2684FF] transition-all shadow-sm bg-slate-50 focus:bg-white placeholder:text-slate-400 p-3"
+                disabled={isLoading}
               />
             </div>
-          </div>
 
-          {/* Actions */}
-          <div className="flex justify-end gap-3 pt-6 mt-2 border-t border-slate-100">
-            <Button
-              variant="outline"
-              onClick={onClose}
-              className="h-10 px-5 text-sm font-semibold text-slate-700 border-slate-300 hover:bg-slate-50 hover:text-slate-900 transition-colors"
-              disabled={loading}
-            >
-              Cancel
-            </Button>
+            {/* Khung thời gian (Dates Grid) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                  <Calendar className="w-3.5 h-3.5" />
+                  Start Date <span className="text-red-500">*</span>
+                </label>
+                <Input
+                  type="date"
+                  value={formData.startDate}
+                  onChange={(e) => handleUpdateForm("startDate", e.target.value)}
+                  className="h-11 border-slate-300 text-[13px] font-medium focus:ring-2 focus:ring-blue-100 focus:border-[#2684FF] transition-all shadow-sm bg-white cursor-pointer"
+                  disabled={isLoading}
+                />
+              </div>
 
-            <Button
-              onClick={handleCreate}
-              disabled={
-                loading ||
-                !formData.name.trim() ||
-                !formData.startDate ||
-                !formData.endDate
-              }
-              className="h-10 px-6 text-sm font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-lg transition-all active:scale-95"
-            >
-              {loading ? (
-                <span className="flex items-center gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Creating...
-                </span>
-              ) : (
-                <span className="flex items-center gap-2">
-                  <Rocket className="w-4 h-4" />
-                  Create Sprint
-                </span>
-              )}
-            </Button>
-          </div>
-        </CardContent>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                  <Calendar className="w-3.5 h-3.5" />
+                  End Date <span className="text-red-500">*</span>
+                </label>
+                <Input
+                  type="date"
+                  value={formData.endDate}
+                  onChange={(e) => handleUpdateForm("endDate", e.target.value)}
+                  className="h-11 border-slate-300 text-[13px] font-medium focus:ring-2 focus:ring-blue-100 focus:border-[#2684FF] transition-all shadow-sm bg-white cursor-pointer"
+                  disabled={isLoading}
+                />
+              </div>
+            </div>
+
+            {/* Nút Submit ẩn để bắt sự kiện phím Enter */}
+            <button type="submit" className="hidden" />
+          </form>
+        </div>
+
+        {/* ================= FOOTER ================= */}
+        <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-100 bg-slate-50 shrink-0">
+          <Button
+            variant="ghost"
+            onClick={onClose}
+            className="h-10 px-5 text-[12px] uppercase tracking-widest font-bold text-slate-500 hover:text-slate-800 hover:bg-[#091E4214] transition-colors"
+            disabled={isLoading}
+          >
+            Cancel
+          </Button>
+
+          <Button
+            onClick={() => handleCreateSprint()}
+            disabled={isLoading || !formData.name.trim() || !formData.startDate || !formData.endDate}
+            className={cn(
+              "h-10 px-6 text-[12px] uppercase tracking-widest font-bold text-white shadow-md transition-all",
+              "bg-[#0052CC] hover:bg-[#0047B3] active:scale-95 disabled:opacity-50"
+            )}
+          >
+            {isLoading ? (
+              <span className="flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Initializing
+              </span>
+            ) : (
+              <span className="flex items-center gap-2">
+                <Rocket className="w-4 h-4" />
+                Create Sprint
+              </span>
+            )}
+          </Button>
+        </div>
       </Card>
     </div>
   );

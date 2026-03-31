@@ -1,70 +1,107 @@
 "use client";
 
-import { useState } from "react";
+// =============================================================================
+// 1. IMPORT
+// =============================================================================
+
+import React, { useState, useCallback } from "react";
 import { Plus, Loader2 } from "lucide-react";
+
+// Internal UI Components & Services
 import { Button } from "@/components/ui/Buttons";
 import { createSprint } from "@/services/apiSprint";
 import { useToast } from "@/components/ui/ToastProvider";
 
+// Internal Utils
+import { cn } from "@/lib/utils";
+
 // =============================================================================
-// 1. INTERFACES
+// 2. INTERFACES
 // =============================================================================
 
 interface QuickSprintButtonProps {
-  projectId: number; // Chỉ cần projectId để tạo Sprint
-  onSuccess: () => void; // Callback reload list sau khi tạo
+  projectId: number; // Định danh dự án để khởi tạo Sprint
+  onSuccess: () => void; // Hàm gọi lại để làm mới danh sách sau khi tạo thành công
 }
 
 // =============================================================================
-// 2. MAIN COMPONENT
+// 3. MAIN COMPONENT
 // =============================================================================
 
+/**
+ * Nút khởi tạo Sprint nhanh (Quick Sprint Creator).
+ * Tự động tạo một Sprint mới với các giá trị mặc định từ hệ thống mà không cần mở Modal.
+ */
 export default function QuickSprintButton({
   projectId,
   onSuccess,
 }: QuickSprintButtonProps) {
-  // --- HOOKS ---
+  
+  // ---------------------------------------------------------------------------
+  // 4. HOOKS & STATE
+  // ---------------------------------------------------------------------------
+  
   const { showToast } = useToast();
-  const [isLoading, setIsLoading] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
 
-  // --- HANDLER: QUICK CREATE ---
-  const handleQuickCreate = async () => {
+  // ---------------------------------------------------------------------------
+  // 5. HANDLERS
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Xử lý kích hoạt tạo Sprint
+   */
+  const handleQuickCreate = useCallback(async () => {
+    if (isProcessing) return;
+
+    setIsProcessing(true);
     try {
-      setIsLoading(true);
-
-      // Gọi API tạo Sprint nhanh. Payload rỗng -> Backend tự sinh tên "Sprint {N}"
-      // Payload cũng phải bao gồm taskIds (mảng rỗng) nếu API yêu cầu
+      // Gọi API tạo Sprint. 
+      // Payload rỗng giúp Backend tự nhận diện số thứ tự Sprint tiếp theo (ví dụ: Sprint 5).
       await createSprint(projectId, { taskIds: [] });
 
-      showToast("Sprint created successfully!", "success");
-      onSuccess(); // Reload lại danh sách bên ngoài
+      showToast("Next sprint created successfully", "success");
+      
+      // Kích hoạt callback để component cha tải lại dữ liệu mới nhất
+      onSuccess();
     } catch (error: any) {
-      console.error(error);
-      // Sử dụng message từ API trả về (nếu có)
-      const message =
-        error.message ||
-        error.response?.data?.message ||
-        "Could not create sprint.";
-      showToast(message, "error");
+      console.error("Quick Create Sprint Error:", error);
+      
+      const errorMessage = 
+        error.response?.data?.message || 
+        error.message || 
+        "Failed to create new sprint";
+        
+      showToast(errorMessage, "error");
     } finally {
-      setIsLoading(false);
+      setIsProcessing(false);
     }
-  };
+  }, [isProcessing, projectId, onSuccess, showToast]);
 
-  // --- RENDER ---
+  // ---------------------------------------------------------------------------
+  // 6. RENDER LOGIC
+  // ---------------------------------------------------------------------------
+
   return (
     <Button
       onClick={handleQuickCreate}
-      disabled={isLoading}
+      disabled={isProcessing}
       variant="outline"
-      className="w-full border-dashed border-2 border-slate-300 bg-slate-50/50 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-600 text-slate-500 h-10 font-semibold mb-8 transition-all"
-    >
-      {isLoading ? (
-        <Loader2 className="w-4 h-4 animate-spin mr-2" />
-      ) : (
-        <Plus className="w-4 h-4 mr-2" />
+      className={cn(
+        "w-full h-11 mb-8 transition-all duration-200 border-2 border-dashed select-none",
+        "bg-slate-50/50 border-slate-200 text-slate-500",
+        "hover:bg-[#E3F2FD] hover:border-[#2684FF] hover:text-[#0052CC] hover:shadow-sm",
+        "active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed",
+        "text-[12px] font-bold uppercase tracking-widest"
       )}
-      Create Next Sprint
+    >
+      {isProcessing ? (
+        <Loader2 className="w-4 h-4 animate-spin mr-2.5" />
+      ) : (
+        <Plus className="w-4 h-4 mr-2.5" />
+      )}
+      
+      {isProcessing ? "Initializing..." : "Create Next Sprint"}
     </Button>
   );
 }

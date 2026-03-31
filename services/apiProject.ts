@@ -3,9 +3,16 @@
 import apiClient from "@/lib/apiClient";
 
 // =============================================================================
-// 1. SHARED INTERFACES & ENUMS (Dùng chung)
+// INTERFACES & ENUMS
 // =============================================================================
 
+// -----------------------------------------------------------------------------
+// Dữ liệu dùng chung (Shared)
+// -----------------------------------------------------------------------------
+
+/**
+ * Cấu trúc phản hồi phân trang chuẩn
+ */
 export interface PageResponse<T> {
   content: T[];
   pageNumber: number;
@@ -16,6 +23,9 @@ export interface PageResponse<T> {
   first: boolean;
 }
 
+/**
+ * Các loại công việc trong hệ thống
+ */
 export enum TaskType {
   STORY = 'STORY',
   TASK = 'TASK',
@@ -24,6 +34,9 @@ export enum TaskType {
   SUBTASK = 'SUBTASK'
 }
 
+/**
+ * Các mức độ ưu tiên của công việc
+ */
 export enum TaskPriority {
   LOW = 'LOW',
   MEDIUM = 'MEDIUM',
@@ -31,10 +44,13 @@ export enum TaskPriority {
   URGENT = 'URGENT'
 }
 
-// =============================================================================
-// 2. PROJECT INTERFACES (Liên quan đến Dự án)
-// =============================================================================
+// -----------------------------------------------------------------------------
+// Dữ liệu Dự án (Project)
+// -----------------------------------------------------------------------------
 
+/**
+ * Thông tin chi tiết của một dự án
+ */
 export interface Project {
   id: number;
   workspaceId: number;
@@ -57,6 +73,9 @@ export interface Project {
   updatedAt: string;
 }
 
+/**
+ * Dữ liệu yêu cầu để tạo dự án mới
+ */
 export interface ProjectRequest {
   name: string;
   projectCode: string;
@@ -64,13 +83,16 @@ export interface ProjectRequest {
   goal?: string | null;
   coverImageUrl?: string | null;
   priority?: "LOW" | "MEDIUM" | "HIGH";
-  startDate?: string | null; // YYYY-MM-DD
-  dueDate?: string | null;   // YYYY-MM-DD
+  startDate?: string | null;
+  dueDate?: string | null;
   managerId?: number | null;
   projectTypeId?: number | null;
-  boardConfig?: any;         // object -> sẽ stringify ở backend
+  boardConfig?: any;
 }
 
+/**
+ * Dữ liệu yêu cầu để cập nhật dự án
+ */
 export interface UpdateProjectPayload {
   name?: string;
   projectCode?: string;
@@ -86,18 +108,19 @@ export interface UpdateProjectPayload {
   file?: File | null;
 }
 
-// =============================================================================
-// 3. TASK & BACKLOG INTERFACES (Liên quan đến Công việc)
-// =============================================================================
+// -----------------------------------------------------------------------------
+// Dữ liệu Công việc (Task & Backlog)
+// -----------------------------------------------------------------------------
 
-// --- Sub-objects ---
 export interface TaskStatusObj { id: number; name: string; color: string; isCompleted: boolean; }
 export interface TaskEpicObj { id: number; name: string; color: string; }
 export interface TaskAssigneeObj { id: number; name: string; avatarUrl: string; }
 export interface TaskTagObj { id: number; name: string; color: string; }
 export interface SubtaskSummaryObj { total: number; completed: number; }
 
-// --- Task DTOs ---
+/**
+ * Dữ liệu yêu cầu để tạo công việc mới
+ */
 export interface CreateTaskPayload {
   title: string; 
   description?: string;
@@ -111,6 +134,9 @@ export interface CreateTaskPayload {
   dueDate?: string; 
 }
 
+/**
+ * Thông tin phản hồi chi tiết của một công việc
+ */
 export interface TaskResponse {
   id: number;
   taskCode: string;
@@ -129,6 +155,9 @@ export interface TaskResponse {
   subtaskSummary: SubtaskSummaryObj;
 }
 
+/**
+ * Thông tin tóm tắt của công việc
+ */
 export interface TaskSummary {
   id: number;
   taskCode: string;
@@ -146,9 +175,11 @@ export interface TaskSummary {
   subtaskSummary?: SubtaskSummaryObj;
 }
 
-// --- Grouped & Filter ---
 export interface TasksGroupedResponse extends Record<string, TaskResponse[]> {}
 
+/**
+ * Tham số lọc danh sách công việc của dự án
+ */
 export interface ProjectTaskFilterParams {
   sprintId?: number | 0 | null; 
   search?: string;              
@@ -162,6 +193,9 @@ export interface ProjectTaskFilterParams {
   sortDir?: 'asc' | 'desc';
 }
 
+/**
+ * Tham số lọc danh sách công việc đã lưu trữ
+ */
 export interface ArchivedTaskParams {
   page?: number;
   size?: number;
@@ -171,7 +205,9 @@ export interface ArchivedTaskParams {
   taskType?: string;
 }
 
-// --- Sprint & Backlog ---
+/**
+ * Thông tin chi tiết của một Sprint
+ */
 export interface SprintDetail {
   id: number;
   name: string;
@@ -185,6 +221,9 @@ export interface SprintDetail {
   tasks: TaskSummary[]; 
 }
 
+/**
+ * Thông tin phản hồi của Backlog dự án
+ */
 export interface ProjectBacklogResponse {
   activeSprints: SprintDetail[]; 
   backlogTasks: TaskSummary[];   
@@ -194,6 +233,9 @@ export interface ProjectBacklogResponse {
   backlogTotalPages: number;
 }
 
+/**
+ * Tham số truy vấn danh sách Backlog
+ */
 export interface BacklogQueryParams {
   keyword?: string;
   priority?: string;
@@ -205,10 +247,13 @@ export interface BacklogQueryParams {
   sortDir?: 'asc' | 'desc';
 }
 
-// =============================================================================
-// 4. MEMBER & INVITATION INTERFACES (Thành viên & Lời mời)
-// =============================================================================
+// -----------------------------------------------------------------------------
+// Dữ liệu Thành viên & Lời mời (Member & Invitation)
+// -----------------------------------------------------------------------------
 
+/**
+ * Thông tin thành viên trong dự án
+ */
 export interface ProjectMember {
   memberId: number;
   userId: number;
@@ -221,6 +266,9 @@ export interface ProjectMember {
   status: string;
 }
 
+/**
+ * Thông tin lời mời gia nhập dự án
+ */
 export interface ProjectInvitation {
   id: number;
   email: string;
@@ -232,6 +280,9 @@ export interface ProjectInvitation {
   invitationLink?: string; 
 }
 
+/**
+ * Tham số tìm kiếm danh sách lời mời
+ */
 export interface InvitationSearchParams {
   page: number;
   size: number;
@@ -242,11 +293,11 @@ export interface InvitationSearchParams {
 }
 
 // =============================================================================
-// 5. UTILS (Hàm tiện ích)
+// INTERNAL HELPERS
 // =============================================================================
 
 /**
- * Loại bỏ các param null/undefined/rỗng để URL sạch sẽ
+ * Loại bỏ các tham số không có giá trị để làm sạch URL truy vấn
  */
 const cleanParams = (params: any) => {
   if (!params) return {};
@@ -256,44 +307,64 @@ const cleanParams = (params: any) => {
 };
 
 // =============================================================================
-// 6. API METHODS IMPLEMENTATION
+// API METHODS
 // =============================================================================
 
 // -----------------------------------------------------------------------------
-// 6.1 Project Management (CRUD)
+// 1. Quản lý Dự án (Project Management)
 // -----------------------------------------------------------------------------
 
+/**
+ * Lấy danh sách dự án thuộc không gian làm việc
+ */
 export const getProjects = async (
   companyId: number,
   workspaceId: number,
   params: any = {}
 ): Promise<PageResponse<Project>> => {
-  const res = await apiClient.get(
-    `/companies/${companyId}/workspaces/${workspaceId}/projects`,
-    { params: cleanParams(params) }
-  );
-  if (!res.data.success) throw new Error(res.data.message || "Failed to fetch projects.");
-  return res.data.data;
+  try {
+    const url = `/companies/${companyId}/workspaces/${workspaceId}/projects`;
+    const res = await apiClient.get(url, { params: cleanParams(params) });
+    
+    if (!res.data.success) {
+      throw new Error(res.data.message || "Failed to fetch projects");
+    }
+    return res.data.data;
+  } catch (err: any) {
+    const errorMsg = err.response?.data?.message || "An error occurred while fetching projects";
+    throw new Error(errorMsg);
+  }
 };
 
+/**
+ * Tìm kiếm dự án theo từ khóa và bộ lọc
+ */
 export const searchProjects = async (
   companyId: number,
   workspaceId: number,
   params: any = {}
 ): Promise<PageResponse<Project>> => {
-  const res = await apiClient.get(
-    `/companies/${companyId}/workspaces/${workspaceId}/projects/search`,
-    { params: cleanParams(params) }
-  );
-  if (!res.data.success) throw new Error(res.data.message || "Failed to search projects.");
-  return res.data.data;
+  try {
+    const url = `/companies/${companyId}/workspaces/${workspaceId}/projects/search`;
+    const res = await apiClient.get(url, { params: cleanParams(params) });
+
+    if (!res.data.success) {
+      throw new Error(res.data.message || "Failed to search projects");
+    }
+    return res.data.data;
+  } catch (err: any) {
+    const errorMsg = err.response?.data?.message || "An error occurred while searching projects";
+    throw new Error(errorMsg);
+  }
 };
 
+/**
+ * Lấy danh sách các dự án đã bị xóa (thùng rác)
+ */
 export const getTrashedProjects = async (
   companyId: number,
   workspaceId: number
 ): Promise<Project[]> => {
-  // Tái sử dụng hàm getProjects với filter status DELETED
   const data = await getProjects(companyId, workspaceId, {
     page: 0,
     size: 200,
@@ -302,6 +373,9 @@ export const getTrashedProjects = async (
   return data.content;
 };
 
+/**
+ * Khởi tạo dự án mới (Hỗ trợ tải lên ảnh bìa)
+ */
 export const createProject = async (
   companyId: number,
   workspaceId: number,
@@ -310,23 +384,32 @@ export const createProject = async (
 ): Promise<Project> => {
   const formData = new FormData();
   
-  // Backend Spring Boot: JSON body nằm trong key "data"
+  // Đóng gói JSON payload thành Blob để Backend Spring Boot xử lý @RequestPart
   formData.append("data", new Blob([JSON.stringify(payload)], { type: "application/json" }));
   
   if (file) {
     formData.append("file", file);
   }
 
-  const res = await apiClient.post(
-    `/companies/${companyId}/workspaces/${workspaceId}/projects`,
-    formData,
-    { headers: { "Content-Type": "multipart/form-data" } }
-  );
+  try {
+    const url = `/companies/${companyId}/workspaces/${workspaceId}/projects`;
+    const res = await apiClient.post(url, formData, { 
+      headers: { "Content-Type": "multipart/form-data" } 
+    });
 
-  if (!res.data?.success) throw new Error(res.data?.message || "Failed to create project.");
-  return res.data.data;
+    if (!res.data?.success) {
+      throw new Error(res.data?.message || "Failed to create project");
+    }
+    return res.data.data;
+  } catch (err: any) {
+    const errorMsg = err.response?.data?.message || "An error occurred while creating project";
+    throw new Error(errorMsg);
+  }
 };
 
+/**
+ * Cập nhật thông tin chi tiết của dự án
+ */
 export const updateProject = async (
   companyId: number,
   workspaceId: number,
@@ -335,7 +418,6 @@ export const updateProject = async (
 ): Promise<Project> => {
   const formData = new FormData();
   
-  // Chuẩn bị JSON Payload
   const jsonPart = {
     name: payload.name,
     projectCode: payload.projectCode,
@@ -349,65 +431,102 @@ export const updateProject = async (
     boardConfig: JSON.stringify(payload.boardConfig || {}),
   };
 
-  const jsonBlob = new Blob([JSON.stringify(jsonPart)], { type: "application/json" });
-  formData.append("data", jsonBlob);
+  formData.append("data", new Blob([JSON.stringify(jsonPart)], { type: "application/json" }));
   
   if (payload.file) {
     formData.append("file", payload.file);
   }
 
-  const res = await apiClient.put(
-    `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}`,
-    formData,
-    { headers: { "Content-Type": "multipart/form-data" } }
-  );
+  try {
+    const url = `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}`;
+    const res = await apiClient.put(url, formData, { 
+      headers: { "Content-Type": "multipart/form-data" } 
+    });
 
-  if (!res.data.success) throw new Error(res.data.message || "Failed to update project.");
-  return res.data.data;
+    if (!res.data.success) {
+      throw new Error(res.data.message || "Failed to update project");
+    }
+    return res.data.data;
+  } catch (err: any) {
+    const errorMsg = err.response?.data?.message || "An error occurred while updating project";
+    throw new Error(errorMsg);
+  }
 };
 
+/**
+ * Xóa vĩnh viễn hoặc chuyển dự án vào thùng rác
+ */
 export const deleteProject = async (
   companyId: number,
   workspaceId: number,
   projectId: number
 ) => {
-  const res = await apiClient.delete(
-    `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}`
-  );
-  if (!res.data.success) throw new Error(res.data.message || "Failed to delete project.");
-  return res.data;
+  try {
+    const url = `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}`;
+    const res = await apiClient.delete(url);
+
+    if (!res.data.success) {
+      throw new Error(res.data.message || "Failed to delete project");
+    }
+    return res.data;
+  } catch (err: any) {
+    const errorMsg = err.response?.data?.message || "An error occurred while deleting project";
+    throw new Error(errorMsg);
+  }
 };
 
+/**
+ * Truy vấn thông tin chi tiết của một dự án cụ thể
+ */
 export const getProjectDetail = async (
   companyId: number,
   workspaceId: number,
   projectId: number
 ): Promise<Project> => {
-  const res = await apiClient.get(
-    `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}`
-  );
-  if (!res.data.success) throw new Error(res.data.message || "Failed to fetch project details.");
-  return res.data.data;
+  try {
+    const url = `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}`;
+    const res = await apiClient.get(url);
+
+    if (!res.data.success) {
+      throw new Error(res.data.message || "Failed to fetch project details");
+    }
+    return res.data.data;
+  } catch (err: any) {
+    const errorMsg = err.response?.data?.message || "An error occurred while fetching project details";
+    throw new Error(errorMsg);
+  }
 };
 
+/**
+ * Thay đổi trạng thái hiện tại của dự án
+ */
 export const updateProjectStatus = async (
   companyId: number,
   workspaceId: number,
   projectId: number,
   newStatus: string
 ) => {
-  const res = await apiClient.put(
-    `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/status`,
-    { newStatus }
-  );
-  if (!res.data.success) throw new Error(res.data.message || "Failed to update project status.");
-  return res.data.data;
+  try {
+    const url = `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/status`;
+    const res = await apiClient.put(url, { newStatus });
+
+    if (!res.data.success) {
+      throw new Error(res.data.message || "Failed to update project status");
+    }
+    return res.data.data;
+  } catch (err: any) {
+    const errorMsg = err.response?.data?.message || "An error occurred while updating project status";
+    throw new Error(errorMsg);
+  }
 };
 
 // -----------------------------------------------------------------------------
-// 6.2 Members & Invitations
+// 2. Thành viên & Lời mời (Members & Invitations)
 // -----------------------------------------------------------------------------
 
+/**
+ * Lấy danh sách các thành viên đang tham gia dự án
+ */
 export const getProjectMembers = async (
   companyId: number,
   workspaceId: number,
@@ -415,14 +534,23 @@ export const getProjectMembers = async (
   params: { page?: number; size?: number; sortBy?: string; sortDir?: string } = {}
 ): Promise<PageResponse<ProjectMember>> => {
   const defaultParams = { page: 0, size: 10, sortBy: "joinedAt", sortDir: "desc", ...params };
-  const res = await apiClient.get(
-    `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/members`,
-    { params: cleanParams(defaultParams) }
-  );
-  if (!res.data.success) throw new Error(res.data.message || "Failed to fetch members.");
-  return res.data.data;
+  try {
+    const url = `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/members`;
+    const res = await apiClient.get(url, { params: cleanParams(defaultParams) });
+
+    if (!res.data.success) {
+      throw new Error(res.data.message || "Failed to fetch members");
+    }
+    return res.data.data;
+  } catch (err: any) {
+    const errorMsg = err.response?.data?.message || "An error occurred while fetching members";
+    throw new Error(errorMsg);
+  }
 };
 
+/**
+ * Tìm kiếm thành viên dự án theo từ khóa
+ */
 export const searchProjectMembers = async (
   companyId: number,
   workspaceId: number,
@@ -430,14 +558,23 @@ export const searchProjectMembers = async (
   params: any
 ): Promise<PageResponse<ProjectMember>> => {
   const defaultParams = { page: 0, size: 10, sortBy: "joinedAt", sortDir: "desc", ...params };
-  const res = await apiClient.get(
-    `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/members/search`,
-    { params: cleanParams(defaultParams) }
-  );
-  if (!res.data.success) throw new Error(res.data.message || "Failed to search members.");
-  return res.data.data;
+  try {
+    const url = `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/members/search`;
+    const res = await apiClient.get(url, { params: cleanParams(defaultParams) });
+
+    if (!res.data.success) {
+      throw new Error(res.data.message || "Failed to search members");
+    }
+    return res.data.data;
+  } catch (err: any) {
+    const errorMsg = err.response?.data?.message || "An error occurred while searching members";
+    throw new Error(errorMsg);
+  }
 };
 
+/**
+ * Cập nhật vai trò của thành viên trong phạm vi dự án
+ */
 export const updateProjectMemberRole = async (
   companyId: number,
   workspaceId: number,
@@ -445,14 +582,23 @@ export const updateProjectMemberRole = async (
   memberId: number,
   roleCode: string
 ) => {
-  const res = await apiClient.put(
-    `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/members/${memberId}/role`,
-    { roleCode }
-  );
-  if (!res.data.success) throw new Error(res.data.message || "Failed to update role.");
-  return res.data.data;
+  try {
+    const url = `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/members/${memberId}/role`;
+    const res = await apiClient.put(url, { roleCode });
+
+    if (!res.data.success) {
+      throw new Error(res.data.message || "Failed to update role");
+    }
+    return res.data.data;
+  } catch (err: any) {
+    const errorMsg = err.response?.data?.message || "An error occurred while updating member role";
+    throw new Error(errorMsg);
+  }
 };
 
+/**
+ * Gửi lời mời tham gia dự án qua Email
+ */
 export const inviteProjectMember = async (
   companyId: number,
   workspaceId: number,
@@ -460,50 +606,72 @@ export const inviteProjectMember = async (
   data: { email: string; roleCode: string }
 ) => {
   try {
-    const res = await apiClient.post(
-      `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/members`,
-      data
-    );
+    const url = `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/members`;
+    const res = await apiClient.post(url, data);
+
     if (!res.data.success) {
-      throw new Error(res.data.message || "Failed to invite member.");
+      throw new Error(res.data.message || "Failed to invite member");
     }
     return res.data;
   } catch (err: any) {
-    throw new Error(err.response?.data?.message || "Could not invite member to project.");
+    const errorMsg = err.response?.data?.message || "Could not invite member to project";
+    throw new Error(errorMsg);
   }
 };
 
+/**
+ * Truy vấn danh sách toàn bộ lời mời đã gửi của dự án
+ */
 export const getProjectInvitations = async (
   companyId: number,
   workspaceId: number,
   projectId: number,
   params: InvitationSearchParams
 ): Promise<PageResponse<ProjectInvitation>> => {
-  const res = await apiClient.get(
-    `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/invitations`,
-    { params }
-  );
-  if (!res.data.success) throw new Error(res.data.message || "Failed to load invitations.");
-  return res.data.data;
+  try {
+    const url = `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/invitations`;
+    const res = await apiClient.get(url, { params });
+
+    if (!res.data.success) {
+      throw new Error(res.data.message || "Failed to load invitations");
+    }
+    return res.data.data;
+  } catch (err: any) {
+    const errorMsg = err.response?.data?.message || "An error occurred while loading invitations";
+    throw new Error(errorMsg);
+  }
 };
 
+/**
+ * Thu hồi lời mời gia nhập dự án đã gửi
+ */
 export const cancelProjectInvitation = async (
   companyId: number,
   workspaceId: number,
   projectId: number,
   invitationId: number
 ) => {
-  const res = await apiClient.delete(
-    `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/invitations/${invitationId}`
-  );
-  if (!res.data.success) throw new Error(res.data.message || "Failed to cancel invitation.");
-  return res.data;
+  try {
+    const url = `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/invitations/${invitationId}`;
+    const res = await apiClient.delete(url);
+
+    if (!res.data.success) {
+      throw new Error(res.data.message || "Failed to cancel invitation");
+    }
+    return res.data;
+  } catch (err: any) {
+    const errorMsg = err.response?.data?.message || "An error occurred while canceling invitation";
+    throw new Error(errorMsg);
+  }
 };
 
 // -----------------------------------------------------------------------------
-// 6.3 Task & Backlog Management
+// 3. Quản lý Công việc & Backlog (Task & Backlog Management)
 // -----------------------------------------------------------------------------
 
+/**
+ * Truy vấn thông tin Backlog và danh sách các Sprint đang hoạt động
+ */
 export const getProjectBacklog = async (
   companyId: number,
   workspaceId: number,
@@ -511,21 +679,30 @@ export const getProjectBacklog = async (
   queryParams?: BacklogQueryParams
 ): Promise<ProjectBacklogResponse> => {
   const params = cleanParams(queryParams);
-  const res = await apiClient.get(
-    `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/backlog`,
-    { params }
-  );
-  if (!res.data.success) throw new Error(res.data.message || "Failed to load backlog.");
-  return res.data.data; 
+  try {
+    const url = `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/backlog`;
+    const res = await apiClient.get(url, { params });
+
+    if (!res.data.success) {
+      throw new Error(res.data.message || "Failed to load backlog");
+    }
+    return res.data.data; 
+  } catch (err: any) {
+    const errorMsg = err.response?.data?.message || "An error occurred while loading backlog";
+    throw new Error(errorMsg);
+  }
 };
 
+/**
+ * Tạo mới một công việc trong dự án
+ */
 export const createProjectTask = async (
   companyId: number,
   workspaceId: number,
   projectId: number,
   payload: CreateTaskPayload
 ) => {
-  // Logic build payload thủ công để đảm bảo đúng format backend yêu cầu
+  // Chuẩn hóa dữ liệu yêu cầu trước khi gửi lên server
   const cleanPayload: any = {
     title: payload.title,
     taskType: payload.taskType || "TASK",    
@@ -539,29 +716,46 @@ export const createProjectTask = async (
   if (payload.storyPoints) cleanPayload.storyPoints = payload.storyPoints;
   if (payload.dueDate) cleanPayload.dueDate = payload.dueDate;
 
-  const res = await apiClient.post(
-    `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/tasks`,
-    cleanPayload
-  );
-  
-  if (!res.data.success) throw new Error(res.data.message || "Failed to create task.");
-  return res.data.data; 
+  try {
+    const url = `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/tasks`;
+    const res = await apiClient.post(url, cleanPayload);
+    
+    if (!res.data.success) {
+      throw new Error(res.data.message || "Failed to create task");
+    }
+    return res.data.data; 
+  } catch (err: any) {
+    const errorMsg = err.response?.data?.message || "An error occurred while creating task";
+    throw new Error(errorMsg);
+  }
 };
 
+/**
+ * Lấy danh sách công việc của dự án theo bộ lọc phân trang
+ */
 export const getProjectTasks = async (
   companyId: number,
   workspaceId: number,
   projectId: number,
   params: ProjectTaskFilterParams
 ): Promise<PageResponse<TaskResponse>> => {
-  const res = await apiClient.get(
-    `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/tasks`, 
-    { params: cleanParams(params) }
-  );
-  if (!res.data.success) throw new Error(res.data.message || "Failed to load tasks.");
-  return res.data.data;
+  try {
+    const url = `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/tasks`;
+    const res = await apiClient.get(url, { params: cleanParams(params) });
+
+    if (!res.data.success) {
+      throw new Error(res.data.message || "Failed to load tasks");
+    }
+    return res.data.data;
+  } catch (err: any) {
+    const errorMsg = err.response?.data?.message || "An error occurred while loading tasks";
+    throw new Error(errorMsg);
+  }
 };
 
+/**
+ * Lấy danh sách công việc được nhóm theo các tiêu chí (ví dụ: Status, Assignee)
+ */
 export const getTasksGrouped = async (
   companyId: number,
   workspaceId: number,
@@ -570,27 +764,41 @@ export const getTasksGrouped = async (
   sprintId?: number | 0 | null,
   search?: string
 ): Promise<TasksGroupedResponse> => {
-  const res = await apiClient.get(
-    `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/tasks/grouped`, 
-    {
+  try {
+    const url = `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/tasks/grouped`;
+    const res = await apiClient.get(url, {
       params: cleanParams({ groupBy, sprintId, search })
+    });
+
+    if (!res.data.success) {
+      throw new Error(res.data.message || "Failed to load grouped tasks");
     }
-  );
-  if (!res.data.success) throw new Error(res.data.message || "Failed to load grouped tasks.");
-  return res.data.data;
+    return res.data.data;
+  } catch (err: any) {
+    const errorMsg = err.response?.data?.message || "An error occurred while loading grouped tasks";
+    throw new Error(errorMsg);
+  }
 };
 
+/**
+ * Truy vấn danh sách các công việc đã được đưa vào kho lưu trữ (Archived)
+ */
 export const getArchivedTasks = async (
   companyId: number,
   workspaceId: number,
   projectId: number,
   params: ArchivedTaskParams
 ): Promise<PageResponse<TaskResponse>> => {
-  const res = await apiClient.get(
-    `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/archived-tasks`,
-    { params: cleanParams(params) } 
-  );
-  
-  if (!res.data.success) throw new Error(res.data.message || "Failed to load archived tasks.");
-  return res.data.data;
+  try {
+    const url = `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/archived-tasks`;
+    const res = await apiClient.get(url, { params: cleanParams(params) });
+    
+    if (!res.data.success) {
+      throw new Error(res.data.message || "Failed to load archived tasks");
+    }
+    return res.data.data;
+  } catch (err: any) {
+    const errorMsg = err.response?.data?.message || "An error occurred while loading archived tasks";
+    throw new Error(errorMsg);
+  }
 };

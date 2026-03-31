@@ -1,15 +1,41 @@
 "use client";
 
-import { Users, Briefcase, ChevronRight, Crown, Shield, Layout, Trash2, Zap } from 'lucide-react';
-import { useRouter } from 'next/navigation';
-// import { DashboardWorkspace } from "@/services/apiDashboard"; // Uncomment nếu cần type chặt
+// =============================================================================
+// 1. IMPORTS (Thư viện -> Internal -> Styles)
+// =============================================================================
+
+import React from "react";
+import { useRouter } from "next/navigation";
+import { 
+    Users, Briefcase, ChevronRight, Crown, 
+    Shield, Layout, Trash2 
+} from "lucide-react";
+
+import { cn } from "@/lib/utils";
 
 // =============================================================================
-// 1. INTERFACES
+// 2. INTERFACES
 // =============================================================================
+
+/**
+ * Định nghĩa cấu trúc dữ liệu cho Workspace dựa trên các trường được sử dụng.
+ * Giúp loại bỏ 'any' để TypeScript hỗ trợ tốt hơn.
+ */
+interface WorkspaceData {
+    workspaceId: number;
+    workspaceName: string;
+    description?: string;
+    workspaceDescription?: string;
+    roleCode?: string;
+    roleName?: string;
+    coverImage?: string;
+    color?: string;
+    memberCount?: number;
+    projectCount?: number;
+}
 
 interface WorkspaceCardProps {
-    workspace: any; // Sử dụng 'any' để tránh phụ thuộc vào type chưa có
+    workspace: WorkspaceData;
     isImpersonating?: boolean;
     onNavigate?: (id: number) => void; 
     onDelete?: (id: number) => void;
@@ -17,9 +43,13 @@ interface WorkspaceCardProps {
 }
 
 // =============================================================================
-// 2. MAIN COMPONENT
+// 3. MAIN COMPONENT
 // =============================================================================
 
+/**
+ * Thành phần thẻ hiển thị Workspace.
+ * Hỗ trợ chế độ xem dạng lưới (Grid) hoặc danh sách (List).
+ */
 export default function WorkspaceCard({ 
     workspace, 
     isImpersonating, 
@@ -27,22 +57,31 @@ export default function WorkspaceCard({
     onDelete,
     viewMode = "grid" 
 }: WorkspaceCardProps) {
+    
+    // ---------------------------------------------------------------------------
+    // 4. HOOKS
+    // ---------------------------------------------------------------------------
+    
     const router = useRouter();
 
-    // Safe check để tránh crash nếu workspace null
+    // Kiểm tra an toàn dữ liệu
     if (!workspace) return null;
 
-    // --- LOGIC UI ---
-    const roleIsAdmin = workspace.roleCode?.includes('ADMIN');
+    // ---------------------------------------------------------------------------
+    // 5. CALCULATIONS (Xử lý logic giao diện)
+    // ---------------------------------------------------------------------------
     
-    // Màu sắc Minimalist dựa trên Role
-    const roleColor = roleIsAdmin 
-        ? 'bg-amber-50 text-amber-700 border-amber-200' 
-        : 'bg-blue-50 text-blue-700 border-blue-200';
-        
-    const Icon = roleIsAdmin ? Crown : Shield;
+    const isAdmin = workspace.roleCode?.includes("ADMIN");
+    const roleName = workspace.roleName || (isAdmin ? "Admin" : "Member");
+    const RoleIcon = isAdmin ? Crown : Shield;
 
-    // Fallback function nếu không truyền onNavigate
+    // ---------------------------------------------------------------------------
+    // 6. HANDLERS (Các hàm xử lý sự kiện)
+    // ---------------------------------------------------------------------------
+
+    /**
+     * Xử lý điều hướng khi người dùng nhấp vào thẻ Workspace
+     */
     const handleNavigate = () => {
         if (onNavigate) {
             onNavigate(workspace.workspaceId);
@@ -50,131 +89,147 @@ export default function WorkspaceCard({
             router.push(`/core/workspace/${workspace.workspaceId}`);
         }
     };
+
+    /**
+     * Xử lý sự kiện xóa Workspace
+     */
+    const handleDelete = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (onDelete) {
+            onDelete(workspace.workspaceId);
+        }
+    };
+
+    // ---------------------------------------------------------------------------
+    // 7. RENDER: LIST VIEW
+    // ---------------------------------------------------------------------------
     
-    // --- Lấy Role Name chuẩn ---
-    const roleName = workspace.roleName || (roleIsAdmin ? 'Admin' : 'Member');
-
-
-    // ========================================================
-    // 1. LIST VIEW
-    // ========================================================
     if (viewMode === "list") {
         return (
             <div 
                 onClick={handleNavigate}
-                className="group flex items-center gap-3 p-3 bg-white border border-slate-200 rounded-lg hover:border-blue-400 hover:shadow-sm transition-all duration-200 cursor-pointer"
+                className={cn(
+                    "group flex items-center gap-4 p-3 bg-white border border-slate-200 rounded-xl transition-all duration-200 cursor-pointer shadow-sm",
+                    "hover:border-[#2684FF] hover:shadow-md active:scale-[0.99]"
+                )}
             >
-                {/* Thumbnail */}
-                <div className="w-10 h-10 shrink-0 rounded-md overflow-hidden bg-slate-100 border border-slate-200 flex items-center justify-center relative">
+                {/* Khối Hình ảnh (Thumbnail) */}
+                <div className="w-10 h-10 shrink-0 rounded-lg overflow-hidden bg-slate-50 border border-slate-200 flex items-center justify-center relative">
                     {workspace.coverImage ? (
-                        <img src={workspace.coverImage} alt="cover" className="w-full h-full object-cover" />
+                        <img src={workspace.coverImage} alt="Cover" className="w-full h-full object-cover" />
                     ) : (
                         <div 
                             className="w-full h-full flex items-center justify-center"
-                            style={{ backgroundColor: `${workspace.color || '#3B82F6'}20` }}
+                            style={{ backgroundColor: `${workspace.color || '#0052CC'}15` }}
                         >
-                            <Layout className="w-5 h-5" style={{ color: workspace.color || "#3B82F6" }} />
+                            <Layout className="w-4 h-4" style={{ color: workspace.color || "#0052CC" }} />
                         </div>
                     )}
                 </div>
 
-                {/* Content */}
+                {/* Khối Nội dung (Content) */}
                 <div className="flex-1 min-w-0">
-                    <div className="font-semibold text-slate-900 text-sm truncate group-hover:text-blue-600 transition-colors">
+                    <div className="font-bold text-[#172B4D] text-[14px] truncate group-hover:text-[#0052CC] transition-colors leading-tight">
                         {workspace.workspaceName}
                     </div>
-                    <div className="flex items-center gap-2 text-[10px] text-slate-500 mt-0.5">
-                        <span className={`inline-flex items-center gap-0.5 ${roleIsAdmin ? 'text-amber-600' : 'text-blue-600'}`}>
-                            {roleIsAdmin ? <Crown className="w-3 h-3" /> : <Shield className="w-3 h-3" />}
+                    <div className="flex items-center gap-2 mt-1">
+                        <span className={cn(
+                            "inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-sm border",
+                            isAdmin ? "text-amber-700 bg-amber-50 border-amber-200" : "text-[#0052CC] bg-blue-50 border-blue-200"
+                        )}>
+                            <RoleIcon className="w-3 h-3" />
                             {roleName}
                         </span>
                     </div>
                 </div>
 
-                {/* Action */}
-                <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-blue-600 group-hover:translate-x-0.5 transition-all" />
+                {/* Biểu tượng điều hướng */}
+                <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-[#0052CC] group-hover:translate-x-1 transition-transform" />
             </div>
         );
     }
 
-    // ========================================================
-    // 2. GRID VIEW (Mặc định)
-    // ========================================================
+    // ---------------------------------------------------------------------------
+    // 8. RENDER: GRID VIEW (Default)
+    // ---------------------------------------------------------------------------
+    
     return (
         <div 
             onClick={handleNavigate}
-            className="group relative bg-white border border-slate-200 rounded-xl shadow-sm hover:shadow-lg hover:border-blue-300 transition-all duration-200 cursor-pointer overflow-hidden flex flex-col h-full"
+            className={cn(
+                "group relative bg-white border border-slate-200 rounded-2xl shadow-sm transition-all duration-300 cursor-pointer overflow-hidden flex flex-col h-full",
+                "hover:shadow-xl hover:border-[#2684FF] hover:-translate-y-1 active:scale-[0.98]"
+            )}
         >
-            {/* Header Background */}
+            {/* Khối nền tiêu đề (Header Background) */}
             <div 
                 className="h-24 w-full relative border-b border-slate-100"
-                style={{ 
-                    backgroundColor: workspace.color ? `${workspace.color}15` : '#f1f5f9',
-                }}
+                style={{ backgroundColor: workspace.color ? `${workspace.color}15` : '#E3F2FD' }}
             >
-                {/* Icon Logo */}
-                <div 
-                    className="absolute bottom-0 left-6 translate-y-1/2 w-12 h-12 rounded-lg shadow-sm border-2 border-white flex items-center justify-center overflow-hidden bg-white"
-                >
+                {/* Logo Workspace */}
+                <div className="absolute bottom-0 left-6 translate-y-1/2 w-14 h-14 rounded-xl shadow-sm border-4 border-white flex items-center justify-center overflow-hidden bg-white">
                     {workspace.coverImage ? (
-                        <img src={workspace.coverImage} alt="logo" className="w-full h-full object-cover" />
+                        <img src={workspace.coverImage} alt="Logo" className="w-full h-full object-cover" />
                     ) : (
-                        <div className="w-full h-full flex items-center justify-center" style={{ backgroundColor: workspace.color || '#3b82f6' }}>
-                            <span className="text-white font-bold text-xl uppercase">
-                            {workspace.workspaceName.charAt(0)}
+                        <div className="w-full h-full flex items-center justify-center" style={{ backgroundColor: workspace.color || '#0052CC' }}>
+                            <span className="text-white font-black text-xl uppercase tracking-widest">
+                                {workspace.workspaceName.charAt(0)}
                             </span>
                         </div>
                     )}
                 </div>
 
-                {/* Role Badge */}
+                {/* Nhãn vai trò (Role Badge) */}
                 <div className="absolute top-3 right-3">
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide border rounded-sm ${roleColor}`}>
-                        <Icon className="w-3 h-3" />
+                    <span className={cn(
+                        "inline-flex items-center gap-1.5 px-2 py-1 text-[10px] font-black uppercase tracking-widest border rounded shadow-sm",
+                        isAdmin ? "bg-amber-50 text-amber-700 border-amber-200" : "bg-blue-50 text-[#0052CC] border-blue-200"
+                    )}>
+                        <RoleIcon className="w-3 h-3 stroke-[2.5]" />
                         {roleName}
                     </span>
                 </div>
             </div>
 
-            {/* Body */}
-            <div className="px-6 pt-8 pb-5 flex-1 flex flex-col">
-                <div className="mb-3">
-                    <h3 className="text-lg font-bold text-slate-900 truncate group-hover:text-blue-600 transition-colors">
+            {/* Khối Nội dung chính (Body) */}
+            <div className="px-6 pt-10 pb-5 flex-1 flex flex-col">
+                <div className="mb-4">
+                    <h3 className="text-[16px] font-bold text-[#172B4D] truncate group-hover:text-[#0052CC] transition-colors">
                         {workspace.workspaceName}
                     </h3>
-                    <p className="text-sm text-slate-500 line-clamp-2 mt-1 min-h-[40px]">
+                    <p className="text-[13px] text-slate-500 line-clamp-2 mt-1.5 min-h-[40px] leading-relaxed">
                         {workspace.description || workspace.workspaceDescription || "No description provided."}
                     </p>
                 </div>
 
-                {/* Stats */}
+                {/* Thống kê (Stats Footer) */}
                 <div className="mt-auto pt-4 border-t border-slate-100 flex items-center justify-between">
-                    <div className="flex items-center gap-4 text-xs font-medium text-slate-500">
-                        <div className="flex items-center gap-1.5" title="Members">
-                            <Users className="w-3.5 h-3.5" />
+                    <div className="flex items-center gap-4 text-[12px] font-bold text-slate-500">
+                        <div className="flex items-center gap-1.5 px-2 py-1 bg-slate-50 rounded-md border border-slate-100" title="Total Members">
+                            <Users className="w-3.5 h-3.5 text-slate-400" />
                             {workspace.memberCount || 0}
                         </div>
-                        <div className="flex items-center gap-1.5" title="Projects">
-                            <Briefcase className="w-3.5 h-3.5" />
+                        <div className="flex items-center gap-1.5 px-2 py-1 bg-slate-50 rounded-md border border-slate-100" title="Total Projects">
+                            <Briefcase className="w-3.5 h-3.5 text-slate-400" />
                             {workspace.projectCount || 0}
                         </div>
                     </div>
 
-                    {/* Hover Action */}
-                    <div className="flex items-center gap-1 text-blue-600 text-xs font-bold opacity-0 group-hover:opacity-100 transition-all translate-x-2 group-hover:translate-x-0">
-                        Open <ChevronRight className="w-3.5 h-3.5" />
+                    {/* Hiệu ứng khi hover (Hover Action) */}
+                    <div className="flex items-center gap-1 text-[#0052CC] text-[11px] font-black uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-all translate-x-2 group-hover:translate-x-0">
+                        Open <ChevronRight className="w-3.5 h-3.5 stroke-[2.5]" />
                     </div>
                 </div>
             </div>
             
-            {/* Delete Button (Only if onDelete provided) */}
+            {/* Nút Xóa (Chỉ hiển thị nếu có truyền prop onDelete) */}
             {onDelete && (
                 <button 
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        onDelete(workspace.workspaceId);
-                    }}
-                    className="absolute top-3 left-3 p-1.5 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all"
+                    onClick={handleDelete}
+                    className={cn(
+                        "absolute top-3 left-3 p-1.5 rounded-lg text-slate-400 bg-white/80 backdrop-blur-sm border border-transparent shadow-sm transition-all",
+                        "hover:text-red-600 hover:bg-red-50 hover:border-red-100 opacity-0 group-hover:opacity-100 active:scale-95"
+                    )}
                     title="Delete Workspace"
                 >
                     <Trash2 className="w-4 h-4" />

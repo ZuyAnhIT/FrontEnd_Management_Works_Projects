@@ -1,16 +1,23 @@
 "use client";
 
-import { useState } from "react";
+// =============================================================================
+// 1. IMPORT
+// =============================================================================
+
+// Thư viện bên ngoài
+import React, { useState, useCallback } from "react";
 import { 
   Building2, FileText, MapPin, Phone, Mail, Globe, LucideIcon 
 } from "lucide-react";
 
+// Internal Services & Components
 import { createCompany } from "@/services/apiCompany";
 import { useToast } from "@/components/ui/ToastProvider";
-import LoadingButton from "@/components/ui/LoadingButton";
+import { LoadingButton } from "@/components/ui/LoadingButton";
+import { cn } from "@/lib/utils";
 
 // =============================================================================
-// 1. INTERFACES & CONFIG
+// 2. INTERFACES & CONFIG
 // =============================================================================
 
 interface CreateCompanyFormProps {
@@ -36,7 +43,9 @@ const INITIAL_FORM_STATE: CompanyFormData = {
   website: "",
 };
 
-// Cấu hình cho các trường thông tin liên hệ (để render vòng lặp)
+/**
+ * Danh sách cấu hình các trường liên hệ để tự động hóa việc render
+ */
 const CONTACT_FIELDS: {
   key: keyof CompanyFormData;
   label: string;
@@ -44,137 +53,170 @@ const CONTACT_FIELDS: {
   placeholder: string;
   type?: string;
 }[] = [
-  { key: "address", label: "Address", icon: MapPin, placeholder: "123 Main St" },
-  { key: "phoneNumber", label: "Phone", icon: Phone, placeholder: "+1 (555) 000-0000" },
-  { key: "email", label: "Email", icon: Mail, placeholder: "contact@acme.com", type: "email" },
-  { key: "website", label: "Website", icon: Globe, placeholder: "https://acme.com" },
+  { key: "address", label: "Office Address", icon: MapPin, placeholder: "e.g. 123 Business Bay, NY" },
+  { key: "phoneNumber", label: "Phone Number", icon: Phone, placeholder: "+1 (555) 000-0000" },
+  { key: "email", label: "Business Email", icon: Mail, placeholder: "contact@company.com", type: "email" },
+  { key: "website", label: "Official Website", icon: Globe, placeholder: "https://company.com" },
 ];
 
 // =============================================================================
-// 2. MAIN COMPONENT
+// 3. MAIN COMPONENT
 // =============================================================================
 
+/**
+ * Biểu mẫu tạo mới Tổ chức/Công ty.
+ * Hỗ trợ thu thập thông tin cơ bản và thông tin liên lạc của doanh nghiệp.
+ */
 export default function CreateCompanyForm({ onSuccess, onCancel }: CreateCompanyFormProps) {
-  // --- HOOKS ---
+  
+  // ---------------------------------------------------------------------------
+  // 4. HOOKS & STATE
+  // ---------------------------------------------------------------------------
+  
   const { showToast } = useToast();
-  
-  // --- STATE ---
-  const [loading, setLoading] = useState(false);
-  const [form, setForm] = useState<CompanyFormData>(INITIAL_FORM_STATE);
+  const [isLoading, setIsLoading] = useState(false);
+  const [formData, setFormData] = useState<CompanyFormData>(INITIAL_FORM_STATE);
 
-  // --- HANDLERS ---
-  
-  // Hàm xử lý thay đổi input chung
-  const handleChange = (field: keyof CompanyFormData, value: string) => {
-    setForm((prev) => ({ ...prev, [field]: value }));
-  };
+  // ---------------------------------------------------------------------------
+  // 5. HANDLERS
+  // ---------------------------------------------------------------------------
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  /**
+   * Cập nhật trạng thái form khi người dùng nhập liệu
+   */
+  const handleInputChange = useCallback((field: keyof CompanyFormData, value: string) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+  }, []);
+
+  /**
+   * Xử lý gửi dữ liệu đăng ký công ty lên máy chủ
+   */
+  const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validate cơ bản
-    if (!form.companyName.trim()) {
-      showToast("Company name is required.", "warning");
+    // Kiểm tra tính hợp lệ cơ bản
+    if (!formData.companyName.trim()) {
+      showToast("Company name is required", "warning");
       return;
     }
 
+    setIsLoading(true);
     try {
-      setLoading(true);
+      // Gọi API nghiệp vụ tạo công ty
+      await createCompany(formData);
       
-      // Gọi API tạo công ty
-      await createCompany(form);
-      
-      showToast("Company created successfully!", "success");
-      onSuccess(); // Callback báo thành công
-    } catch (err: any) {
-      // Lấy message lỗi từ API trả về
-      const errorMessage = err.message || err.detail || "Failed to create company.";
+      showToast("Organization created successfully", "success");
+      onSuccess(); 
+    } catch (error: any) {
+      // Ưu tiên hiển thị message lỗi chi tiết từ Backend trả về
+      const errorMessage = error.message || error.detail || "Failed to create organization";
       showToast(errorMessage, "error");
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
-  // --- RENDER ---
+  // ---------------------------------------------------------------------------
+  // 6. RENDER
+  // ---------------------------------------------------------------------------
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-5">
+    <form onSubmit={handleFormSubmit} className="space-y-6">
       
-      {/* --- SECTION 1: MAIN INFO --- */}
+      {/* PHẦN 1: THÔNG TIN CHÍNH (IDENTITY) */}
       <div className="space-y-4">
-        {/* Company Name */}
+        {/* Tên công ty */}
         <div className="space-y-1.5">
-          <label className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-            <Building2 className="w-4 h-4 text-slate-500" />
+          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2 ml-1">
+            <Building2 className="w-3.5 h-3.5" />
             Company Name <span className="text-red-500">*</span>
           </label>
           <input
-            value={form.companyName}
-            onChange={(e) => handleChange("companyName", e.target.value)}
-            placeholder="e.g. Acme Inc."
-            className="w-full h-10 px-3 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-600 outline-none transition-all"
+            value={formData.companyName}
+            onChange={(e) => handleInputChange("companyName", e.target.value)}
+            placeholder="e.g. Acme Corporation"
+            className={cn(
+              "w-full h-10 px-3 border border-slate-200 rounded-lg text-sm transition-all outline-none",
+              "focus:ring-2 focus:ring-blue-100 focus:border-blue-600 placeholder:text-slate-400",
+              "disabled:bg-slate-50 disabled:cursor-not-allowed"
+            )}
             autoFocus
-            disabled={loading}
+            disabled={isLoading}
           />
         </div>
 
-        {/* Description */}
+        {/* Mô tả doanh nghiệp */}
         <div className="space-y-1.5">
-          <label className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-            <FileText className="w-4 h-4 text-slate-500" />
+          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2 ml-1">
+            <FileText className="w-3.5 h-3.5" />
             Description
           </label>
           <textarea
-            value={form.description}
-            onChange={(e) => handleChange("description", e.target.value)}
-            placeholder="What does your company do?"
+            value={formData.description}
+            onChange={(e) => handleInputChange("description", e.target.value)}
+            placeholder="Tell us about your organization's mission..."
             rows={3}
-            className="w-full p-3 border border-slate-300 rounded-md text-sm resize-none focus:ring-2 focus:ring-blue-100 focus:border-blue-600 outline-none transition-all"
-            disabled={loading}
+            className={cn(
+              "w-full p-3 border border-slate-200 rounded-lg text-sm transition-all outline-none resize-none",
+              "focus:ring-2 focus:ring-blue-100 focus:border-blue-600 placeholder:text-slate-400",
+              "disabled:bg-slate-50 disabled:cursor-not-allowed"
+            )}
+            disabled={isLoading}
           />
         </div>
       </div>
 
-      <div className="h-px bg-slate-100 my-2"></div>
+      {/* Dòng kẻ phân cách khu vực */}
+      <div className="relative">
+        <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-100"></div></div>
+        <div className="relative flex justify-center text-[9px] uppercase font-bold tracking-[0.2em] text-slate-300">
+          <span className="bg-white px-2">Contact Details</span>
+        </div>
+      </div>
 
-      {/* --- SECTION 2: CONTACT INFO (GRID) --- */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* PHẦN 2: THÔNG TIN LIÊN HỆ (GRID) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
         {CONTACT_FIELDS.map((field) => {
           const Icon = field.icon;
           return (
             <div key={field.key} className="space-y-1.5">
-              <label className="text-sm font-medium text-slate-700 flex items-center gap-2">
-                <Icon className="w-3.5 h-3.5 text-slate-400" /> 
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2 ml-1">
+                <Icon className="w-3.5 h-3.5 opacity-70" /> 
                 {field.label}
               </label>
               <input
                 type={field.type || "text"}
-                value={form[field.key]}
-                onChange={(e) => handleChange(field.key, e.target.value)}
+                value={formData[field.key]}
+                onChange={(e) => handleInputChange(field.key, e.target.value)}
                 placeholder={field.placeholder}
-                className="w-full h-9 px-3 border border-slate-300 rounded-md text-sm focus:border-blue-500 outline-none transition-colors"
-                disabled={loading}
+                className={cn(
+                  "w-full h-9 px-3 border border-slate-200 rounded-lg text-sm transition-all outline-none",
+                  "focus:border-blue-500 focus:ring-2 focus:ring-blue-50/50 placeholder:text-slate-300",
+                  "disabled:bg-slate-50 disabled:cursor-not-allowed"
+                )}
+                disabled={isLoading}
               />
             </div>
           );
         })}
       </div>
 
-      {/* --- FOOTER ACTIONS --- */}
-      <div className="pt-4 flex items-center justify-end gap-3 border-t border-slate-100 mt-4">
+      {/* PHẦN 3: NÚT HÀNH ĐỘNG (FOOTER) */}
+      <div className="pt-6 flex items-center justify-end gap-3 border-t border-slate-100 mt-2">
          <button 
            type="button"
            onClick={onCancel}
-           disabled={loading}
-           className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+           disabled={isLoading}
+           className="px-5 py-2 text-sm font-bold text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-all uppercase tracking-widest"
          >
            Cancel
          </button>
          
          <LoadingButton
            text="Create Organization"
-           isLoading={loading}
-           loadingText="Creating..."
-           className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg shadow-sm font-medium"
+           isLoading={isLoading}
+           loadingText="Initializing..."
+           className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-2 rounded-lg shadow-md font-bold text-sm min-w-[180px]"
          />
       </div>
 

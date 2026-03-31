@@ -1,501 +1,405 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+// =============================================================================
+// 1. IMPORT (Libraries -> Services -> Hooks -> Components)
+// =============================================================================
+
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams } from "next/navigation";
 import {
-  Archive,
-  RefreshCcw,
-  Loader2,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
-  Bug,
-  FileText,
-  Bookmark,
-  CheckCircle2,
+    Archive,
+    RefreshCcw,
+    Loader2,
+    ChevronLeft,
+    ChevronRight,
+    ChevronsLeft,
+    ChevronsRight,
+    Bug,
+    Bookmark,
+    CheckCircle2,
 } from "lucide-react";
-import { Chatbot } from "@/components/chatbot/chatbot";
-// Services
-import {
-  getArchivedTasks,
-  ArchivedTaskParams,
-  getProjectMembers,
-  ProjectMember,
-  TaskResponse,
-} from "@/services/apiProject";
 
+// Services & Types
+import {
+    getArchivedTasks,
+    ArchivedTaskParams,
+    getProjectMembers,
+    ProjectMember,
+    TaskResponse,
+} from "@/services/apiProject";
 import { restoreTask } from "@/services/apiTask";
 
+// Context & UI Components
 import { useToast } from "@/components/ui/ToastProvider";
-import ArchivedFilterBar from "@/components/features/core/archived/ArchivedFilterBar";
 import { Button } from "@/components/ui/Buttons";
+import { Chatbot } from "@/components/chatbot/chatbot";
+import ArchivedFilterBar from "@/components/features/core/archived/ArchivedFilterBar";
 import ConfirmationModal from "@/components/ui/ConfirmationModal";
+import { cn } from "@/lib/utils";
 
-// ===================================================
-// 🛠️ Interfaces & Constants
-// ===================================================
+// =============================================================================
+// 2. INTERFACES & TYPES
+// =============================================================================
 
-// Định nghĩa lại các trường cần thiết trong TaskResponse (đã dùng type TaskResponse)
 interface TaskToRestore {
-  id: number;
-  title: string;
+    id: number;
+    title: string;
 }
 
-// ===================================================
-// 🖥️ Component Chính
-// ===================================================
+// =============================================================================
+// 3. MAIN COMPONENT
+// =============================================================================
 
 export default function ArchivedPage() {
-  const params = useParams();
-  // Giả định companyId/workspaceId/projectId là bắt buộc từ URL/Context
-  const companyId = Number(params.companyId) || 1;
-  const workspaceId = Number(params.workspaceId);
-  const projectId = Number(params.projectId);
-  const { showToast } = useToast();
+    
+    // ---------------------------------------------------------------------------
+    // 4. HOOKS, CONTEXT & PARAMS
+    // ---------------------------------------------------------------------------
+    
+    const params = useParams();
+    const { showToast } = useToast();
 
-  // --- STATE ---
-  const [loading, setLoading] = useState(true);
-  const [tasks, setTasks] = useState<TaskResponse[]>([]);
-  const [members, setMembers] = useState<ProjectMember[]>([]);
+    // Dam bao IDs luon co gia tri hop le
+    const projectId = useMemo(() => Number(params.projectId), [params.projectId]);
+    const workspaceId = useMemo(() => Number(params.workspaceId), [params.workspaceId]);
+    const companyId = useMemo(() => Number(params.companyId) || 1, [params.companyId]);
 
-  // State quản lý Modal Xác nhận Khôi phục
-  const [confirmModalOpen, setConfirmModalOpen] = useState(false);
-  const [taskToRestore, setTaskToRestore] = useState<TaskToRestore | null>(
-    null
-  );
-  const [isRestoring, setIsRestoring] = useState(false);
+    // ---------------------------------------------------------------------------
+    // 5. STATE MANAGEMENT
+    // ---------------------------------------------------------------------------
 
-  // Pagination State
-  const [pagination, setPagination] = useState({
-    pageNumber: 0,
-    pageSize: 10,
-    totalPages: 0,
-    totalElements: 0,
-    first: true,
-    last: true,
-  });
+    // Data States
+    const [tasks, setTasks] = useState<TaskResponse[]>([]);
+    const [members, setMembers] = useState<ProjectMember[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
 
-  // Filters
-  const [filters, setFilters] = useState<ArchivedTaskParams>({});
+    // Modal & Action States
+    const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+    const [isRestoring, setIsRestoring] = useState(false);
+    const [selectedTask, setSelectedTask] = useState<TaskToRestore | null>(null);
 
-  // --- API CALLS ---
-  // Fetch Project Members (Chỉ gọi 1 lần khi component mount)
-  useEffect(() => {
-    if (!projectId) return;
-    getProjectMembers(companyId, workspaceId, projectId, { size: 100 })
-      .then((res) => setMembers(res.content || []))
-      .catch((err: any) => console.error("Failed to load members:", err)); // Chỉ log lỗi members
-  }, [companyId, workspaceId, projectId]);
+    // Pagination & Filter States
+    const [pagination, setPagination] = useState({
+        pageNumber: 0,
+        pageSize: 10,
+        totalPages: 0,
+        totalElements: 0,
+        first: true,
+        last: true,
+    });
+    const [filters, setFilters] = useState<ArchivedTaskParams>({});
 
-  // Fetch Tasks (Logic nghiệp vụ quan trọng)
-  const fetchTasks = useCallback(async () => {
-    if (!projectId) return;
-    setLoading(true);
-    try {
-      const apiParams: ArchivedTaskParams = {
-        page: pagination.pageNumber,
-        size: pagination.pageSize,
-        ...filters,
-      };
-      const res = await getArchivedTasks(
-        companyId,
-        workspaceId,
-        projectId,
-        apiParams
-      );
+    // ---------------------------------------------------------------------------
+    // 6. DATA FETCHING (Handlers)
+    // ---------------------------------------------------------------------------
 
-      setTasks(res.content);
-      setPagination({
-        pageNumber: res.pageNumber,
-        pageSize: res.pageSize,
-        totalPages: res.totalPages,
-        totalElements: res.totalElements,
-        first: res.first,
-        last: res.last,
-      });
-    } catch (error: any) {
-      console.error("Failed to load archived tasks", error);
-      const message =
-        error.response?.data?.message ||
-        error.message ||
-        "Failed to load archived tasks";
-      showToast(message, "error");
-      setTasks([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [
-    companyId,
-    workspaceId,
-    projectId,
-    pagination.pageSize,
-    pagination.pageNumber,
-    filters,
-    showToast,
-  ]);
+    /**
+     * Tai danh sach thanh vien du an (Metadata)
+     */
+    const fetchMetadata = useCallback(async () => {
+        if (!projectId) return;
+        try {
+            const response = await getProjectMembers(companyId, workspaceId, projectId, { size: 100 });
+            setMembers(response.content || []);
+        } catch (err: any) {
+            console.error("[Archived] Metadata load failed:", err.message);
+        }
+    }, [companyId, workspaceId, projectId]);
 
-  useEffect(() => {
-    const t = setTimeout(() => fetchTasks(), 300);
-    return () => clearTimeout(t);
-  }, [fetchTasks]);
+    /**
+     * Tai danh sach tac vu da luu tru dua tren phan trang va bo loc
+     */
+    const fetchArchivedTasks = useCallback(async () => {
+        if (!projectId) return;
+        setIsLoading(true);
+        try {
+            const apiParams: ArchivedTaskParams = {
+                page: pagination.pageNumber,
+                size: pagination.pageSize,
+                ...filters,
+            };
+            const response = await getArchivedTasks(companyId, workspaceId, projectId, apiParams);
 
-  // --- HANDLERS ---
+            setTasks(response.content || []);
+            setPagination({
+                pageNumber: response.pageNumber,
+                pageSize: response.pageSize,
+                totalPages: response.totalPages,
+                totalElements: response.totalElements,
+                first: response.first,
+                last: response.last,
+            });
+        } catch (error: any) {
+            const message = error.response?.data?.message || "Failed to retrieve archived records";
+            showToast(message, "error");
+            setTasks([]);
+        } finally {
+            setIsLoading(false);
+        }
+    }, [companyId, workspaceId, projectId, pagination.pageSize, pagination.pageNumber, filters, showToast]);
 
-  const handleFilterChange = (key: keyof ArchivedTaskParams, value: any) => {
-    setFilters((prev) => ({ ...prev, [key]: value }));
-    setPagination((prev) => ({ ...prev, pageNumber: 0 }));
-  };
+    // Side effects khoi tao va tai du lieu (co debounce)
+    useEffect(() => {
+        fetchMetadata();
+    }, [fetchMetadata]);
 
-  const handleClearFilters = () => {
-    setFilters({});
-    setPagination((prev) => ({ ...prev, pageNumber: 0 }));
-  };
+    useEffect(() => {
+        const timer = setTimeout(() => fetchArchivedTasks(), 300);
+        return () => clearTimeout(timer);
+    }, [fetchArchivedTasks]);
 
-  const handlePageChange = (newPage: number) => {
-    if (newPage >= 0 && newPage < pagination.totalPages) {
-      setPagination((prev) => ({ ...prev, pageNumber: newPage }));
-    }
-  };
+    // ---------------------------------------------------------------------------
+    // 7. EVENT HANDLERS (Business Logic)
+    // ---------------------------------------------------------------------------
 
-  // 1. Mở Modal xác nhận
-  const handleRequestRestore = (task: TaskResponse) => {
-    setTaskToRestore({ id: task.id, title: task.title });
-    setConfirmModalOpen(true);
-  };
+    const onFilterUpdate = (key: keyof ArchivedTaskParams, value: any) => {
+        setFilters((prev) => ({ ...prev, [key]: value }));
+        setPagination((prev) => ({ ...prev, pageNumber: 0 }));
+    };
 
-  // 2. Thực hiện Restore khi người dùng bấm Confirm (Logic nghiệp vụ quan trọng)
-  const confirmRestore = async () => {
-    if (!taskToRestore) return;
+    const onClearFilters = () => {
+        setFilters({});
+        setPagination((prev) => ({ ...prev, pageNumber: 0 }));
+    };
 
-    try {
-      setIsRestoring(true); // Bật loading trên modal
+    const onPageSwitch = (newPage: number) => {
+        setPagination((prev) => ({ ...prev, pageNumber: newPage }));
+    };
 
-      // Gọi API Restore
-      await restoreTask(taskToRestore.id);
+    /**
+     * Kich hoat quy trinh khoi phuc tac vu
+     */
+    const initiateRestore = (task: TaskResponse) => {
+        setSelectedTask({ id: task.id, title: task.title });
+        setIsConfirmModalOpen(true);
+    };
 
-      showToast("Task restored successfully!", "success");
+    /**
+     * Thuc thi goi API khoi phuc va cap nhat giao dien
+     */
+    const executeTaskRestoration = async () => {
+        if (!selectedTask) return;
+        setIsRestoring(true);
+        try {
+            await restoreTask(selectedTask.id);
+            showToast("Task restored to active board", "success");
 
-      // Cập nhật UI: Loại bỏ task khỏi danh sách ngay lập tức
-      setTasks((prev) => prev.filter((t) => t.id !== taskToRestore.id));
-      setPagination((prev) => ({
-        ...prev,
-        totalElements: prev.totalElements - 1,
-      }));
+            // Cap nhat local state de xoa item khoi danh sach ngay lap tuc
+            setTasks((prev) => prev.filter((t) => t.id !== selectedTask.id));
+            setPagination((prev) => ({ ...prev, totalElements: prev.totalElements - 1 }));
+            setIsConfirmModalOpen(false);
+        } catch (error: any) {
+            const message = error.response?.data?.message || "Restore execution failed";
+            showToast(message, "error");
+        } finally {
+            setIsRestoring(false);
+            setSelectedTask(null);
+        }
+    };
 
-      // Đóng modal
-      setConfirmModalOpen(false);
-      setTaskToRestore(null);
-    } catch (error: any) {
-      console.error(error);
-      const message =
-        error.response?.data?.message ||
-        error.message ||
-        "Failed to restore task. Please try again.";
-      showToast(message, "error");
-    } finally {
-      setIsRestoring(false);
-    }
-  };
+    // ---------------------------------------------------------------------------
+    // 8. RENDER HELPERS
+    // ---------------------------------------------------------------------------
 
-  // UI Helpers (Chuyển sang Tiếng Anh)
-  const getTypeBadge = (type: string) => {
-    switch (type) {
-      case "BUG":
+    const renderTypeBadge = (type: string) => {
+        const configs: any = {
+            BUG: { icon: Bug, color: "bg-red-50 text-red-700 border-red-100", label: "Bug" },
+            STORY: { icon: Bookmark, color: "bg-emerald-50 text-emerald-700 border-emerald-100", label: "Story" },
+            TASK: { icon: CheckCircle2, color: "bg-blue-50 text-blue-700 border-blue-100", label: "Task" }
+        };
+        const config = configs[type] || configs.TASK;
         return (
-          <div className="flex items-center gap-1.5 px-2 py-0.5 bg-red-50 text-red-700 rounded border border-red-100 text-[10px] font-bold uppercase">
-            <Bug className="w-3 h-3" /> Bug
-          </div>
+            <div className={cn("inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider border shadow-sm", config.color)}>
+                <config.icon className="w-3 h-3 stroke-[2.5]" /> {config.label}
+            </div>
         );
-      case "STORY":
-        return (
-          <div className="flex items-center gap-1.5 px-2 py-0.5 bg-green-50 text-green-700 rounded border border-green-100 text-[10px] font-bold uppercase">
-            <Bookmark className="w-3 h-3" /> Story
-          </div>
-        );
-      default:
-        return (
-          <div className="flex items-center gap-1.5 px-2 py-0.5 bg-blue-50 text-blue-700 rounded border border-blue-100 text-[10px] font-bold uppercase">
-            <CheckCircle2 className="w-3 h-3" /> Task
-          </div>
-        );
-    }
-  };
+    };
 
-  const getPriorityStyle = (p: string) => {
-    switch (p) {
-      case "URGENT":
-        return "bg-red-50 text-red-700 border-red-200";
-      case "HIGH":
-        return "bg-orange-50 text-orange-700 border-orange-200";
-      case "MEDIUM":
-        return "bg-blue-50 text-blue-700 border-blue-200";
-      default:
-        return "bg-slate-50 text-slate-600 border-slate-200";
-    }
-  };
+    const getPriorityStyles = (priority: string) => {
+        switch (priority) {
+            case "URGENT": return "bg-[#FFEBE6] text-[#BF2600] border-[#FFBDAD]";
+            case "HIGH": return "bg-[#FFF0B3] text-[#FF8B00] border-[#FFE380]";
+            case "MEDIUM": return "bg-[#DEEBFF] text-[#0052CC] border-[#B3D4FF]";
+            default: return "bg-[#F4F5F7] text-[#42526E] border-[#DFE1E6]";
+        }
+    };
 
-  if (!projectId) return null;
+    // ---------------------------------------------------------------------------
+    // 9. RENDER LOGIC
+    // ---------------------------------------------------------------------------
 
-  return (
-    <div className="p-6 sm:p-8 min-h-screen bg-slate-50/50">
-      {/* HEADER & FILTER */}
-      <div className="mb-6">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="p-2 bg-orange-100 rounded-lg shadow-sm border border-orange-200">
-            <Archive className="w-6 h-6 text-orange-600" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">
-              Archived Items
-            </h1>
-            <p className="text-sm text-slate-500">
-              View and restore tasks that have been archived.
-            </p>
-          </div>
-        </div>
-      </div>
+    if (!projectId) return null;
 
-      <ArchivedFilterBar
-        filters={filters}
-        onFilterChange={handleFilterChange}
-        onClear={handleClearFilters}
-        members={members}
-      />
+    return (
+        <div className="p-6 sm:p-10 min-h-screen bg-[#F4F5F7] font-sans text-[#172B4D]">
+            
+            {/* HEADER SECTION */}
+            <header className="mb-10 animate-in fade-in slide-in-from-left-4 duration-500">
+                <div className="flex items-center gap-5">
+                    <div className="p-3 bg-white rounded-xl shadow-sm border border-[#DFE1E6]">
+                        <Archive className="w-7 h-7 text-[#FF8B00] stroke-[2.5]" />
+                    </div>
+                    <div>
+                        <h1 className="text-2xl font-black text-[#172B4D] tracking-tight uppercase">Archived Items</h1>
+                        <p className="text-[14px] text-[#6B778C] font-medium mt-1">Audit and restore legacy tasks back to the active project stream.</p>
+                    </div>
+                </div>
+            </header>
 
-      {/* TABLE CONTENT */}
-      <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col min-h-[500px]">
-        {loading ? (
-          <div className="flex-1 flex flex-col items-center justify-center gap-3">
-            <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
-            <span className="text-sm text-slate-500">Loading archives...</span>
-          </div>
-        ) : tasks.length > 0 ? (
-          <>
-            <div className="flex-1 overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-slate-50 border-b border-slate-200">
-                  <tr>
-                    <th className="px-6 py-3 font-bold text-slate-600 uppercase text-[11px] tracking-wider w-[50px] text-center">
-                      #
-                    </th>
-                    <th className="px-6 py-3 font-bold text-slate-600 uppercase text-[11px] tracking-wider w-[120px]">
-                      Key
-                    </th>
-                    <th className="px-6 py-3 font-bold text-slate-600 uppercase text-[11px] tracking-wider">
-                      Title
-                    </th>
-                    <th className="px-6 py-3 font-bold text-slate-600 uppercase text-[11px] tracking-wider w-[180px]">
-                      Assignee
-                    </th>
-                    <th className="px-6 py-3 font-bold text-slate-600 uppercase text-[11px] tracking-wider w-[120px]">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 font-bold text-slate-600 uppercase text-[11px] tracking-wider w-[100px]">
-                      Type
-                    </th>
-                    <th className="px-6 py-3 font-bold text-slate-600 uppercase text-[11px] tracking-wider w-[100px]">
-                      Priority
-                    </th>
-                    <th className="px-6 py-3 font-bold text-slate-600 uppercase text-[11px] tracking-wider text-right w-[100px]">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {tasks.map((task, index) => {
-                    const stt =
-                      pagination.pageNumber * pagination.pageSize + index + 1;
-                    return (
-                      <tr
-                        key={task.id}
-                        className="hover:bg-slate-50/80 transition-colors group"
-                      >
-                        <td className="px-6 py-4 text-center text-slate-400 font-medium text-xs">
-                          {stt}
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className="font-mono font-medium text-slate-700">
-                            {task.taskCode}
-                          </span>
-                        </td>
+            <ArchivedFilterBar
+                filters={filters}
+                onFilterChange={onFilterUpdate}
+                onClear={onClearFilters}
+                members={members}
+            />
 
-                        <td className="px-6 py-4">
-                          <div className="flex flex-col">
-                            <span
-                              className="font-medium text-slate-800 line-clamp-1"
-                              title={task.title}
-                            >
-                              {task.title}
-                            </span>
-                            {task.epic && (
-                              <span
-                                className="text-[10px] mt-1 opacity-80 flex items-center gap-1"
-                                style={{ color: task.epic.color }}
-                              >
-                                <span
-                                  className="w-1.5 h-1.5 rounded-full"
-                                  style={{ backgroundColor: task.epic.color }}
-                                ></span>
-                                {task.epic.name}
-                              </span>
-                            )}
-                          </div>
-                        </td>
+            {/* MAIN DATA TABLE */}
+            <div className="bg-white border border-[#DFE1E6] rounded-2xl shadow-sm overflow-hidden flex flex-col min-h-[550px] animate-in fade-in duration-700">
+                {isLoading ? (
+                    <div className="flex-1 flex flex-col items-center justify-center gap-4">
+                        <Loader2 className="w-10 h-10 text-[#0052CC] animate-spin opacity-60" />
+                        <span className="text-[11px] font-black uppercase tracking-[0.2em] text-[#6B778C]">Syncing Archives...</span>
+                    </div>
+                ) : tasks.length > 0 ? (
+                    <>
+                        <div className="flex-1 overflow-x-auto">
+                            <table className="w-full text-left text-[13px]">
+                                <thead className="bg-[#FAFBFC] border-b border-[#DFE1E6]">
+                                    <tr className="h-12">
+                                        <th className="px-6 font-black text-[#6B778C] uppercase text-[10px] tracking-[0.15em] text-center w-[60px]">#</th>
+                                        <th className="px-6 font-black text-[#6B778C] uppercase text-[10px] tracking-[0.15em] w-[140px]">Key</th>
+                                        <th className="px-6 font-black text-[#6B778C] uppercase text-[10px] tracking-[0.15em]">Issue Summary</th>
+                                        <th className="px-6 font-black text-[#6B778C] uppercase text-[10px] tracking-[0.15em] w-[200px]">Owner</th>
+                                        <th className="px-6 font-black text-[#6B778C] uppercase text-[10px] tracking-[0.15em] w-[150px]">Legacy Status</th>
+                                        <th className="px-6 font-black text-[#6B778C] uppercase text-[10px] tracking-[0.15em] w-[120px]">Category</th>
+                                        <th className="px-6 font-black text-[#6B778C] uppercase text-[10px] tracking-[0.15em] w-[120px]">Priority</th>
+                                        <th className="px-6 font-black text-[#6B778C] uppercase text-[10px] tracking-[0.15em] text-right w-[120px]">Operations</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-[#F4F5F7]">
+                                    {tasks.map((task, index) => (
+                                        <tr key={task.id} className="hover:bg-[#F4F5F7]/50 transition-colors group">
+                                            <td className="px-6 py-4 text-center text-[#6B778C] font-bold text-[11px]">
+                                                {pagination.pageNumber * pagination.pageSize + index + 1}
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <span className="font-mono font-black text-[#0052CC] text-[11px] uppercase">
+                                                    {task.taskCode}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className="flex flex-col gap-1.5">
+                                                    <span className="font-bold text-[#172B4D] line-clamp-1 group-hover:text-[#0052CC] transition-colors" title={task.title}>
+                                                        {task.title}
+                                                    </span>
+                                                    {task.epic && (
+                                                        <div className="flex items-center gap-1.5">
+                                                            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: task.epic.color }} />
+                                                            <span className="text-[10px] font-bold uppercase tracking-wider opacity-70" style={{ color: task.epic.color }}>
+                                                                {task.epic.name}
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                {task.assignee ? (
+                                                    <div className="flex items-center gap-3">
+                                                        <img src={task.assignee.avatarUrl} alt="" className="w-6 h-6 rounded-full border border-[#DFE1E6] shadow-sm object-cover" />
+                                                        <span className="text-[#42526E] font-semibold truncate max-w-[140px]">{task.assignee.name}</span>
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-[#6B778C] italic opacity-60">Unassigned</span>
+                                                )}
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <span 
+                                                    className="px-2.5 py-1 rounded-[3px] text-[10px] font-black uppercase tracking-wider border inline-block text-center min-w-[90px] shadow-sm"
+                                                    style={{ backgroundColor: task.status.color + "15", color: task.status.color, borderColor: task.status.color + "30" }}
+                                                >
+                                                    {task.status.name}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4">{renderTypeBadge(task.taskType)}</td>
+                                            <td className="px-6 py-4">
+                                                <span className={cn("text-[10px] font-black px-2.5 py-1 rounded-[3px] border uppercase shadow-sm", getPriorityStyles(task.priority))}>
+                                                    {task.priority}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                <button
+                                                    onClick={() => initiateRestore(task)}
+                                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[#0052CC] hover:bg-[#DEEBFF] rounded-lg font-black text-[11px] uppercase tracking-widest transition-all opacity-0 group-hover:opacity-100"
+                                                >
+                                                    <RefreshCcw className="w-3.5 h-3.5 stroke-[2.5]" /> Restore
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
 
-                        <td className="px-6 py-4">
-                          {task.assignee ? (
-                            <div className="flex items-center gap-2">
-                              <img
-                                src={task.assignee.avatarUrl}
-                                alt={task.assignee.name}
-                                className="w-6 h-6 rounded-full border border-slate-200"
-                              />
-                              <span className="text-slate-600 truncate max-w-[120px] text-xs">
-                                {task.assignee.name}
-                              </span>
+                        {/* PAGINATION FOOTER */}
+                        <footer className="flex items-center justify-between px-8 py-5 border-t border-[#DFE1E6] bg-[#FAFBFC]">
+                            <p className="text-[11px] font-black text-[#6B778C] uppercase tracking-widest">
+                                Page <span className="text-[#172B4D]">{pagination.pageNumber + 1}</span> of <span className="text-[#172B4D]">{pagination.totalPages || 1}</span> 
+                                <span className="mx-3 opacity-30">|</span> 
+                                Total <span className="text-[#0052CC]">{pagination.totalElements}</span> items
+                            </p>
+
+                            <div className="flex gap-1.5">
+                                <PaginationBtn onClick={() => onPageSwitch(0)} disabled={pagination.first} icon={ChevronsLeft} title="First Page" />
+                                <PaginationBtn onClick={() => onPageSwitch(pagination.pageNumber - 1)} disabled={pagination.first} icon={ChevronLeft} title="Previous" />
+                                <div className="px-4 flex items-center text-[10px] font-black uppercase tracking-[0.2em] text-[#0052CC]">Navigate</div>
+                                <PaginationBtn onClick={() => onPageSwitch(pagination.pageNumber + 1)} disabled={pagination.last} icon={ChevronRight} title="Next" />
+                                <PaginationBtn onClick={() => onPageSwitch(pagination.totalPages - 1)} disabled={pagination.last} icon={ChevronsRight} title="Last Page" />
                             </div>
-                          ) : (
-                            <span className="text-slate-400 italic text-xs">
-                              Unassigned
-                            </span>
-                          )}
-                        </td>
-
-                        <td className="px-6 py-4">
-                          <span
-                            className="px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wide border inline-block text-center min-w-[80px]"
-                            style={{
-                              backgroundColor: task.status.color + "15",
-                              color: task.status.color,
-                              borderColor: task.status.color + "40",
-                            }}
-                          >
-                            {task.status.name}
-                          </span>
-                        </td>
-
-                        <td className="px-6 py-3">
-                          {getTypeBadge(task.taskType)}
-                        </td>
-
-                        <td className="px-6 py-4">
-                          <span
-                            className={`text-[10px] font-bold px-2 py-1 rounded border uppercase ${getPriorityStyle(
-                              task.priority
-                            )}`}
-                          >
-                            {task.priority}
-                          </span>
-                        </td>
-
-                        {/* Actions */}
-                        <td className="px-6 py-4 text-right">
-                          <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button
-                              onClick={() => handleRequestRestore(task)} // ✅ Mở Modal
-                              className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-md border border-transparent hover:border-blue-100 transition-all flex items-center gap-1 text-xs font-medium"
-                              title="Restore Task"
-                            >
-                              <RefreshCcw className="w-3.5 h-3.5" /> Restore
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                        </footer>
+                    </>
+                ) : (
+                    <div className="flex-1 flex flex-col items-center justify-center py-20 text-center">
+                        <div className="p-6 bg-[#F4F5F7] rounded-full mb-5 border border-[#DFE1E6] shadow-inner">
+                            <Archive className="w-10 h-10 text-[#B3BAC5] stroke-[1.5]" />
+                        </div>
+                        <h3 className="text-lg font-black text-[#172B4D] uppercase tracking-tight">Project Archives Empty</h3>
+                        <p className="text-[#6B778C] font-medium text-[14px] mt-2 max-w-sm leading-relaxed">
+                            No tasks have been decommissioned yet. Archived records will be centralized here for future restoration.
+                        </p>
+                    </div>
+                )}
             </div>
 
-            {/* PAGINATION CONTROLS */}
-            <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100 bg-slate-50/50 mt-auto">
-              <p className="text-xs text-slate-500 font-medium">
-                Page{" "}
-                <span className="font-bold text-slate-700">
-                  {pagination.pageNumber + 1}
-                </span>{" "}
-                of{" "}
-                <span className="font-bold text-slate-700">
-                  {pagination.totalPages || 1}
-                </span>
-                <span className="mx-2 text-slate-300">|</span>
-                Total{" "}
-                <span className="font-bold text-slate-700">
-                  {pagination.totalElements}
-                </span>{" "}
-                items
-              </p>
-
-              <div className="flex gap-1">
-                <Button
-                  onClick={() => handlePageChange(0)}
-                  disabled={pagination.first}
-                  variant="outline"
-                  size="icon"
-                  className="h-8 w-8 bg-white border-slate-200 text-slate-600 hover:text-blue-600"
-                  title="First Page"
-                >
-                  <ChevronsLeft className="w-4 h-4" />
-                </Button>
-                <Button
-                  onClick={() => handlePageChange(pagination.pageNumber - 1)}
-                  disabled={pagination.first}
-                  variant="outline"
-                  size="icon"
-                  className="h-8 w-8 bg-white border-slate-200 text-slate-600 hover:text-blue-600"
-                  title="Previous Page"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </Button>
-                <Button
-                  onClick={() => handlePageChange(pagination.pageNumber + 1)}
-                  disabled={pagination.last}
-                  variant="outline"
-                  size="icon"
-                  className="h-8 w-8 bg-white border-slate-200 text-slate-600 hover:text-blue-600"
-                  title="Next Page"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </Button>
-                <Button
-                  onClick={() => handlePageChange(pagination.totalPages - 1)}
-                  disabled={pagination.last}
-                  variant="outline"
-                  size="icon"
-                  className="h-8 w-8 bg-white border-slate-200 text-slate-600 hover:text-blue-600"
-                  title="Last Page"
-                >
-                  <ChevronsRight className="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
-          </>
-        ) : (
-          <div className="flex-1 flex flex-col items-center justify-center text-slate-400 py-20">
-            <div className="p-4 bg-slate-50 rounded-full mb-3 shadow-sm border border-slate-100">
-              <Archive className="w-8 h-8 text-slate-300" />
-            </div>
-            <p className="font-medium text-slate-600">
-              No archived tasks found
-            </p>
-            <p className="text-sm">Tasks you archive will appear here.</p>
-          </div>
-        )}
-      </div>
-
-      {/* ✅ CONFIRMATION MODAL */}
-      <ConfirmationModal
-        isOpen={confirmModalOpen}
-        onClose={() => setConfirmModalOpen(false)}
-        onConfirm={confirmRestore}
-        isLoading={isRestoring}
-        title="Restore Task"
-        description={`Are you sure you want to restore the task "${taskToRestore?.title}"? It will be moved back to the project board.`}
-        confirmText="Restore"
-        modalVariant="info" // Dùng màu xanh dương cho hành động khôi phục (không phải nguy hiểm)
-      />
-      <Chatbot />
-    </div>
-  );
+            {/* CONFIRMATION OVERLAY */}
+            <ConfirmationModal
+                isOpen={isConfirmModalOpen}
+                onClose={() => setIsConfirmModalOpen(false)}
+                onConfirm={executeTaskRestoration}
+                isLoading={isRestoring}
+                title="Restore Task to Active Board"
+                description={`Are you sure you want to reactivate "${selectedTask?.title}"? It will be returned to the primary workspace with its historical attributes.`}
+                confirmText="Execute Restore"
+                modalVariant="info"
+            />
+            
+            <Chatbot />
+        </div>
+    );
 }
+
+// =============================================================================
+// SUB-COMPONENTS (Refactored for Layout Consistency)
+// =============================================================================
+
+const PaginationBtn = ({ onClick, disabled, icon: Icon, title }: any) => (
+    <Button
+        onClick={onClick}
+        disabled={disabled}
+        variant="outline"
+        size="icon"
+        className="h-9 w-9 bg-white border-[#DFE1E6] text-[#42526E] hover:bg-[#F4F5F7] hover:text-[#0052CC] shadow-sm transition-all active:scale-90"
+        title={title}
+    >
+        <Icon className="w-4 h-4 stroke-[2.5]" />
+    </Button>
+);

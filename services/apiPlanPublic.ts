@@ -1,5 +1,12 @@
 import apiClient from "@/lib/apiClient";
 
+// =============================================================================
+// INTERFACES & TYPES
+// =============================================================================
+
+/**
+ * Thông tin chi tiết của gói cước hiển thị công khai
+ */
 export interface PublicPlan {
   id: number;
   planCode: string;
@@ -11,9 +18,12 @@ export interface PublicPlan {
   maxWorkspaces: number;
   maxProjects: number;
   maxStorageGb: number;
-  features: string[]; // Trả về mảng các tính năng
+  features: string[];
 }
 
+/**
+ * Cấu trúc phản hồi phân trang dành cho các truy vấn công khai
+ */
 export interface PublicPageResponse<T> {
   content: T[];
   pageNumber: number;
@@ -24,43 +34,71 @@ export interface PublicPageResponse<T> {
   first: boolean;
 }
 
+// =============================================================================
+// API METHODS
+// =============================================================================
+
 /**
- * API 1: Lấy danh sách gói cước mặc định (Public)
+ * Lấy danh sách các gói cước mặc định cho trang bảng giá
  */
 export const getPublicPlans = async (
   params?: { page?: number; size?: number; sortBy?: string; sortDir?: string }
 ): Promise<PublicPageResponse<PublicPlan>> => {
   try {
-    const res = await apiClient.get(`/plans`, { params });
-    return res.data.data; // Trả về thẳng object PageResponse
+    const res = await apiClient.get("/plans", { params });
+    const { success, message, data } = res.data;
+
+    if (!success) {
+      throw new Error(message || "Unable to load pricing plans");
+    }
+
+    return data;
   } catch (err: any) {
-    throw new Error(err.response?.data?.message || "Failed to load pricing plans.");
+    const errorMsg = err.response?.data?.message || "An error occurred while loading pricing plans";
+    throw new Error(errorMsg);
   }
 };
 
 /**
- * API 2: Tìm kiếm gói cước (Public)
+ * Tìm kiếm gói cước dựa trên tên gói
  */
 export const searchPublicPlans = async (
   searchName: string,
   params?: { page?: number; size?: number; sortBy?: string; sortDir?: string }
 ): Promise<PublicPageResponse<PublicPlan>> => {
   try {
-    const res = await apiClient.get(`/plans/search`, { params: { searchName, ...params } });
-    return res.data.data;
+    const url = "/plans/search";
+    const res = await apiClient.get(url, { 
+      params: { searchName, ...params } 
+    });
+    const { success, message, data } = res.data;
+
+    if (!success) {
+      throw new Error(message || "Unable to search pricing plans");
+    }
+
+    return data;
   } catch (err: any) {
-    throw new Error(err.response?.data?.message || "Failed to search pricing plans.");
+    const errorMsg = err.response?.data?.message || "An error occurred while searching pricing plans";
+    throw new Error(errorMsg);
   }
 };
 
 /**
- * API 3: Xem chi tiết một gói cước (Public)
+ * Truy vấn thông tin chi tiết của một gói cước cụ thể
  */
 export const getPublicPlanDetail = async (planId: number): Promise<PublicPlan> => {
   try {
     const res = await apiClient.get(`/plans/${planId}`);
-    return res.data.data;
+    const { success, message, data } = res.data;
+
+    if (!success) {
+      throw new Error(message || "Unable to load plan details");
+    }
+
+    return data;
   } catch (err: any) {
-    throw new Error(err.response?.data?.message || "Failed to load plan details.");
+    const errorMsg = err.response?.data?.message || "An error occurred while loading plan details";
+    throw new Error(errorMsg);
   }
 };

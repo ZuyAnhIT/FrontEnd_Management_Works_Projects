@@ -1,53 +1,40 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+// =============================================================================
+// 1. IMPORT (Libraries -> Internal -> Components)
+// =============================================================================
+
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams } from "next/navigation";
 import {
-  Search,
-  Users,
-  UserPlus,
-  Shield,
-  Loader2,
-  Crown,
-  Edit,
-  X,
-  CheckCircle,
-  Clock,
-  ShieldAlert,
-  Save,
-  Filter,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
-  XCircle as CloseIcon,
+  Search, Users, UserPlus, Shield, Loader2, Crown,
+  CheckCircle, Clock, Save, Filter, ChevronLeft,
+  ChevronRight, ChevronsLeft, ChevronsRight, X, ShieldAlert
 } from "lucide-react";
 
+// Services & Types
 import {
-  getWorkspaceMembers,
-  searchWorkspaceMembers,
-  inviteMemberToWorkspace,
-  removeWorkspaceMember,
-  updateWorkspaceMemberStatus,
-  updateWorkspaceMemberRole,
-  getWorkspaceMemberDetail,
-  PageResponse,
-  WorkspaceMember,
+  getWorkspaceMembers, searchWorkspaceMembers, inviteMemberToWorkspace,
+  removeWorkspaceMember, updateWorkspaceMemberStatus, updateWorkspaceMemberRole,
+  getWorkspaceMemberDetail, PageResponse, WorkspaceMember,
 } from "@/services/apiWorkspace";
 
+// Context & UI
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/components/ui/ToastProvider";
 import { Button } from "@/components/ui/Buttons";
+import { cn } from "@/lib/utils";
 
-// Components tái sử dụng
+// Shared Feature Components
 import MemberTable from "@/components/ui/MemberTable";
 import InviteMemberModal from "@/components/ui/InviteMemberModal";
 import MemberDetailModalBase from "@/components/ui/MemberDetailModalBase";
 import ConfirmationModal from "@/components/ui/ConfirmationModal";
 
-// ===================================================
-// 🛠️ CONSTANTS & INTERFACES
-// ===================================================
+// =============================================================================
+// 2. CONSTANTS & INTERFACES
+// =============================================================================
+
 const DEFAULT_PAGE_SIZE = 10;
 const DEFAULT_SORT_BY = "joinedAt";
 const DEFAULT_SORT_DIR = "desc";
@@ -60,31 +47,44 @@ interface MemberSearchParams {
   name?: string;
   email?: string;
   phone?: string;
-  role?: string; // API dùng 'role' thay vì 'roleName'
-  [key: string]: any;
+  role?: string;
 }
 
-// ===================================================
-// 🖥️ COMPONENT CHÍNH
-// ===================================================
+// =============================================================================
+// 3. MAIN COMPONENT
+// =============================================================================
 
 export default function WorkspaceMembersPage() {
+  
+  // ---------------------------------------------------------------------------
+  // 4. HOOKS, CONTEXT & PARAMS
+  // ---------------------------------------------------------------------------
+  
   const { showToast } = useToast();
   const params = useParams();
   const workspaceId = Number(params.workspaceId);
-
-  // Lấy activeCompany từ AuthContext
   const { user, activeCompany, isLoading: isAuthLoading } = useAuth();
   const companyId = activeCompany?.companyId;
 
-  // State Data
-  const [members, setMembers] = useState<WorkspaceMember[]>([]);
-  const [loading, setLoading] = useState(true);
+  // ---------------------------------------------------------------------------
+  // 5. STATE MANAGEMENT
+  // ---------------------------------------------------------------------------
 
-  // State Pagination & Search
-  const [pagination, setPagination] = useState<
-    Omit<PageResponse<WorkspaceMember>, "content">
-  >({
+  // Data States
+  const [members, setMembers] = useState<WorkspaceMember[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Search & Pagination States
+  const [searchValue, setSearchValue] = useState("");
+  const [searchBy, setSearchBy] = useState("name");
+  const [searchParams, setSearchParams] = useState<MemberSearchParams>({
+    page: 0,
+    size: DEFAULT_PAGE_SIZE,
+    sortBy: DEFAULT_SORT_BY,
+    sortDir: DEFAULT_SORT_DIR,
+  });
+
+  const [pagination, setPagination] = useState({
     pageNumber: 0,
     pageSize: DEFAULT_PAGE_SIZE,
     totalElements: 0,
@@ -93,99 +93,80 @@ export default function WorkspaceMembersPage() {
     first: true,
   });
 
-  const [searchParams, setSearchParams] = useState<MemberSearchParams>({
-    page: 0,
-    size: DEFAULT_PAGE_SIZE,
-    sortBy: DEFAULT_SORT_BY,
-    sortDir: DEFAULT_SORT_DIR,
-  });
-
-  const [searchValue, setSearchValue] = useState("");
-  const [searchBy, setSearchBy] = useState("name");
-
-  // --- MODAL STATES ---
+  // Modal: Invite
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRoleCode, setInviteRoleCode] = useState("WORKSPACE_MEMBER");
 
+  // Modal: Edit
   const [showEditModal, setShowEditModal] = useState(false);
-  const [selectedMember, setSelectedMember] = useState<WorkspaceMember | null>(
-    null
-  );
+  const [selectedMember, setSelectedMember] = useState<WorkspaceMember | null>(null);
   const [newStatus, setNewStatus] = useState("");
   const [newRole, setNewRole] = useState("");
   const [isUpdating, setIsUpdating] = useState(false);
 
+  // Modal: Delete
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [memberToDelete, setMemberToDelete] = useState<WorkspaceMember | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [memberToDelete, setMemberToDelete] = useState<WorkspaceMember | null>(
-    null
-  );
 
+  // Modal: Detail
   const [showDetailModal, setShowDetailModal] = useState(false);
-  const [detailMember, setDetailMember] = useState<WorkspaceMember | null>(
-    null
-  );
-  const [loadingDetail, setLoadingDetail] = useState(false);
+  const [detailMember, setDetailMember] = useState<WorkspaceMember | null>(null);
+  const [isLoadingDetail, setIsLoadingDetail] = useState(false);
 
-  // ===================================================
-  // 🔄 FETCH DATA LOGIC (Logic nghiệp vụ quan trọng)
-  // ===================================================
-  const fetchMembers = useCallback(
-    async (params: MemberSearchParams) => {
-      if (!companyId || !workspaceId) return;
-      setLoading(true);
+  // ---------------------------------------------------------------------------
+  // 6. DATA FETCHING (Handlers)
+  // ---------------------------------------------------------------------------
 
-      try {
-        const { name, email, phone, role, ...apiParams } = params;
-        let data: PageResponse<WorkspaceMember>;
+  /**
+   * Tai danh sach thanh vien dua tren bo loc va phan trang
+   */
+  const fetchMembersData = useCallback(async (params: MemberSearchParams) => {
+    if (!companyId || !workspaceId) return;
+    setIsLoading(true);
 
-        const isSearching = name || email || phone || role;
-
-        if (isSearching) {
-          // Gọi API Search Workspace Members
-          data = await searchWorkspaceMembers(companyId, workspaceId, params);
-        } else {
-          // Gọi API Get All
-          data = await getWorkspaceMembers(companyId, workspaceId, apiParams);
-        }
-
-        setMembers(data.content || []);
-        setPagination({
-          pageNumber: data.pageNumber,
-          pageSize: data.pageSize,
-          totalElements: data.totalElements,
-          totalPages: data.totalPages,
-          first: data.first,
-          last: data.last,
-        });
-      } catch (err: any) {
-        console.error("Fetch Error:", err);
-        const message =
-          err.response?.data?.message ||
-          err.message ||
-          "Failed to load members";
-        showToast(message, "error");
-        setMembers([]);
-      } finally {
-        setLoading(false);
+    try {
+      const { name, email, phone, role, ...apiParams } = params;
+      const isSearching = name || email || phone || role;
+      
+      let response: PageResponse<WorkspaceMember>;
+      
+      if (isSearching) {
+        response = await searchWorkspaceMembers(companyId, workspaceId, params);
+      } else {
+        response = await getWorkspaceMembers(companyId, workspaceId, apiParams);
       }
-    },
-    [companyId, workspaceId, showToast]
-  );
 
-  // Auto reload khi params thay đổi (Debounced)
+      setMembers(response.content || []);
+      setPagination({
+        pageNumber: response.pageNumber,
+        pageSize: response.pageSize,
+        totalElements: response.totalElements,
+        totalPages: response.totalPages,
+        first: response.first,
+        last: response.last,
+      });
+    } catch (err: any) {
+      const message = err.response?.data?.message || err.message || "Failed to load directory";
+      showToast(message, "error");
+      setMembers([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [companyId, workspaceId, showToast]);
+
+  // Hieu ung tu dong tai lai khi tham so thay doi (co Debounce)
   useEffect(() => {
     if (!companyId || !workspaceId || isAuthLoading) return;
-    const t = setTimeout(() => fetchMembers(searchParams), 300);
-    return () => clearTimeout(t);
-  }, [searchParams, companyId, workspaceId, isAuthLoading, fetchMembers]);
+    const timer = setTimeout(() => fetchMembersData(searchParams), 300);
+    return () => clearTimeout(timer);
+  }, [searchParams, companyId, workspaceId, isAuthLoading, fetchMembersData]);
 
-  // ===================================================
-  // ⚙️ HANDLERS (Logic nghiệp vụ quan trọng)
-  // ===================================================
+  // ---------------------------------------------------------------------------
+  // 7. EVENT HANDLERS (Business Logic)
+  // ---------------------------------------------------------------------------
 
-  // Pagination & Sort
   const handlePageChange = (newPage: number) => {
     setSearchParams((prev) => ({ ...prev, page: newPage }));
   };
@@ -194,80 +175,62 @@ export default function WorkspaceMembersPage() {
     setSearchParams((prev) => ({
       ...prev,
       sortBy: field,
-      sortDir:
-        prev.sortBy === field && prev.sortDir === "desc" ? "asc" : "desc",
+      sortDir: prev.sortBy === field && prev.sortDir === "desc" ? "asc" : "desc",
       page: 0,
     }));
   };
 
-  // Search Handlers
-  const handleSearchChange = (text: string) => {
+  const handleSearchUpdate = (text: string) => {
     setSearchValue(text);
     setSearchParams((prev) => ({
       ...prev,
       page: 0,
-      name: undefined,
-      email: undefined,
-      phone: undefined,
-      role: undefined,
+      name: undefined, email: undefined, phone: undefined, role: undefined,
       [searchBy]: text,
     }));
   };
 
-  const handleSearchByChange = (field: string) => {
+  const handleSearchCriteriaChange = (field: string) => {
     setSearchBy(field);
     setSearchParams((prev) => ({
       ...prev,
       page: 0,
-      name: undefined,
-      email: undefined,
-      phone: undefined,
-      role: undefined,
+      name: undefined, email: undefined, phone: undefined, role: undefined,
       [field]: searchValue,
     }));
   };
 
-  // 1. INVITE MEMBER
-  const handleInvite = async () => {
+  /**
+   * Gui loi moi tham gia vao Workspace
+   */
+  const handleInviteExecution = async () => {
     if (!inviteEmail.trim()) {
-      showToast("Please enter an email address.", "warning");
+      showToast("Email address is required.", "warning");
       return;
     }
     if (!companyId || !workspaceId) return;
 
-    setLoading(true);
+    setIsLoading(true);
     try {
       await inviteMemberToWorkspace(companyId, workspaceId, {
         email: inviteEmail,
         roleCode: inviteRoleCode,
       });
-      showToast("Invitation sent successfully!", "success");
+      showToast("Invitation dispatched successfully!", "success");
       setShowInviteModal(false);
       setInviteEmail("");
-      setInviteRoleCode("WORKSPACE_MEMBER");
-      fetchMembers(searchParams);
+      fetchMembersData(searchParams);
     } catch (err: any) {
-      const message =
-        err.response?.data?.message || err.message || "Invitation failed";
-      showToast(message, "error");
+      showToast(err.response?.data?.message || "Invitation failed", "error");
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
-  // 2. EDIT MEMBER (Role/Status)
-  const openEditModal = (member: WorkspaceMember) => {
-    if (member.userId === user?.id) {
-      showToast("You cannot edit your own role/status.", "warning");
-      return;
-    }
-    setSelectedMember(member);
-    setNewStatus("");
-    setNewRole("");
-    setShowEditModal(true);
-  };
-
-  const handleUpdateMember = async () => {
+  /**
+   * Cap nhat vai tro hoac trang thai thanh vien
+   */
+  const handleUpdateMemberAction = async () => {
     if (!companyId || !workspaceId || !selectedMember) return;
     if (newStatus === "" && newRole === "") {
       setShowEditModal(false);
@@ -276,446 +239,357 @@ export default function WorkspaceMembersPage() {
 
     setIsUpdating(true);
     try {
-      const promises = [];
-      if (newStatus !== "") {
-        promises.push(
-          updateWorkspaceMemberStatus(
-            companyId,
-            workspaceId,
-            selectedMember.memberId,
-            newStatus
-          )
-        );
-      }
-      if (newRole !== "") {
-        promises.push(
-          updateWorkspaceMemberRole(
-            companyId,
-            workspaceId,
-            selectedMember.memberId,
-            newRole
-          )
-        );
-      }
-      await Promise.all(promises);
-
-      showToast("Member updated successfully!", "success");
+      const tasks = [];
+      if (newStatus) tasks.push(updateWorkspaceMemberStatus(companyId, workspaceId, selectedMember.memberId, newStatus));
+      if (newRole) tasks.push(updateWorkspaceMemberRole(companyId, workspaceId, selectedMember.memberId, newRole));
+      
+      await Promise.all(tasks);
+      showToast("Member permissions updated.", "success");
       setShowEditModal(false);
-      fetchMembers(searchParams);
+      fetchMembersData(searchParams);
     } catch (err: any) {
-      const message =
-        err.response?.data?.message || err.message || "Update failed";
-      showToast(message, "error");
+      showToast(err.response?.data?.message || "Update failed", "error");
     } finally {
       setIsUpdating(false);
     }
   };
 
-  // 3. DELETE MEMBER
-  const openDeleteConfirmation = (member: WorkspaceMember) => {
-    if (member.userId === user?.id) {
-      showToast("You cannot remove yourself.", "error");
-      return;
-    }
-    setMemberToDelete(member);
-    setIsDeleteModalOpen(true);
-  };
-
-  const handleConfirmRemove = async () => {
+  /**
+   * Loai bo thanh vien khoi Workspace
+   */
+  const handleConfirmRemoval = async () => {
     if (!companyId || !workspaceId || !memberToDelete) return;
     setIsDeleting(true);
     try {
-      await removeWorkspaceMember(
-        companyId,
-        workspaceId,
-        memberToDelete.memberId
-      );
-      showToast("Member removed successfully", "success");
+      await removeWorkspaceMember(companyId, workspaceId, memberToDelete.memberId);
+      showToast("Member removed from workspace.", "success");
       setIsDeleteModalOpen(false);
-      fetchMembers(searchParams);
+      fetchMembersData(searchParams);
     } catch (err: any) {
-      const message =
-        err.response?.data?.message || err.message || "Failed to remove member";
-      showToast(message, "error");
+      showToast(err.response?.data?.message || "Removal failed", "error");
     } finally {
       setIsDeleting(false);
       setMemberToDelete(null);
     }
   };
 
-  // 4. VIEW DETAIL
-  const handleViewDetail = async (memberId: number) => {
+  /**
+   * Xem chi tiet thanh vien (360 View)
+   */
+  const handleViewMemberDetails = async (memberId: number) => {
     if (!companyId || !workspaceId) return;
-    setLoadingDetail(true);
+    setIsLoadingDetail(true);
     setShowDetailModal(true);
     try {
-      // API chỉ lấy detail của member trong workspace
-      const detail = await getWorkspaceMemberDetail(
-        companyId,
-        workspaceId,
-        memberId
-      );
+      const detail = await getWorkspaceMemberDetail(companyId, workspaceId, memberId);
       setDetailMember(detail);
     } catch (err: any) {
-      const message =
-        err.response?.data?.message ||
-        err.message ||
-        "Failed to load member details";
-      showToast(message, "error");
+      showToast(err.message || "Failed to load details", "error");
       setShowDetailModal(false);
     } finally {
-      setLoadingDetail(false);
+      setIsLoadingDetail(false);
     }
   };
 
-  // ===================================================
-  // 🎨 HELPERS RENDER
-  // ===================================================
+  // ---------------------------------------------------------------------------
+  // 8. UI HELPERS (Renderers)
+  // ---------------------------------------------------------------------------
+
   const renderStatusBadge = (status: string) => {
-    switch (status) {
-      case "ACTIVE":
-        return (
-          <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
-            <CheckCircle className="w-3 h-3" /> Active
-          </div>
-        );
-      case "SUSPENDED":
-        return (
-          <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-            <Clock className="w-3 h-3" /> Suspended
-          </div>
-        );
-      default:
-        return (
-          <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-50 text-slate-500 border border-slate-200">
-            {status}
-          </div>
-        );
-    }
+    const configs: any = {
+      ACTIVE: { class: "bg-emerald-50 text-emerald-700 border-emerald-200", icon: CheckCircle, label: "Active" },
+      SUSPENDED: { class: "bg-amber-50 text-amber-700 border-amber-200", icon: Clock, label: "Suspended" },
+    };
+    const config = configs[status] || { class: "bg-slate-50 text-slate-500", icon: Users, label: status };
+    return (
+      <div className={cn("inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-black uppercase tracking-wider border shadow-sm", config.class)}>
+        <config.icon className="w-3 h-3" /> {config.label}
+      </div>
+    );
   };
 
   const renderRoleBadge = (m: WorkspaceMember) => {
-    // Check role name string (Backend trả về 'Workspace Administrator' hoặc 'Workspace Member')
     const isAdmin = m.roleName?.toUpperCase().includes("ADMIN");
     const Icon = isAdmin ? Crown : Shield;
-    const style = isAdmin
-      ? "bg-amber-50 text-amber-800 border-2 border-amber-500"
-      : "bg-blue-50 text-blue-700 border border-blue-300";
-
     return (
-      <div
-        className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${style}`}
-      >
-        <Icon className="w-3 h-3" />
-        {m.roleName || "Member"}
+      <div className={cn(
+        "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-black uppercase tracking-widest border shadow-sm",
+        isAdmin ? "bg-amber-50 text-amber-700 border-amber-200" : "bg-blue-50 text-[#0052CC] border-blue-100"
+      )}>
+        <Icon className="w-3 h-3" /> {m.roleName || "Member"}
       </div>
     );
   };
 
   const formatDateTime = (date?: string | null): string => {
     if (!date) return "—";
-    try {
-      return new Date(date).toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      });
-    } catch {
-      return "—";
-    }
+    return new Date(date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   };
 
-  // ===================================================
-  // 🖥️ RENDER UI
-  // ===================================================
+  // ---------------------------------------------------------------------------
+  // 9. RENDER LOGIC
+  // ---------------------------------------------------------------------------
 
   if (isAuthLoading || !companyId) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+      <div className="min-h-screen flex items-center justify-center bg-[#F4F5F7]">
+        <Loader2 className="w-10 h-10 text-[#0052CC] animate-spin opacity-80" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-white via-blue-50/30 to-white py-8 font-sans text-slate-900">
-      <div className="max-w-[1600px] mx-auto px-6 space-y-6">
-        {/* HEADER */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="min-h-screen bg-[#F4F5F7] font-sans text-[#172B4D] py-10 px-6">
+      <div className="max-w-[1600px] mx-auto space-y-8 animate-in fade-in duration-500">
+        
+        {/* HEADER SECTION */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">
-              Workspace Members{" "}
-              <span className="text-slate-400 text-lg ml-2">
-                ({pagination.totalElements})
+            <h1 className="text-2xl font-black text-[#172B4D] tracking-tight uppercase flex items-center gap-3">
+              Workspace Directory
+              <span className="text-[#0052CC] bg-blue-50 px-2.5 py-0.5 rounded-lg text-[14px]">
+                {pagination.totalElements}
               </span>
             </h1>
-            <p className="text-sm text-slate-500 mt-1">
-              Manage members within this specific workspace.
+            <p className="text-[14px] text-[#42526E] font-medium mt-1">
+              Manage permissions and roster for this specific workspace.
             </p>
           </div>
           <Button
             onClick={() => setShowInviteModal(true)}
-            className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm font-bold h-10 px-5 rounded-[3px] flex items-center gap-2"
+            className="bg-[#0052CC] hover:bg-[#0747A6] text-white font-black text-[12px] uppercase tracking-widest h-11 px-8 rounded-lg shadow-md active:scale-95 transition-all flex items-center gap-2"
           >
-            <UserPlus className="w-4 h-4" /> Invite to Workspace
+            <UserPlus className="w-4 h-4 stroke-[3]" /> Invite Teammates
           </Button>
         </div>
 
-        {/* TOOLBAR */}
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-3 items-center">
-          <div className="relative w-full md:w-40">
+        {/* TOOLBAR: SEARCH & FILTER */}
+        <div className="bg-white p-5 rounded-2xl border border-[#DFE1E6] shadow-sm flex flex-col md:flex-row gap-4 items-center">
+          <div className="relative w-full md:w-48">
             <select
               value={searchBy}
-              onChange={(e) => handleSearchByChange(e.target.value)}
-              className="w-full h-10 pl-3 pr-8 border border-slate-300 rounded-lg text-sm
-                                focus:ring-2 focus:ring-blue-100 focus:border-blue-500 bg-slate-50 
-                                cursor-pointer appearance-none [-webkit-appearance:none] [-moz-appearance:none]"
+              onChange={(e) => handleSearchCriteriaChange(e.target.value)}
+              className="w-full h-11 pl-4 pr-10 border border-[#DFE1E6] rounded-xl text-[12px] font-black uppercase tracking-widest bg-[#F4F5F7] cursor-pointer outline-none focus:ring-2 focus:ring-blue-100 appearance-none"
             >
-              <option value="name">Name</option>
-              <option value="email">Email</option>
-              <option value="phone">Phone</option>
-              <option value="role">Role</option>
+              <option value="name">Full Name</option>
+              <option value="email">Email Addr</option>
+              <option value="phone">Mobile No</option>
+              <option value="role">Auth Role</option>
             </select>
-            <Filter className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <Filter className="absolute right-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
           </div>
 
-          <div className="relative w-full md:w-96 group">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
+          <div className="relative w-full md:w-[450px] group">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-400 group-focus-within:text-[#0052CC] transition-colors" />
             <input
               type="text"
               value={searchValue}
-              onChange={(e) => handleSearchChange(e.target.value)}
-              placeholder={`Search by ${searchBy}...`}
-              className="w-full pl-9 pr-4 h-10 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition-all"
+              onChange={(e) => handleSearchUpdate(e.target.value)}
+              placeholder={`Lookup member by ${searchBy}...`}
+              className="w-full pl-12 pr-4 h-11 bg-white border border-[#DFE1E6] rounded-xl text-[14px] font-medium focus:outline-none focus:ring-2 focus:ring-blue-50 focus:border-[#2684FF] transition-all"
             />
           </div>
         </div>
 
-        {/* TABLE */}
-        {loading ? (
-          <div className="flex justify-center py-20 bg-white rounded-xl border border-slate-200 shadow-sm">
-            <Loader2 className="w-10 h-10 text-blue-600 animate-spin" />
-          </div>
-        ) : members.length > 0 ? (
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden animate-fadeInUp">
-            <MemberTable
-              members={members}
-              renderStatus={renderStatusBadge}
-              renderRole={renderRoleBadge}
-              formatDateTime={formatDateTime}
-              onViewDetail={(m) => handleViewDetail(m.memberId)}
-              onEdit={openEditModal}
-              onDelete={openDeleteConfirmation}
-              onSort={handleSort}
-              currentSortBy={searchParams.sortBy}
-              currentSortDir={searchParams.sortDir}
-              disableEdit={(m) => m.userId === user?.id} // Không sửa chính mình
-              disableDelete={(m) => m.userId === user?.id} // Không xóa chính mình
-            />
-
-            {/* Pagination Controls */}
-            <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100">
-              <p className="text-sm text-slate-500">
-                Page {pagination.pageNumber + 1} of {pagination.totalPages || 1}
-              </p>
-              <div className="flex gap-1">
-                <Button
-                  onClick={() => handlePageChange(0)}
-                  disabled={pagination.first}
-                  variant="outline"
-                  size="icon"
-                  className="h-8 w-8"
-                  title="First Page"
-                >
-                  <ChevronsLeft className="w-4 h-4" />
-                </Button>
-                <Button
-                  onClick={() => handlePageChange(pagination.pageNumber - 1)}
-                  disabled={pagination.first}
-                  variant="outline"
-                  size="icon"
-                  className="h-8 w-8"
-                  title="Previous Page"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </Button>
-                <Button
-                  onClick={() => handlePageChange(pagination.pageNumber + 1)}
-                  disabled={pagination.last}
-                  variant="outline"
-                  size="icon"
-                  className="h-8 w-8"
-                  title="Next Page"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </Button>
-                <Button
-                  onClick={() => handlePageChange(pagination.totalPages - 1)}
-                  disabled={pagination.last}
-                  variant="outline"
-                  size="icon"
-                  className="h-8 w-8"
-                  title="Last Page"
-                >
-                  <ChevronsRight className="w-4 h-4" />
-                </Button>
+        {/* DATA CONTENT AREA */}
+        <div className="relative min-h-[400px]">
+          {isLoading ? (
+            <div className="absolute inset-0 flex flex-col justify-center items-center bg-[#F4F5F7]/50 backdrop-blur-sm z-10 rounded-2xl">
+              <Loader2 className="w-10 h-10 text-[#0052CC] animate-spin opacity-60 mb-3" />
+              <span className="text-[11px] font-black uppercase tracking-widest text-slate-400">Syncing Roster...</span>
+            </div>
+          ) : members.length > 0 ? (
+            <div className="space-y-6">
+              <div className="bg-white rounded-2xl border border-[#DFE1E6] shadow-sm overflow-hidden">
+                <MemberTable
+                  members={members}
+                  renderStatus={renderStatusBadge}
+                  renderRole={renderRoleBadge}
+                  formatDateTime={formatDateTime}
+                  onViewDetail={(m) => handleViewMemberDetails(m.memberId)}
+                  onEdit={(m) => {
+                    if (m.userId === user?.id) {
+                      showToast("Self-configuration is restricted.", "warning");
+                      return;
+                    }
+                    setSelectedMember(m);
+                    setNewStatus("");
+                    setNewRole("");
+                    setShowEditModal(true);
+                  }}
+                  onDelete={(m) => {
+                    if (m.userId === user?.id) {
+                      showToast("You cannot remove yourself.", "error");
+                      return;
+                    }
+                    setMemberToDelete(m);
+                    setIsDeleteModalOpen(true);
+                  }}
+                  onSort={handleSort}
+                  currentSortBy={searchParams.sortBy}
+                  currentSortDir={searchParams.sortDir}
+                  disableEdit={(m) => m.userId === user?.id}
+                  disableDelete={(m) => m.userId === user?.id}
+                />
               </div>
-            </div>
-          </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center py-20 bg-white rounded-xl border-2 border-dashed border-slate-200">
-            <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
-              <Users className="w-8 h-8 text-slate-300" />
-            </div>
-            <h3 className="text-lg font-bold text-slate-900">
-              No members found
-            </h3>
-            <p className="text-sm text-slate-500 mt-1">
-              Try inviting a new member to this workspace.
-            </p>
-          </div>
-        )}
 
-        {/* --- MODALS --- */}
+              <PaginationFooter pagination={pagination} onPageChange={handlePageChange} />
+            </div>
+          ) : (
+            <EmptyState icon={Users} message="No members found in this directory." />
+          )}
+        </div>
 
-        {/* Invite Modal */}
+        {/* MODALS SECTION */}
         <InviteMemberModal
           isOpen={showInviteModal}
           onClose={() => setShowInviteModal(false)}
-          onInvite={handleInvite}
-          isLoading={loading}
+          onInvite={handleInviteExecution}
+          isLoading={isLoading}
           email={inviteEmail}
           setEmail={setInviteEmail}
           roleCode={inviteRoleCode}
           setRoleCode={setInviteRoleCode}
-          title="Invite to Workspace"
-          description="Add a new member to this workspace."
           contextType="workspace"
           companyId={companyId}
         />
 
-        {/* Detail Modal (Chuyển type an toàn) */}
         <MemberDetailModalBase
           isOpen={showDetailModal}
           onClose={() => setShowDetailModal(false)}
           member={detailMember as any}
-          loading={loadingDetail}
-          title="Member Details"
+          loading={isLoadingDetail}
+          title="Member Snapshot"
           fields={[
-            { label: "Full Name", key: "fullName" },
-            { label: "Email", key: "email" },
-            { label: "Role", key: "roleName" },
-            { label: "Joined At", key: "joinedAt" },
-            { label: "Phone", key: "phoneNumber" },
+            { label: "Identity", key: "fullName" },
+            { label: "Corporate Email", key: "email" },
+            { label: "Permissions", key: "roleName" },
+            { label: "Onboarding Date", key: "joinedAt" },
+            { label: "Contact No", key: "phoneNumber" },
           ]}
         />
 
-        {/* Delete Confirmation */}
         <ConfirmationModal
           isOpen={isDeleteModalOpen}
           onClose={() => setIsDeleteModalOpen(false)}
-          onConfirm={handleConfirmRemove}
+          onConfirm={handleConfirmRemoval}
           isLoading={isDeleting}
-          title="Remove Member"
-          description={`Are you sure you want to remove ${memberToDelete?.fullName} from this workspace?`}
-          confirmText="Remove"
+          title="Revoke Access"
+          description={`Are you sure you want to remove ${memberToDelete?.fullName}? They will lose all permissions for this workspace.`}
+          confirmText="Confirm Removal"
           modalVariant="danger"
         />
 
-        {/* Edit Modal (Inline) */}
         {showEditModal && selectedMember && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in">
-            <div className="w-full max-w-md bg-white rounded-xl shadow-2xl overflow-hidden animate-in zoom-in-95">
-              <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                <h3 className="font-bold text-slate-900">
-                  Edit Workspace Member
-                </h3>
-                <button
-                  onClick={() => setShowEditModal(false)}
-                  className="p-2 text-slate-400 hover:text-slate-600 rounded-md hover:bg-slate-100 transition-colors"
-                  title="Close"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-              <div className="p-6 space-y-5">
-                <div className="p-3 bg-slate-50 rounded-lg border border-slate-100 flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-full bg-purple-100 flex items-center justify-center text-purple-700 font-bold">
-                    {selectedMember.fullName.charAt(0)}
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold text-slate-900">
-                      {selectedMember.fullName}
-                    </p>
-                    <p className="text-xs text-slate-500">
-                      {selectedMember.email}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-sm font-semibold text-slate-900 block">
-                    Role
-                  </label>
-                  <div className="relative">
-                    <select
-                      value={newRole}
-                      onChange={(e) => setNewRole(e.target.value)}
-                      className="w-full pl-3 pr-8 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-500 bg-white appearance-none"
-                    >
-                      <option value="">
-                        {selectedMember.roleName || "No Change"}
-                      </option>
-                      <option value="WORKSPACE_MEMBER">Member</option>
-                      <option value="WORKSPACE_ADMIN">Administrator</option>
-                    </select>
-                    <ShieldAlert className="w-4 h-4 text-slate-400 absolute right-3 top-3 pointer-events-none" />
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-sm font-semibold text-slate-900 block">
-                    Status
-                  </label>
-                  <div className="relative">
-                    <select
-                      value={newStatus}
-                      onChange={(e) => setNewStatus(e.target.value)}
-                      className="w-full pl-3 pr-8 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-500 bg-white appearance-none"
-                    >
-                      <option value="">
-                        {selectedMember.status || "No Change"}
-                      </option>
-                      <option value="ACTIVE">ACTIVE</option>
-                    </select>
-                    <CheckCircle className="w-4 h-4 text-slate-400 absolute right-3 top-3 pointer-events-none" />
-                  </div>
-                </div>
-              </div>
-              <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
-                <Button
-                  variant="outline"
-                  onClick={() => setShowEditModal(false)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleUpdateMember}
-                  disabled={isUpdating}
-                  className="bg-blue-600 hover:bg-blue-700 text-white"
-                >
-                  {isUpdating ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : (
-                    <Save className="w-4 h-4 mr-2" />
-                  )}
-                  Save Changes
-                </Button>
-              </div>
-            </div>
-          </div>
+          <EditMemberModal 
+            member={selectedMember}
+            onClose={() => setShowEditModal(false)}
+            onSave={handleUpdateMemberAction}
+            isUpdating={isUpdating}
+            newRole={newRole}
+            setNewRole={setNewRole}
+            newStatus={newStatus}
+            setNewStatus={setNewStatus}
+          />
         )}
       </div>
     </div>
   );
 }
+
+// =============================================================================
+// SUB-COMPONENTS (Refactored for Cleanliness)
+// =============================================================================
+
+const EmptyState = ({ icon: Icon, message }: { icon: any, message: string }) => (
+  <div className="flex flex-col items-center justify-center py-28 bg-white rounded-2xl border-2 border-dashed border-[#DFE1E6]">
+    <div className="w-16 h-16 bg-[#F4F5F7] rounded-full flex items-center justify-center mb-4">
+      <Icon className="w-8 h-8 text-slate-300 stroke-[1.5]" />
+    </div>
+    <h3 className="text-[16px] font-black uppercase tracking-widest text-[#172B4D]">{message}</h3>
+    <p className="text-[14px] text-[#6B778C] font-medium mt-1">Try adjusting your filters or invite new teammates.</p>
+  </div>
+);
+
+const PaginationFooter = ({ pagination, onPageChange }: any) => {
+  return (
+    <div className="flex flex-col sm:flex-row items-center justify-between gap-6 pt-2">
+      <p className="text-[12px] font-bold text-[#6B778C] uppercase tracking-widest">
+        Page <span className="text-[#172B4D]">{pagination.pageNumber + 1}</span> 
+        {" "}of <span className="text-[#172B4D]">{pagination.totalPages || 1}</span> 
+        {" "}(<span className="text-[#172B4D]">{pagination.totalElements}</span> members)
+      </p>
+
+      <div className="flex items-center gap-1.5 bg-white p-1.5 rounded-xl border border-[#DFE1E6] shadow-sm">
+        <PaginationBtn onClick={() => onPageChange(0)} disabled={pagination.first} icon={ChevronsLeft} />
+        <PaginationBtn onClick={() => onPageChange(pagination.pageNumber - 1)} disabled={pagination.first} icon={ChevronLeft} />
+        <div className="px-4 text-[11px] font-black uppercase tracking-[0.15em] text-[#0052CC]">
+          Navigate
+        </div>
+        <PaginationBtn onClick={() => onPageChange(pagination.pageNumber + 1)} disabled={pagination.last} icon={ChevronRight} />
+        <PaginationBtn onClick={() => onPageChange(pagination.totalPages - 1)} disabled={pagination.last} icon={ChevronsRight} />
+      </div>
+    </div>
+  );
+};
+
+const PaginationBtn = ({ onClick, disabled, icon: Icon }: any) => (
+  <Button 
+    onClick={onClick} 
+    disabled={disabled} 
+    variant="outline" 
+    size="icon" 
+    className="h-9 w-9 rounded-lg border-transparent text-[#42526E] hover:bg-[#F4F5F7] hover:text-[#172B4D] disabled:opacity-30 active:scale-90 transition-all"
+  >
+    <Icon className="w-4.5 h-4.5" />
+  </Button>
+);
+
+const EditMemberModal = ({ member, onClose, onSave, isUpdating, newRole, setNewRole, newStatus, setNewStatus }: any) => (
+  <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-[#091E42]/60 backdrop-blur-sm animate-in fade-in duration-300">
+    <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+      <div className="px-8 py-5 border-b border-slate-100 flex justify-between items-center bg-[#FAFBFC]">
+        <h3 className="text-[13px] font-black uppercase tracking-[0.2em] text-[#172B4D]">Modify Permissions</h3>
+        <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 transition-all"><X className="w-5 h-5" /></button>
+      </div>
+      <div className="p-8 space-y-6">
+        <div className="flex items-center gap-4 p-4 bg-[#F4F5F7] rounded-xl border border-slate-100">
+          <div className="h-12 w-12 rounded-xl bg-[#0052CC] flex items-center justify-center text-white text-lg font-black shadow-md">{member.fullName.charAt(0)}</div>
+          <div className="min-w-0">
+            <p className="font-black text-[#172B4D] truncate">{member.fullName}</p>
+            <p className="text-[12px] font-medium text-slate-500 truncate">{member.email}</p>
+          </div>
+        </div>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest px-1">Workspace Role</label>
+            <div className="relative">
+              <select value={newRole} onChange={(e) => setNewRole(e.target.value)} className="w-full h-11 pl-4 pr-10 border border-slate-200 rounded-xl text-[14px] font-bold text-[#172B4D] bg-white focus:ring-2 focus:ring-blue-100 appearance-none outline-none">
+                <option value="">Current: {member.roleName}</option>
+                <option value="WORKSPACE_MEMBER">Member</option>
+                <option value="WORKSPACE_ADMIN">Administrator</option>
+              </select>
+              <ShieldAlert className="w-4 h-4 text-slate-400 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest px-1">Account Status</label>
+            <div className="relative">
+              <select value={newStatus} onChange={(e) => setNewStatus(e.target.value)} className="w-full h-11 pl-4 pr-10 border border-slate-200 rounded-xl text-[14px] font-bold text-[#172B4D] bg-white focus:ring-2 focus:ring-blue-100 appearance-none outline-none">
+                <option value="">Current: {member.status}</option>
+                <option value="ACTIVE">ACTIVE</option>
+              </select>
+              <CheckCircle className="w-4 h-4 text-slate-400 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className="px-8 py-5 bg-[#FAFBFC] border-t border-slate-100 flex justify-end gap-3">
+        <Button variant="outline" onClick={onClose} className="h-10 px-6 rounded-lg text-[12px] font-black uppercase tracking-widest border-slate-200">Cancel</Button>
+        <Button onClick={onSave} disabled={isUpdating} className="h-10 px-8 bg-[#0052CC] hover:bg-[#0747A6] text-white font-black text-[12px] uppercase tracking-widest rounded-lg shadow-md active:scale-95 transition-all">
+          {isUpdating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />} Save Changes
+        </Button>
+      </div>
+    </div>
+  </div>
+);

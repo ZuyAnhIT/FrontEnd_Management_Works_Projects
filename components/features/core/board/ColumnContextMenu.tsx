@@ -1,16 +1,32 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { MoreHorizontal, ArrowLeftRight, Ban, Trash2, ChevronRight, ChevronLeft } from "lucide-react";
-import { useToast } from "@/components/ui/ToastProvider"; 
+// =============================================================================
+// 1. IMPORT
+// =============================================================================
+
+import React, { useState, useRef, useEffect, useCallback } from "react";
+import { 
+  MoreHorizontal, 
+  ArrowLeftRight, 
+  Ban, 
+  Trash2, 
+  ChevronRight, 
+  ChevronLeft 
+} from "lucide-react";
+
+// Internal Services & Utils
 import { deleteProjectStatus } from "@/services/apiBoard"; 
+import { useToast } from "@/components/ui/ToastProvider"; 
+import { cn } from "@/lib/utils";
+
+// Internal Components
 import ConfirmationModal from "@/components/ui/ConfirmationModal"; 
 
 // =============================================================================
-// 1. INTERFACES
+// 2. INTERFACES
 // =============================================================================
 
-interface ColumnContextMenuProps {
+export interface ColumnContextMenuProps {
   projectId: number;
   columnId: string;
   columnLabel: string;
@@ -20,9 +36,13 @@ interface ColumnContextMenuProps {
 }
 
 // =============================================================================
-// 2. MAIN COMPONENT
+// 3. MAIN COMPONENT
 // =============================================================================
 
+/**
+ * Menu ngữ cảnh cho cột trên Bảng Kanban (Column Context Menu).
+ * Hỗ trợ các thao tác như di chuyển cột, giới hạn số lượng và xóa cột.
+ */
 export function ColumnContextMenu({
   projectId,
   columnId,
@@ -31,16 +51,26 @@ export function ColumnContextMenu({
   onSetColumnLimit,
   onDeleted,
 }: ColumnContextMenuProps) {
-  // --- STATE ---
+  
+  // ---------------------------------------------------------------------------
+  // 4. HOOKS & STATE
+  // ---------------------------------------------------------------------------
+  
+  const { showToast } = useToast();
+  const menuRef = useRef<HTMLDivElement>(null);
+
   const [isOpen, setIsOpen] = useState(false);
   const [showMoreActions, setShowMoreActions] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
-  
-  const menuRef = useRef<HTMLDivElement>(null);
-  const { showToast } = useToast();
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  // --- EFFECT: CLICK OUTSIDE ---
+  // ---------------------------------------------------------------------------
+  // 5. EFFECTS
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Đóng menu khi người dùng click ra ngoài vùng hiển thị của dropdown
+   */
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
@@ -48,68 +78,92 @@ export function ColumnContextMenu({
         setShowMoreActions(false);
       }
     };
-    if (isOpen) document.addEventListener("mousedown", handleClickOutside);
+    
+    if (isOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isOpen]);
 
-  // --- HANDLERS ---
+  // ---------------------------------------------------------------------------
+  // 6. HANDLERS
+  // ---------------------------------------------------------------------------
 
-  const handleRequestDelete = () => {
-      setIsOpen(false); // Close menu
-      setIsConfirmOpen(true); // Open modal
-  };
+  /**
+   * Kích hoạt quy trình yêu cầu xóa cột
+   */
+  const handleRequestDelete = useCallback(() => {
+      setIsOpen(false); 
+      setIsConfirmOpen(true); 
+  }, []);
 
-  const handleConfirmDelete = async () => {
+  /**
+   * Xác nhận xóa cột và gọi API
+   */
+  const handleConfirmDelete = useCallback(async () => {
+    setIsDeleting(true);
+    
     try {
-        setIsDeleting(true);
         await deleteProjectStatus(projectId, Number(columnId));
-
-        showToast("Column deleted successfully.", "success");
+        
+        showToast("Column deleted successfully", "success");
         setIsConfirmOpen(false);
 
         if (onDeleted) {
             onDeleted(columnId);
         }
     } catch (error: any) {
-        // Use error message from API
-        const message = error.message || error.response?.data?.message || "Failed to delete column.";
+        // Ưu tiên hiển thị message lỗi do Backend trả về
+        const message = error.message || error.response?.data?.message || "Failed to delete column";
         showToast(message, "error");
     } finally {
         setIsDeleting(false);
     }
-  };
+  }, [columnId, onDeleted, projectId, showToast]);
 
-  // --- RENDER ---
+  // ---------------------------------------------------------------------------
+  // 7. RENDER
+  // ---------------------------------------------------------------------------
+
   return (
     <>
       <div className="relative" ref={menuRef}>
-        {/* Trigger Button */}
+        
+        {/* Nút Kích hoạt (Trigger Button) */}
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className={`p-1.5 rounded text-slate-500 hover:bg-slate-200 transition-colors ${isOpen ? 'bg-slate-200 text-slate-700' : ''}`}
-          title="Column actions"
+          className={cn(
+            "p-1.5 rounded transition-colors text-slate-500 hover:bg-[#091E4214] hover:text-slate-800",
+            isOpen && "bg-[#091E4214] text-slate-800"
+          )}
+          title="Column options"
         >
           <MoreHorizontal className="w-4 h-4" />
         </button>
 
-        {/* Dropdown Menu */}
+        {/* Menu Thả xuống (Dropdown Content) */}
         {isOpen && (
-          <div className="absolute right-0 top-full mt-1 w-56 bg-white rounded-lg shadow-xl z-50 border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+          <div className="absolute right-0 top-full mt-1.5 w-60 bg-white rounded-lg shadow-xl z-50 border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-100 origin-top-right">
+            
             {!showMoreActions ? (
-              // Main Menu
-              <div className="flex flex-col py-1">
-                <div className="px-4 py-2 text-xs font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-100 mb-1">
+              // MENU CHÍNH (MAIN MENU)
+              <div className="flex flex-col py-1.5">
+                
+                {/* Tiêu đề Menu (Column Name) */}
+                <div className="px-4 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100 mb-1 truncate">
                   {columnLabel}
                 </div>
                 
+                {/* Các hành động cơ bản */}
                 <button
                   onClick={() => {
-                    console.log("Move logic"); // Placeholder
+                    showToast("Move feature is in development", "info");
                     setIsOpen(false);
                   }}
-                  className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                  className="w-full text-left px-4 py-2 text-[13px] font-medium text-slate-700 hover:bg-slate-50 flex items-center gap-3 transition-colors"
                 >
-                  <ArrowLeftRight className="w-4 h-4 text-slate-400" />
+                  <ArrowLeftRight className="w-3.5 h-3.5 text-slate-400" />
                   Move column
                 </button>
 
@@ -118,44 +172,51 @@ export function ColumnContextMenu({
                     onSetColumnLimit?.(columnId);
                     setIsOpen(false);
                   }}
-                  className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                  className="w-full text-left px-4 py-2 text-[13px] font-medium text-slate-700 hover:bg-slate-50 flex items-center gap-3 transition-colors"
                 >
-                  <Ban className="w-4 h-4 text-slate-400" />
+                  <Ban className="w-3.5 h-3.5 text-slate-400" />
                   Set column limit
                 </button>
 
-                <div className="h-px bg-slate-100 my-1" />
+                <div className="h-px bg-slate-100 my-1.5" />
 
+                {/* Hành động xóa (Nguy hiểm) */}
                 <button
                   onClick={handleRequestDelete}
-                  className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                  className="w-full text-left px-4 py-2 text-[13px] font-medium text-red-600 hover:bg-red-50 hover:text-red-700 flex items-center gap-3 transition-colors"
                 >
-                  <Trash2 className="w-4 h-4" />
+                  <Trash2 className="w-3.5 h-3.5" />
                   Delete
                 </button>
 
-                <div className="h-px bg-slate-100 my-1" />
+                <div className="h-px bg-slate-100 my-1.5" />
 
+                {/* Chuyển sang menu phụ */}
                 <button
                   onClick={() => setShowMoreActions(true)}
-                  className="w-full text-left px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 flex items-center justify-between"
+                  className="w-full text-left px-4 py-2 text-[13px] font-medium text-slate-600 hover:bg-slate-50 flex items-center justify-between transition-colors"
                 >
                   More actions
                   <ChevronRight className="w-4 h-4 text-slate-400" />
                 </button>
+
               </div>
             ) : (
-              // Sub Menu (More Actions)
-              <div className="flex flex-col py-1">
+              // MENU PHỤ (SUB MENU - MORE ACTIONS)
+              <div className="flex flex-col py-1.5">
+                
+                {/* Nút quay lại */}
                 <button
                   onClick={() => setShowMoreActions(false)}
-                  className="w-full text-left px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 flex items-center gap-2 border-b border-slate-100 mb-1"
+                  className="w-full text-left px-4 py-2 text-[13px] font-medium text-slate-600 hover:bg-slate-50 flex items-center gap-2 border-b border-slate-100 mb-1 transition-colors"
                 >
                   <ChevronLeft className="w-4 h-4 text-slate-400" />
                   Back
                 </button>
-                <div className="px-4 py-2 text-sm text-slate-400 italic text-center">
-                  No extra actions yet
+                
+                {/* Nội dung menu phụ */}
+                <div className="px-4 py-4 text-[12px] text-slate-400 italic text-center">
+                  No additional actions available.
                 </div>
               </div>
             )}
@@ -163,14 +224,14 @@ export function ColumnContextMenu({
         )}
       </div>
 
-      {/* Confirmation Modal */}
+      {/* MODAL XÁC NHẬN XÓA CỘT */}
       <ConfirmationModal
         isOpen={isConfirmOpen}
         onClose={() => !isDeleting && setIsConfirmOpen(false)}
         onConfirm={handleConfirmDelete}
         isLoading={isDeleting}
         title={`Delete Column "${columnLabel}"?`}
-        description="Are you sure you want to delete this column? This action cannot be undone and all settings will be lost."
+        description="Are you sure you want to permanently delete this column? This action cannot be undone and may affect associated tasks."
         confirmText="Delete Column"
         cancelText="Cancel"
         modalVariant="danger"

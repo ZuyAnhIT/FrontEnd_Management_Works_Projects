@@ -1,6 +1,10 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+// =============================================================================
+// 1. IMPORT (Libraries -> Internal -> Components)
+// =============================================================================
+
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
@@ -9,66 +13,73 @@ import listPlugin from '@fullcalendar/list';
 import { useParams } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 
-// Services
+// Services & Hooks
 import { getProjectCalendar, CalendarEvent, CalendarParams } from '@/services/apiStatistics';
 import { getProjectMembers, ProjectMember } from '@/services/apiProject';
 import { getProjectStatuses, RawStatusColumn } from "@/services/apiBoard"; 
 import { getSprints, Sprint } from "@/services/apiSprint";
-import { apiEpic, Epic } from "@/services/apiEpic";
-import { Chatbot } from "@/components/chatbot/chatbot";
-// Components
-import CalendarFilterBar from '@/components/features/core/calendar/CalendarFilterBar';
-import CalendarEventContent from '@/components/features/core/calendar/CalendarEventContent';
+import { getEpics, Epic } from "@/services/apiEpic"; // ✅ Da sua loi import
+import { updateTask } from "@/services/apiTask";
+import { useAuth } from "@/context/AuthContext";
+import { useProjectRole } from "@/hooks/useProjectRole";
 import { useToast } from "@/components/ui/ToastProvider";
 
-// Modals
+// UI Components & Modals
+import CalendarFilterBar from '@/components/features/core/calendar/CalendarFilterBar';
+import CalendarEventContent from '@/components/features/core/calendar/CalendarEventContent';
 import SprintDetailModal from "@/components/features/core/sprint/SprintDetailModal";
 import TaskDetailPanel from "@/components/features/core/task/TaskDetailPanel"; 
 import TaskDetailModalFloating from "@/components/features/core/task/TaskDetailModalFloating";
+import { Chatbot } from "@/components/chatbot/chatbot";
+import { cn } from "@/lib/utils";
 
-// ✅ Import Hook phân quyền
-import { useProjectRole } from "@/hooks/useProjectRole"; 
-import { updateTask } from "@/services/apiTask"; // Cần import thêm updateTask để hàm handleEventDrop hoạt động (như logic cũ)
-
-// ===================================================
-// 1. MAIN COMPONENT
-// ===================================================
+// =============================================================================
+// 2. MAIN COMPONENT
+// =============================================================================
 
 export default function ProjectCalendarPage() {
+    
+    // ---------------------------------------------------------------------------
+    // 3. HOOKS, CONTEXT & PARAMS
+    // ---------------------------------------------------------------------------
+    
     const params = useParams();
+    const { showToast } = useToast();
+    const { activeCompany } = useAuth();
+    
     const projectId = Number(params.projectId);
     const workspaceId = Number(params.workspaceId);
-    // ✅ FIX: Đảm bảo companyId được lấy từ URL nếu có, hoặc dùng fallback an toàn
-    const paramCompanyId = Number(params.companyId);
-    const companyId = !isNaN(paramCompanyId) ? paramCompanyId : 1; 
-    const { showToast } = useToast();
+    const companyId = activeCompany?.companyId || 0;
 
-    // ✅ Lấy quyền Guest
+    // Kiem tra quyen han nguoi dung trong du an
     const { isGuest } = useProjectRole(projectId);
+    const calendarRef = useRef<FullCalendar>(null);
 
-    // --- STATE ---
-    const [loading, setLoading] = useState(false);
+    // ---------------------------------------------------------------------------
+    // 4. STATE MANAGEMENT
+    // ---------------------------------------------------------------------------
+
+    // Data States
     const [events, setEvents] = useState<CalendarEvent[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
     
-    // ✅ STATE CHO MODAL CHI TIẾT TASK
-    const [viewMode, setViewMode] = useState<'panel' | 'floating'>('floating');
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    
-    // Data State cho Task Modal
+    // Metadata States (Dung cho Modal chi tiet)
     const [members, setMembers] = useState<ProjectMember[]>([]);
     const [sprints, setSprints] = useState<Sprint[]>([]);
     const [epics, setEpics] = useState<Epic[]>([]);
     const [statuses, setStatuses] = useState<RawStatusColumn[]>([]);
 
-    // Calendar State
+    // UI & Navigation States
+    const [viewMode, setViewMode] = useState<'panel' | 'floating'>('floating');
+    const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
+    const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
+    const [selectedSprintId, setSelectedSprintId] = useState<number | null>(null);
+
     const [dateRange, setDateRange] = useState<{ from: string; to: string } | null>(null);
     const [currentTitle, setCurrentTitle] = useState("");
     const [currentView, setCurrentView] = useState("dayGridMonth");
 
-    // Selection State
-    const [selectedSprintId, setSelectedSprintId] = useState<number | null>(null);
-    const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null); // ✅ State Task
-
+    // Filter States
     const [filters, setFilters] = useState({
         keyword: '',
         assigneeId: '',
@@ -79,42 +90,40 @@ export default function ProjectCalendarPage() {
         to: ''
     });
 
-    const calendarRef = useRef<FullCalendar>(null);
+    // ---------------------------------------------------------------------------
+    // 5. DATA FETCHING (Handlers)
+    // ---------------------------------------------------------------------------
 
-    // ===================================================
-    // 2. API HANDLERS (Logic nghiệp vụ quan trọng)
-    // ===================================================
-    
-    // 1. Fetch All Project Data (Members, Sprints, Epics, Statuses)
-    useEffect(() => {
-        if (!projectId || !workspaceId) return;
+    /**
+     * Tai danh sach du lieu nen (Metadata) cua du an
+     */
+    const fetchMetadata = useCallback(async () => {
+        if (!projectId || !workspaceId || !companyId) return;
 
-        const fetchAllData = async () => {
-            try {
-                const [membersRes, sprintsRes, epicsRes, statusesRes] = await Promise.all([
-                    getProjectMembers(companyId, workspaceId, projectId, { size: 100 }),
-                    getSprints(projectId),
-                    apiEpic.getEpics(projectId),
-                    getProjectStatuses(projectId)
-                ]);
+        try {
+            const [membersRes, sprintsRes, epicsRes, statusesRes] = await Promise.all([
+                getProjectMembers(companyId, workspaceId, projectId, { size: 100 }),
+                getSprints(projectId),
+                getEpics(projectId),
+                getProjectStatuses(projectId)
+            ]);
 
-                setMembers(membersRes.content || []);
-                setSprints(sprintsRes || []);
-                setEpics(epicsRes || []);
-                setStatuses(statusesRes || []);
-
-            } catch (err) {
-                console.error("Failed to fetch project meta data", err);
-            }
-        };
-
-        fetchAllData();
+            setMembers(membersRes.content || []);
+            setSprints(sprintsRes || []);
+            setEpics(epicsRes || []);
+            setStatuses(statusesRes || []);
+        } catch (err: any) {
+            console.error("[Calendar] Metadata fetch error:", err.message);
+        }
     }, [companyId, workspaceId, projectId]);
 
-    // 2. Fetch Events
-    const fetchEvents = useCallback(async () => {
+    /**
+     * Tai danh sach cac su kien lich dua tren khoang thoi gian va bo loc
+     */
+    const fetchCalendarEvents = useCallback(async () => {
         if (!projectId || !dateRange) return;
-        setLoading(true);
+        
+        setIsLoading(true);
         try {
             const apiParams: CalendarParams = {
                 from: filters.from || dateRange.from,
@@ -128,27 +137,34 @@ export default function ProjectCalendarPage() {
             const data = await getProjectCalendar(projectId, apiParams);
             setEvents(data);
         } catch (error: any) {
-             const message = error.response?.data?.message || error.message || "Failed to load calendar events";
-            showToast(message, "error");
+            showToast(error.response?.data?.message || "Failed to sync calendar events", "error");
         } finally {
-            setLoading(false);
+            setIsLoading(false);
         }
     }, [projectId, dateRange, filters, showToast]);
 
+    // Side effects cho viec tai du lieu
     useEffect(() => {
-        const t = setTimeout(() => fetchEvents(), 300);
-        return () => clearTimeout(t);
-    }, [fetchEvents]);
+        fetchMetadata();
+    }, [fetchMetadata]);
 
-    // ===================================================
-    // 3. UI HANDLERS (Logic nghiệp vụ quan trọng)
-    // ===================================================
+    useEffect(() => {
+        const timer = setTimeout(() => fetchCalendarEvents(), 300);
+        return () => clearTimeout(timer);
+    }, [fetchCalendarEvents]);
 
-    const handleFilterChange = (key: keyof typeof filters, value: any) => {
+    // ---------------------------------------------------------------------------
+    // 6. EVENT HANDLERS (Business Logic)
+    // ---------------------------------------------------------------------------
+
+    const handleFilterUpdate = (key: keyof typeof filters, value: any) => {
         setFilters((prev) => ({ ...prev, [key]: value }));
     };
 
-    const handleDatesSet = (dateInfo: any) => {
+    /**
+     * Cap nhat khoang thoi gian khi nguoi dung dieu huong lich
+     */
+    const handleDatesUpdate = (dateInfo: any) => {
         setDateRange({
             from: dateInfo.startStr.split('T')[0],
             to: dateInfo.endStr.split('T')[0],
@@ -156,43 +172,40 @@ export default function ProjectCalendarPage() {
         setCurrentTitle(dateInfo.view.title);
     };
 
-    const handleNavigate = (action: 'PREV' | 'NEXT' | 'TODAY') => {
-        const calendarApi = calendarRef.current?.getApi();
-        if (!calendarApi) return;
-        if (action === 'PREV') calendarApi.prev();
-        if (action === 'NEXT') calendarApi.next();
-        if (action === 'TODAY') calendarApi.today();
+    const handleCalendarNavigation = (action: 'PREV' | 'NEXT' | 'TODAY') => {
+        const api = calendarRef.current?.getApi();
+        if (!api) return;
+        if (action === 'PREV') api.prev();
+        if (action === 'NEXT') api.next();
+        if (action === 'TODAY') api.today();
     };
 
-    const handleViewChange = (view: string) => {
-        const calendarApi = calendarRef.current?.getApi();
-        if (calendarApi) {
-            calendarApi.changeView(view);
+    const handleViewTypeChange = (view: string) => {
+        const api = calendarRef.current?.getApi();
+        if (api) {
+            api.changeView(view);
             setCurrentView(view);
         }
     };
 
-    // ✅ FIX: Hàm xử lý khi Task được update -> Load lại lịch
-    const handleTaskUpdate = () => {
-        fetchEvents(); 
-    };
-
-    // ✅ FIX: Sửa lại hàm click để mở Modal Task/Sprint
-    const handleEventClick = (info: any) => {
-        const props = info.event.extendedProps;
+    /**
+     * Mo modal chi tiet khi click vao su kien
+     */
+    const handleEventSelection = (info: any) => {
+        const { type, originalId } = info.event.extendedProps;
         
-        if (props.type === 'SPRINT') {
-            setSelectedSprintId(props.originalId);
-            // setIsSprintModalOpen(true); // Biến này chưa khai báo trong code gốc của bạn, dùng selectedSprintId check là đủ hoặc thêm state nếu cần
-        } else if (props.type === 'TASK') {
-            setSelectedTaskId(props.originalId); 
-            setIsModalOpen(true); // <--- Mở Modal chi tiết Task
+        if (type === 'SPRINT') {
+            setSelectedSprintId(originalId);
+        } else if (type === 'TASK') {
+            setSelectedTaskId(originalId); 
+            setIsTaskModalOpen(true); 
         }
     };
 
-    // ✅ Bổ sung hàm xử lý kéo thả (Dựa trên logic calendar thông thường)
-    const handleEventDrop = async (info: any) => {
-        // Chặn nếu là Guest
+    /**
+     * Xu ly cap nhat thoi gian khi keo tha su kien (Drag & Drop)
+     */
+    const handleEventMovement = async (info: any) => {
         if (isGuest) {
             info.revert();
             return;
@@ -200,156 +213,125 @@ export default function ProjectCalendarPage() {
 
         const { type, originalId } = info.event.extendedProps;
         if (type === 'TASK') {
-            // Logic update task date
             const newStart = info.event.start?.toISOString();
             const newEnd = info.event.end?.toISOString() || newStart; 
             try {
                 await updateTask(originalId, { startDate: newStart, dueDate: newEnd });
-                showToast("Task updated", "success");
-            } catch (err) {
+                showToast("Schedule updated successfully", "success");
+            } catch (err: any) {
                 info.revert();
-                showToast("Update failed", "error");
+                showToast(err.message || "Failed to update schedule", "error");
             }
         } else {
             info.revert();
         }
     };
 
-    const handleDateClick = (info: any) => {
-        if (isGuest) return;
-        // Logic create task (nếu có)
-    };
-
+    // ---------------------------------------------------------------------------
+    // 7. RENDER LOGIC
+    // ---------------------------------------------------------------------------
 
     if (!projectId) return null;
 
+    const taskDetailProps = {
+        taskId: selectedTaskId || 0,
+        companyId,
+        workspaceId,
+        projectId,
+        members,
+        statuses,
+        sprints,
+        epics,
+        readOnly: isGuest,
+        onUpdate: fetchCalendarEvents,
+        onClose: () => { setIsTaskModalOpen(false); setSelectedTaskId(null); }
+    };
+
     return (
-        <div className="flex flex-col h-screen bg-slate-50 overflow-hidden relative">
+        <div className="flex flex-col h-screen bg-[#F4F5F7] overflow-hidden relative font-sans text-[#172B4D]">
             
-            {/* HEADER & FILTER */}
-            <div className="bg-white border-b border-slate-200 shrink-0 z-10 shadow-sm">
-                <div className="px-6 py-3 flex items-center justify-between">
-                    <h1 className="text-xl font-bold text-slate-800 tracking-tight">Project Calendar</h1>
-                    {loading && (
-                        <div className="flex items-center gap-2 text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-full animate-pulse">
-                            <Loader2 className="w-3 h-3 animate-spin"/> Syncing...
+            {/* HEADER & FILTER SECTION */}
+            <header className="bg-white border-b border-[#DFE1E6] shrink-0 z-10 shadow-sm">
+                <div className="px-6 py-4 flex items-center justify-between">
+                    <h1 className="text-xl font-black uppercase tracking-tight text-[#172B4D]">Project Calendar</h1>
+                    {isLoading && (
+                        <div className="flex items-center gap-2 text-[11px] font-black text-[#0052CC] bg-[#DEEBFF] px-3 py-1 rounded-lg animate-pulse">
+                            <Loader2 className="w-3.5 h-3.5 animate-spin"/> Syncing Roadmap...
                         </div>
                     )}
                 </div>
-                <div className="px-4 pb-3">
+                <div className="px-5 pb-4">
                     <CalendarFilterBar 
                         filters={filters} 
-                        onFilterChange={handleFilterChange}
+                        onFilterChange={handleFilterUpdate}
                         viewMode={currentView}
-                        onViewChange={handleViewChange}
-                        onNavigate={handleNavigate}
+                        onViewChange={handleViewTypeChange}
+                        onNavigate={handleCalendarNavigation}
                         titleDate={currentTitle}
                         members={members} 
                     />
                 </div>
-            </div>
+            </header>
 
-            {/* CALENDAR BODY */}
-            <div className="flex-1 p-4 sm:p-6 overflow-hidden">
-                <div className="bg-white p-1 rounded-xl shadow-sm border border-slate-200 h-full relative">
+            {/* CALENDAR MAIN BODY */}
+            <main className="flex-1 p-4 sm:p-6 overflow-hidden animate-in fade-in duration-500">
+                <div className="bg-white p-2 rounded-2xl shadow-sm border border-[#DFE1E6] h-full relative overflow-hidden">
                     <FullCalendar
                         ref={calendarRef}
                         plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, listPlugin]}
                         initialView="dayGridMonth"
                         headerToolbar={false} 
                         events={events}
-                        datesSet={handleDatesSet}
+                        datesSet={handleDatesUpdate}
                         eventContent={CalendarEventContent}
-                        eventClick={handleEventClick}
+                        eventClick={handleEventSelection}
                         
-                        // ✅ CONFIG QUYỀN HẠN
+                        // Permissions Control
                         editable={!isGuest}      
                         selectable={!isGuest}    
                         droppable={!isGuest} 
-                        eventDrop={handleEventDrop}
-                        eventResize={handleEventDrop}
-                        dateClick={handleDateClick}
+                        eventDrop={handleEventMovement}
+                        eventResize={handleEventMovement}
 
                         height="100%"
                         dayMaxEvents={4}
                         firstDay={1}
                         fixedWeekCount={false}
                         nowIndicator={true}
-                        eventClassNames="focus:outline-none"
+                        eventClassNames="cursor-pointer transition-transform active:scale-[0.98]"
                     />
                 </div>
-            </div>
+            </main>
 
-            {/* --- MODALS --- */}
+            {/* MODALS REGISTRATION */}
 
-            {/* Sprint Modal - Read Only if Guest */}
+            {/* Sprint Details */}
             {selectedSprintId && (
                 <SprintDetailModal 
                     projectId={projectId}
                     sprintId={selectedSprintId}
-                    // isOpen={true} // Code gốc bạn ko có biến state này, dùng selectedSprintId && ... để render
                     onClose={() => setSelectedSprintId(null)}
-                    onUpdate={fetchEvents} 
-                    readOnly={isGuest} // ✅ Truyền quyền
+                    onUpdate={fetchCalendarEvents} 
+                    readOnly={isGuest}
                 />
             )}
             
-            {/* ✅ RENDER MODAL CHI TIẾT TASK */}
-            
-            {/* TRƯỜNG HỢP 1: HIỆN PANEL DỌC (View Mode = 'panel') */}
-            {isModalOpen && selectedTaskId && viewMode === 'panel' && (
-                <TaskDetailPanel
-                    taskId={selectedTaskId}
-                    // Đóng thì reset cả cờ mở và ID
-                    onClose={() => { setIsModalOpen(false); setSelectedTaskId(null); }}
-                    
-                    // Chuyển sang Floating
-                    onSwitchToFloating={() => setViewMode('floating')} 
-                    
-                    onUpdate={handleTaskUpdate} 
-                    
-                    // Data Props
-                    members={members}
-                    statuses={statuses} 
-                    sprints={sprints} 
-                    epics={epics} 
-                    
-                    // Context IDs
-                    companyId={companyId!}
-                    workspaceId={workspaceId}
-                    projectId={projectId}
-
-                    readOnly={isGuest} // ✅ Truyền quyền
-                />
+            {/* Task Details (Toggle between Panel and Floating) */}
+            {isTaskModalOpen && selectedTaskId && (
+                viewMode === 'panel' ? (
+                    <TaskDetailPanel
+                        {...taskDetailProps}
+                        onSwitchToFloating={() => setViewMode('floating')} 
+                    />
+                ) : (
+                    <TaskDetailModalFloating
+                        {...taskDetailProps}
+                        isOpen={true}
+                        onSwitchToPanel={() => setViewMode('panel')} 
+                    />
+                )
             )}
 
-            {/* TRƯỜNG HỢP 2: HIỆN MODAL NỔI (View Mode = 'floating') */}
-            {isModalOpen && selectedTaskId && viewMode === 'floating' && (
-                <TaskDetailModalFloating
-                    taskId={selectedTaskId}
-                    isOpen={true}
-                    // Đóng thì reset cả cờ mở và ID
-                    onClose={() => { setIsModalOpen(false); setSelectedTaskId(null); }}
-                    
-                    // Chuyển về Panel
-                    onSwitchToPanel={() => setViewMode('panel')} 
-                    
-                    onUpdate={handleTaskUpdate} 
-                    
-                    // Data Props (Giống hệt Panel)
-                    members={members}
-                    statuses={statuses} 
-                    sprints={sprints}
-                    epics={epics}
-                    
-                    // Context IDs
-                    companyId={companyId!}
-                    workspaceId={workspaceId}
-                    projectId={projectId}
-
-                    readOnly={isGuest} // ✅ Truyền quyền
-                />
-            )}
             <Chatbot />
         </div>
     );

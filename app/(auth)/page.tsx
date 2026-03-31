@@ -1,30 +1,60 @@
 "use client";
 
+// =============================================================================
+// 1. IMPORT (Libraries -> Internal -> Styles)
+// =============================================================================
+
+import React, { useCallback } from "react";
 import { useRouter } from "next/navigation";
+
+// Components
 import AuthModal from "@/components/features/auth/AuthModal";
 
+// Utils
+import { cn } from "@/lib/utils";
+
+// =============================================================================
+// 2. MAIN COMPONENT
+// =============================================================================
+
 /**
- * Trang Auth (Đăng nhập/Đăng ký) chuyên biệt.
- * Trang này hoạt động như một wrapper để hiển thị AuthModal dưới dạng một trang đầy đủ
- * thay vì một popup đè lên nội dung khác.
+ * Trang xac thuc tap trung (Auth Page).
+ * Su dung AuthModal nhu mot thanh phan chinh de thuc hien Dang nhap/Dang ky.
  */
 export default function AuthPage() {
+  // ---------------------------------------------------------------------------
+  // 3. HOOKS
+  // ---------------------------------------------------------------------------
+
   const router = useRouter();
 
-  // Xử lý khi đóng modal: Quay về trang chủ
-  const handleClose = () => {
+  // ---------------------------------------------------------------------------
+  // 4. HANDLERS
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Dieu huong nguoi dung quay lai trang chu khi dong modal.
+   * Su dung useCallback de toi uu hieu suat render.
+   */
+  const handleClose = useCallback(() => {
     router.push("/");
-  };
+  }, [router]);
+
+  // ---------------------------------------------------------------------------
+  // 5. RENDER LOGIC
+  // ---------------------------------------------------------------------------
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4 bg-gradient-to-b from-white via-blue-50/40 to-white">
-      {/* Render AuthModal ở trạng thái luôn mở (isOpen=true).
-        Giao diện sẽ hiển thị như một Card nằm giữa màn hình nhờ class của div bao ngoài.
+    <main
+      className={cn(
+        "flex min-h-screen items-center justify-center p-4 transition-colors duration-300",
+        "bg-[#F4F5F7] dark:bg-slate-950", // Su dung mau nen trung tinh giong Jira
+      )}
+    >
+      {/* Hien thi AuthModal o che do luon mo (isOpen=true).
+        Trong moi truong nay, Modal se dong vai tro nhu mot Card trung tam.
       */}
-      <AuthModal 
-        isOpen={true} 
-        onClose={handleClose} 
-      />
-    </div>
+      <AuthModal isOpen={true} onClose={handleClose} />
+    </main>
   );
 }

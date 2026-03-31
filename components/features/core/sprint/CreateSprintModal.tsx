@@ -1,23 +1,27 @@
 "use client";
 
-import { useState } from "react";
-import { X, Loader2, Calendar, Target } from "lucide-react";
+// =============================================================================
+// 1. IMPORT
+// =============================================================================
+
+import React, { useState, useCallback } from "react";
+import { X, Loader2, Calendar, Target, Rocket, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/Buttons";
 import { createSprint, SprintPayload } from "@/services/apiSprint";
 import { useToast } from "@/components/ui/ToastProvider";
+import { cn } from "@/lib/utils";
 
 // =============================================================================
-// 1. INTERFACES
+// 2. INTERFACES & CONSTANTS
 // =============================================================================
 
 interface CreateSprintModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: () => void; // Callback để reload lại danh sách
-  projectId: number; // Chỉ cần projectId
+  onSuccess: () => void; // Callback để reload danh sách sau khi tạo
+  projectId: number;
 }
 
-// Khởi tạo form data với undefined cho date, vì date input có thể trả về string rỗng
 const INITIAL_FORM_DATA: SprintPayload = {
   name: "",
   goal: "",
@@ -26,179 +30,222 @@ const INITIAL_FORM_DATA: SprintPayload = {
 };
 
 // =============================================================================
-// 2. MAIN COMPONENT
+// 3. MAIN COMPONENT
 // =============================================================================
 
+/**
+ * Modal khởi tạo Sprint mới.
+ * Cung cấp giao diện nhập liệu Tên, Mục tiêu và Khung thời gian cho chu kỳ làm việc.
+ */
 export default function CreateSprintModal({
   isOpen,
   onClose,
   onSuccess,
   projectId,
 }: CreateSprintModalProps) {
-  // --- HOOKS ---
+  
+  // ---------------------------------------------------------------------------
+  // 4. HOOKS & STATE
+  // ---------------------------------------------------------------------------
+  
   const { showToast } = useToast();
-  const [loading, setLoading] = useState(false);
-
-  // --- STATE ---
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState<SprintPayload>(INITIAL_FORM_DATA);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // --- HANDLER: SUBMIT ---
-  const handleSubmit = async () => {
-    // 1. Validate (giữ nguyên logic gốc)
+  // ---------------------------------------------------------------------------
+  // 5. HANDLERS
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Cập nhật Form State và xóa thông báo lỗi khi người dùng thay đổi dữ liệu
+   */
+  const handleUpdateField = useCallback((field: keyof SprintPayload, value: string) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+    if (errorMsg) setErrorMsg(null);
+  }, [errorMsg]);
+
+  /**
+   * Xử lý xác thực và gửi dữ liệu tạo Sprint lên API
+   */
+  const handleFormSubmit = async () => {
+    // 1. Validation sơ bộ tại Client
     if (!formData.name?.trim()) {
-      showToast("Sprint name is required", "error");
+      setErrorMsg("Sprint name is required");
       return;
     }
 
-    try {
-      setLoading(true);
+    setIsSubmitting(true);
+    setErrorMsg(null);
 
-      // 2. Chuẩn bị payload (Convert date string -> ISO format cho API)
+    try {
+      // 2. Chuẩn bị payload (Chuyển đổi date string -> ISO format chuẩn API)
       const payload: SprintPayload = {
         name: formData.name.trim(),
         goal: formData.goal?.trim() || "",
-
-        // Chuyển đổi sang ISO string hoặc undefined nếu rỗng
-        startDate: formData.startDate
-          ? new Date(formData.startDate).toISOString()
-          : undefined,
-        endDate: formData.endDate
-          ? new Date(formData.endDate).toISOString()
-          : undefined,
-
-        taskIds: [], // Mảng rỗng mặc định
+        startDate: formData.startDate ? new Date(formData.startDate).toISOString() : undefined,
+        endDate: formData.endDate ? new Date(formData.endDate).toISOString() : undefined,
+        taskIds: [], 
       };
 
-      // 3. Gọi API
+      // 3. Gọi API service
       await createSprint(projectId, payload);
 
-      // 4. Thành công
+      // 4. Xử lý sau khi thành công
       showToast("Sprint created successfully", "success");
+      setFormData(INITIAL_FORM_DATA);
       onSuccess();
       onClose();
-
-      // Reset form
-      setFormData(INITIAL_FORM_DATA);
     } catch (error: any) {
-      console.error(error);
-      // Sử dụng message từ API trả về
-      const message =
-        error.message ||
-        error.response?.data?.message ||
-        "Failed to create sprint.";
-      showToast(message, "error");
+      console.error("Create Sprint Error:", error);
+      const message = error.response?.data?.message || error.message || "Failed to create sprint.";
+      setErrorMsg(message);
     } finally {
-      setLoading(false);
+      setIsSubmitting(false);
     }
   };
 
-  // --- RENDER GUARD ---
+  // ---------------------------------------------------------------------------
+  // 6. RENDER LOGIC
+  // ---------------------------------------------------------------------------
+
   if (!isOpen) return null;
 
-  // --- RENDER UI ---
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-      {/* Overlay click to close */}
-      <div className="absolute inset-0" onClick={onClose}></div>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+      
+      {/* Lớp nền click để đóng */}
+      <div className="absolute inset-0" onClick={onClose} />
 
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md animate-in zoom-in-95 duration-200 relative z-10">
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b">
-          <h2 className="text-lg font-bold text-slate-800">
-            Create New Sprint
-          </h2>
+      {/* Container Modal */}
+      <div 
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200 relative z-10 border border-slate-200"
+        onClick={(e) => e.stopPropagation()}
+      >
+        
+        {/* ================= HEADER ================= */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-white">
+          <div className="flex items-center gap-3">
+             <div className="p-2 bg-blue-50 rounded-lg">
+                <Rocket className="w-5 h-5 text-[#0052CC]" />
+             </div>
+             <h2 className="text-lg font-bold text-slate-800 tracking-tight">
+               Create Sprint
+             </h2>
+          </div>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-700 p-1.5 rounded-md hover:bg-slate-100 transition-colors"
+            className="text-slate-400 hover:text-slate-700 p-1.5 rounded-md hover:bg-slate-100 transition-all active:scale-95"
             title="Close"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Body Form */}
-        <div className="p-6 space-y-4">
-          {/* Name */}
-          <div>
-            <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
+        {/* ================= BODY FORM ================= */}
+        <div className="p-6 space-y-5 bg-white">
+          
+          {/* Thông báo lỗi tập trung */}
+          {errorMsg && (
+            <div className="p-3 bg-red-50 border border-red-100 text-red-700 rounded-lg text-xs font-bold flex items-start gap-2.5 animate-in fade-in duration-200">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-red-500" />
+              <span className="leading-relaxed">{errorMsg}</span>
+            </div>
+          )}
+
+          {/* Trường: Tên Sprint */}
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">
               Sprint Name <span className="text-red-500">*</span>
             </label>
             <input
               autoFocus
-              className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-shadow"
-              placeholder="e.g. Sprint 24: Login Flow"
+              disabled={isSubmitting}
+              className={cn(
+                "w-full border border-slate-200 rounded-lg p-3 text-sm font-medium transition-all outline-none",
+                "focus:ring-2 focus:ring-blue-100 focus:border-[#2684FF] placeholder:text-slate-400 bg-slate-50/50 focus:bg-white"
+              )}
+              placeholder="e.g. Sprint 24: Core Components"
               value={formData.name}
-              onChange={(e) =>
-                setFormData({ ...formData, name: e.target.value })
-              }
-              disabled={loading}
+              onChange={(e) => handleUpdateField('name', e.target.value)}
             />
           </div>
 
-          {/* Goal */}
-          <div>
-            <label className="text-xs font-bold text-slate-500 uppercase mb-1 block flex items-center gap-1">
-              <Target className="w-3 h-3" /> Sprint Goal
+          {/* Trường: Mục tiêu Sprint */}
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
+              <Target className="w-3.5 h-3.5" /> Sprint Goal
             </label>
             <textarea
-              className="w-full border border-slate-300 rounded-lg p-2.5 text-sm h-20 focus:ring-2 focus:ring-blue-500 outline-none resize-none transition-shadow"
-              placeholder="What is the main focus of this sprint?"
+              disabled={isSubmitting}
+              className={cn(
+                "w-full border border-slate-200 rounded-lg p-3 text-sm font-medium h-24 transition-all outline-none resize-none",
+                "focus:ring-2 focus:ring-blue-100 focus:border-[#2684FF] placeholder:text-slate-400 bg-slate-50/50 focus:bg-white"
+              )}
+              placeholder="Define the primary objective of this iteration..."
               value={formData.goal || ""}
-              onChange={(e) =>
-                setFormData({ ...formData, goal: e.target.value })
-              }
-              disabled={loading}
+              onChange={(e) => handleUpdateField('goal', e.target.value)}
             />
           </div>
 
-          {/* Dates */}
+          {/* Trường: Thời gian (Grid) */}
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-xs font-bold text-slate-500 uppercase mb-1 block flex items-center gap-1">
-                <Calendar className="w-3 h-3" /> Start Date
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5" /> Start Date
               </label>
               <input
                 type="datetime-local"
-                className="w-full border border-slate-300 rounded-lg p-2 text-sm text-slate-600 focus:ring-2 focus:ring-blue-500 outline-none transition-shadow"
-                onChange={(e) =>
-                  setFormData({ ...formData, startDate: e.target.value })
-                }
-                disabled={loading}
+                disabled={isSubmitting}
+                className={cn(
+                  "w-full border border-slate-200 rounded-lg p-2.5 text-[12px] font-medium text-slate-600 transition-all outline-none cursor-pointer",
+                  "focus:ring-2 focus:ring-blue-100 focus:border-[#2684FF] bg-slate-50/50 focus:bg-white"
+                )}
+                value={formData.startDate || ""}
+                onChange={(e) => handleUpdateField('startDate', e.target.value)}
               />
             </div>
-            <div>
-              <label className="text-xs font-bold text-slate-500 uppercase mb-1 block flex items-center gap-1">
-                <Calendar className="w-3 h-3" /> End Date
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5" /> End Date
               </label>
               <input
                 type="datetime-local"
-                className="w-full border border-slate-300 rounded-lg p-2 text-sm text-slate-600 focus:ring-2 focus:ring-blue-500 outline-none transition-shadow"
-                onChange={(e) =>
-                  setFormData({ ...formData, endDate: e.target.value })
-                }
-                disabled={loading}
+                disabled={isSubmitting}
+                className={cn(
+                  "w-full border border-slate-200 rounded-lg p-2.5 text-[12px] font-medium text-slate-600 transition-all outline-none cursor-pointer",
+                  "focus:ring-2 focus:ring-blue-100 focus:border-[#2684FF] bg-slate-50/50 focus:bg-white"
+                )}
+                value={formData.endDate || ""}
+                onChange={(e) => handleUpdateField('endDate', e.target.value)}
               />
             </div>
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="p-4 border-t bg-slate-50 rounded-b-xl flex justify-end gap-2">
+        {/* ================= FOOTER ================= */}
+        <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
           <Button
             variant="ghost"
             onClick={onClose}
-            disabled={loading}
-            className="text-slate-700 hover:bg-slate-100"
+            disabled={isSubmitting}
+            className="text-slate-600 font-bold text-[12px] uppercase tracking-widest hover:bg-slate-200/50"
           >
             Cancel
           </Button>
           <Button
-            onClick={handleSubmit}
-            disabled={loading || !formData.name?.trim()}
-            className="bg-blue-600 hover:bg-blue-700 text-white"
+            onClick={handleFormSubmit}
+            disabled={isSubmitting || !formData.name?.trim()}
+            className={cn(
+              "bg-[#0052CC] hover:bg-[#0047B3] text-white font-bold text-[12px] uppercase tracking-widest shadow-md transition-all active:scale-95 px-6",
+              "disabled:opacity-50 disabled:cursor-not-allowed"
+            )}
           >
-            {loading && <Loader2 className="w-4 h-4 animate-spin mr-2" />}{" "}
-            Create Sprint
+            {isSubmitting ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              "Create Sprint"
+            )}
           </Button>
         </div>
       </div>

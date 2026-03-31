@@ -3,10 +3,12 @@
 import apiClient from "@/lib/apiClient";
 
 // =============================================================================
-// 1. INTERFACES & TYPES (Định nghĩa kiểu dữ liệu)
+// INTERFACES & TYPES
 // =============================================================================
 
-// Dữ liệu Tag trả về từ Backend
+/**
+ * Thông tin chi tiết của thẻ phân loại (Tag)
+ */
 export interface Tag {
   id: number;
   projectId: number;
@@ -20,23 +22,29 @@ export interface Tag {
   updatedAt: string;
 }
 
-// Payload khi Tạo hoặc Cập nhật Tag
+/**
+ * Dữ liệu yêu cầu khi tạo hoặc cập nhật thông tin thẻ
+ */
 export interface TagPayload {
   name: string;
   color: string;
   description?: string;
 }
 
-// Tham số lọc cho API Get Tags
+/**
+ * Các tham số dùng để lọc danh sách thẻ
+ */
 export interface TagFilterParams {
   keyword?: string;
-  names?: string[]; // array[string]
+  names?: string[];
   createdById?: number;
-  createdFrom?: string; // ISO Date string
-  createdTo?: string;   // ISO Date string
+  createdFrom?: string;
+  createdTo?: string;
 }
 
-// Wrapper Response chuẩn (để tái sử dụng type nội bộ)
+/**
+ * Cấu trúc phản hồi chuẩn từ hệ thống API
+ */
 interface ApiResponse<T> {
   success: boolean;
   message: string;
@@ -44,184 +52,176 @@ interface ApiResponse<T> {
 }
 
 // =============================================================================
-// 2. HELPER FUNCTIONS
+// INTERNAL HELPERS
 // =============================================================================
 
 /**
- * Loại bỏ các param null/undefined/rỗng để URL sạch sẽ
+ * Loại bỏ các tham số lọc không có giá trị để tối ưu hóa đường dẫn truy vấn
  */
 const buildCleanParams = (params?: TagFilterParams) => {
   if (!params) return {};
   return Object.fromEntries(
-    Object.entries(params).filter(([_, v]) => v !== null && v !== undefined && v !== "")
+    Object.entries(params).filter(
+      ([_, v]) => v !== null && v !== undefined && v !== ""
+    )
   );
 };
 
 // =============================================================================
-// 3. API SERVICE IMPLEMENTATION
+// API METHODS
 // =============================================================================
 
-export const apiTag = {
+/**
+ * Truy vấn danh sách các thẻ phân loại trong dự án với bộ lọc nâng cao
+ */
+export const getTags = async (
+  companyId: number | string,
+  workspaceId: number | string,
+  projectId: number | string,
+  params?: TagFilterParams
+): Promise<Tag[]> => {
+  try {
+    const url = `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/tags`;
+    const res = await apiClient.get<ApiResponse<Tag[]>>(url, { 
+      params: buildCleanParams(params) 
+    });
+    
+    const { success, message, data } = res.data;
 
-  /**
-   * 🔹 Lấy danh sách tags với bộ lọc nâng cao
-   * GET /api/companies/{cId}/workspaces/{wId}/projects/{pId}/tags
-   */
-  getTags: async (
-    companyId: number | string,
-    workspaceId: number | string,
-    projectId: number | string,
-    params?: TagFilterParams
-  ): Promise<Tag[]> => {
-    try {
-      const res = await apiClient.get<ApiResponse<Tag[]>>(
-        `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/tags`,
-        { params: buildCleanParams(params) }
-      );
-      
-      const { success, message, data } = res.data;
-
-      if (!success) {
-        throw new Error(message || "Failed to load tags.");
-      }
-      return data;
-    } catch (error: any) {
-      throw new Error(error.response?.data?.message || "System error loading tags.");
+    if (!success) {
+      throw new Error(message || "Unable to load tags");
     }
-  },
+    return data;
+  } catch (error: any) {
+    const errorMsg = error.response?.data?.message || "An error occurred while loading tags";
+    throw new Error(errorMsg);
+  }
+};
 
-  /**
-   * 🔹 Tạo tag mới
-   * POST /api/companies/{cId}/workspaces/{wId}/projects/{pId}/tags
-   */
-  createTag: async (
-    companyId: number | string,
-    workspaceId: number | string,
-    projectId: number | string,
-    payload: TagPayload
-  ): Promise<Tag> => {
-    try {
-      const res = await apiClient.post<ApiResponse<Tag>>(
-        `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/tags`,
-        payload
-      );
+/**
+ * Khởi tạo một thẻ phân loại mới cho dự án
+ */
+export const createTag = async (
+  companyId: number | string,
+  workspaceId: number | string,
+  projectId: number | string,
+  payload: TagPayload
+): Promise<Tag> => {
+  try {
+    const url = `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/tags`;
+    const res = await apiClient.post<ApiResponse<Tag>>(url, payload);
 
-      const { success, message, data } = res.data;
+    const { success, message, data } = res.data;
 
-      if (!success) {
-        throw new Error(message || "Failed to create tag.");
-      }
-      return data;
-    } catch (error: any) {
-      throw new Error(error.response?.data?.message || "System error creating tag.");
+    if (!success) {
+      throw new Error(message || "Unable to create tag");
     }
-  },
+    return data;
+  } catch (error: any) {
+    const errorMsg = error.response?.data?.message || "An error occurred while creating tag";
+    throw new Error(errorMsg);
+  }
+};
 
-  /**
-   * 🔹 Cập nhật tag
-   * PUT /api/companies/{cId}/workspaces/{wId}/projects/{pId}/tags/{tagId}
-   */
-  updateTag: async (
-    companyId: number | string,
-    workspaceId: number | string,
-    projectId: number | string,
-    tagId: number | string,
-    payload: TagPayload
-  ): Promise<Tag> => {
-    try {
-      const res = await apiClient.put<ApiResponse<Tag>>(
-        `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/tags/${tagId}`,
-        payload
-      );
+/**
+ * Cập nhật thông tin chi tiết (tên, màu sắc, mô tả) của thẻ
+ */
+export const updateTag = async (
+  companyId: number | string,
+  workspaceId: number | string,
+  projectId: number | string,
+  tagId: number | string,
+  payload: TagPayload
+): Promise<Tag> => {
+  try {
+    const url = `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/tags/${tagId}`;
+    const res = await apiClient.put<ApiResponse<Tag>>(url, payload);
 
-      const { success, message, data } = res.data;
+    const { success, message, data } = res.data;
 
-      if (!success) {
-        throw new Error(message || "Failed to update tag.");
-      }
-      return data;
-    } catch (error: any) {
-      throw new Error(error.response?.data?.message || "System error updating tag.");
+    if (!success) {
+      throw new Error(message || "Unable to update tag");
     }
-  },
+    return data;
+  } catch (error: any) {
+    const errorMsg = error.response?.data?.message || "An error occurred while updating tag";
+    throw new Error(errorMsg);
+  }
+};
 
-  /**
-   * 🔹 Xóa tag (Xóa hoàn toàn khỏi project)
-   * DELETE /api/companies/{cId}/workspaces/{wId}/projects/{pId}/tags/{tagId}
-   */
-  deleteTag: async (
-    companyId: number | string,
-    workspaceId: number | string,
-    projectId: number | string,
-    tagId: number | string
-  ): Promise<boolean> => {
-    try {
-      const res = await apiClient.delete<ApiResponse<{}>>(
-        `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/tags/${tagId}`
-      );
+/**
+ * Xóa bỏ hoàn toàn thẻ phân loại khỏi phạm vi dự án
+ */
+export const deleteTag = async (
+  companyId: number | string,
+  workspaceId: number | string,
+  projectId: number | string,
+  tagId: number | string
+): Promise<boolean> => {
+  try {
+    const url = `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/tags/${tagId}`;
+    const res = await apiClient.delete<ApiResponse<{}>>(url);
 
-      const { success, message } = res.data;
+    const { success, message } = res.data;
 
-      if (!success) {
-        throw new Error(message || "Failed to delete tag.");
-      }
-      return true;
-    } catch (error: any) {
-      throw new Error(error.response?.data?.message || "System error deleting tag.");
+    if (!success) {
+      throw new Error(message || "Unable to delete tag");
     }
-  },
+    return true;
+  } catch (error: any) {
+    const errorMsg = error.response?.data?.message || "An error occurred while deleting tag";
+    throw new Error(errorMsg);
+  }
+};
 
-  /**
-   * 🔹 Gán tag vào một Task cụ thể
-   * POST .../tasks/{taskId}/tags/{tagId}
-   */
-  assignTagToTask: async (
-    companyId: number | string,
-    workspaceId: number | string,
-    projectId: number | string,
-    taskId: number | string,
-    tagId: number | string
-  ): Promise<boolean> => {
-    try {
-      const res = await apiClient.post<ApiResponse<{}>>(
-        `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/tasks/${taskId}/tags/${tagId}`
-      );
+/**
+ * Thực hiện gắn thẻ phân loại vào một công việc cụ thể
+ */
+export const assignTagToTask = async (
+  companyId: number | string,
+  workspaceId: number | string,
+  projectId: number | string,
+  taskId: number | string,
+  tagId: number | string
+): Promise<boolean> => {
+  try {
+    const url = `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/tasks/${taskId}/tags/${tagId}`;
+    const res = await apiClient.post<ApiResponse<{}>>(url);
 
-      const { success, message } = res.data;
+    const { success, message } = res.data;
 
-      if (!success) {
-        throw new Error(message || "Failed to assign tag to task.");
-      }
-      return true;
-    } catch (error: any) {
-      throw new Error(error.response?.data?.message || "System error assigning tag.");
+    if (!success) {
+      throw new Error(message || "Unable to assign tag to task");
     }
-  },
+    return true;
+  } catch (error: any) {
+    const errorMsg = error.response?.data?.message || "An error occurred while assigning tag";
+    throw new Error(errorMsg);
+  }
+};
 
-  /**
-   * 🔹 Gỡ tag khỏi một Task cụ thể
-   * DELETE .../tasks/{taskId}/tags/{tagId}
-   */
-  removeTagFromTask: async (
-    companyId: number | string,
-    workspaceId: number | string,
-    projectId: number | string,
-    taskId: number | string,
-    tagId: number | string
-  ): Promise<boolean> => {
-    try {
-      const res = await apiClient.delete<ApiResponse<{}>>(
-        `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/tasks/${taskId}/tags/${tagId}`
-      );
+/**
+ * Thực hiện gỡ bỏ thẻ phân loại khỏi một công việc cụ thể
+ */
+export const removeTagFromTask = async (
+  companyId: number | string,
+  workspaceId: number | string,
+  projectId: number | string,
+  taskId: number | string,
+  tagId: number | string
+): Promise<boolean> => {
+  try {
+    const url = `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/tasks/${taskId}/tags/${tagId}`;
+    const res = await apiClient.delete<ApiResponse<{}>>(url);
 
-      const { success, message } = res.data;
+    const { success, message } = res.data;
 
-      if (!success) {
-        throw new Error(message || "Failed to remove tag from task.");
-      }
-      return true;
-    } catch (error: any) {
-      throw new Error(error.response?.data?.message || "System error removing tag.");
+    if (!success) {
+      throw new Error(message || "Unable to remove tag from task");
     }
-  },
+    return true;
+  } catch (error: any) {
+    const errorMsg = error.response?.data?.message || "An error occurred while removing tag";
+    throw new Error(errorMsg);
+  }
 };
