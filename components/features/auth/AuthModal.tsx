@@ -1,11 +1,18 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+// =============================================================================
+// 1. IMPORT
+// =============================================================================
+
+// Thư viện bên ngoài
+import React, { useState, useMemo, useCallback } from "react";
+
+// Internal Services & Contexts
+import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/components/ui/ToastProvider";
 import { registerUser, verifyEmail } from "@/services/apiAuth";
-import { useAuth } from "@/context/AuthContext";
 
+// Internal Components
 import AuthHeader from "./AuthHeader";
 import AuthTabs from "./AuthTabs";
 import AuthFormLogin from "./AuthFormLogin";
@@ -15,7 +22,7 @@ import AuthFormForgot from "./AuthFormForgot";
 import AuthSocialButtons from "./AuthSocialButtons";
 
 // =============================================================================
-// 1. CONSTANTS & TYPES
+// 2. CONSTANTS & TYPES
 // =============================================================================
 
 export type AuthTab = "login" | "register" | "verify" | "forgot";
@@ -37,7 +44,7 @@ const INITIAL_FORM_STATE: AuthFormData = {
 };
 
 // =============================================================================
-// 2. MAIN COMPONENT
+// 3. MAIN COMPONENT
 // =============================================================================
 
 export default function AuthModal({
@@ -47,37 +54,48 @@ export default function AuthModal({
   isOpen: boolean;
   onClose: () => void;
 }) {
-  // --- HOOKS ---
+  // ---------------------------------------------------------------------------
+  // 4. STATE & HOOKS
+  // ---------------------------------------------------------------------------
+  
   const { showToast } = useToast();
   const { login, loginWithTokens, isLoading: isAuthLoading } = useAuth();
 
-  // --- STATE ---
   const [tab, setTab] = useState<AuthTab>("login");
   const [isLoading, setIsLoading] = useState(false);
   const [form, setForm] = useState<AuthFormData>(INITIAL_FORM_STATE);
 
-  // --- HANDLERS ---
+  // Xác định trạng thái xử lý tổng hợp
+  const isProcessing = useMemo(() => isLoading || isAuthLoading, [isLoading, isAuthLoading]);
 
-  const handleChange = (field: keyof AuthFormData) => (e: React.ChangeEvent<HTMLInputElement>) => {
-    setForm((prev) => ({ ...prev, [field]: e.target.value }));
-  };
+  // ---------------------------------------------------------------------------
+  // 5. HANDLERS
+  // ---------------------------------------------------------------------------
 
-  // 1. Handle Login
+  // Cập nhật giá trị các trường trong biểu mẫu
+  const handleChange = useCallback(
+    (field: keyof AuthFormData) => (e: React.ChangeEvent<HTMLInputElement>) => {
+      setForm((prev) => ({ ...prev, [field]: e.target.value }));
+    },
+    []
+  );
+
+  // Xử lý logic đăng nhập
   const handleLogin = async () => {
     if (!form.email || !form.password) {
-      throw new Error("Please enter email and password.");
+      throw new Error("Please enter email and password");
     }
     await login(form.email.trim(), form.password.trim());
-    onClose(); // Close modal on success
+    onClose();
   };
 
-  // 2. Handle Register
+  // Xử lý logic đăng ký tài khoản mới
   const handleRegister = async () => {
     if (!form.fullName || !form.email || !form.password || !form.confirmPassword) {
-      throw new Error("Please fill in all fields.");
+      throw new Error("Please fill in all fields");
     }
     if (form.password !== form.confirmPassword) {
-      throw new Error("Passwords do not match.");
+      throw new Error("Passwords do not match");
     }
 
     const res = await registerUser({
@@ -86,24 +104,26 @@ export default function AuthModal({
       password: form.password.trim(),
     });
 
-    showToast(res.message || "Registration successful! Please check your email for OTP.", "success");
+    showToast(res.message || "Registration successful. Please check your email for OTP", "success");
     setTab("verify");
   };
 
-  // 3. Handle Verify OTP
+  // Xử lý xác thực mã OTP
   const handleVerify = async () => {
-    if (!form.otp) throw new Error("Please enter the OTP code.");
+    if (!form.otp) {
+      throw new Error("Please enter the OTP code");
+    }
 
     const res = await verifyEmail({
       email: form.email.trim(),
       otp: form.otp.trim(),
     });
 
-    showToast(res.message || "Verification successful! You can now login.", "success");
+    showToast(res.message || "Verification successful. You can now login", "success");
     setTab("login");
   };
 
-  // Main Submit Handler
+  // Điều phối hành động submit dựa trên tab hiện tại
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
@@ -123,29 +143,30 @@ export default function AuthModal({
           break;
       }
     } catch (error: any) {
-      const message = error.response?.data?.message || error.message || "An unexpected error occurred.";
+      // Ưu tiên hiển thị message từ phía backend
+      const message = error.response?.data?.message || error.message || "An unexpected error occurred";
       showToast(message, "error");
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Social Login Handler
+  // Xử lý đăng nhập thông qua mạng xã hội
   const handleSocialLoginSuccess = async (data: { accessToken: string; refreshToken: string }) => {
     try {
       await loginWithTokens(data.accessToken, data.refreshToken);
-      showToast("Login successful!", "success");
+      showToast("Login successful", "success");
       onClose();
     } catch (error: any) {
-      showToast(error.message || "Social login failed.", "error");
+      showToast(error.message || "Social login failed", "error");
     }
   };
 
-  // --- RENDER ---
+  // ---------------------------------------------------------------------------
+  // 6. RENDER
+  // ---------------------------------------------------------------------------
 
   if (!isOpen) return null;
-
-  const isProcessing = isLoading || isAuthLoading;
 
   return (
     <div
@@ -156,16 +177,16 @@ export default function AuthModal({
         onClick={(e) => e.stopPropagation()}
         className="relative w-full max-w-sm bg-white rounded-xl shadow-2xl overflow-hidden border border-slate-200 transition-all animate-in zoom-in-95 duration-200"
       >
-        {/* Header */}
+        {/* Phần đầu của Modal */}
         <AuthHeader tab={tab} setTab={setTab} onClose={onClose} />
 
         <div className="p-6">
-          {/* Tabs (Login/Register) */}
+          {/* Thanh chuyển đổi tab giữa Đăng nhập và Đăng ký */}
           {(tab === "login" || tab === "register") && (
             <AuthTabs tab={tab} setTab={setTab} />
           )}
 
-          {/* Forms */}
+          {/* Các biểu mẫu nhập liệu tương ứng */}
           <form onSubmit={handleSubmit} className="space-y-4 mt-4">
             {tab === "login" && (
               <AuthFormLogin
@@ -199,7 +220,7 @@ export default function AuthModal({
             )}
           </form>
 
-          {/* Social Buttons */}
+          {/* Các nút đăng nhập bằng mạng xã hội */}
           {(tab === "login" || tab === "register") && (
             <AuthSocialButtons
               onAuthSuccess={handleSocialLoginSuccess}

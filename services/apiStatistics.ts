@@ -3,46 +3,20 @@
 import apiClient from "@/lib/apiClient";
 
 // =============================================================================
-// 1. UTILS (Hàm tiện ích nội bộ)
+// INTERFACES & TYPES
 // =============================================================================
 
-/**
- * Xây dựng params sạch cho API:
- * - Loại bỏ null, undefined, chuỗi rỗng.
- * - Tự động join mảng thành chuỗi ngăn cách bởi dấu phẩy (cho statusIds, epicIds...).
- */
-const buildQueryParams = (params: any) => {
-  if (!params) return {};
-  
-  const clean: any = {};
-  
-  Object.keys(params).forEach((key) => {
-    const value = params[key];
-    
-    if (value !== null && value !== undefined && value !== "") {
-      if (Array.isArray(value)) {
-        // Backend Spring Boot thường nhận list qua chuỗi "1,2,3" hoặc lặp lại key
-        // Logic cũ của bạn join phẩy, nên giữ nguyên cách này
-        if (value.length > 0) {
-            clean[key] = value.join(","); 
-        }
-      } else {
-        clean[key] = value;
-      }
-    }
-  });
+// -----------------------------------------------------------------------------
+// Dữ liệu dùng chung (Shared)
+// -----------------------------------------------------------------------------
 
-  return clean;
-};
-
-// =============================================================================
-// 2. INTERFACES (Định nghĩa kiểu dữ liệu)
-// =============================================================================
-
-// --- Shared Sub-Interfaces ---
 export interface StatsStatus { id: number; name: string; color: string; }
 export interface StatsAssignee { id: number; name: string; avatarUrl: string; }
 export interface StatsEpic { id: number; name: string; color: string; }
+
+/**
+ * Thông tin công việc tóm tắt dùng trong các báo cáo thống kê
+ */
 export interface StatsTask {
   id: number;
   taskCode: string;
@@ -60,10 +34,13 @@ export interface StatsTask {
   tags?: { id: number; name: string; color: string }[];
 }
 
-// --- 2.1 Overview Module ---
+// -----------------------------------------------------------------------------
+// Phân hệ Tổng quan (Overview)
+// -----------------------------------------------------------------------------
+
 export interface OverviewParams {
-  from?: string;        // YYYY-MM-DD
-  to?: string;          // YYYY-MM-DD
+  from?: string; // Định dạng YYYY-MM-DD
+  to?: string;   // Định dạng YYYY-MM-DD
   keyword?: string;
   assigneeId?: number;
   priority?: string;
@@ -71,6 +48,9 @@ export interface OverviewParams {
   statusIds?: number[];
 }
 
+/**
+ * Dữ liệu thống kê hoạt động hàng tuần
+ */
 export interface WeeklyOverviewData {
   fromDate: string;
   toDate: string;
@@ -84,9 +64,15 @@ export interface WeeklyOverviewData {
   updatedTasks: StatsTask[];
 }
 
-// --- 2.2 Distribution Charts ---
+// -----------------------------------------------------------------------------
+// Phân hệ Biểu đồ phân bổ (Distribution Charts)
+// -----------------------------------------------------------------------------
+
+/**
+ * Dữ liệu cho các biểu đồ tròn (Trạng thái, Ưu tiên, Loại công việc)
+ */
 export interface DistributionStat {
-  name: string;      // Map từ statusName/typeName...
+  name: string;
   color: string;
   code?: string;
   taskCount: number;
@@ -94,7 +80,10 @@ export interface DistributionStat {
   [key: string]: any;
 }
 
-// --- 2.3 Epic Progress ---
+// -----------------------------------------------------------------------------
+// Phân hệ Tiến độ Epic (Epic Progress)
+// -----------------------------------------------------------------------------
+
 export interface EpicProgressParams {
   sprintId?: number | null;
   statusIds?: number[];
@@ -103,6 +92,9 @@ export interface EpicProgressParams {
   export?: boolean;
 }
 
+/**
+ * Thống kê chi tiết tiến độ hoàn thành của Epic
+ */
 export interface EpicProgressStat {
   epicId: number;
   epicName: string;
@@ -116,7 +108,10 @@ export interface EpicProgressStat {
   pointProgressPercent: number;
 }
 
-// --- 2.4 Workload ---
+// -----------------------------------------------------------------------------
+// Phân hệ Tải công việc (Workload)
+// -----------------------------------------------------------------------------
+
 export interface WorkloadParams {
   viewType?: "POINTS" | "HOURS";
   groupBy?: "STATUS" | "PRIORITY";
@@ -134,6 +129,9 @@ export interface WorkloadBreakdown {
   taskCount: number;
 }
 
+/**
+ * Thống kê khối lượng công việc theo từng thành viên
+ */
 export interface WorkloadStat {
   userId: number;
   userName: string;
@@ -142,7 +140,10 @@ export interface WorkloadStat {
   breakdowns: WorkloadBreakdown[];
 }
 
-// --- 2.5 Roadmap ---
+// -----------------------------------------------------------------------------
+// Phân hệ Lộ trình & Lịch (Roadmap & Calendar)
+// -----------------------------------------------------------------------------
+
 export interface RoadmapParams {
   viewType?: "EPIC" | "SPRINT" | "ALL";
   keyword?: string;
@@ -168,10 +169,9 @@ export interface RoadmapItemResponse {
   completedTasks: number;
 }
 
-// --- 2.6 Calendar ---
 export interface CalendarParams {
-  from: string; // Required
-  to: string;   // Required
+  from: string; // Bắt buộc
+  to: string;   // Bắt buộc
   keyword?: string;
   assigneeId?: number;
   priority?: string;
@@ -179,6 +179,9 @@ export interface CalendarParams {
   showSprints?: boolean;
 }
 
+/**
+ * Sự kiện hiển thị trên lịch dự án
+ */
 export interface CalendarEvent {
   id: string;
   originalId: number;
@@ -197,40 +200,76 @@ export interface CalendarEvent {
 }
 
 // =============================================================================
-// 3. API METHODS (Các hàm gọi API)
+// INTERNAL HELPERS
 // =============================================================================
 
 /**
- * 1. Lấy tổng quan (Weekly Overview)
+ * Xây dựng tham số truy vấn sạch cho API
+ * Loại bỏ các giá trị trống và chuyển đổi mảng thành chuỗi phân cách bởi dấu phẩy
+ */
+const buildQueryParams = (params: any) => {
+  if (!params) return {};
+  
+  const clean: any = {};
+  
+  Object.keys(params).forEach((key) => {
+    const value = params[key];
+    
+    if (value !== null && value !== undefined && value !== "") {
+      if (Array.isArray(value)) {
+        if (value.length > 0) {
+          clean[key] = value.join(","); 
+        }
+      } else {
+        clean[key] = value;
+      }
+    }
+  });
+
+  return clean;
+};
+
+// =============================================================================
+// API METHODS
+// =============================================================================
+
+/**
+ * Lấy báo cáo tổng quan hoạt động theo tuần của dự án
  */
 export const getWeeklyOverview = async (
   projectId: number,
   params?: OverviewParams
 ): Promise<WeeklyOverviewData> => {
   try {
-    const res = await apiClient.get(`/statistics/projects/${projectId}`, {
+    const url = `/statistics/projects/${projectId}`;
+    const res = await apiClient.get(url, {
       params: buildQueryParams(params),
     });
 
     const { success, message, data } = res.data;
-    if (!success) throw new Error(message || "Failed to load overview data.");
+    if (!success) {
+      throw new Error(message || "Failed to load overview data");
+    }
     return data;
   } catch (error: any) {
-    throw new Error(error.response?.data?.message || "System error loading overview.");
+    const errorMsg = error.response?.data?.message || "An error occurred while loading overview";
+    throw new Error(errorMsg);
   }
 };
 
 /**
- * 2. Lấy phân bổ trạng thái (Status Distribution)
+ * Lấy dữ liệu phân bổ công việc theo trạng thái
  */
 export const getStatusDistribution = async (projectId: number): Promise<DistributionStat[]> => {
   try {
-    const res = await apiClient.get(`/statistics/projects/${projectId}/status-distribution`);
+    const url = `/statistics/projects/${projectId}/status-distribution`;
+    const res = await apiClient.get(url);
     const { success, message, data } = res.data;
 
-    if (!success) throw new Error(message || "Failed to load status distribution.");
+    if (!success) {
+      throw new Error(message || "Failed to load status distribution");
+    }
 
-    // Map dữ liệu từ Backend về chuẩn Frontend
     return data.map((item: any) => ({
       name: item.statusName,
       color: item.color,
@@ -238,19 +277,23 @@ export const getStatusDistribution = async (projectId: number): Promise<Distribu
       percentage: item.percentage,
     }));
   } catch (error: any) {
-    throw new Error(error.response?.data?.message || "System error loading status distribution.");
+    const errorMsg = error.response?.data?.message || "An error occurred while loading status distribution";
+    throw new Error(errorMsg);
   }
 };
 
 /**
- * 3. Lấy phân bổ mức độ ưu tiên (Priority Distribution)
+ * Lấy dữ liệu phân bổ công việc theo mức độ ưu tiên
  */
 export const getPriorityDistribution = async (projectId: number): Promise<DistributionStat[]> => {
   try {
-    const res = await apiClient.get(`/statistics/projects/${projectId}/priority-distribution`);
+    const url = `/statistics/projects/${projectId}/priority-distribution`;
+    const res = await apiClient.get(url);
     const { success, message, data } = res.data;
 
-    if (!success) throw new Error(message || "Failed to load priority distribution.");
+    if (!success) {
+      throw new Error(message || "Failed to load priority distribution");
+    }
 
     return data.map((item: any) => ({
       name: item.priorityName,
@@ -260,19 +303,23 @@ export const getPriorityDistribution = async (projectId: number): Promise<Distri
       percentage: item.percentage,
     }));
   } catch (error: any) {
-    throw new Error(error.response?.data?.message || "System error loading priority distribution.");
+    const errorMsg = error.response?.data?.message || "An error occurred while loading priority distribution";
+    throw new Error(errorMsg);
   }
 };
 
 /**
- * 4. Lấy phân bổ loại công việc (Type Distribution)
+ * Lấy dữ liệu phân bổ công việc theo loại (Task, Bug, Story...)
  */
 export const getTypeDistribution = async (projectId: number): Promise<DistributionStat[]> => {
   try {
-    const res = await apiClient.get(`/statistics/projects/${projectId}/type-distribution`);
+    const url = `/statistics/projects/${projectId}/type-distribution`;
+    const res = await apiClient.get(url);
     const { success, message, data } = res.data;
 
-    if (!success) throw new Error(message || "Failed to load type distribution.");
+    if (!success) {
+      throw new Error(message || "Failed to load type distribution");
+    }
 
     return data.map((item: any) => ({
       name: item.typeName,
@@ -282,32 +329,37 @@ export const getTypeDistribution = async (projectId: number): Promise<Distributi
       percentage: item.percentage,
     }));
   } catch (error: any) {
-    throw new Error(error.response?.data?.message || "System error loading type distribution.");
+    const errorMsg = error.response?.data?.message || "An error occurred while loading type distribution";
+    throw new Error(errorMsg);
   }
 };
 
 /**
- * 5. Lấy tiến độ theo Epic (Epic Progress)
+ * Lấy dữ liệu tiến độ hoàn thành của các Epic trong dự án
  */
 export const getEpicProgress = async (
   projectId: number,
   params?: EpicProgressParams
 ): Promise<EpicProgressStat[]> => {
   try {
-    const res = await apiClient.get(`/statistics/projects/${projectId}/epic-progress`, {
+    const url = `/statistics/projects/${projectId}/epic-progress`;
+    const res = await apiClient.get(url, {
       params: buildQueryParams(params),
     });
 
     const { success, message, data } = res.data;
-    if (!success) throw new Error(message || "Failed to load epic progress.");
+    if (!success) {
+      throw new Error(message || "Failed to load epic progress");
+    }
     return data;
   } catch (error: any) {
-    throw new Error(error.response?.data?.message || "System error loading epic progress.");
+    const errorMsg = error.response?.data?.message || "An error occurred while loading epic progress";
+    throw new Error(errorMsg);
   }
 };
 
 /**
- * 5.1 Export Excel cho Epic Progress
+ * Xuất báo cáo tiến độ Epic dưới định dạng tệp Excel
  */
 export const exportEpicProgress = async (
   projectId: number,
@@ -315,20 +367,19 @@ export const exportEpicProgress = async (
 ): Promise<Blob> => {
   try {
     const queryParams = buildQueryParams(params);
-    const res = await apiClient.get(`/statistics/projects/${projectId}/epic-progress`, {
+    const url = `/statistics/projects/${projectId}/epic-progress`;
+    const res = await apiClient.get(url, {
       params: { ...queryParams, export: true },
       responseType: "blob",
     });
     return res.data;
   } catch (error: any) {
-    // Với Blob, xử lý lỗi hơi khác (thường backend trả về JSON lỗi thay vì Blob)
-    // Nhưng để đơn giản ta vẫn ném lỗi chuẩn
-    throw new Error("Failed to export epic progress report.");
+    throw new Error("Failed to export epic progress report");
   }
 };
 
 /**
- * 6. Lấy tải công việc (Workload)
+ * Lấy dữ liệu phân bổ khối lượng công việc (Workload) của các thành viên
  */
 export const getProjectWorkload = async (
   projectId: number,
@@ -336,20 +387,24 @@ export const getProjectWorkload = async (
 ): Promise<WorkloadStat[]> => {
   try {
     const queryParams = buildQueryParams(params);
-    const res = await apiClient.get(`/statistics/${projectId}/workload`, {
+    const url = `/statistics/${projectId}/workload`;
+    const res = await apiClient.get(url, {
       params: { ...queryParams, export: false },
     });
 
     const { success, message, data } = res.data;
-    if (!success) throw new Error(message || "Failed to load workload.");
+    if (!success) {
+      throw new Error(message || "Failed to load workload");
+    }
     return data;
   } catch (error: any) {
-    throw new Error(error.response?.data?.message || "System error loading workload.");
+    const errorMsg = error.response?.data?.message || "An error occurred while loading workload";
+    throw new Error(errorMsg);
   }
 };
 
 /**
- * 6.1 Export Excel cho Workload
+ * Xuất báo cáo khối lượng công việc (Workload) dưới định dạng tệp Excel
  */
 export const exportWorkloadReport = async (
   projectId: number,
@@ -357,53 +412,61 @@ export const exportWorkloadReport = async (
 ): Promise<Blob> => {
   try {
     const queryParams = buildQueryParams(params);
-    const res = await apiClient.get(`/statistics/${projectId}/workload`, {
+    const url = `/statistics/${projectId}/workload`;
+    const res = await apiClient.get(url, {
       params: { ...queryParams, export: true },
       responseType: "blob",
     });
     return res.data;
   } catch (error: any) {
-    throw new Error("Failed to export workload report.");
+    throw new Error("Failed to export workload report");
   }
 };
 
 /**
- * 7. Lấy dữ liệu Roadmap
+ * Truy vấn dữ liệu lộ trình (Roadmap) của dự án
  */
 export const getProjectRoadmap = async (
   projectId: number,
   params?: RoadmapParams
 ): Promise<RoadmapItemResponse[]> => {
   try {
-    // Hàm buildQueryParams đã tự động xử lý join mảng epicIds, sprintIds...
-    const res = await apiClient.get(`/statistics/projects/${projectId}/roadmap`, {
+    const url = `/statistics/projects/${projectId}/roadmap`;
+    const res = await apiClient.get(url, {
       params: buildQueryParams(params),
     });
 
     const { success, message, data } = res.data;
-    if (!success) throw new Error(message || "Failed to load roadmap.");
+    if (!success) {
+      throw new Error(message || "Failed to load roadmap");
+    }
     return data;
   } catch (error: any) {
-    throw new Error(error.response?.data?.message || "System error loading roadmap.");
+    const errorMsg = error.response?.data?.message || "An error occurred while loading roadmap";
+    throw new Error(errorMsg);
   }
 };
 
 /**
- * 8. Lấy dữ liệu Lịch dự án (Calendar)
+ * Truy vấn các sự kiện cho lịch dự án (Tasks và Sprints)
  */
 export const getProjectCalendar = async (
   projectId: number,
   params: CalendarParams
 ): Promise<CalendarEvent[]> => {
   try {
-    const res = await apiClient.get(`/statistics/projects/${projectId}/calendar`, {
+    const url = `/statistics/projects/${projectId}/calendar`;
+    const res = await apiClient.get(url, {
       params: buildQueryParams(params),
     });
 
     const { success, message, data } = res.data;
-    if (!success) throw new Error(message || "Failed to load calendar events.");
+    if (!success) {
+      throw new Error(message || "Failed to load calendar events");
+    }
     return data;
   } catch (error: any) {
-    throw new Error(error.response?.data?.message || "System error loading calendar.");
+    const errorMsg = error.response?.data?.message || "An error occurred while loading calendar";
+    throw new Error(errorMsg);
   }
 };

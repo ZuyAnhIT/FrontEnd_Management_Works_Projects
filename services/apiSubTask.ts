@@ -3,11 +3,13 @@
 import apiClient from "@/lib/apiClient";
 
 // =============================================================================
-// 1. INTERFACES & DTOs (Định nghĩa kiểu dữ liệu)
+// INTERFACES & TYPES
 // =============================================================================
 
+/**
+ * Thông tin chi tiết của một Subtask (Công việc con)
+ */
 export interface Subtask {
-  assignee: any;
   id: number;
   parentTaskId: number;
   title: string;
@@ -22,8 +24,12 @@ export interface Subtask {
   createdByName: string;
   createdAt: string;
   updatedAt: string;
+  assignee: any; // Dữ liệu mở rộng về người thực hiện
 }
 
+/**
+ * Dữ liệu yêu cầu khi khởi tạo một Subtask mới
+ */
 export interface CreateSubtaskPayload {
   title: string;
   description?: string;
@@ -31,6 +37,9 @@ export interface CreateSubtaskPayload {
   estimatedHours?: number | null;
 }
 
+/**
+ * Dữ liệu yêu cầu khi cập nhật thông tin Subtask
+ */
 export interface UpdateSubtaskPayload {
   title?: string;
   description?: string;
@@ -40,12 +49,12 @@ export interface UpdateSubtaskPayload {
 }
 
 // =============================================================================
-// 2. HELPER FUNCTIONS
+// INTERNAL HELPERS
 // =============================================================================
 
 /**
- * Tạo URL chuẩn cho Subtask API để tránh lặp code.
- * Cấu trúc: /companies/{cid}/workspaces/{wid}/projects/{pid}/tasks/{tid}/subtasks[/{subId}]
+ * Xây dựng đường dẫn URL chuẩn cho tài nguyên Subtask
+ * Cấu trúc phân cấp: Company -> Workspace -> Project -> Task -> Subtask
  */
 const buildUrl = (
   companyId: number,
@@ -53,17 +62,17 @@ const buildUrl = (
   projectId: number,
   taskId: number,
   subTaskId?: number
-) => {
+): string => {
   const base = `/companies/${companyId}/workspaces/${workspaceId}/projects/${projectId}/tasks/${taskId}/subtasks`;
   return subTaskId ? `${base}/${subTaskId}` : base;
 };
 
 // =============================================================================
-// 3. READ APIs (Lấy dữ liệu)
+// API METHODS
 // =============================================================================
 
 /**
- * 📌 Lấy danh sách Subtask
+ * Truy vấn danh sách toàn bộ các Subtask thuộc một Task chính
  */
 export const getSubtaskList = async (
   companyId: number,
@@ -72,20 +81,22 @@ export const getSubtaskList = async (
   taskId: number
 ): Promise<Subtask[]> => {
   try {
-    const res = await apiClient.get(
-      buildUrl(companyId, workspaceId, projectId, taskId)
-    );
+    const url = buildUrl(companyId, workspaceId, projectId, taskId);
+    const res = await apiClient.get(url);
     const { success, message, data } = res.data;
 
-    if (!success) throw new Error(message || "Failed to load subtasks.");
+    if (!success) {
+      throw new Error(message || "Unable to load subtasks");
+    }
     return data;
   } catch (error: any) {
-    throw new Error(error.response?.data?.message || "System error loading subtasks.");
+    const errorMsg = error.response?.data?.message || "An error occurred while loading subtasks";
+    throw new Error(errorMsg);
   }
 };
 
 /**
- * 📌 Lấy chi tiết Subtask
+ * Truy vấn thông tin chi tiết của một Subtask cụ thể
  */
 export const getSubtaskDetail = async (
   companyId: number,
@@ -95,24 +106,22 @@ export const getSubtaskDetail = async (
   subTaskId: number
 ): Promise<Subtask> => {
   try {
-    const res = await apiClient.get(
-      buildUrl(companyId, workspaceId, projectId, taskId, subTaskId)
-    );
+    const url = buildUrl(companyId, workspaceId, projectId, taskId, subTaskId);
+    const res = await apiClient.get(url);
     const { success, message, data } = res.data;
 
-    if (!success) throw new Error(message || "Failed to fetch subtask details.");
+    if (!success) {
+      throw new Error(message || "Unable to fetch subtask details");
+    }
     return data;
   } catch (error: any) {
-    throw new Error(error.response?.data?.message || "System error fetching subtask.");
+    const errorMsg = error.response?.data?.message || "An error occurred while fetching subtask details";
+    throw new Error(errorMsg);
   }
 };
 
-// =============================================================================
-// 4. WRITE APIs (Tạo, Sửa, Xóa)
-// =============================================================================
-
 /**
- * 📌 Tạo Subtask mới
+ * Khởi tạo một Subtask mới gắn liền với Task chính
  */
 export const createSubtask = async (
   companyId: number,
@@ -122,21 +131,22 @@ export const createSubtask = async (
   payload: CreateSubtaskPayload
 ): Promise<Subtask> => {
   try {
-    const res = await apiClient.post(
-      buildUrl(companyId, workspaceId, projectId, taskId),
-      payload
-    );
+    const url = buildUrl(companyId, workspaceId, projectId, taskId);
+    const res = await apiClient.post(url, payload);
     const { success, message, data } = res.data;
 
-    if (!success) throw new Error(message || "Failed to create subtask.");
+    if (!success) {
+      throw new Error(message || "Unable to create subtask");
+    }
     return data;
   } catch (error: any) {
-    throw new Error(error.response?.data?.message || "System error creating subtask.");
+    const errorMsg = error.response?.data?.message || "An error occurred while creating subtask";
+    throw new Error(errorMsg);
   }
 };
 
 /**
- * 📌 Cập nhật Subtask
+ * Cập nhật các thông tin thuộc tính hoặc trạng thái của Subtask
  */
 export const updateSubtask = async (
   companyId: number,
@@ -147,21 +157,22 @@ export const updateSubtask = async (
   payload: UpdateSubtaskPayload
 ): Promise<Subtask> => {
   try {
-    const res = await apiClient.put(
-      buildUrl(companyId, workspaceId, projectId, taskId, subTaskId),
-      payload
-    );
+    const url = buildUrl(companyId, workspaceId, projectId, taskId, subTaskId);
+    const res = await apiClient.put(url, payload);
     const { success, message, data } = res.data;
 
-    if (!success) throw new Error(message || "Failed to update subtask.");
+    if (!success) {
+      throw new Error(message || "Unable to update subtask");
+    }
     return data;
   } catch (error: any) {
-    throw new Error(error.response?.data?.message || "System error updating subtask.");
+    const errorMsg = error.response?.data?.message || "An error occurred while updating subtask";
+    throw new Error(errorMsg);
   }
 };
 
 /**
- * 📌 Xóa Subtask
+ * Xóa bỏ vĩnh viễn một Subtask khỏi hệ thống
  */
 export const deleteSubtask = async (
   companyId: number,
@@ -171,14 +182,16 @@ export const deleteSubtask = async (
   subTaskId: number
 ) => {
   try {
-    const res = await apiClient.delete(
-      buildUrl(companyId, workspaceId, projectId, taskId, subTaskId)
-    );
+    const url = buildUrl(companyId, workspaceId, projectId, taskId, subTaskId);
+    const res = await apiClient.delete(url);
     const { success, message } = res.data;
 
-    if (!success) throw new Error(message || "Failed to delete subtask.");
+    if (!success) {
+      throw new Error(message || "Unable to delete subtask");
+    }
     return res.data;
   } catch (error: any) {
-    throw new Error(error.response?.data?.message || "System error deleting subtask.");
+    const errorMsg = error.response?.data?.message || "An error occurred while deleting subtask";
+    throw new Error(errorMsg);
   }
 };

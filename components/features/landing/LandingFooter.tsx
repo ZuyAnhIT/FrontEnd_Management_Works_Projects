@@ -1,26 +1,54 @@
 "use client";
 
-import { useTranslation } from "react-i18next";
-import { useTheme } from "@/context/ThemeContext";
+// =============================================================================
+// 1. IMPORTS
+// =============================================================================
 
+import React from "react";
+import { useTranslation } from "react-i18next";
+
+// Context & Utils
+import { useTheme } from "@/context/ThemeContext";
+import { cn } from "@/lib/utils";
+
+// =============================================================================
+// 2. MAIN COMPONENT
+// =============================================================================
+
+/**
+ * Thành phần chân trang (Footer) cho trang Landing Page.
+ * Hiển thị thông tin bản quyền và tự động cập nhật năm hiện tại.
+ */
 export default function LandingFooter() {
+  
+  // ---------------------------------------------------------------------------
+  // 3. HOOKS & VARIABLES
+  // ---------------------------------------------------------------------------
+  
   const { t } = useTranslation();
-  const { theme } = useTheme();
-  const year = new Date().getFullYear();
+  
+  // Khai báo theme để đảm bảo component đồng bộ re-render khi đổi chế độ Sáng/Tối
+  const { theme } = useTheme(); 
+  
+  const currentYear = new Date().getFullYear();
+
+  // ---------------------------------------------------------------------------
+  // 4. RENDER LOGIC
+  // ---------------------------------------------------------------------------
 
   return (
     <footer
-      className="
-        py-10 
-        bg-white dark:bg-slate-900
-        border-t border-gray-100 dark:border-slate-700
-        text-center 
-        text-gray-500 dark:text-gray-400 
-        text-sm 
-        transition-colors duration-300
-      "
+      className={cn(
+        "py-10 text-center transition-colors duration-300",
+        "bg-white dark:bg-slate-900",
+        "border-t border-slate-200 dark:border-slate-800"
+      )}
     >
-      {t("footer.copyright", { year })}
+      <div className="max-w-6xl mx-auto px-6">
+        <p className="text-[13px] font-semibold tracking-wide text-[#6B778C] dark:text-slate-400">
+          {t("footer.copyright", { year: currentYear })}
+        </p>
+      </div>
     </footer>
   );
 }

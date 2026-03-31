@@ -1,5 +1,11 @@
 "use client";
 
+// =============================================================================
+// 1. IMPORT (Libraries -> Internal -> Components)
+// =============================================================================
+
+import React, { useMemo } from "react";
+import Link from "next/link";
 import {
   Users,
   FolderKanban,
@@ -8,138 +14,166 @@ import {
   UserPlus,
   ChevronRight,
 } from "lucide-react";
-import Link from "next/link";
-import { useAuth } from "@/context/AuthContext"; // Giả định AuthContext đã tồn tại
-import { Button } from "@/components/ui/Buttons"; // Giả định Button component đã tồn tại
 
-// =================================================================
-// 1. CONFIG: Action Links (Chuyển sang Tiếng Anh)
-// =================================================================
-const actionLinks = [
-  {
-    icon: Building2,
-    title: "Company Profile",
-    desc: "Update name, logo, and address details.",
-    href: "/admin/company/companyinfo",
-    variant: "blue",
-  },
-  {
-    icon: Users,
-    title: "Member Management",
-    desc: "Invite, remove, or change member roles.",
-    href: "/admin/company/members",
-    variant: "green",
-  },
-  {
-    icon: FolderKanban,
-    title: "Workspaces",
-    desc: "Create and manage department workspaces.",
-    href: "/admin/company/workspaces",
-    variant: "purple",
-  },
-  {
-    icon: CreditCard,
-    title: "Billing & Plan",
-    desc: "View payment history and manage subscription.",
-    href: "/admin/company/billing",
-    variant: "orange",
-  },
-];
+// Context & Hooks
+import { useAuth } from "@/context/AuthContext";
 
-// 2. Style Map cho các icon (Màu nền & Màu chữ)
-const variantStyles: Record<string, string> = {
-  blue: "bg-blue-50 text-blue-600 group-hover:bg-blue-100",
-  green: "bg-green-50 text-green-600 group-hover:bg-green-100",
-  purple: "bg-purple-50 text-purple-600 group-hover:bg-purple-100",
-  orange: "bg-orange-50 text-orange-600 group-hover:bg-orange-100",
+// UI Components
+import { Button } from "@/components/ui/Buttons";
+import { cn } from "@/lib/utils";
+
+// =============================================================================
+// 2. CONFIG & TYPES
+// =============================================================================
+
+interface ActionLink {
+  icon: React.ElementType;
+  title: string;
+  desc: string;
+  href: string;
+  variant: "blue" | "green" | "purple" | "orange";
+}
+
+/**
+ * Ban do mau sac cho cac bieu tuong theo phong cach Atlassian
+ */
+const VARIANT_STYLES: Record<string, string> = {
+  blue: "bg-blue-50 text-[#0052CC] group-hover:bg-blue-100",
+  green: "bg-green-50 text-[#36B37E] group-hover:bg-green-100",
+  purple: "bg-purple-50 text-[#6554C0] group-hover:bg-purple-100",
+  orange: "bg-orange-50 text-[#FF8B00] group-hover:bg-orange-100",
 };
 
-// =================================================================
+// =============================================================================
 // 3. MAIN COMPONENT
-// =================================================================
+// =============================================================================
 
 export default function CompanyDashboardPage() {
-  // Lấy user và activeCompany từ AuthContext
+  // ---------------------------------------------------------------------------
+  // 4. HOOKS & CONTEXT
+  // ---------------------------------------------------------------------------
+  
   const { user, activeCompany } = useAuth();
 
-  return (
-    <div className="min-h-screen bg-slate-50/50 p-8 font-sans text-slate-900">
-      {/* --- HEADER SECTION --- */}
-      <div className="max-w-5xl mx-auto mb-8">
-        <h1 className="text-2xl font-bold text-slate-900">
-          Dashboard:{" "}
-          <span className="text-blue-600">
-            {activeCompany?.companyName || "My Company"}
-          </span>
-        </h1>
-        <p className="text-slate-500 text-sm mt-1">
-          Welcome back, {user?.fullName}. Manage your organization from here.
-        </p>
-      </div>
+  // ---------------------------------------------------------------------------
+  // 5. DATA PREPARATION
+  // ---------------------------------------------------------------------------
 
-      <div className="max-w-5xl mx-auto space-y-8">
-        {/* --- CTA BANNER (Mời thành viên nhanh) --- */}
-        <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center shadow-sm shrink-0">
-              <UserPlus className="w-6 h-6 text-white" />
+  /**
+   * Danh sach cac hanh dong nhanh duoc ghi nho de tranh render lai du thua
+   */
+  const actionLinks: ActionLink[] = useMemo(() => [
+    {
+      icon: Building2,
+      title: "Company Profile",
+      desc: "Update identity, branding, and corporate address.",
+      href: "/admin/company/companyinfo",
+      variant: "blue",
+    },
+    {
+      icon: Users,
+      title: "Member Directory",
+      desc: "Manage access, roles, and invitation status.",
+      href: "/admin/company/members",
+      variant: "green",
+    },
+    {
+      icon: FolderKanban,
+      title: "Workspaces",
+      desc: "Organize departments and specialized working groups.",
+      href: "/admin/company/workspaces",
+      variant: "purple",
+    },
+    {
+      icon: CreditCard,
+      title: "Billing & Plans",
+      desc: "Monitor usage metrics and subscription history.",
+      href: "/admin/company/billing",
+      variant: "orange",
+    },
+  ], []);
+
+  // ---------------------------------------------------------------------------
+  // 6. RENDER LOGIC
+  // ---------------------------------------------------------------------------
+
+  return (
+    <div className="min-h-screen bg-[#F4F5F7] py-10">
+      <div className="max-w-5xl mx-auto px-6 space-y-10">
+        
+        {/* TIÊU ĐỀ TRANG (PAGE HEADER) */}
+        <div className="animate-in fade-in slide-in-from-left-4 duration-500">
+          <h1 className="text-2xl font-black text-[#172B4D] tracking-tight uppercase">
+            Dashboard:{" "}
+            <span className="text-[#0052CC]">
+              {activeCompany?.companyName || "Organization"}
+            </span>
+          </h1>
+          <p className="text-[#42526E] text-[14px] font-medium mt-1">
+            Welcome back, <span className="font-bold">{user?.fullName}</span>. Access your administrative controls below.
+          </p>
+        </div>
+
+        {/* KHỐI KÊU GỌI HÀNH ĐỘNG (GROW TEAM CTA) */}
+        <div className="bg-white border border-[#DFE1E6] rounded-2xl p-8 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-8 transition-all hover:shadow-md">
+          <div className="flex items-center gap-6">
+            <div className="w-14 h-14 bg-[#0052CC] rounded-2xl flex items-center justify-center shadow-lg shadow-blue-200 shrink-0">
+              <UserPlus className="w-7 h-7 text-white stroke-[2.5]" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-slate-900">
-                Grow your team
+              <h2 className="text-lg font-black text-[#172B4D] tracking-tight">
+                Scale your workforce
               </h2>
-              <p className="text-slate-500 text-sm mt-0.5">
-                Start collaborating by inviting new members to your company.
+              <p className="text-[#42526E] text-[14px] font-medium mt-0.5">
+                Invite teammates to start collaborating on projects and tasks.
               </p>
             </div>
           </div>
 
           <Link href="/admin/company/members" passHref>
-            <Button className="bg-blue-600 hover:bg-blue-700 text-white font-bold h-10 px-5 shadow-sm rounded-[3px]">
+            <Button className="bg-[#0052CC] hover:bg-[#0747A6] text-white font-black text-[12px] uppercase tracking-widest h-11 px-8 rounded-lg shadow-md active:scale-95 transition-all">
               Invite Members
             </Button>
           </Link>
         </div>
 
-        {/* --- QUICK ACTIONS GRID (Các nút điều hướng) --- */}
-        <div>
-          <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-4">
-            Quick Actions
+        {/* LƯỚI HÀNH ĐỘNG NHANH (QUICK ACTIONS GRID) */}
+        <div className="space-y-6">
+          <h3 className="text-[11px] font-black text-slate-500 uppercase tracking-[0.2em] px-1">
+            Administrative Operations
           </h3>
+          
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {actionLinks.map((item) => {
-              // Lấy style class dựa trên variant
-              const styleClass =
-                variantStyles[item.variant] || variantStyles.blue;
-
-              return (
-                <Link
-                  key={item.title}
-                  href={item.href}
-                  className="group flex items-start gap-4 p-5 bg-white rounded-xl border border-slate-200 hover:border-blue-300 hover:shadow-md transition-all duration-200"
+            {actionLinks.map((item) => (
+              <Link
+                key={item.title}
+                href={item.href}
+                className="group flex items-start gap-5 p-6 bg-white rounded-2xl border border-[#DFE1E6] hover:border-[#2684FF] hover:shadow-xl transition-all duration-300"
+              >
+                {/* Khoi bieu tuong (Icon Box) */}
+                <div
+                  className={cn(
+                    "w-14 h-14 rounded-xl flex items-center justify-center shrink-0 transition-all duration-300 shadow-sm",
+                    VARIANT_STYLES[item.variant]
+                  )}
                 >
-                  {/* Icon Box */}
-                  <div
-                    className={`w-12 h-12 rounded-lg flex items-center justify-center shrink-0 transition-colors ${styleClass}`}
-                  >
-                    <item.icon className="w-6 h-6" />
-                  </div>
+                  <item.icon className="w-7 h-7 stroke-[2.5]" />
+                </div>
 
-                  {/* Text Content */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-base font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
-                        {item.title}
-                      </h3>
-                      <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-blue-500 group-hover:translate-x-1 transition-all" />
-                    </div>
-                    <p className="text-sm text-slate-500 mt-1 line-clamp-2">
-                      {item.desc}
-                    </p>
+                {/* Noi dung van ban (Text Content) */}
+                <div className="flex-1 min-w-0 pt-1">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-[16px] font-black text-[#172B4D] group-hover:text-[#0052CC] transition-colors tracking-tight">
+                      {item.title}
+                    </h3>
+                    <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-[#0052CC] group-hover:translate-x-1 transition-all" />
                   </div>
-                </Link>
-              );
-            })}
+                  <p className="text-[13px] text-[#42526E] font-medium mt-1.5 leading-relaxed">
+                    {item.desc}
+                  </p>
+                </div>
+              </Link>
+            ))}
           </div>
         </div>
       </div>

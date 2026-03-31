@@ -3,10 +3,12 @@
 import apiClient from "@/lib/apiClient";
 
 // =============================================================================
-// 1. INTERFACES (Định nghĩa kiểu dữ liệu)
+// INTERFACES & TYPES
 // =============================================================================
 
-// Interface: Workspace trong Dashboard
+/**
+ * Thông tin không gian làm việc (Workspace) hiển thị tại Dashboard
+ */
 export interface DashboardWorkspace {
   workspaceId: number;
   workspaceName: string;
@@ -26,7 +28,9 @@ export interface DashboardWorkspace {
   joinedAt: string;
 }
 
-// Interface: Task của tôi
+/**
+ * Thông tin công việc cá nhân (My Task) hiển thị tại Dashboard
+ */
 export interface DashboardMyTask {
   taskId: number;
   taskCode: string;
@@ -40,7 +44,9 @@ export interface DashboardMyTask {
   workspaceName: string;
 }
 
-// Interface: Project của tôi
+/**
+ * Thông tin dự án cá nhân (My Project) hiển thị tại Dashboard
+ */
 export interface DashboardMyProject {
   projectId: number;
   projectName: string;
@@ -54,7 +60,9 @@ export interface DashboardMyProject {
   myRoleName: string;
 }
 
-// Interface: Company của tôi
+/**
+ * Thông tin công ty (Company) mà người dùng là thành viên
+ */
 export interface DashboardCompany {
   companyId: number;
   companyName: string;
@@ -69,73 +77,78 @@ export interface DashboardCompany {
 }
 
 // =============================================================================
-// 2. API METHODS (Các hàm gọi API)
+// API METHODS
 // =============================================================================
 
 /**
- * 1️⃣ GET – Lấy danh sách Workspace tôi tham gia
+ * Truy vấn danh sách các không gian làm việc (Workspaces) người dùng tham gia
  */
 export const getDashboardWorkspaces = async (): Promise<DashboardWorkspace[]> => {
   try {
-    const res = await apiClient.get('/dashboard/workspaces');
+    const res = await apiClient.get("/dashboard/workspaces");
     const { success, message, data } = res.data;
 
     if (!success) {
-      throw new Error(message || "Failed to load workspaces.");
+      throw new Error(message || "Failed to fetch workspaces");
     }
     return data as DashboardWorkspace[];
   } catch (err: any) {
-    throw new Error(err.response?.data?.message || "Unable to fetch your workspaces.");
+    // Ưu tiên sử dụng thông báo lỗi từ phía backend
+    const errorMessage = err.response?.data?.message || "An error occurred while fetching workspaces";
+    throw new Error(errorMessage);
   }
 };
 
 /**
- * 2️⃣ GET – Lấy danh sách Task của tôi
+ * Truy vấn danh sách các công việc (Tasks) được giao cho người dùng
  */
 export const getDashboardMyTasks = async (): Promise<DashboardMyTask[]> => {
   try {
-    const res = await apiClient.get('/dashboard/my-tasks');
+    const res = await apiClient.get("/dashboard/my-tasks");
     const { success, message, data } = res.data;
 
     if (!success) {
-      throw new Error(message || "Failed to load tasks.");
+      throw new Error(message || "Failed to fetch tasks");
     }
     return data as DashboardMyTask[];
   } catch (err: any) {
-    throw new Error(err.response?.data?.message || "Unable to fetch your tasks.");
+    const errorMessage = err.response?.data?.message || "An error occurred while fetching tasks";
+    throw new Error(errorMessage);
   }
 };
 
 /**
- * 3️⃣ GET – Lấy danh sách Project của tôi
+ * Truy vấn danh sách các dự án (Projects) người dùng đang tham gia
  */
 export const getDashboardMyProjects = async (): Promise<DashboardMyProject[]> => {
   try {
-    const res = await apiClient.get('/dashboard/my-projects');
+    const res = await apiClient.get("/dashboard/my-projects");
     const { success, message, data } = res.data;
 
     if (!success) {
-      throw new Error(message || "Failed to load projects.");
+      throw new Error(message || "Failed to fetch projects");
     }
     return data as DashboardMyProject[];
   } catch (err: any) {
-    throw new Error(err.response?.data?.message || "Unable to fetch your projects.");
+    const errorMessage = err.response?.data?.message || "An error occurred while fetching projects";
+    throw new Error(errorMessage);
   }
 };
 
 /**
- * 4️⃣ GET – Lấy danh sách Company của tôi
+ * Truy vấn danh sách các công ty (Companies) liên kết với người dùng
  */
 export const getDashboardCompanies = async (): Promise<DashboardCompany[]> => {
   try {
-    const res = await apiClient.get('/dashboard/companies');
+    const res = await apiClient.get("/dashboard/companies");
     const { success, message, data } = res.data;
 
     if (!success) {
-      throw new Error(message || "Failed to load companies.");
+      throw new Error(message || "Failed to fetch companies");
     }
     return data as DashboardCompany[];
   } catch (err: any) {
-    throw new Error(err.response?.data?.message || "Unable to fetch your companies.");
+    const errorMessage = err.response?.data?.message || "An error occurred while fetching companies";
+    throw new Error(errorMessage);
   }
 };

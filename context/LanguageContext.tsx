@@ -1,7 +1,18 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, useCallback } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  useCallback,
+  ReactNode
+} from "react";
 import i18n from "@/i18n";
+
+// =============================================================================
+// INTERFACES & TYPES
+// =============================================================================
 
 interface LanguageContextType {
   language: string;
@@ -10,29 +21,49 @@ interface LanguageContextType {
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
-export function LanguageProvider({ children }: { children: React.ReactNode }) {
+// =============================================================================
+// LANGUAGE PROVIDER
+// =============================================================================
+
+export function LanguageProvider({ children }: { children: ReactNode }) {
+  // ---------------------------------------------------------------------------
+  // 1. STATE
+  // ---------------------------------------------------------------------------
   const [language, setLanguageState] = useState<string>("vn");
 
-  // 🔹 Load lang từ localStorage khi app mount
-  useEffect(() => {
-    const saved = localStorage.getItem("lang") || i18n.language || "vn";
-    setLanguageState(saved);
-    i18n.changeLanguage(saved);
+  // ---------------------------------------------------------------------------
+  // 2. EFFECTS
+  // ---------------------------------------------------------------------------
 
-    // Update <html lang="">
-    document.documentElement.lang = saved;
+  // Tải cấu hình ngôn ngữ từ bộ nhớ cục bộ khi ứng dụng khởi chạy
+  useEffect(() => {
+    const savedLanguage = localStorage.getItem("lang") || i18n.language || "vn";
+    setLanguageState(savedLanguage);
+    i18n.changeLanguage(savedLanguage);
+
+    // Cập nhật thuộc tính lang của thẻ html để hỗ trợ SEO và truy cập
+    document.documentElement.lang = savedLanguage;
   }, []);
 
-  // 🔹 Hàm đổi ngôn ngữ — dùng useCallback để tránh re-render thừa
+  // ---------------------------------------------------------------------------
+  // 3. HANDLERS
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Thiết lập ngôn ngữ mới cho toàn bộ hệ thống
+   */
   const setLanguage = useCallback((lang: string) => {
     setLanguageState(lang);
     localStorage.setItem("lang", lang);
     i18n.changeLanguage(lang);
 
-    // Update SEO <html lang="">
+    // Đồng bộ hóa ngôn ngữ hiển thị trên thẻ html
     document.documentElement.lang = lang;
   }, []);
 
+  // ---------------------------------------------------------------------------
+  // 4. RENDER
+  // ---------------------------------------------------------------------------
   return (
     <LanguageContext.Provider value={{ language, setLanguage }}>
       {children}
@@ -40,8 +71,17 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
+// =============================================================================
+// CUSTOM HOOK
+// =============================================================================
+
+/**
+ * Hook sử dụng để truy cập và thay đổi ngôn ngữ trong các component
+ */
 export function useLanguage() {
-  const ctx = useContext(LanguageContext);
-  if (!ctx) throw new Error("useLanguage must be used in LanguageProvider");
-  return ctx;
+  const context = useContext(LanguageContext);
+  if (!context) {
+    throw new Error("useLanguage must be used within a LanguageProvider");
+  }
+  return context;
 }

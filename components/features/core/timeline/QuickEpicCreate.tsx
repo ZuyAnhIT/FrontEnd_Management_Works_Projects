@@ -1,122 +1,155 @@
 "use client";
 
-import { useState } from "react";
+// =============================================================================
+// 1. IMPORT (Libraries -> Internal -> Styles)
+// =============================================================================
+
+import React, { useState } from "react";
 import { Plus, Loader2 } from "lucide-react";
-import { apiEpic, CreateEpicPayload } from "@/services/apiEpic"; 
+
+// Internal Components & Utils
 import { useToast } from "@/components/ui/ToastProvider";
+import { cn } from "@/lib/utils";
+
+// Internal Services & Types
+import * as apiEpic from "@/services/apiEpic"; 
+import { CreateEpicPayload } from "@/services/apiEpic"; 
 
 // =============================================================================
-// 1. INTERFACES & CONFIG
+// 2. INTERFACES & CONSTANTS
 // =============================================================================
 
 interface QuickEpicCreateProps {
     projectId: number;
-    onSuccess: () => void; // Callback để reload Gantt Chart
+    onSuccess: () => void; 
 }
 
-const DEFAULT_EPIC_COLOR = "#8b5cf6"; // Màu tím mặc định cho Epic
+const DEFAULT_EPIC_COLOR = "#8b5cf6"; // Màu tím mặc định (Purple-500)
 
 // =============================================================================
-// 2. MAIN COMPONENT
+// 3. MAIN COMPONENT
 // =============================================================================
 
+/**
+ * Thành phần khởi tạo nhanh Epic (Quick Epic Create).
+ * Cho phép tạo Epic ngay trên giao diện (thường dùng ở Gantt Chart/Roadmap).
+ */
 export default function QuickEpicCreate({ projectId, onSuccess }: QuickEpicCreateProps) {
+    
+    // ---------------------------------------------------------------------------
+    // 4. HOOKS & STATE
+    // ---------------------------------------------------------------------------
+    
     const { showToast } = useToast();
+    
     const [isEditing, setIsEditing] = useState(false);
-    const [name, setName] = useState("");
-    const [loading, setLoading] = useState(false);
+    const [epicName, setEpicName] = useState("");
+    const [isLoading, setIsLoading] = useState(false);
 
-    // --- HANDLER: CREATE (Logic nghiệp vụ quan trọng) ---
-    const handleCreate = async () => {
-        if (!name.trim()) {
+    // ---------------------------------------------------------------------------
+    // 5. HANDLERS
+    // ---------------------------------------------------------------------------
+
+    /**
+     * Xử lý gọi API tạo Epic mới
+     */
+    const handleCreateEpic = async () => {
+        if (!epicName.trim()) {
             setIsEditing(false);
             return;
         }
 
-        setLoading(true);
+        setIsLoading(true);
         try {
-            // 1. Tự động tạo ngày tháng mặc định (Hôm nay -> 30 ngày sau)
-            // Để Epic hiện lên Timeline ngay lập tức thay vì bị ẩn
+            // Tự động set thời gian mặc định (Hôm nay -> 30 ngày sau)
+            // Đảm bảo Epic vừa tạo sẽ hiển thị ngay trên Gantt Chart thay vì bị ẩn
             const startDate = new Date();
             const endDate = new Date();
             endDate.setDate(startDate.getDate() + 30);
 
-            // 2. Chuẩn bị Payload
             const payload: CreateEpicPayload = {
-                name: name.trim(),
+                name: epicName.trim(),
                 description: "", 
                 color: DEFAULT_EPIC_COLOR, 
                 startDate: startDate.toISOString(),
                 dueDate: endDate.toISOString(),
             };
 
-            // 3. Gọi API
             await apiEpic.createEpic(projectId, payload);
             
-            showToast("Epic created successfully", "success");
-            onSuccess(); // Reload list
-            setName(""); // Clear input để nhập tiếp (Bulk create style)
+            showToast("Epic created successfully.", "success");
+            onSuccess(); 
+            setEpicName(""); // Giữ nguyên mode edit để người dùng có thể tạo liên tiếp (Bulk create)
 
         } catch (error: any) {
-            console.error(error);
-            const message = error.message || error.response?.data?.message || "Failed to create epic";
+            console.error("Create Epic Error:", error);
+            const message = error.response?.data?.message || error.message || "Failed to create epic.";
             showToast(message, "error");
         } finally {
-            setLoading(false);
+            setIsLoading(false);
         }
     };
 
-    // --- HANDLER: KEYBOARD (Logic nghiệp vụ quan trọng) ---
-    const handleKeyDown = (e: React.KeyboardEvent) => {
-        // ✅ QUAN TRỌNG: Ngăn sự kiện phím lan ra ngoài (lên thư viện Gantt)
+    /**
+     * Xử lý các sự kiện bàn phím.
+     * Cần chặn sự kiện (stopPropagation) để không bị xung đột với thư viện kéo thả (Gantt).
+     */
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
         e.stopPropagation();
 
-        if (e.key === 'Enter') {
+        if (e.key === "Enter") {
             e.preventDefault();
-            handleCreate();
+            handleCreateEpic();
         }
-        if (e.key === 'Escape') {
+        
+        if (e.key === "Escape") {
             setIsEditing(false);
-            setName("");
+            setEpicName("");
         }
     };
 
-    // --- RENDER: NÚT BẤM (IDLE STATE) ---
+    // ---------------------------------------------------------------------------
+    // 6. RENDER LOGIC
+    // ---------------------------------------------------------------------------
+
+    // TRẠNG THÁI CHỜ (IDLE STATE): Hiển thị nút bấm
     if (!isEditing) {
         return (
             <button 
                 onClick={() => setIsEditing(true)}
-                className="w-full h-full flex items-center pl-4 text-xs font-bold text-slate-400 hover:text-blue-600 hover:bg-slate-50 transition-colors group"
+                className={cn(
+                    "w-full h-full flex items-center pl-4 group transition-colors",
+                    "text-[12px] font-bold text-slate-500 hover:text-[#0052CC] hover:bg-slate-50/50"
+                )}
                 title="Create a new Epic"
             >
-                <Plus className="w-3.5 h-3.5 mr-2 group-hover:scale-110 transition-transform" /> 
-                Create Epic
+                <Plus className="w-3.5 h-3.5 mr-2 group-hover:scale-110 transition-transform stroke-[2.5]" /> 
+                <span className="uppercase tracking-widest">Create Epic</span>
             </button>
         );
     }
 
-    // --- RENDER: Ô NHẬP LIỆU (EDITING STATE) ---
+    // TRẠNG THÁI NHẬP LIỆU (EDITING STATE): Hiển thị Form Input
     return (
-        <div className="w-full h-full flex items-center px-2 bg-white border-l-4 border-blue-500">
-            <div className="relative w-full">
+        <div className="w-full h-full flex items-center px-3 bg-white border-l-4 border-[#0052CC] shadow-inner animate-in fade-in duration-200">
+            <div className="relative w-full flex items-center">
                 <input 
                     autoFocus
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
+                    value={epicName}
+                    onChange={(e) => setEpicName(e.target.value)}
                     onKeyDown={handleKeyDown} 
+                    onKeyUp={(e) => e.stopPropagation()} // Đảm bảo không kích hoạt hotkey của cha
                     onBlur={() => {
-                        // Tự đóng nếu không có nội dung
-                        if (!name.trim()) setIsEditing(false);
+                        if (!epicName.trim()) setIsEditing(false);
                     }}
                     placeholder="Type epic name & press Enter..."
-                    className="w-full text-sm outline-none text-slate-800 placeholder:text-slate-400 bg-transparent h-8 pr-6"
-                    disabled={loading}
-                    // Thêm onKeyUp stopPropagation cho chắc chắn
-                    onKeyUp={(e) => e.stopPropagation()}
+                    className="w-full text-[13px] font-medium outline-none text-[#172B4D] placeholder:text-slate-400 bg-transparent h-8 pr-8 focus:ring-0"
+                    disabled={isLoading}
                 />
-                {loading && (
-                    <div className="absolute right-0 top-1/2 -translate-y-1/2">
-                        <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600" />
+                
+                {isLoading && (
+                    <div className="absolute right-1">
+                        <Loader2 className="w-4 h-4 animate-spin text-[#0052CC]" />
                     </div>
                 )}
             </div>

@@ -1,6 +1,10 @@
 "use client";
 
-import { useState, useRef } from "react";
+// =============================================================================
+// 1. IMPORT
+// =============================================================================
+
+import React, { useState, useRef, useCallback, useEffect } from "react";
 import {
   X,
   Loader2,
@@ -14,49 +18,59 @@ import {
   UploadCloud,
   Trash2,
 } from "lucide-react";
+
+// Internal Services & Context
 import { createProject, ProjectRequest } from "@/services/apiProject";
 import { useToast } from "@/components/ui/ToastProvider";
+
+// Internal Components & Utils
 import { Card, CardHeader, CardTitle } from "@/components/ui/Cards";
 import { Button } from "@/components/ui/Buttons";
 import { Input } from "@/components/ui/Inputs";
 import { Textarea } from "@/components/ui/TextAreas";
+import { cn } from "@/lib/utils";
 
 // =============================================================================
-// 1. CONSTANTS & HELPERS
+// 2. CONSTANTS & HELPERS
 // =============================================================================
 
 const PRIORITY_OPTIONS = [
   {
     value: "LOW",
     label: "Low",
-    color: "bg-slate-100 text-slate-700 border-slate-200",
+    color: "bg-slate-50 text-slate-600 border-slate-200",
+    activeColor: "bg-slate-100 text-slate-800 border-slate-300 ring-2 ring-slate-200",
   },
   {
     value: "MEDIUM",
     label: "Medium",
-    color: "bg-blue-50 text-blue-700 border-blue-200",
+    color: "bg-blue-50/50 text-blue-600 border-blue-100",
+    activeColor: "bg-blue-50 text-blue-700 border-blue-300 ring-2 ring-blue-100",
   },
   {
     value: "HIGH",
     label: "High",
-    color: "bg-orange-50 text-orange-700 border-orange-200",
+    color: "bg-orange-50/50 text-orange-600 border-orange-100",
+    activeColor: "bg-orange-50 text-orange-700 border-orange-300 ring-2 ring-orange-100",
   },
 ];
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
-// Helper: Chuyển đổi ID sang number an toàn
+/**
+ * Trích xuất ID số nguyên (Number ID) một cách an toàn.
+ */
 export const toNumberId = (maybeId: unknown): number => {
   if (typeof maybeId === "number") return maybeId;
   if (typeof maybeId === "string") return Number(maybeId);
-  if (typeof maybeId === "object" && maybeId && (maybeId as any).id != null) {
+  if (typeof maybeId === "object" && maybeId && "id" in maybeId) {
     return Number((maybeId as any).id);
   }
   return NaN;
 };
 
 // =============================================================================
-// 2. INTERFACES
+// 3. INTERFACES
 // =============================================================================
 
 interface CreateProjectModalProps {
@@ -77,10 +91,24 @@ interface ProjectFormState {
   dueDate: string;
 }
 
+const INITIAL_FORM_STATE: ProjectFormState = {
+  name: "",
+  projectCode: "",
+  description: "",
+  goal: "",
+  priority: "MEDIUM",
+  startDate: "",
+  dueDate: "",
+};
+
 // =============================================================================
-// 3. MAIN COMPONENT
+// 4. MAIN COMPONENT
 // =============================================================================
 
+/**
+ * Modal khởi tạo Dự án mới (Create Project Modal).
+ * Cho phép thiết lập tên dự án, mã KEY dự án, mục tiêu, độ ưu tiên và ảnh bìa.
+ */
 export default function CreateProjectModal({
   isOpen,
   onClose,
@@ -88,92 +116,121 @@ export default function CreateProjectModal({
   workspaceId,
   onSuccess,
 }: CreateProjectModalProps) {
-  // --- HOOKS ---
+  
+  // ---------------------------------------------------------------------------
+  // 5. HOOKS & STATE
+  // ---------------------------------------------------------------------------
+  
   const { showToast } = useToast();
-  const [loading, setLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // --- STATE FORM ---
-  const [form, setForm] = useState<ProjectFormState>({
-    name: "",
-    projectCode: "",
-    description: "",
-    goal: "",
-    priority: "MEDIUM",
-    startDate: "",
-    dueDate: "",
-  });
-
-  // --- STATE FILE UPLOAD ---
+  const [isLoading, setIsLoading] = useState(false);
+  const [form, setForm] = useState<ProjectFormState>(INITIAL_FORM_STATE);
+  
+  // File Upload State
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
-  // --- HANDLERS: FILE ---
+  // ---------------------------------------------------------------------------
+  // 6. EFFECTS
+  // ---------------------------------------------------------------------------
 
+  /**
+   * Reset toàn bộ dữ liệu form khi modal đóng lại
+   */
+  useEffect(() => {
+    if (!isOpen) {
+      setForm(INITIAL_FORM_STATE);
+      setSelectedFile(null);
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      setPreviewUrl(null);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]); // Cố tình bỏ qua `previewUrl` ở deps để tránh re-run liên tục
+
+  // ---------------------------------------------------------------------------
+  // 7. HANDLERS
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Cập nhật thông tin từng trường riêng lẻ (Patch Update form)
+   */
+  const handleUpdateForm = useCallback((field: keyof ProjectFormState, value: string) => {
+     setForm(prev => ({ ...prev, [field]: value }));
+  }, []);
+
+  /**
+   * Tự động sinh mã KEY (projectCode) dự án dựa trên Tên dự án.
+   * Logic: Lấy các chữ cái đầu của mỗi từ, tối đa 5 ký tự.
+   */
+  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newName = e.target.value;
+    
+    // Nếu projectCode đang trống (hoặc đang auto-gen giống cái cũ), thì tự động gen mã KEY
+    const words = newName.trim().split(/\s+/);
+    let autoCode = "";
+    
+    if (words.length === 1) {
+       autoCode = words[0].substring(0, 3).toUpperCase();
+    } else {
+       autoCode = words.map(w => w.charAt(0)).join("").toUpperCase().substring(0, 5);
+    }
+
+    setForm(prev => ({ 
+      ...prev, 
+      name: newName, 
+      // Chỉ auto-gen nếu mã key hiện tại chưa bị user tự sửa thủ công
+      projectCode: prev.projectCode ? prev.projectCode : autoCode 
+    }));
+  };
+
+  /**
+   * Xử lý tiếp nhận file ảnh tải lên
+   */
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      // Validate size
-      if (file.size > MAX_FILE_SIZE) {
-        showToast("File size too large (max. 5MB)", "error");
-        // Reset input field
-        if (fileInputRef.current) {
-          fileInputRef.current.value = "";
-        }
-        return;
-      }
+    if (!file) return;
 
-      // Update state and create preview URL
-      setSelectedFile(file);
-      setPreviewUrl(URL.createObjectURL(file));
+    if (file.size > MAX_FILE_SIZE) {
+      showToast("File size too large (Max. 5MB allowed)", "error");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
     }
+
+    setSelectedFile(file);
+    setPreviewUrl(URL.createObjectURL(file));
   };
 
+  /**
+   * Gỡ bỏ ảnh đã tải lên
+   */
   const handleRemoveFile = () => {
     setSelectedFile(null);
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
     setPreviewUrl(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
-    // Revoke old URL to free memory (cleanup)
-    if (previewUrl) {
-      URL.revokeObjectURL(previewUrl);
-    }
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  // --- HANDLERS: FORM ---
+  /**
+   * Submit gọi API tạo Project
+   */
+  const handleCreateProject = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
 
-  const resetForm = () => {
-    setForm({
-      name: "",
-      projectCode: "",
-      description: "",
-      goal: "",
-      priority: "MEDIUM",
-      startDate: "",
-      dueDate: "",
-    });
-    handleRemoveFile(); // Reset file state as well
-  };
-
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    // Validation
+    // Validation cơ bản
     if (!form.name.trim() || !form.projectCode.trim()) {
-      showToast("Please enter the project name and key.", "warning");
+      showToast("Project Name and Key are required fields", "warning");
       return;
     }
 
     const wsId = toNumberId(workspaceId);
     if (Number.isNaN(companyId) || Number.isNaN(wsId)) {
-      showToast("Invalid Company ID or Workspace ID.", "error");
+      showToast("System error: Invalid workspace identity", "error");
       return;
     }
 
-    setLoading(true);
+    setIsLoading(true);
     try {
-      // 1. Prepare Payload
       const payload: ProjectRequest = {
         name: form.name.trim(),
         projectCode: form.projectCode.trim(),
@@ -182,242 +239,204 @@ export default function CreateProjectModal({
         priority: form.priority as "LOW" | "MEDIUM" | "HIGH",
         startDate: form.startDate || null,
         dueDate: form.dueDate || null,
-        // coverImageUrl is now handled by the file upload logic, sent as null in payload
-        coverImageUrl: null,
+        coverImageUrl: null, // Ảnh được gửi kèm như một part của FormData 
       };
 
-      // 2. Call API (including file upload if selectedFile is present)
-      const newProject = await createProject(
-        companyId,
-        wsId,
-        payload,
-        selectedFile
-      );
+      const newProject = await createProject(companyId, wsId, payload, selectedFile);
 
-      // 3. Success
       onSuccess(newProject);
-      resetForm();
-      showToast("Project created successfully!", "success");
+      showToast("Project initialized successfully", "success");
       onClose();
-    } catch (err: any) {
-      console.error("CreateProject error:", err?.response?.data || err);
-      // Use API error message if available
-      const message =
-        err?.message ||
-        err?.response?.data?.message ||
-        "Failed to create project.";
+    } catch (error: any) {
+      console.error("Create Project Error:", error);
+      const message = error.response?.data?.message || error.message || "Failed to initialize project";
       showToast(message, "error");
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
-  // --- RENDER GUARD ---
+  // ---------------------------------------------------------------------------
+  // 8. RENDER LOGIC
+  // ---------------------------------------------------------------------------
+
   if (!isOpen) return null;
 
-  // --- RENDER UI ---
   return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur-[2px] z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-      {/* Modal Card */}
-      <Card className="w-full max-w-3xl max-h-[90vh] bg-white border border-slate-200 shadow-2xl rounded-xl flex flex-col animate-in zoom-in-95 duration-200 overflow-hidden">
-        {/* HEADER */}
-        <CardHeader className="bg-white border-b border-slate-100 px-6 py-5 flex flex-row items-center justify-between sticky top-0 z-10 shrink-0">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+      
+      {/* KHỐI MODAL */}
+      <Card 
+        className="w-full max-w-[700px] max-h-[90vh] bg-white border border-slate-200 shadow-2xl rounded-2xl flex flex-col animate-in zoom-in-95 duration-200 overflow-hidden"
+        onClick={e => e.stopPropagation()}
+      >
+        
+        {/* ================= HEADER ================= */}
+        <CardHeader className="bg-white border-b border-slate-100 px-6 py-5 flex flex-row items-center justify-between shrink-0">
           <div className="flex items-center gap-4">
-            <div className="w-10 h-10 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center shadow-sm">
-              <FolderPlus className="w-5 h-5 text-blue-600" />
+            <div className="w-10 h-10 rounded-xl bg-[#E3F2FD] border border-[#2684FF]/20 flex items-center justify-center shadow-sm">
+              <FolderPlus className="w-5 h-5 text-[#0052CC]" />
             </div>
             <div>
-              <CardTitle className="text-xl text-slate-900 font-bold">
-                Create Project
+              <CardTitle className="text-lg text-slate-800 font-bold tracking-tight">
+                Create New Project
               </CardTitle>
-              <p className="text-slate-500 text-xs font-medium mt-0.5">
-                Start a new initiative
+              <p className="text-slate-400 text-[11px] font-bold uppercase tracking-widest mt-0.5">
+                Start a fresh initiative
               </p>
             </div>
           </div>
+          
           <button
             onClick={onClose}
-            className="p-2 rounded-md hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors"
-            disabled={loading}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-[#091E4214] transition-colors active:scale-95"
+            disabled={isLoading}
+            title="Cancel"
           >
             <X className="w-5 h-5" />
           </button>
         </CardHeader>
 
-        {/* BODY: Scrollable Form */}
-        <div className="flex-1 overflow-y-auto p-6 bg-white custom-scrollbar">
-          <form onSubmit={handleCreate} className="space-y-6">
-            {/* Project Name */}
+        {/* ================= BODY FORM ================= */}
+        <div className="flex-1 overflow-y-auto px-8 py-6 bg-white custom-scrollbar">
+          <form onSubmit={handleCreateProject} className="space-y-6">
+            
+            {/* Tên Dự án */}
             <div className="space-y-1.5">
-              <label className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-                <FileText className="w-4 h-4 text-slate-500" />
-                Project Name <span className="text-red-500">*</span>
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                <FileText className="w-3.5 h-3.5" /> Project Name <span className="text-red-500">*</span>
               </label>
               <Input
                 value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                placeholder="e.g. Customer Portal Revamp"
-                className="h-10 border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-600 transition-all shadow-sm"
+                onChange={handleNameChange}
+                placeholder="e.g. Website Redesign 2026"
+                className="h-11 border-slate-300 text-sm font-medium focus:ring-2 focus:ring-blue-100 focus:border-[#2684FF] transition-all shadow-sm"
                 autoFocus
-                disabled={loading}
+                disabled={isLoading}
               />
             </div>
 
-            {/* Row: Code & Priority */}
+            {/* Mã Project (KEY) & Độ ưu tiên (Priority) */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Project Code */}
+              
               <div className="space-y-1.5">
-                <label className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-                  <Code className="w-4 h-4 text-slate-500" />
-                  Key <span className="text-red-500">*</span>
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                  <Code className="w-3.5 h-3.5" /> Project Key <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
                   <Input
                     value={form.projectCode}
-                    onChange={(e) =>
-                      setForm({
-                        ...form,
-                        projectCode: e.target.value.toUpperCase(),
-                      })
-                    }
-                    placeholder="PRJ"
-                    className="h-10 border-slate-300 rounded-md text-sm font-mono font-medium uppercase focus:ring-2 focus:ring-blue-100 focus:border-blue-600 transition-all shadow-sm pr-10"
-                    disabled={loading}
+                    onChange={(e) => handleUpdateForm("projectCode", e.target.value.toUpperCase())}
+                    placeholder="WBR26"
+                    className="h-10 border-slate-300 text-sm font-mono font-bold uppercase focus:ring-2 focus:ring-blue-100 focus:border-[#2684FF] transition-all shadow-sm pr-12"
+                    disabled={isLoading}
                     maxLength={10}
                   />
-                  <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none text-xs text-slate-400 font-medium">
+                  <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none text-[10px] text-slate-400 font-bold uppercase tracking-widest">
                     KEY
                   </div>
                 </div>
               </div>
 
-              {/* Priority */}
               <div className="space-y-1.5">
-                <label className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-                  <Flag className="w-4 h-4 text-slate-500" />
-                  Priority
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                  <Flag className="w-3.5 h-3.5" /> Priority
                 </label>
                 <div className="grid grid-cols-3 gap-2">
-                  {PRIORITY_OPTIONS.map((option) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      onClick={() =>
-                        setForm({ ...form, priority: option.value })
-                      }
-                      className={`
-                        px-3 py-2 rounded-md text-xs font-bold border transition-all
-                        ${
-                          form.priority === option.value
-                            ? `${option.color} ring-2 ring-offset-1 ring-slate-200`
-                            : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"
-                        }
-                      `}
-                      disabled={loading}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
+                  {PRIORITY_OPTIONS.map((option) => {
+                    const isActive = form.priority === option.value;
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => handleUpdateForm("priority", option.value)}
+                        className={cn(
+                          "px-2 h-10 rounded-md text-[11px] font-bold uppercase tracking-widest border transition-all",
+                          isActive 
+                            ? option.activeColor 
+                            : cn(option.color, "bg-white hover:bg-slate-50")
+                        )}
+                        disabled={isLoading}
+                      >
+                        {option.label}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             </div>
 
-            {/* Dates */}
+            {/* Thời gian thực hiện (Timeline) */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-1.5">
-                <label className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-                  <Calendar className="w-4 h-4 text-slate-500" />
-                  Start Date
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                  <Calendar className="w-3.5 h-3.5" /> Start Date
                 </label>
                 <Input
                   type="date"
                   value={form.startDate}
-                  onChange={(e) =>
-                    setForm({ ...form, startDate: e.target.value })
-                  }
-                  className="w-full h-10 px-3 py-2 border border-slate-300 rounded-md text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-600 transition-all shadow-sm"
-                  disabled={loading}
+                  onChange={(e) => handleUpdateForm("startDate", e.target.value)}
+                  className="h-10 border-slate-300 text-[13px] font-medium focus:ring-2 focus:ring-blue-100 focus:border-[#2684FF] transition-all shadow-sm bg-white"
+                  disabled={isLoading}
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-                  <Calendar className="w-4 h-4 text-slate-500" />
-                  Due Date
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                  <Target className="w-3.5 h-3.5" /> Target End Date
                 </label>
                 <Input
                   type="date"
                   value={form.dueDate}
-                  onChange={(e) =>
-                    setForm({ ...form, dueDate: e.target.value })
-                  }
-                  className="w-full h-10 px-3 py-2 border border-slate-300 rounded-md text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-600 transition-all shadow-sm"
-                  disabled={loading}
+                  onChange={(e) => handleUpdateForm("dueDate", e.target.value)}
+                  className="h-10 border-slate-300 text-[13px] font-medium focus:ring-2 focus:ring-blue-100 focus:border-[#2684FF] transition-all shadow-sm bg-white"
+                  disabled={isLoading}
                 />
               </div>
             </div>
 
-            {/* Goal */}
+            {/* Mô tả (Description) */}
             <div className="space-y-1.5">
-              <label className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-                <Target className="w-4 h-4 text-slate-500" />
-                Project Goal
-              </label>
-              <Input
-                value={form.goal}
-                onChange={(e) => setForm({ ...form, goal: e.target.value })}
-                placeholder="What is the main objective?"
-                className="h-10 border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-600 transition-all shadow-sm"
-                disabled={loading}
-              />
-            </div>
-
-            {/* Description */}
-            <div className="space-y-1.5">
-              <label className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-                <FileText className="w-4 h-4 text-slate-500" />
-                Description
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                <FileText className="w-3.5 h-3.5" /> Project Description
               </label>
               <Textarea
                 value={form.description}
-                onChange={(e) =>
-                  setForm({ ...form, description: e.target.value })
-                }
+                onChange={(e) => handleUpdateForm("description", e.target.value)}
                 rows={3}
-                placeholder="Describe the project scope..."
-                className="resize-none border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-600 transition-all shadow-sm"
-                disabled={loading}
+                placeholder="What is the main objective of this project?"
+                className="resize-none border-slate-300 text-[13px] focus:ring-2 focus:ring-blue-100 focus:border-[#2684FF] transition-all shadow-sm bg-slate-50 focus:bg-white placeholder:text-slate-400 p-3"
+                disabled={isLoading}
               />
             </div>
 
-            {/* FILE UPLOAD (Cover Image) */}
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-                <ImageIcon className="w-4 h-4 text-slate-500" />
-                Cover Image
+            {/* Tải ảnh bìa (Cover Image Upload) */}
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                <ImageIcon className="w-3.5 h-3.5" /> Cover Image
               </label>
 
               {!previewUrl ? (
-                // 1. Upload Button
+                // Nút tải ảnh lên
                 <div
-                  onClick={() => !loading && fileInputRef.current?.click()}
-                  className={`border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center transition-all group ${
-                    loading
+                  onClick={() => !isLoading && fileInputRef.current?.click()}
+                  className={cn(
+                    "border-2 border-dashed rounded-xl p-6 flex flex-col items-center justify-center transition-all group",
+                    isLoading
                       ? "cursor-not-allowed border-slate-200 bg-slate-50/50"
-                      : "cursor-pointer border-slate-300 hover:bg-blue-50 hover:border-blue-400"
-                  }`}
+                      : "cursor-pointer border-slate-300 hover:bg-[#E3F2FD] hover:border-[#2684FF]"
+                  )}
                 >
-                  <div
-                    className={`p-3 bg-blue-50 rounded-full mb-3 transition-transform ${
-                      loading ? "opacity-50" : "group-hover:scale-110"
-                    }`}
-                  >
-                    <UploadCloud className="w-6 h-6 text-blue-600" />
+                  <div className={cn(
+                    "p-3 bg-blue-50 border border-blue-100 rounded-full mb-3 transition-transform",
+                    isLoading ? "opacity-50" : "group-hover:scale-110"
+                  )}>
+                    <UploadCloud className="w-5 h-5 text-[#0052CC]" />
                   </div>
-                  <p className="text-sm font-medium text-slate-700">
-                    Click to upload image
+                  <p className="text-[13px] font-bold text-slate-700">
+                    Upload an image cover
                   </p>
-                  <p className="text-xs text-slate-400 mt-1">
-                    SVG, PNG, JPG or GIF (max. 5MB)
+                  <p className="text-[11px] font-medium text-slate-400 mt-1">
+                    SVG, PNG, JPG (Max 5MB)
                   </p>
                   <input
                     type="file"
@@ -425,24 +444,24 @@ export default function CreateProjectModal({
                     onChange={handleFileChange}
                     className="hidden"
                     accept="image/*"
-                    disabled={loading}
+                    disabled={isLoading}
                   />
                 </div>
               ) : (
-                // 2. Preview + Remove Button
-                <div className="relative rounded-lg overflow-hidden border border-slate-200 shadow-sm w-full h-40 bg-slate-100 group">
+                // Khu vực xem trước ảnh
+                <div className="relative rounded-xl overflow-hidden border border-slate-200 shadow-sm w-full h-[180px] bg-slate-100 group">
                   <img
                     src={previewUrl}
-                    alt="Preview"
+                    alt="Cover preview"
                     className="w-full h-full object-cover"
                   />
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  <div className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
                     <Button
                       type="button"
                       variant="destructive"
                       size="sm"
                       onClick={handleRemoveFile}
-                      className="gap-2 shadow-md"
+                      className="gap-2 shadow-xl font-bold uppercase tracking-widest text-[11px]"
                     >
                       <Trash2 className="w-4 h-4" /> Remove Image
                     </Button>
@@ -451,31 +470,34 @@ export default function CreateProjectModal({
               )}
             </div>
 
-            {/* Hidden Submit Button to allow Enter key submission */}
+            {/* Nút Submit ẩn để bắt sự kiện Enter trên bàn phím */}
             <button type="submit" className="hidden" />
           </form>
         </div>
 
-        {/* FOOTER ACTIONS */}
-        <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-100 bg-slate-50/50 shrink-0">
+        {/* ================= FOOTER ================= */}
+        <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-100 bg-slate-50 shrink-0">
           <Button
-            variant="outline"
+            variant="ghost"
             onClick={onClose}
-            className="h-10 px-5 text-sm font-semibold text-slate-700 border-slate-300 hover:bg-white hover:text-slate-900 transition-colors"
-            disabled={loading}
+            className="h-10 px-5 text-[12px] uppercase tracking-widest font-bold text-slate-500 hover:text-slate-800 hover:bg-[#091E4214] transition-colors"
+            disabled={isLoading}
           >
             Cancel
           </Button>
+          
           <Button
-            type="submit" // Trigger form submit
-            onClick={handleCreate}
-            disabled={loading || !form.name.trim() || !form.projectCode.trim()}
-            className="h-10 px-6 text-sm font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-lg transition-all active:scale-95"
+            onClick={() => handleCreateProject()}
+            disabled={isLoading || !form.name.trim() || !form.projectCode.trim()}
+            className={cn(
+              "h-10 px-6 text-[12px] uppercase tracking-widest font-bold text-white shadow-md transition-all",
+              "bg-[#0052CC] hover:bg-[#0047B3] active:scale-95 disabled:opacity-50"
+            )}
           >
-            {loading ? (
+            {isLoading ? (
               <span className="flex items-center gap-2">
                 <Loader2 className="w-4 h-4 animate-spin" />
-                Creating...
+                Initializing
               </span>
             ) : (
               "Create Project"
@@ -483,6 +505,12 @@ export default function CreateProjectModal({
           </Button>
         </div>
       </Card>
+
+      <style jsx global>{`
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+      `}</style>
     </div>
   );
 }

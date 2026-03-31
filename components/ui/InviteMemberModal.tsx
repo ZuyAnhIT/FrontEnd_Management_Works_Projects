@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   X,
   Mail,
@@ -8,16 +8,17 @@ import {
   UserPlus,
   FolderKanban,
   Briefcase,
-  Search,
   Loader2,
 } from "lucide-react";
+
+// Internal Components & Services
 import { Button } from "@/components/ui/Buttons";
 import { Input } from "@/components/ui/Inputs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/Avatars";
 import { searchCompanyMembers, CompanyMember } from "@/services/apiCompany";
 
 // =============================================================================
-// 1. INTERFACES
+// INTERFACES
 // =============================================================================
 
 interface InviteMemberModalProps {
@@ -26,23 +27,29 @@ interface InviteMemberModalProps {
   onInvite: () => void | Promise<void>;
   isLoading?: boolean;
 
+  // Trạng thái dữ liệu (được quản lý bởi component cha)
   email: string;
   setEmail: (val: string) => void;
-
   roleCode: string;
   setRoleCode: (val: string) => void;
 
+  // Tùy chỉnh hiển thị
   title?: string;
   description?: string;
   contextType?: "company" | "workspace" | "project";
 
+  // Dùng để thực hiện tìm kiếm thành viên trong nội bộ công ty
   companyId?: number;
 }
 
 // =============================================================================
-// 2. MAIN COMPONENT
+// MAIN COMPONENT
 // =============================================================================
 
+/**
+ * Thành phần cửa sổ mời thành viên tham gia hệ thống.
+ * Hỗ trợ tìm kiếm gợi ý thành viên dựa trên dữ liệu công ty và phân quyền theo ngữ cảnh.
+ */
 export default function InviteMemberModal({
   isOpen,
   onClose,
@@ -57,24 +64,34 @@ export default function InviteMemberModal({
   contextType = "company",
   companyId,
 }: InviteMemberModalProps) {
-  // --- STATE SUGGESTIONS ---
+  // ---------------------------------------------------------------------------
+  // 1. STATE & REFS
+  // ---------------------------------------------------------------------------
   const [suggestions, setSuggestions] = useState<CompanyMember[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const wrapperRef = useRef<HTMLDivElement>(null);
+  const suggestionWrapperRef = useRef<HTMLDivElement>(null);
 
-  // --- CLICK OUTSIDE TO CLOSE SUGGESTIONS (Logic nghiệp vụ quan trọng) ---
+  // ---------------------------------------------------------------------------
+  // 2. SIDE EFFECTS
+  // ---------------------------------------------------------------------------
+
+  // Xử lý đóng danh sách gợi ý khi người dùng nhấn chuột ra ngoài
   useEffect(() => {
-    function handleClickOutside(event: any) {
-      if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        suggestionWrapperRef.current && 
+        !suggestionWrapperRef.current.contains(event.target as Node)
+      ) {
         setShowSuggestions(false);
       }
-    }
+    };
+    
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Reset suggestions when modal closes
+  // Làm sạch dữ liệu khi đóng cửa sổ modal
   useEffect(() => {
     if (!isOpen) {
       setShowSuggestions(false);
@@ -82,14 +99,18 @@ export default function InviteMemberModal({
     }
   }, [isOpen]);
 
-  if (!isOpen) return null;
+  // ---------------------------------------------------------------------------
+  // 3. LOGIC HANDLERS
+  // ---------------------------------------------------------------------------
 
-  // --- LOGIC TÌM KIẾM (Logic nghiệp vụ quan trọng) ---
+  /**
+   * Xử lý thay đổi nội dung nhập liệu và thực hiện tìm kiếm gợi ý (Debounce)
+   */
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setEmail(value);
 
-    // Chỉ tìm kiếm nếu có companyId, và nhập > 1 ký tự
+    // Điều kiện thực hiện tìm kiếm: có mã công ty và từ khóa dài hơn 1 ký tự
     if (!companyId || value.length < 1) {
       setSuggestions([]);
       setShowSuggestions(false);
@@ -99,37 +120,36 @@ export default function InviteMemberModal({
     setShowSuggestions(true);
     setIsSearching(true);
 
-    // Debounce search
-    const timeoutId = setTimeout(async () => {
+    const debounceTimer = setTimeout(async () => {
       try {
-        // Tìm theo email hoặc tên
-        const res = await searchCompanyMembers(companyId, {
-          email: value, // Backend nên hỗ trợ tìm gần đúng (ILIKE)
+        const response = await searchCompanyMembers(companyId, {
+          email: value,
           page: 0,
           size: 5,
         });
-
-        // Lọc bớt kết quả trùng khớp hoàn toàn nếu cần, hoặc để nguyên
-        setSuggestions(res.content || []);
-      } catch (error: any) {
-        console.error("Search failed", error);
-        // Nếu lỗi, nên log và reset suggestions
+        setSuggestions(response.content || []);
+      } catch (error) {
+        console.error("[Invite Service] Member search failed:", error);
         setSuggestions([]);
-        // NOTE: Nếu API trả về message lỗi cụ thể, nó sẽ được xử lý ở component cha (nếu onInvite gọi API)
       } finally {
         setIsSearching(false);
       }
     }, 400);
 
-    return () => clearTimeout(timeoutId);
+    return () => clearTimeout(debounceTimer);
   };
 
-  const selectSuggestion = (memberEmail: string) => {
+  /**
+   * Chọn một thành viên từ danh sách gợi ý
+   */
+  const handleSelectSuggestion = (memberEmail: string) => {
     setEmail(memberEmail);
-    setShowSuggestions(false); // Đóng gợi ý sau khi chọn
+    setShowSuggestions(false);
   };
 
-  // Helper Render Icon
+  /**
+   * Xác định biểu tượng hiển thị dựa trên ngữ cảnh mời
+   */
   const renderHeaderIcon = () => {
     switch (contextType) {
       case "project":
@@ -141,10 +161,16 @@ export default function InviteMemberModal({
     }
   };
 
+  // ---------------------------------------------------------------------------
+  // 4. RENDER
+  // ---------------------------------------------------------------------------
+  if (!isOpen) return null;
+
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-[2px] flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
       <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
-        {/* HEADER */}
+        
+        {/* Khu vực Header */}
         <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100 bg-white shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0">
@@ -157,17 +183,18 @@ export default function InviteMemberModal({
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-md hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors"
+            className="p-2 rounded-md hover:bg-slate-100 text-slate-400 hover:text-slate-800 transition-colors"
             title="Close"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* BODY */}
+        {/* Khu vực Nội dung (Body) */}
         <div className="p-6 space-y-5 overflow-visible">
-          {/* 1. Email Input + Suggestions */}
-          <div className="space-y-1.5 relative" ref={wrapperRef}>
+          
+          {/* Nhập liệu Email và Gợi ý thành viên */}
+          <div className="space-y-1.5 relative" ref={suggestionWrapperRef}>
             <label className="text-sm font-semibold text-slate-900 flex items-center gap-2">
               <Mail className="w-4 h-4 text-slate-500" />
               Email Address <span className="text-red-500">*</span>
@@ -191,7 +218,7 @@ export default function InviteMemberModal({
               )}
             </div>
 
-            {/* SUGGESTION DROPDOWN */}
+            {/* Menu thả xuống hiển thị danh sách gợi ý */}
             {showSuggestions && (suggestions.length > 0 || isSearching) && (
               <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-xl z-50 max-h-60 overflow-y-auto custom-scrollbar">
                 {suggestions.length > 0 ? (
@@ -202,9 +229,8 @@ export default function InviteMemberModal({
                     {suggestions.map((member) => (
                       <button
                         key={member.memberId || member.userId}
-                        // QUAN TRỌNG: preventDefault để không bị mất focus khỏi input khi click
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={() => selectSuggestion(member.email)}
+                        onMouseDown={(e) => e.preventDefault()} // Giữ focus cho input
+                        onClick={() => handleSelectSuggestion(member.email)}
                         className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-blue-50 transition-colors text-left group border-b border-slate-50 last:border-0"
                       >
                         <Avatar className="w-8 h-8 border border-slate-200 shrink-0">
@@ -233,7 +259,7 @@ export default function InviteMemberModal({
                 ) : (
                   !isSearching && (
                     <div className="p-3 text-center text-xs text-slate-500 italic">
-                      No company members found.
+                      No matching company members found
                     </div>
                   )
                 )}
@@ -241,7 +267,7 @@ export default function InviteMemberModal({
             )}
           </div>
 
-          {/* 2. Role Select */}
+          {/* Lựa chọn vai trò (Role) */}
           <div className="space-y-1.5">
             <label className="text-sm font-semibold text-slate-900 flex items-center gap-2">
               <Crown className="w-4 h-4 text-slate-500" />
@@ -273,27 +299,16 @@ export default function InviteMemberModal({
                   </>
                 )}
               </select>
-              <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none text-slate-500">
-                {/* Custom Chevron Down Icon */}
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M19 9l-7 7-7-7"
-                  />
+              <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none text-slate-400">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
               </div>
             </div>
           </div>
         </div>
 
-        {/* FOOTER */}
+        {/* Khu vực Nút hành động (Footer) */}
         <div className="bg-slate-50/50 px-6 py-4 flex justify-end gap-3 border-t border-slate-100 shrink-0">
           <Button
             onClick={onClose}

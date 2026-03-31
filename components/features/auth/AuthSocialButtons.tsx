@@ -1,12 +1,20 @@
 "use client";
 
-import { useState } from "react";
+// =============================================================================
+// 1. IMPORT
+// =============================================================================
+
+// Thư viện bên ngoài
+import React, { useState, useCallback } from "react";
 import { GoogleLogin, CredentialResponse } from "@react-oauth/google";
 import { Loader2 } from "lucide-react";
+
+// Internal Services
 import { loginWithGoogle } from "@/services/apiAuth";
+import { cn } from "@/lib/utils";
 
 // =============================================================================
-// 1. INTERFACES
+// 2. INTERFACES
 // =============================================================================
 
 interface AuthSocialButtonsProps {
@@ -16,100 +24,100 @@ interface AuthSocialButtonsProps {
 }
 
 // =============================================================================
-// 2. MAIN COMPONENT
+// 3. MAIN COMPONENT
 // =============================================================================
 
+/**
+ * Thành phần các nút đăng nhập mạng xã hội (Social Authentication).
+ * Hiện tại hỗ trợ Google OAuth 2.0 với quy trình trao đổi ID Token lấy App Token.
+ */
 export default function AuthSocialButtons({
   onAuthSuccess,
   onError,
   setLoading,
 }: AuthSocialButtonsProps) {
-  // --- STATE ---
-  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  
+  // ---------------------------------------------------------------------------
+  // 4. STATE
+  // ---------------------------------------------------------------------------
+  
+  const [isProcessing, setIsProcessing] = useState(false);
 
-  // --- HANDLERS ---
+  // ---------------------------------------------------------------------------
+  // 5. HANDLERS
+  // ---------------------------------------------------------------------------
 
   /**
-   * Xử lý khi người dùng đăng nhập thành công qua Google Popup
-   * Quy trình: Lấy ID Token từ Google -> Gửi về Backend -> Nhận App Token
+   * Xử lý khi xác thực thành công phía Google Client
+   * ID Token sẽ được gửi về Backend để định danh và khởi tạo phiên làm việc
    */
-  const handleGoogleSuccess = async (credentialResponse: CredentialResponse) => {
-    setIsGoogleLoading(true);
-    setLoading(true); // Báo cho Modal cha biết đang xử lý
+  const handleGoogleSuccess = useCallback(async (credentialResponse: CredentialResponse) => {
+    const googleToken = credentialResponse.credential;
+    
+    if (!googleToken) {
+      onError("Google identity token was not found");
+      return;
+    }
+
+    setIsProcessing(true);
+    setLoading(true);
 
     try {
-      // 1. Lấy ID Token (Credential) từ phản hồi của Google
-      const googleToken = credentialResponse.credential;
-      
-      if (!googleToken) {
-        throw new Error("Google token not found.");
+      // Gọi API trao đổi token với Backend
+      const response = await loginWithGoogle(googleToken);
+
+      if (!response?.data?.accessToken) {
+        throw new Error(response.message || "Server authentication failed");
       }
 
-      // 2. Gọi API Backend để xác thực và đổi token
-      const res = await loginWithGoogle(googleToken);
+      // Thông báo thành công cho thành phần cha
+      await onAuthSuccess(response.data);
 
-      // 3. Kiểm tra kết quả trả về từ Backend
-      if (!res?.data?.accessToken) {
-        // Ưu tiên hiển thị message từ API trả về
-        throw new Error(res.message || "Google login failed.");
-      }
-
-      // 4. Thành công: Trả dữ liệu về cho component cha xử lý tiếp
-      await onAuthSuccess(res.data);
-
-    } catch (err: any) {
-      // Hiển thị lỗi từ API hoặc lỗi mặc định
-      onError(err.message || "An error occurred during Google login.");
+    } catch (error: any) {
+      // Ưu tiên message lỗi từ API backend
+      const errorMessage = error.response?.data?.message || error.message || "Social login failed";
+      onError(errorMessage);
     } finally {
-      setIsGoogleLoading(false);
+      setIsProcessing(false);
       setLoading(false);
     }
-  };
+  }, [onAuthSuccess, onError, setLoading]);
 
   /**
-   * Xử lý khi Popup Google bị đóng hoặc lỗi kết nối
+   * Xử lý các lỗi phát sinh từ cửa sổ Popup của Google
    */
-  const handleGoogleError = () => {
-    onError("Google login failed. Please try again.");
-  };
+  const handleGoogleError = useCallback(() => {
+    onError("Google login process was interrupted or failed");
+  }, [onError]);
 
-  // --- RENDER ---
+  // ---------------------------------------------------------------------------
+  // 6. RENDER
+  // ---------------------------------------------------------------------------
+
   return (
-    <div className="mt-4">
-      {/* Divider: OR */}
-      <div className="relative my-4">
-        <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-gray-200"></div>
-        </div>
-        <div className="relative flex justify-center text-xs uppercase">
-          <span className="bg-white px-2 text-gray-400 font-medium">
-            Or continue with
-          </span>
-        </div>
+    <div className="w-full animate-in fade-in slide-in-from-bottom-1 duration-500">
+      <div className="flex justify-center w-full min-h-[44px]">
+        {isProcessing ? (
+          // Trạng thái đang xử lý (Loading)
+          <div className="flex items-center justify-center w-full h-11 bg-slate-50 border border-slate-200 rounded-lg">
+            <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
+          </div>
+        ) : (
+          // Nút Google Login tiêu chuẩn
+          <div className="w-full overflow-hidden rounded-lg border border-slate-200 hover:border-slate-300 transition-all shadow-sm">
+            <GoogleLogin
+              onSuccess={handleGoogleSuccess}
+              onError={handleGoogleError}
+              useOneTap={false}
+              width="100%"
+              theme="outline"
+              size="large"
+              shape="rectangular"
+              text="signin_with"
+            />
+          </div>
+        )}
       </div>
-
-      {/* Google Button Area */}
-      {isGoogleLoading ? (
-        <div className="flex justify-center items-center p-2 h-[40px] bg-gray-50 rounded border border-gray-200">
-          <Loader2 className="w-5 h-5 animate-spin text-gray-500" />
-        </div>
-      ) : (
-        <div className="flex justify-center w-full">
-          {/* Lưu ý: Component GoogleLogin được cung cấp bởi thư viện @react-oauth/google.
-            Nó tự động render iframe/button của Google.
-          */}
-          <GoogleLogin
-            onSuccess={handleGoogleSuccess}
-            onError={handleGoogleError}
-            useOneTap={false}
-            width="100%"
-            theme="outline"
-            size="large"
-            shape="rectangular"
-            text="signin_with"
-          />
-        </div>
-      )}
     </div>
   );
 }

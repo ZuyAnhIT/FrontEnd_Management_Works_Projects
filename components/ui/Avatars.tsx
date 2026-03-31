@@ -1,88 +1,74 @@
-'use client'
+"use client";
 
-import * as React from 'react'
-import * as AvatarPrimitive from '@radix-ui/react-avatar'
+import * as React from "react";
+import * as AvatarPrimitive from "@radix-ui/react-avatar";
 
-// Import helper function to merge class names (assuming it's available)
-import { cn } from '@/lib/utils'
+// Internal Utils
+import { cn } from "@/lib/utils";
 
 // =============================================================================
-// 1. AVATAR ROOT
+// AVATAR COMPONENTS
 // =============================================================================
 
 /**
- * Renders the root container for the avatar component.
- * Sets default styles for size, overflow, and shape (rounded-full).
+ * Thành phần khung chứa (Root) của ảnh đại diện.
+ * Thiết lập các thuộc tính cơ bản về kích thước, bo góc và chống tràn.
  */
 function Avatar({
-    className,
-    ...props
+  className,
+  ...props
 }: React.ComponentProps<typeof AvatarPrimitive.Root>) {
-    return (
-        <AvatarPrimitive.Root
-            data-slot="avatar"
-            className={cn(
-                // Base styles: relative, flex, fixed size (8/size-32px), shrink-0, overflow-hidden, rounded-full
-                'relative flex size-8 shrink-0 overflow-hidden rounded-full',
-                className,
-            )}
-            {...props}
-        />
-    )
+  return (
+    <AvatarPrimitive.Root
+      data-slot="avatar"
+      className={cn(
+        "relative flex size-8 shrink-0 overflow-hidden rounded-full",
+        className
+      )}
+      {...props}
+    />
+  );
 }
 
-// =============================================================================
-// 2. AVATAR IMAGE
-// =============================================================================
-
 /**
- * Renders the image element inside the avatar root.
- * Ensures the image covers the full size of the container and maintains aspect ratio.
+ * Thành phần hiển thị hình ảnh thực tế của người dùng.
+ * Đảm bảo hình ảnh lấp đầy khung chứa và giữ đúng tỉ lệ khung hình.
  */
 function AvatarImage({
-    className,
-    ...props
+  className,
+  ...props
 }: React.ComponentProps<typeof AvatarPrimitive.Image>) {
-    return (
-        <AvatarPrimitive.Image
-            data-slot="avatar-image"
-            className={cn(
-                // Base styles: square aspect ratio, full size
-                'aspect-square size-full',
-                className
-            )}
-            {...props}
-        />
-    )
+  return (
+    <AvatarPrimitive.Image
+      data-slot="avatar-image"
+      className={cn("aspect-square size-full", className)}
+      {...props}
+    />
+  );
 }
-
-// =============================================================================
-// 3. AVATAR FALLBACK
-// =============================================================================
 
 /**
- * Renders the fallback element (initials or icon) when the image fails to load or is not provided.
- * Centers the content within the full size of the root container.
+ * Thành phần hiển thị khi hình ảnh không tải được hoặc không có sẵn.
+ * Thường dùng để hiển thị chữ cái đầu tên người dùng hoặc icon mặc định.
  */
 function AvatarFallback({
-    className,
-    ...props
+  className,
+  ...props
 }: React.ComponentProps<typeof AvatarPrimitive.Fallback>) {
-    return (
-        <AvatarPrimitive.Fallback
-            data-slot="avatar-fallback"
-            className={cn(
-                // Base styles: muted background, flex, size-full, center content, rounded-full
-                'bg-muted flex size-full items-center justify-center rounded-full',
-                className,
-            )}
-            {...props}
-        />
-    )
+  return (
+    <AvatarPrimitive.Fallback
+      data-slot="avatar-fallback"
+      className={cn(
+        "bg-muted flex size-full items-center justify-center rounded-full",
+        className
+      )}
+      {...props}
+    />
+  );
 }
 
 // =============================================================================
-// 4. EXPORTS
+// EXPORTS
 // =============================================================================
 
-export { Avatar, AvatarImage, AvatarFallback }
+export { Avatar, AvatarImage, AvatarFallback };

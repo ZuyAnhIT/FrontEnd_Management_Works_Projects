@@ -1,56 +1,45 @@
 "use client";
 
-// =================================================================
-// 1️⃣ IMPORTS
-// =================================================================
-import { useEffect, useState, useCallback } from "react";
+// =============================================================================
+// 1. IMPORT (Libraries -> Internal -> Components)
+// =============================================================================
+
+import React, { useEffect, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import {
-  Search,
-  Loader2,
-  Plus,
-  ChevronsLeft,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsRight,
-  Grid,
-  List as ListIcon,
-  Filter,
-  Building2,
+  Search, Loader2, Plus, ChevronsLeft, ChevronLeft,
+  ChevronRight, ChevronsRight, Grid, List as ListIcon,
+  Filter, Building2, LayoutGrid
 } from "lucide-react";
 
-import { useRouter } from "next/navigation";
+// Context & Utils
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/components/ui/ToastProvider";
-import { Button } from "@/components/ui/Buttons";
+import { cn } from "@/lib/utils";
 
 // API Services
 import {
-  getCompanyWorkspaces,
-  searchCompanyWorkspaces,
-  PageResponse,
-  Workspace,
-  deleteWorkspace,
-  updateWorkspaceStatus,
+  getCompanyWorkspaces, searchCompanyWorkspaces, deleteWorkspace,
+  updateWorkspaceStatus, PageResponse, Workspace
 } from "@/services/apiWorkspace";
 
-// Components
+// UI Components
+import { Button } from "@/components/ui/Buttons";
 import CreateWorkspaceModal from "@/components/features/admin/CreateWorkspaceModal";
 import WorkspaceCard from "@/components/features/admin/WorkspaceCard";
 import ConfirmationModal from "@/components/ui/ConfirmationModal";
 
-// =================================================================
-// 2️⃣ CONSTANTS & TYPES
-// =================================================================
+// =============================================================================
+// 2. CONSTANTS & INTERFACES
+// =============================================================================
 
-// Các trường cho phép tìm kiếm trong dropdown
 const SEARCH_FIELDS = [
-  { value: "name", label: "Name" },
-  { value: "code", label: "Code" },
+  { value: "name", label: "Workspace Name" },
+  { value: "code", label: "Workspace Code" },
   { value: "description", label: "Description" },
 ];
 
-// Định nghĩa tham số tìm kiếm chuẩn để gọi API
-type WorkspaceSearchParams = {
+interface WorkspaceSearchParams {
   page: number;
   size: number;
   sortBy: string;
@@ -59,43 +48,49 @@ type WorkspaceSearchParams = {
   code?: string;
   description?: string;
   status?: "ACTIVE" | "ARCHIVED" | "DELETED";
-  [key: string]: any; // Cho phép dynamic key để map field search
-};
+  [key: string]: any; 
+}
 
-// =================================================================
-// 3️⃣ COMPONENT CHÍNH
-// =================================================================
+const DEFAULT_PAGE_SIZE = 12;
+
+// =============================================================================
+// 3. MAIN COMPONENT
+// =============================================================================
+
 export default function CompanyWorkspacesPage() {
+  
+  // ---------------------------------------------------------------------------
+  // 4. HOOKS & CONTEXT
+  // ---------------------------------------------------------------------------
+  
   const router = useRouter();
   const { showToast } = useToast();
-
-  // Lấy activeCompany từ AuthContext
   const { activeCompany, isLoading: isAuthLoading } = useAuth();
   const companyId = activeCompany?.companyId;
 
-  // --- STATE QUẢN LÝ DỮ LIỆU ---
-  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
-  const [loading, setLoading] = useState(true);
+  // ---------------------------------------------------------------------------
+  // 5. STATE MANAGEMENT
+  // ---------------------------------------------------------------------------
 
-  // --- STATE GIAO DIỆN (View & Search) ---
+  // Data States
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // View & Filter States
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [searchBy, setSearchBy] = useState("name");
   const [searchValue, setSearchValue] = useState("");
 
-  // --- STATE MODALS ---
+  // Modal States
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [workspaceToDelete, setWorkspaceToDelete] = useState<number | null>(
-    null
-  );
+  const [workspaceToDelete, setWorkspaceToDelete] = useState<number | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // --- STATE PHÂN TRANG & SEARCH PARAMS ---
-  const [pagination, setPagination] = useState<
-    Omit<PageResponse<Workspace>, "content">
-  >({
+  // Pagination & Search Params States
+  const [pagination, setPagination] = useState<Omit<PageResponse<Workspace>, "content">>({
     pageNumber: 0,
-    pageSize: 12,
+    pageSize: DEFAULT_PAGE_SIZE,
     totalElements: 0,
     totalPages: 0,
     first: true,
@@ -104,142 +99,118 @@ export default function CompanyWorkspacesPage() {
 
   const [searchParams, setSearchParams] = useState<WorkspaceSearchParams>({
     page: 0,
-    size: 10,
+    size: DEFAULT_PAGE_SIZE,
     sortBy: "createdAt",
     sortDir: "desc",
-    name: undefined,
-    code: undefined,
-    description: undefined,
-    status: undefined,
   });
 
-  // =================================================================
-  // 4️⃣ FETCH DATA LOGIC (Logic nghiệp vụ quan trọng)
-  // =================================================================
+  // ---------------------------------------------------------------------------
+  // 6. DATA FETCHING (Handlers)
+  // ---------------------------------------------------------------------------
 
-  // Hàm gọi API lấy danh sách (được bọc useCallback để dùng trong useEffect)
-  const fetchWorkspaces = useCallback(
-    async (params: WorkspaceSearchParams) => {
-      if (!companyId) return;
-      setLoading(true);
+  /**
+   * Ham goi API lay danh sach workspace ket hop tim kiem va phan trang
+   */
+  const fetchWorkspaces = useCallback(async (params: WorkspaceSearchParams) => {
+    if (!companyId) return;
+    setIsLoading(true);
 
-      try {
-        let data: PageResponse<Workspace>;
+    try {
+      let responseData: PageResponse<Workspace>;
+      const { name, code, description, status, ...apiParams } = params;
+      const isSearching = name || code || description || status;
 
-        // Tách các params search ra để kiểm tra xem có đang search không
-        const { name, code, description, status, ...apiParams } = params;
-        const isSearching = name || code || description || status;
-
-        if (isSearching) {
-          // Nếu có từ khóa -> Gọi API Search
-          data = await searchCompanyWorkspaces(companyId, params);
-        } else {
-          // Nếu không -> Gọi API Get All
-          data = await getCompanyWorkspaces(companyId, apiParams);
-        }
-
-        // Cập nhật State
-        setWorkspaces(data.content || []);
-        setPagination({
-          pageNumber: data.pageNumber,
-          pageSize: data.pageSize,
-          totalElements: data.totalElements,
-          totalPages: data.totalPages,
-          first: data.first,
-          last: data.last,
-        });
-      } catch (err: any) {
-        console.error("Fetch error:", err);
-        const message =
-          err.response?.data?.message ||
-          err.message ||
-          "Failed to load workspaces";
-        showToast(message, "error");
-        setWorkspaces([]);
-      } finally {
-        setLoading(false);
+      if (isSearching) {
+        responseData = await searchCompanyWorkspaces(companyId, params);
+      } else {
+        responseData = await getCompanyWorkspaces(companyId, apiParams);
       }
-    },
-    [companyId, showToast]
-  );
 
-  // 🟢 USE EFFECT: Tự động load khi searchParams hoặc companyId thay đổi (Có Debounce)
+      setWorkspaces(responseData.content || []);
+      setPagination({
+        pageNumber: responseData.pageNumber,
+        pageSize: responseData.pageSize,
+        totalElements: responseData.totalElements,
+        totalPages: responseData.totalPages,
+        first: responseData.first,
+        last: responseData.last,
+      });
+    } catch (err: any) {
+      const message = err.response?.data?.message || err.message || "Failed to retrieve workspaces";
+      showToast(message, "error");
+      setWorkspaces([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [companyId, showToast]);
+
+  // ---------------------------------------------------------------------------
+  // 7. SIDE EFFECTS
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Tu dong goi API khi cac tham so tim kiem hoac cong ty thay doi (co Debounce)
+   */
   useEffect(() => {
     if (!companyId || isAuthLoading) return;
-
-    const t = setTimeout(() => fetchWorkspaces(searchParams), 300);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => fetchWorkspaces(searchParams), 300);
+    return () => clearTimeout(timer);
   }, [searchParams, companyId, isAuthLoading, fetchWorkspaces]);
 
-  // =================================================================
-  // 5️⃣ HANDLERS (Logic nghiệp vụ quan trọng)
-  // =================================================================
+  // ---------------------------------------------------------------------------
+  // 8. EVENT HANDLERS (Business Logic)
+  // ---------------------------------------------------------------------------
 
-  // Chuyển trang
   const handlePageChange = (newPage: number) => {
     setSearchParams((prev) => ({ ...prev, page: newPage }));
   };
 
-  // Sắp xếp (Sort)
   const handleSort = (field: string) => {
     setSearchParams((prev) => ({
       ...prev,
       sortBy: field,
-      sortDir:
-        prev.sortBy === field && prev.sortDir === "desc" ? "asc" : "desc",
-      page: 0, // Reset về trang đầu khi sort
+      sortDir: prev.sortBy === field && prev.sortDir === "desc" ? "asc" : "desc",
+      page: 0, 
     }));
   };
 
-  // Xử lý khi gõ vào ô tìm kiếm
-  const handleSearchChange = (text: string) => {
+  const handleSearchUpdate = (text: string) => {
     setSearchValue(text);
     setSearchParams((prev) => ({
       ...prev,
       page: 0,
-      // Reset các field cũ
-      name: undefined,
-      code: undefined,
-      description: undefined,
-      // Gán giá trị vào field đang chọn (ví dụ: name: "abc")
+      name: undefined, code: undefined, description: undefined,
       [searchBy]: text,
     }));
   };
 
-  // Xử lý khi đổi tiêu chí tìm kiếm (Name -> Code)
-  const handleSearchByChange = (field: string) => {
+  const handleSearchCriteriaChange = (field: string) => {
     setSearchBy(field);
-    // Cập nhật lại params với giá trị hiện tại nhưng field mới
     setSearchParams((prev) => ({
       ...prev,
       page: 0,
-      name: undefined,
-      code: undefined,
-      description: undefined,
+      name: undefined, code: undefined, description: undefined,
       [field]: searchValue,
     }));
   };
 
-  // Xóa Workspace (Mở modal)
-  const handleDeleteClick = (workspaceId: number) => {
+  const initDeleteWorkspace = (workspaceId: number) => {
     setWorkspaceToDelete(workspaceId);
     setShowDeleteModal(true);
   };
 
-  // Xác nhận Xóa (Gọi API)
+  /**
+   * Xac nhan va goi API xoa workspace
+   */
   const handleConfirmDelete = async () => {
     if (!workspaceToDelete || !companyId) return;
     setIsDeleting(true);
     try {
       await deleteWorkspace(companyId, workspaceToDelete);
-      showToast("Workspace deleted successfully", "success");
-      // Load lại danh sách
+      showToast("Workspace successfully deleted", "success");
       fetchWorkspaces(searchParams);
     } catch (err: any) {
-      const message =
-        err.response?.data?.message ||
-        err.message ||
-        "Failed to delete workspace";
+      const message = err.response?.data?.message || err.message || "Failed to delete workspace";
       showToast(message, "error");
     } finally {
       setIsDeleting(false);
@@ -248,320 +219,261 @@ export default function CompanyWorkspacesPage() {
     }
   };
 
-  // Khôi phục Workspace (Restore)
-  const handleRestore = async (workspaceId: number) => {
+  /**
+   * Khoi phuc workspace da xoa hoac luu tru
+   */
+  const handleRestoreWorkspace = async (workspaceId: number) => {
     if (!companyId) return;
     try {
       await updateWorkspaceStatus(companyId, workspaceId, "ACTIVE");
-      showToast("Workspace restored successfully", "success");
+      showToast("Workspace successfully restored", "success");
       fetchWorkspaces(searchParams);
     } catch (err: any) {
-      const message =
-        err.response?.data?.message ||
-        err.message ||
-        "Failed to restore workspace";
+      const message = err.response?.data?.message || err.message || "Failed to restore workspace";
       showToast(message, "error");
     }
   };
 
-  // Điều hướng vào trang chi tiết Workspace (Module Core)
-  const goToWorkspace = (id: number) => {
+  const navigateToWorkspace = (id: number) => {
     router.push(`/core/workspace/${id}`);
   };
 
-  // =================================================================
-  // 6️⃣ RENDER UI
-  // =================================================================
+  // ---------------------------------------------------------------------------
+  // 9. RENDER LOGIC
+  // ---------------------------------------------------------------------------
 
-  // 🔴 Màn hình Loading Auth
-  if (isAuthLoading)
+  if (isAuthLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <Loader2 className="w-10 h-10 text-blue-600 animate-spin" />
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#F4F5F7] gap-3">
+        <Loader2 className="w-10 h-10 text-[#0052CC] animate-spin" />
+        <p className="text-[13px] font-bold text-[#42526E] uppercase tracking-widest">Loading Environments...</p>
       </div>
     );
+  }
 
-  // 🔴 Màn hình Empty (Chưa chọn công ty)
   if (!companyId) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="text-center p-10 bg-white rounded-xl border border-slate-200 shadow-sm">
-          <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4 mx-auto">
-            <Building2 className="w-8 h-8 text-slate-300" />
+      <div className="min-h-screen flex items-center justify-center bg-[#F4F5F7] p-6">
+        <div className="max-w-md w-full text-center p-12 bg-white rounded-2xl border border-[#DFE1E6] shadow-sm">
+          <div className="w-20 h-20 mx-auto mb-6 bg-[#F4F5F7] rounded-full flex items-center justify-center border border-[#DFE1E6]">
+            <Building2 className="w-10 h-10 text-[#6B778C]" />
           </div>
-          <h3 className="text-lg font-bold text-slate-900">
-            No Active Company
-          </h3>
-          <p className="text-slate-500 mt-1 mb-4">
-            Please select a company from the dashboard.
+          <h3 className="text-xl font-black text-[#172B4D] tracking-tight">No Active Organization</h3>
+          <p className="text-[#42526E] text-sm mt-2 mb-6 leading-relaxed">
+            Please select an organization from the dashboard to manage its workspaces.
           </p>
-          <Button variant="outline" onClick={() => router.push("/admin")}>
-            Go to Hub
+          <Button variant="outline" onClick={() => router.push("/admin")} className="font-bold uppercase tracking-widest text-[12px]">
+            Return to Hub
           </Button>
         </div>
       </div>
     );
   }
 
-  // 🔵 Màn hình chính
   return (
-    <div className="min-h-screen bg-slate-50 px-6 py-8">
-      <div className="max-w-[1600px] mx-auto space-y-6">
-        {/* --- HEADER --- */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="min-h-screen bg-[#F4F5F7] py-10 px-6">
+      <div className="max-w-[1600px] mx-auto space-y-8">
+        
+        {/* HEADER SECTION */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">
-              Workspaces{" "}
-              <span className="text-slate-400 font-normal text-lg ml-2">
-                ({pagination.totalElements})
+            <h1 className="text-2xl font-black text-[#172B4D] tracking-tight uppercase flex items-center gap-3">
+              Workspaces 
+              <span className="text-[#0052CC] bg-blue-50 px-2.5 py-0.5 rounded-lg text-[14px]">
+                {pagination.totalElements}
               </span>
             </h1>
-            <p className="text-sm text-slate-500 mt-1">
-              Manage working environments for{" "}
-              <span className="font-semibold text-blue-600">
-                {activeCompany?.companyName}
-              </span>
-              .
+            <p className="text-[14px] text-[#42526E] font-medium mt-1">
+              Manage operational environments for <span className="text-[#0052CC] font-bold">{activeCompany?.companyName}</span>.
             </p>
           </div>
-
           <Button
             onClick={() => setShowCreateModal(true)}
-            className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm font-bold h-10 px-5 rounded-[3px] flex items-center gap-2"
+            className="bg-[#0052CC] hover:bg-[#0747A6] text-white font-black text-[12px] uppercase tracking-widest h-11 px-6 rounded-lg shadow-md active:scale-95 transition-all flex items-center gap-2"
           >
-            <Plus className="w-4 h-4" /> Create Workspace
+            <Plus className="w-4 h-4 stroke-[3]" /> Create Workspace
           </Button>
         </div>
 
-        {/* --- FILTER & SEARCH BAR --- */}
-        <div className="bg-white p-4 border border-slate-200 rounded-xl shadow-sm flex flex-col md:flex-row gap-4 items-center justify-between">
-          {/* LEFT: Search Controls */}
-          <div className="flex items-center gap-3 w-full md:w-auto">
-            {/* Dropdown chọn trường tìm kiếm */}
-            <div className="relative w-36">
+        {/* TOOLBAR: SEARCH & FILTER */}
+        <div className="bg-white p-5 rounded-2xl border border-[#DFE1E6] shadow-sm flex flex-col xl:flex-row gap-5 items-center justify-between">
+          
+          <div className="flex flex-col sm:flex-row items-center gap-4 w-full xl:w-auto">
+            <div className="relative w-full sm:w-48">
               <select
                 value={searchBy}
-                onChange={(e) => handleSearchByChange(e.target.value)}
-                className="w-full h-10 pl-3 pr-7 border rounded-lg text-sm bg-slate-50 border-slate-300 focus:ring-2 focus:ring-blue-100 focus:border-blue-500 appearance-none cursor-pointer"
+                onChange={(e) => handleSearchCriteriaChange(e.target.value)}
+                className="w-full h-11 pl-4 pr-10 border border-[#DFE1E6] rounded-xl text-[12px] font-black uppercase tracking-widest bg-[#F4F5F7] cursor-pointer outline-none focus:ring-2 focus:ring-blue-100 appearance-none text-[#172B4D]"
               >
                 {SEARCH_FIELDS.map((f) => (
-                  <option key={f.value} value={f.value}>
-                    {f.label}
-                  </option>
+                  <option key={f.value} value={f.value}>{f.label}</option>
                 ))}
               </select>
-              <Filter className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <Filter className="absolute right-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
             </div>
 
-            {/* Input tìm kiếm */}
-            <div className="relative w-full md:w-80 group">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 group-focus-within:text-blue-500 transition-colors" />
+            <div className="relative w-full sm:w-80 group">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-400 group-focus-within:text-[#0052CC] transition-colors" />
               <input
                 value={searchValue}
-                onChange={(e) => handleSearchChange(e.target.value)}
+                onChange={(e) => handleSearchUpdate(e.target.value)}
                 placeholder={`Search by ${searchBy}...`}
-                className="w-full h-10 pl-9 pr-3 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all"
+                className="w-full h-11 pl-12 pr-4 bg-white border border-[#DFE1E6] rounded-xl text-[14px] font-medium focus:outline-none focus:ring-2 focus:ring-blue-50 focus:border-[#2684FF] transition-all placeholder:text-slate-400"
               />
             </div>
           </div>
 
-          {/* RIGHT: Sort & View Controls */}
-          <div className="flex items-center gap-3">
-            {/* Sort Dropdown */}
-            <div className="relative">
+          <div className="flex flex-wrap items-center gap-4 w-full xl:w-auto justify-end">
+            <div className="relative w-full sm:w-56">
               <select
                 value={searchParams.sortBy}
                 onChange={(e) => handleSort(e.target.value)}
-                className="h-10 pl-3 pr-8 border border-slate-300 rounded-lg text-sm bg-white cursor-pointer focus:ring-2 focus:ring-blue-100 focus:border-blue-500 appearance-none"
+                className="w-full h-11 pl-4 pr-10 border border-[#DFE1E6] rounded-xl text-[12px] font-bold uppercase tracking-wider bg-white cursor-pointer outline-none focus:ring-2 focus:ring-blue-100 appearance-none text-[#42526E]"
               >
-                <option value="createdAt">Sort by Created</option>
+                <option value="createdAt">Sort by Creation Date</option>
                 <option value="workspaceName">Sort by Name</option>
               </select>
-              <ChevronsRight className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <ChevronsRight className="absolute right-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
             </div>
 
-            {/* Sort Direction */}
             <select
               value={searchParams.sortDir}
-              onChange={(e) =>
-                setSearchParams((prev) => ({
-                  ...prev,
-                  sortDir: e.target.value as "asc" | "desc",
-                }))
-              }
-              className="h-10 px-3 border border-slate-300 rounded-lg text-sm bg-white cursor-pointer focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
+              onChange={(e) => setSearchParams((prev) => ({ ...prev, sortDir: e.target.value as "asc" | "desc" }))}
+              className="h-11 px-4 border border-[#DFE1E6] rounded-xl text-[12px] font-bold uppercase tracking-wider bg-white cursor-pointer outline-none focus:ring-2 focus:ring-blue-100 text-[#42526E]"
             >
               <option value="desc">Desc</option>
               <option value="asc">Asc</option>
             </select>
 
-            {/* View Mode Switch (Grid/List) */}
-            <div className="flex bg-slate-100 p-1 rounded-lg border border-slate-200">
+            <div className="flex bg-[#F4F5F7] p-1 rounded-xl border border-[#DFE1E6]">
               <button
                 onClick={() => setViewMode("grid")}
-                className={`p-1.5 rounded-md transition-all ${
-                  viewMode === "grid"
-                    ? "bg-white shadow-sm text-blue-600"
-                    : "text-slate-500 hover:text-slate-700"
-                }`}
-                title="Grid View"
+                className={cn(
+                  "p-2 rounded-lg transition-all active:scale-95",
+                  viewMode === "grid" ? "bg-white shadow-sm text-[#0052CC]" : "text-[#6B778C] hover:text-[#172B4D]"
+                )}
+                title="Grid Layout"
               >
-                <Grid className="w-4 h-4" />
+                <Grid className="w-4.5 h-4.5" />
               </button>
               <button
                 onClick={() => setViewMode("list")}
-                className={`p-1.5 rounded-md transition-all ${
-                  viewMode === "list"
-                    ? "bg-white shadow-sm text-blue-600"
-                    : "text-slate-500 hover:text-slate-700"
-                }`}
-                title="List View"
+                className={cn(
+                  "p-2 rounded-lg transition-all active:scale-95",
+                  viewMode === "list" ? "bg-white shadow-sm text-[#0052CC]" : "text-[#6B778C] hover:text-[#172B4D]"
+                )}
+                title="List Layout"
               >
-                <ListIcon className="w-4 h-4" />
+                <ListIcon className="w-4.5 h-4.5" />
               </button>
             </div>
           </div>
         </div>
 
-        {/* --- CONTENT LIST --- */}
-        {loading ? (
-          <div className="flex justify-center py-20">
-            <Loader2 className="w-10 h-10 text-blue-600 animate-spin" />
-          </div>
-        ) : workspaces.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 border-2 border-dashed border-slate-200 rounded-xl bg-white">
-            <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
-              <Building2 className="w-8 h-8 text-slate-300" />
+        {/* CONTENT AREA */}
+        <div className="relative min-h-[400px]">
+          {isLoading ? (
+            <div className="absolute inset-0 flex flex-col justify-center items-center bg-[#F4F5F7]/50 backdrop-blur-sm z-10 rounded-2xl border border-transparent">
+              <Loader2 className="w-10 h-10 text-[#0052CC] animate-spin opacity-80 mb-3" />
+              <span className="text-[11px] font-black uppercase tracking-widest text-slate-500">Syncing data...</span>
             </div>
-            <h3 className="text-lg font-bold text-slate-900">
-              No workspaces found
-            </h3>
-            <p className="text-sm text-slate-500 mt-1">
-              Create a new workspace to get started.
-            </p>
-          </div>
-        ) : (
-          <div
-            className={
-              viewMode === "grid"
-                ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
-                : "flex flex-col gap-3"
-            }
-          >
-            {workspaces.map((ws) => (
-              <WorkspaceCard
-                key={ws.workspaceId}
-                workspace={ws as any} // ÉP KIỂU ĐỂ TRÁNH LỖI TYPE STATUS
-                viewMode={viewMode}
-                onDelete={handleDeleteClick}
-                onNavigate={goToWorkspace}
-                onRestore={handleRestore}
-              />
-            ))}
-          </div>
-        )}
-
-        {/* --- PAGINATION --- */}
-        {workspaces.length > 0 && (
-          <div className="flex flex-col sm:flex-row items-center justify-between pt-4 gap-4">
-            <p className="text-sm text-slate-600">
-              Showing{" "}
-              <span className="font-semibold text-slate-900">
-                {pagination.pageNumber * pagination.pageSize + 1}
-              </span>{" "}
-              to{" "}
-              <span className="font-semibold text-slate-900">
-                {Math.min(
-                  (pagination.pageNumber + 1) * pagination.pageSize,
-                  pagination.totalElements
-                )}
-              </span>{" "}
-              of{" "}
-              <span className="font-semibold text-slate-900">
-                {pagination.totalElements}
-              </span>{" "}
-              results
-            </p>
-
-            <div className="flex items-center gap-2">
-              <Button
-                onClick={() => handlePageChange(0)}
-                disabled={pagination.first}
-                size="icon"
-                variant="outline"
-                className="w-9 h-9"
-                title="First Page"
-              >
-                <ChevronsLeft className="w-4 h-4" />
-              </Button>
-
-              <Button
-                onClick={() => handlePageChange(pagination.pageNumber - 1)}
-                disabled={pagination.first}
-                size="icon"
-                variant="outline"
-                className="w-9 h-9"
-                title="Previous Page"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </Button>
-
-              <span className="text-sm font-medium px-2">
-                Page {pagination.pageNumber + 1} / {pagination.totalPages || 1}
-              </span>
-
-              <Button
-                onClick={() => handlePageChange(pagination.pageNumber + 1)}
-                disabled={pagination.last}
-                size="icon"
-                variant="outline"
-                className="w-9 h-9"
-                title="Next Page"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </Button>
-
-              <Button
-                onClick={() => handlePageChange(pagination.totalPages - 1)}
-                disabled={pagination.last}
-                size="icon"
-                variant="outline"
-                className="w-9 h-9"
-                title="Last Page"
-              >
-                <ChevronsRight className="w-4 h-4" />
-              </Button>
+          ) : workspaces.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-28 border-2 border-dashed border-[#DFE1E6] rounded-2xl bg-white">
+              <div className="w-16 h-16 bg-[#F4F5F7] rounded-full flex items-center justify-center mb-4">
+                <LayoutGrid className="w-8 h-8 text-slate-300" />
+              </div>
+              <h3 className="text-[16px] font-black uppercase tracking-widest text-[#172B4D]">No workspaces found</h3>
+              <p className="text-[14px] text-[#6B778C] font-medium mt-1">Adjust filters or create a new workspace to get started.</p>
             </div>
-          </div>
+          ) : (
+            <div className={cn(
+              "animate-in fade-in duration-500",
+              viewMode === "grid" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6" : "flex flex-col gap-4"
+            )}>
+              {workspaces.map((ws) => (
+                <WorkspaceCard
+                  key={ws.workspaceId}
+                  workspace={ws as any}
+                  viewMode={viewMode}
+                  onDelete={initDeleteWorkspace}
+                  onNavigate={navigateToWorkspace}
+                  onRestore={handleRestoreWorkspace}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* PAGINATION FOOTER */}
+        {!isLoading && workspaces.length > 0 && (
+          <PaginationFooter pagination={pagination} onPageChange={handlePageChange} />
         )}
 
-        {/* --- MODALS --- */}
-        {/* Chỉ render modal tạo khi đã có companyId */}
-        {companyId && (
-          <CreateWorkspaceModal
-            isOpen={showCreateModal}
-            onClose={() => setShowCreateModal(false)}
-            companyId={companyId}
-            onSuccess={() => {
-              setShowCreateModal(false);
-              // Refresh lại danh sách sau khi tạo
-              fetchWorkspaces(searchParams);
-            }}
-          />
-        )}
-
-        <ConfirmationModal
-          isOpen={showDeleteModal}
-          onClose={() => setShowDeleteModal(false)}
-          onConfirm={handleConfirmDelete}
-          isLoading={isDeleting}
-          title="Delete Workspace"
-          description="Are you sure you want to delete this workspace? This action cannot be undone."
-          confirmText="Delete"
-          cancelText="Cancel"
-          modalVariant="danger"
-        />
       </div>
+
+      {/* MODALS */}
+      {companyId && (
+        <CreateWorkspaceModal
+          isOpen={showCreateModal}
+          onClose={() => setShowCreateModal(false)}
+          companyId={companyId}
+          onSuccess={() => {
+            setShowCreateModal(false);
+            fetchWorkspaces(searchParams);
+          }}
+        />
+      )}
+
+      <ConfirmationModal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={handleConfirmDelete}
+        isLoading={isDeleting}
+        title="Decommission Workspace"
+        description="Are you sure you want to delete this operational environment? This action will archive all associated projects and tasks."
+        confirmText="Confirm Deletion"
+        cancelText="Cancel"
+        modalVariant="danger"
+      />
     </div>
   );
 }
+
+// =============================================================================
+// SUB-COMPONENTS (Refactored for Cleanliness)
+// =============================================================================
+
+const PaginationFooter = ({ pagination, onPageChange }: any) => {
+  if (pagination.totalElements === 0) return null;
+  return (
+    <div className="flex flex-col sm:flex-row items-center justify-between gap-6 pt-6 border-t border-[#DFE1E6]">
+      <p className="text-[12px] font-bold text-[#6B778C] uppercase tracking-widest">
+        Displaying <span className="text-[#172B4D]">{pagination.pageNumber * pagination.pageSize + 1}</span> 
+        {" "}to <span className="text-[#172B4D]">{Math.min((pagination.pageNumber + 1) * pagination.pageSize, pagination.totalElements)}</span> 
+        {" "}of <span className="text-[#172B4D]">{pagination.totalElements}</span> entries
+      </p>
+
+      <div className="flex items-center gap-1.5 bg-white p-1.5 rounded-xl border border-[#DFE1E6] shadow-sm">
+        <PaginationBtn onClick={() => onPageChange(0)} disabled={pagination.first} icon={ChevronsLeft} />
+        <PaginationBtn onClick={() => onPageChange(pagination.pageNumber - 1)} disabled={pagination.first} icon={ChevronLeft} />
+        <div className="px-4 text-[11px] font-black uppercase tracking-[0.15em] text-[#0052CC]">
+          Page {pagination.pageNumber + 1} / {pagination.totalPages}
+        </div>
+        <PaginationBtn onClick={() => onPageChange(pagination.pageNumber + 1)} disabled={pagination.last} icon={ChevronRight} />
+        <PaginationBtn onClick={() => onPageChange(pagination.totalPages - 1)} disabled={pagination.last} icon={ChevronsRight} />
+      </div>
+    </div>
+  );
+};
+
+const PaginationBtn = ({ onClick, disabled, icon: Icon }: any) => (
+  <Button 
+    onClick={onClick} 
+    disabled={disabled} 
+    variant="outline" 
+    size="icon" 
+    className="h-9 w-9 rounded-lg border-transparent text-[#42526E] hover:bg-[#F4F5F7] hover:text-[#172B4D] disabled:opacity-30 active:scale-90 transition-all"
+  >
+    <Icon className="w-4.5 h-4.5" />
+  </Button>
+);

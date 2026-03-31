@@ -1,5 +1,12 @@
 import apiClient from "@/lib/apiClient";
 
+// =============================================================================
+// INTERFACES & TYPES
+// =============================================================================
+
+/**
+ * Thông tin công ty trong hệ thống quản trị
+ */
 export interface SystemCompany {
   id: number;
   name: string;
@@ -8,7 +15,7 @@ export interface SystemCompany {
   phoneNumber: string | null;
   currentStorageBytes: number;
   isVerifiedTenant: boolean;
-  status: string; // ACTIVE, LOCKED
+  status: "ACTIVE" | "SUSPENDED" | string;
   createdAt: string;
   subscriptionStatus: string;
   currentPeriodEnd: string;
@@ -16,6 +23,9 @@ export interface SystemCompany {
   planName: string;
 }
 
+/**
+ * Tham số tìm kiếm và lọc danh sách công ty
+ */
 export interface SystemCompanySearchParams {
   page?: number;
   size?: number;
@@ -28,6 +38,9 @@ export interface SystemCompanySearchParams {
   searchPlanCode?: string;
 }
 
+/**
+ * Cấu trúc phản hồi phân trang dành riêng cho hệ thống quản trị
+ */
 export interface SystemPageResponse<T> {
   content: T[];
   pageNo: number; 
@@ -37,6 +50,9 @@ export interface SystemPageResponse<T> {
   last: boolean;
 }
 
+/**
+ * Dữ liệu chi tiết toàn cảnh (360 View) của một công ty/tenant
+ */
 export interface Tenant360View {
   companyId: number;
   companyName: string;
@@ -44,7 +60,7 @@ export interface Tenant360View {
   status: string;
   createdAt: string;
   
-  // Billing
+  // Thông tin thanh toán (Billing)
   planCode: string;
   planName: string;
   monthlyPrice: number;
@@ -52,7 +68,7 @@ export interface Tenant360View {
   currentPeriodStart: string;
   currentPeriodEnd: string;
   
-  // Quotas
+  // Thông tin hạn mức (Quotas)
   totalMembers: number;
   maxUsers: number;
   totalProjects: number;
@@ -60,16 +76,19 @@ export interface Tenant360View {
   currentStorageBytes: number;
   maxStorageBytes: number;
   
-  // Flags
+  // Các cờ cảnh báo giới hạn (Flags)
   isGracePeriod: boolean;
   isUserLimitExceeded: boolean;
   isProjectLimitExceeded: boolean;
   isStorageLimitExceeded: boolean;
 }
 
+// =============================================================================
+// SYSTEM ADMINISTRATION APIs
+// =============================================================================
 
 /**
- * Tìm kiếm & Lọc nâng cao danh sách Công ty (Dành riêng cho SYSTEM_ADMIN)
+ * Tìm kiếm và lọc nâng cao danh sách công ty (Dành cho System Admin)
  */
 export const searchSystemCompanies = async (
   params: SystemCompanySearchParams
@@ -78,56 +97,68 @@ export const searchSystemCompanies = async (
     const res = await apiClient.get(`/admin/companies/search`, { params });
     const { success, message, data } = res.data;
 
-    if (!success) throw new Error(message || "Failed to fetch companies.");
+    if (!success) {
+      throw new Error(message || "Failed to load company list");
+    }
     return data;
   } catch (err: any) {
-    throw new Error(err.response?.data?.message || "Unable to load companies.");
+    // Ưu tiên thông báo lỗi từ phía backend
+    const errorMsg = err.response?.data?.message || "An error occurred while fetching companies";
+    throw new Error(errorMsg);
   }
 };
 
 /**
- * Lấy toàn cảnh 360 độ của một Công ty (Tenant 360 View)
+ * Truy vấn thông tin chi tiết toàn diện (360 View) của một công ty
  */
 export const getCompany360View = async (companyId: number): Promise<Tenant360View> => {
   try {
-    // Đảm bảo URL khớp với cấu hình backend của bạn (có thể thêm /v1 nếu backend yêu cầu)
-    const res = await apiClient.get(`/admin/companies/${companyId}/detail`);
+    const url = `/admin/companies/${companyId}/detail`;
+    const res = await apiClient.get(url);
     const { success, message, data } = res.data;
 
-    if (!success) throw new Error(message || "Failed to fetch tenant details.");
+    if (!success) {
+      throw new Error(message || "Failed to fetch tenant details");
+    }
     return data;
   } catch (err: any) {
-    throw new Error(err.response?.data?.message || "Unable to load tenant details.");
+    const errorMsg = err.response?.data?.message || "Unable to load tenant information";
+    throw new Error(errorMsg);
   }
 };
 
-// Thêm 2 hàm này vào cuối file services/apiCompanySystem.ts (Giữ nguyên các code cũ)
-
 /**
- * Khóa (Đình chỉ) hoạt động của Công ty
+ * Thực hiện khóa hoặc đình chỉ hoạt động của một công ty
  */
 export const suspendCompany = async (companyId: number): Promise<void> => {
   try {
-    const res = await apiClient.put(`/admin/companies/${companyId}/suspend`);
+    const url = `/admin/companies/${companyId}/suspend`;
+    const res = await apiClient.put(url);
     const { success, message } = res.data;
-    if (!success) throw new Error(message || "Failed to suspend company.");
+
+    if (!success) {
+      throw new Error(message || "Failed to suspend company");
+    }
   } catch (err: any) {
-    throw new Error(err.response?.data?.message || "Unable to suspend company.");
+    const errorMsg = err.response?.data?.message || "Unable to suspend company";
+    throw new Error(errorMsg);
   }
 };
 
 /**
- * Mở khóa (Kích hoạt lại) Công ty
+ * Mở khóa hoặc kích hoạt lại hoạt động cho một công ty
  */
 export const activateCompany = async (companyId: number): Promise<void> => {
   try {
-    const res = await apiClient.put(`/admin/companies/${companyId}/activate`);
+    const url = `/admin/companies/${companyId}/activate`;
+    const res = await apiClient.put(url);
     const { success, message } = res.data;
-    if (!success) throw new Error(message || "Failed to activate company.");
+
+    if (!success) {
+      throw new Error(message || "Failed to activate company");
+    }
   } catch (err: any) {
-    throw new Error(err.response?.data?.message || "Unable to activate company.");
+    const errorMsg = err.response?.data?.message || "Unable to activate company";
+    throw new Error(errorMsg);
   }
 };
-
-// LƯU Ý: Trong Interface SystemCompany và Tenant360View ở file này, 
-// hãy nhẩm hiểu status bây giờ là "ACTIVE" | "SUSPENDED" nhé!

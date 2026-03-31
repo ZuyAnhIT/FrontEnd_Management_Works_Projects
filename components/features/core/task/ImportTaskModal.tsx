@@ -1,5 +1,9 @@
 "use client";
 
+// =============================================================================
+// 1. IMPORT (Libraries -> Internal -> Styles)
+// =============================================================================
+
 import React, { useState, useRef, useEffect } from "react";
 import {
   X,
@@ -12,8 +16,13 @@ import {
   AlertTriangle,
   Save,
 } from "lucide-react";
+
+// Internal Components & Hooks
 import { Button } from "@/components/ui/Buttons";
 import { useToast } from "@/components/ui/ToastProvider";
+import { cn } from "@/lib/utils";
+
+// Internal Services & Interfaces
 import {
   downloadTemplate,
   previewImportTasks,
@@ -23,10 +32,9 @@ import { RawStatusColumn } from "@/services/apiBoard";
 import { ProjectMember } from "@/services/apiProject";
 
 // =============================================================================
-// 1. INTERFACES & CONSTANTS
+// 2. INTERFACES & CONSTANTS
 // =============================================================================
 
-// Interface for Preview Row
 interface PreviewRow {
   rowIndex: number;
   title: string;
@@ -42,7 +50,6 @@ interface PreviewRow {
   errors: string[];
 }
 
-// Interface for Props
 export interface ImportTaskModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -55,85 +62,102 @@ export interface ImportTaskModalProps {
 const PRIORITIES = ["LOW", "MEDIUM", "HIGH", "URGENT"];
 
 // =============================================================================
-// 2. MAIN COMPONENT
+// 3. MAIN COMPONENT
 // =============================================================================
 
-export default function ImportTaskModal(props: ImportTaskModalProps) {
+export default function ImportTaskModal({
+  isOpen,
+  onClose,
+  onSuccess,
+  projectId,
+  statuses,
+  members,
+}: ImportTaskModalProps) {
+  
+  // ---------------------------------------------------------------------------
+  // 4. HOOKS, REFS & STATE
+  // ---------------------------------------------------------------------------
+  
   const { showToast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // --- STATE ---
+  // Trạng thái luồng xử lý (Step 1: Upload, Step 2: Review)
   const [step, setStep] = useState<1 | 2>(1);
   const [file, setFile] = useState<File | null>(null);
   const [previewData, setPreviewData] = useState<PreviewRow[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  // State for Confirmation Modal & Success Alert
+  // Trạng thái hiển thị Modal phụ & Thông báo
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showSuccessAlert, setShowSuccessAlert] = useState(false);
 
-  // Tính toán số lượng lỗi
+  // Tính toán tổng số dòng đang có lỗi
   const errorCount = previewData.filter(
     (r) => !r.isValid || r.errors.length > 0
   ).length;
 
-  // --- EFFECT: Xử lý hiển thị Alert thành công ---
-  useEffect(() => {
-    // Chỉ chạy khi modal mở ở bước 2
-    if (props.isOpen && step === 2) {
-      if (errorCount === 0) {
-        // Nếu không có lỗi: Hiện thông báo thành công
-        setShowSuccessAlert(true);
+  // ---------------------------------------------------------------------------
+  // 5. EFFECTS
+  // ---------------------------------------------------------------------------
 
-        // Hẹn giờ 2s sau thì tắt
+  /**
+   * Quản lý hiển thị thanh thông báo xanh (Success Alert) ở Bước 2.
+   * Tự động ẩn sau 2 giây nếu không còn lỗi nào.
+   */
+  useEffect(() => {
+    if (isOpen && step === 2) {
+      if (errorCount === 0) {
+        setShowSuccessAlert(true);
         const timer = setTimeout(() => {
           setShowSuccessAlert(false);
         }, 2000);
-
         return () => clearTimeout(timer);
       } else {
-        // Nếu có lỗi: Tắt thông báo thành công ngay lập tức
         setShowSuccessAlert(false);
       }
     }
-  }, [props.isOpen, step, errorCount]);
+  }, [isOpen, step, errorCount]);
 
-  // --- HANDLERS ---
+  // ---------------------------------------------------------------------------
+  // 6. HANDLERS
+  // ---------------------------------------------------------------------------
 
+  /**
+   * Xử lý tải file mẫu (Template) từ Backend
+   */
   const handleDownloadTemplate = async () => {
     try {
       await downloadTemplate();
-      showToast("Sample file downloaded!", "success");
+      showToast("Template downloaded successfully.", "success");
     } catch (error: any) {
-      const message =
-        error.message ||
-        error.response?.data?.message ||
-        "Error loading template file.";
+      const message = error.response?.data?.message || error.message || "Failed to download template.";
       showToast(message, "error");
     }
   };
 
+  /**
+   * Xử lý gửi file lên Backend để phân tích và trả về dữ liệu xem trước (Preview)
+   */
   const handleFileUpload = async () => {
     if (!file) return;
+    
     setIsLoading(true);
     try {
-      // Gọi API Preview
-      const data = await previewImportTasks(props.projectId, file);
+      const data = await previewImportTasks(projectId, file);
       setPreviewData(data);
       setStep(2);
     } catch (error: any) {
-      // Lấy message lỗi từ API trả về
-      const message =
-        error.message ||
-        error.response?.data?.message ||
-        "Error with the file.";
+      const message = error.response?.data?.message || error.message || "Failed to process the uploaded file.";
       showToast(message, "error");
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Logic nghiệp vụ quan trọng: Chỉnh sửa ô và xóa lỗi liên quan
+  /**
+   * Xử lý thay đổi dữ liệu trực tiếp trên bảng Preview.
+   * Chứa logic đánh giá lại lỗi (Clear error) nếu người dùng sửa đúng trường tương ứng.
+   */
   const handleCellChange = (
     index: number,
     field: keyof PreviewRow,
@@ -142,10 +166,10 @@ export default function ImportTaskModal(props: ImportTaskModalProps) {
     const newData = [...previewData];
     const row = { ...newData[index] };
 
-    // 1. Update value
+    // 1. Cập nhật giá trị
     row[field] = value as never;
 
-    // 2. Remove error related to this field
+    // 2. Xóa lỗi liên quan đến trường đang được sửa
     if (row.errors.length > 0) {
       let keyword = "";
 
@@ -157,100 +181,106 @@ export default function ImportTaskModal(props: ImportTaskModalProps) {
       if (field === "storyPoints") keyword = "Points";
       if (field === "estimatedHours") keyword = "Hours";
 
-      // Xử lý logic lỗi ngày tháng phức tạp hơn
+      // Xử lý loại trừ lỗi cho trường Ngày tháng (Logic nghiệp vụ gốc)
       if (field === "startDate" || field === "dueDate") {
         row.errors = row.errors.filter(
           (err) =>
-            // Giữ lại lỗi logic ngày (start > due)
             !err.toLowerCase().includes("date") &&
             !err.toLowerCase().includes("before")
         );
       } else if (keyword) {
-        // Xóa các lỗi đơn giản liên quan đến từ khóa
+        // Xóa các lỗi đơn giản chứa từ khóa tương ứng
         row.errors = row.errors.filter(
           (err) => !err.toLowerCase().includes(keyword.toLowerCase())
         );
       }
 
-      // Nếu không còn lỗi, đánh dấu là hợp lệ
+      // Xác nhận dòng hợp lệ nếu mảng lỗi đã trống
       if (row.errors.length === 0) {
         row.isValid = true;
       }
     }
+    
     newData[index] = row;
     setPreviewData(newData);
   };
 
-  // Triggered when clicking "Save" -> Kiểm tra lỗi trước
+  /**
+   * Xử lý khi nhấn nút "Save". 
+   * Kiểm tra nếu còn lỗi thì hiển thị Modal cảnh báo.
+   */
   const onSaveClick = () => {
     const hasErrors = previewData.some((row) => row.errors.length > 0);
     if (hasErrors) {
-      // Show custom confirmation modal
       setShowConfirmModal(true);
     } else {
-      // If no errors, proceed directly
       handleConfirmImport();
     }
   };
 
-  // Actual Save Logic (Xác nhận Import)
+  /**
+   * Thực thi gọi API Import dữ liệu chính thức vào hệ thống.
+   */
   const handleConfirmImport = async () => {
-    setShowConfirmModal(false); // Close confirm modal if open
+    setShowConfirmModal(false);
     setIsLoading(true);
 
     try {
-      // Gọi API Save (Logic nghiệp vụ quan trọng)
-      await saveImportedTasks(props.projectId, previewData);
+      await saveImportedTasks(projectId, previewData);
+      
+      showToast("Data imported successfully. Tasks are now available.", "success");
+      
+      onSuccess();
+      onClose();
 
-      showToast("Imported successfully! Tasks will appear shortly.", "success");
-
-      props.onSuccess();
-      props.onClose();
-
-      // Reset
+      // Reset toàn bộ State
       setStep(1);
       setFile(null);
       setPreviewData([]);
     } catch (error: any) {
-      // Lấy message lỗi từ API trả về
-      const message =
-        error.message ||
-        error.response?.data?.message ||
-        "Failed to save data.";
+      const message = error.response?.data?.message || error.message || "Failed to import tasks.";
       showToast(message, "error");
     } finally {
       setIsLoading(false);
     }
   };
 
-  // --- RENDER GUARD ---
-  if (!props.isOpen) return null;
+  // ---------------------------------------------------------------------------
+  // 7. RENDER GUARD
+  // ---------------------------------------------------------------------------
+  
+  if (!isOpen) return null;
 
-  // --- RENDER UI ---
+  // ---------------------------------------------------------------------------
+  // 8. RENDER LOGIC
+  // ---------------------------------------------------------------------------
+
   return (
     <>
-      {/* MAIN MODAL */}
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+      {/* ==================== MAIN MODAL ==================== */}
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
         <div
-          className={`bg-white rounded-xl shadow-2xl w-full flex flex-col transition-all duration-300 ${
-            step === 2 ? "max-w-6xl h-[90vh]" : "max-w-lg max-h-[90vh]"
-          }`}
+          className={cn(
+            "bg-white rounded-2xl shadow-2xl w-full flex flex-col transition-all duration-300 border border-slate-200",
+            step === 2 ? "max-w-[90vw] lg:max-w-6xl h-[90vh]" : "max-w-lg max-h-[90vh]"
+          )}
+          onClick={(e) => e.stopPropagation()}
         >
           {/* HEADER */}
-          <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/80 shrink-0">
+          <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white shrink-0 rounded-t-2xl">
             <div>
-              <h2 className="text-lg font-bold text-slate-800">
-                {step === 1 ? "Import Tasks" : "Review & Edit Data"}
+              <h2 className="text-lg font-bold text-[#172B4D] tracking-tight">
+                {step === 1 ? "Import Issues" : "Review & Edit Data"}
               </h2>
-              <p className="text-xs text-slate-500 mt-0.5">
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-1">
                 {step === 1
-                  ? "Upload CSV/Excel to start"
-                  : `Found ${previewData.length} rows. Please review errors before importing.`}
+                  ? "Upload CSV or Excel file to start"
+                  : `Found ${previewData.length} records. Please review errors before saving.`}
               </p>
             </div>
             <button
-              onClick={props.onClose}
-              className="text-slate-400 hover:text-slate-600 p-1 hover:bg-slate-100 rounded-full"
+              onClick={onClose}
+              className="text-slate-400 hover:text-slate-600 p-1.5 hover:bg-slate-100 rounded-md transition-colors active:scale-95"
               disabled={isLoading}
             >
               <X className="w-5 h-5" />
@@ -259,29 +289,31 @@ export default function ImportTaskModal(props: ImportTaskModalProps) {
 
           {/* BODY */}
           <div className="flex-1 overflow-hidden p-0 relative">
+            
             {/* === STEP 1: UPLOAD === */}
             {step === 1 && (
               <div className="p-6 space-y-6">
+                
                 {/* Template Download Block */}
-                <div className="bg-blue-50 border border-blue-100 rounded-lg p-4 flex gap-3">
-                  <div className="bg-blue-100 p-2 rounded-full text-blue-600 h-fit shrink-0">
+                <div className="bg-[#E3F2FD] border border-[#2684FF]/20 rounded-xl p-4 flex gap-4">
+                  <div className="bg-white p-2.5 rounded-lg text-[#0052CC] h-fit shrink-0 shadow-sm">
                     <FileSpreadsheet className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="text-sm font-bold text-slate-700">
-                      Download sample file
+                    <h3 className="text-[13px] font-bold text-[#172B4D]">
+                      Download Template File
                     </h3>
-                    <p className="text-xs text-slate-500 mb-2">
-                      Use a template file to avoid formatting errors.
+                    <p className="text-xs text-slate-600 mb-3 mt-1">
+                      Ensure your data matches our system format to avoid validation errors.
                     </p>
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={handleDownloadTemplate}
-                      className="h-7 text-xs bg-white text-blue-700 border-blue-200 hover:bg-blue-100"
+                      className="h-8 text-[11px] font-bold uppercase tracking-widest bg-white text-[#0052CC] border-[#2684FF]/30 hover:bg-blue-50 transition-colors"
                       disabled={isLoading}
                     >
-                      <Download className="w-3 h-3 mr-2" /> Download .CSV
+                      <Download className="w-3.5 h-3.5 mr-2" /> Download Template
                     </Button>
                   </div>
                 </div>
@@ -289,13 +321,15 @@ export default function ImportTaskModal(props: ImportTaskModalProps) {
                 {/* Upload Box */}
                 <div
                   onClick={() => fileInputRef.current?.click()}
-                  className="border-2 border-dashed border-slate-300 hover:border-blue-500 hover:bg-blue-50 rounded-xl p-10 flex flex-col items-center justify-center cursor-pointer transition-all"
+                  className="border-2 border-dashed border-slate-300 hover:border-[#2684FF] hover:bg-blue-50/50 rounded-xl p-10 flex flex-col items-center justify-center cursor-pointer transition-all group"
                 >
-                  <UploadCloud className="w-12 h-12 text-slate-400 mb-3" />
-                  <p className="font-medium text-slate-700">
-                    Click to upload Excel/CSV
+                  <UploadCloud className="w-12 h-12 text-slate-300 group-hover:text-[#0052CC] mb-3 transition-colors" />
+                  <p className="font-bold text-[13px] text-[#172B4D]">
+                    Click to browse files
                   </p>
-                  <p className="text-xs text-slate-400 mt-1">Max size 5MB</p>
+                  <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-1.5">
+                    Supported: .CSV, .XLSX (Max 5MB)
+                  </p>
                   <input
                     type="file"
                     ref={fileInputRef}
@@ -308,8 +342,8 @@ export default function ImportTaskModal(props: ImportTaskModalProps) {
 
                 {/* Selected File */}
                 {file && (
-                  <div className="flex items-center justify-between bg-slate-50 p-3 rounded-lg border border-slate-200">
-                    <span className="text-sm font-medium text-slate-700 truncate">
+                  <div className="flex items-center justify-between bg-slate-50 p-3 rounded-lg border border-slate-200 animate-in fade-in slide-in-from-bottom-2">
+                    <span className="text-[13px] font-bold text-slate-700 truncate px-2">
                       {file.name}
                     </span>
                     <Button
@@ -320,8 +354,9 @@ export default function ImportTaskModal(props: ImportTaskModalProps) {
                         setFile(null);
                       }}
                       disabled={isLoading}
+                      className="text-slate-400 hover:text-red-600 hover:bg-red-50 px-2"
                     >
-                      <X className="w-4 h-4 text-red-500" />
+                      <X className="w-4 h-4" />
                     </Button>
                   </div>
                 )}
@@ -330,149 +365,114 @@ export default function ImportTaskModal(props: ImportTaskModalProps) {
 
             {/* === STEP 2: REVIEW TABLE (EDITABLE) === */}
             {step === 2 && (
-              <div className="h-full flex flex-col">
+              <div className="h-full flex flex-col bg-slate-50">
+                
                 {/* Alert Bar */}
                 {errorCount > 0 ? (
-                  // Error message bar
-                  <div className="bg-red-50 px-6 py-2 border-b border-red-100 flex items-center gap-2 text-red-700 text-xs font-medium transition-all duration-300 shrink-0">
+                  <div className="bg-red-50 px-6 py-2.5 border-b border-red-100 flex items-center gap-2 text-red-700 text-[12px] font-bold transition-all duration-300 shrink-0 shadow-sm">
                     <AlertTriangle className="w-4 h-4" />
-                    {errorCount} rows contain errors. Correct them or invalid
-                    fields will be skipped/nulled during import.
+                    {errorCount} rows contain errors. Invalid fields will be skipped or saved as empty if imported now.
                   </div>
                 ) : (
-                  // Success message bar (Transition effect)
                   <div
-                    className={`
-                                            px-6 py-2 border-b flex items-center gap-2 text-xs font-medium transition-all duration-500 ease-in-out shrink-0
-                                            ${
-                                              showSuccessAlert
-                                                ? "bg-green-50 border-green-100 text-green-700 opacity-100 max-h-12"
-                                                : "bg-transparent border-transparent text-transparent opacity-0 max-h-0 py-0 border-0"
-                                            }
-                                        `}
+                    className={cn(
+                      "px-6 border-b flex items-center gap-2 text-[12px] font-bold transition-all duration-500 ease-in-out shrink-0 overflow-hidden",
+                      showSuccessAlert 
+                        ? "bg-emerald-50 border-emerald-100 text-emerald-700 opacity-100 py-2.5 shadow-sm" 
+                        : "bg-transparent border-transparent text-transparent opacity-0 py-0 h-0"
+                    )}
                   >
                     <CheckCircle2 className="w-4 h-4" />
-                    Valid data. Ready to import.
+                    All data is valid and ready to be imported.
                   </div>
                 )}
 
                 {/* TABLE CONTAINER */}
-                <div className="flex-1 overflow-auto custom-scrollbar bg-slate-50">
-                  <table className="w-full text-left border-collapse text-xs">
-                    <thead className="bg-slate-100 sticky top-0 z-10 shadow-sm font-semibold text-slate-600 uppercase">
+                <div className="flex-1 overflow-auto custom-scrollbar">
+                  <table className="w-full text-left border-collapse text-[12px]">
+                    <thead className="bg-slate-100 sticky top-0 z-10 shadow-sm font-black text-slate-500 uppercase tracking-widest text-[10px]">
                       <tr>
-                        <th className="p-2 border-b w-10 text-center">#</th>
-                        <th className="p-2 border-b min-w-[200px]">Title</th>
-                        <th className="p-2 border-b min-w-[180px]">
-                          Assignee Email
-                        </th>
-                        <th className="p-2 border-b w-32">Status</th>
-                        <th className="p-2 border-b w-32">Priority</th>
-                        <th className="p-2 border-b w-32">Start Date</th>
-                        <th className="p-2 border-b w-32">Due Date</th>
-                        <th className="p-2 border-b w-20 text-center">Pts</th>
-                        <th className="p-2 border-b w-20 text-center">Hours</th>
+                        <th className="p-3 border-b border-slate-200 w-12 text-center bg-slate-100">#</th>
+                        <th className="p-3 border-b border-slate-200 min-w-[250px] bg-slate-100">Summary</th>
+                        <th className="p-3 border-b border-slate-200 min-w-[200px] bg-slate-100">Assignee Email</th>
+                        <th className="p-3 border-b border-slate-200 w-36 bg-slate-100">Status</th>
+                        <th className="p-3 border-b border-slate-200 w-32 bg-slate-100">Priority</th>
+                        <th className="p-3 border-b border-slate-200 w-36 bg-slate-100">Start Date</th>
+                        <th className="p-3 border-b border-slate-200 w-36 bg-slate-100">Due Date</th>
+                        <th className="p-3 border-b border-slate-200 w-20 text-center bg-slate-100">Points</th>
+                        <th className="p-3 border-b border-slate-200 w-20 text-center bg-slate-100">Hours</th>
                       </tr>
                     </thead>
+                    
                     <tbody className="bg-white divide-y divide-slate-100">
                       {previewData.map((row, idx) => {
                         const hasError = row.errors.length > 0;
                         return (
                           <React.Fragment key={idx}>
-                            <tr
-                              className={`group hover:bg-slate-50 transition-colors ${
-                                hasError ? "bg-red-50/50" : ""
-                              }`}
-                            >
-                              <td className="p-2 text-center text-slate-400">
+                            <tr className={cn(
+                              "group transition-colors",
+                              hasError ? "bg-red-50/30 hover:bg-red-50/50" : "hover:bg-slate-50"
+                            )}>
+                              {/* INDEX */}
+                              <td className={cn(
+                                "p-2 text-center font-medium",
+                                hasError ? "text-red-400" : "text-slate-400"
+                              )}>
                                 {idx + 1}
                               </td>
 
                               {/* TITLE */}
                               <td className="p-2">
                                 <input
-                                  className={`w-full bg-transparent border rounded px-2 py-1 outline-none transition-all ${
+                                  className={cn(
+                                    "w-full bg-transparent border rounded px-2 py-1.5 outline-none transition-all font-medium text-[13px]",
                                     row.errors.some((e) => e.includes("Title"))
-                                      ? "border-red-300 bg-red-50 text-red-700"
-                                      : "border-transparent hover:border-slate-300 focus:border-blue-500"
-                                  }`}
+                                      ? "border-red-300 bg-red-50 text-red-900 focus:border-red-500 focus:ring-1 focus:ring-red-200"
+                                      : "border-transparent hover:border-slate-300 focus:border-[#2684FF] focus:bg-white text-slate-700"
+                                  )}
                                   value={row.title || ""}
-                                  onChange={(e) =>
-                                    handleCellChange(
-                                      idx,
-                                      "title",
-                                      e.target.value
-                                    )
-                                  }
+                                  onChange={(e) => handleCellChange(idx, "title", e.target.value)}
                                   disabled={isLoading}
                                 />
                               </td>
 
-                              {/* ASSIGNEE DROPDOWN */}
+                              {/* ASSIGNEE EMAIL */}
                               <td className="p-2">
                                 <select
-                                  className={`w-full bg-transparent border rounded px-1 py-1 outline-none cursor-pointer ${
-                                    row.errors.some((e) =>
-                                      e.toLowerCase().includes("user")
-                                    )
-                                      ? "border-red-300 bg-red-50 text-red-700"
-                                      : "border-transparent hover:border-slate-300 focus:border-blue-500"
-                                  }`}
+                                  className={cn(
+                                    "w-full bg-transparent border rounded px-1.5 py-1.5 outline-none cursor-pointer text-[12px] font-medium",
+                                    row.errors.some((e) => e.toLowerCase().includes("user"))
+                                      ? "border-red-300 bg-red-50 text-red-900 focus:border-red-500"
+                                      : "border-transparent hover:border-slate-300 focus:border-[#2684FF] focus:bg-white text-slate-700"
+                                  )}
                                   value={row.assigneeEmail || ""}
-                                  onChange={(e) =>
-                                    handleCellChange(
-                                      idx,
-                                      "assigneeEmail",
-                                      e.target.value
-                                    )
-                                  }
-                                  title="Select a project member"
+                                  onChange={(e) => handleCellChange(idx, "assigneeEmail", e.target.value)}
                                   disabled={isLoading}
                                 >
                                   <option value="">Unassigned</option>
-                                  {props.members.map((m) => (
-                                    <option
-                                      key={m.userId}
-                                      value={m.email}
-                                      title={m.fullName}
-                                    >
+                                  {members.map((m) => (
+                                    <option key={m.userId} value={m.email} title={m.fullName}>
                                       {m.email} ({m.fullName})
                                     </option>
                                   ))}
-
-                                  {/* Trường hợp: Email trong file CSV không có trong danh sách thành viên */}
-                                  {row.assigneeEmail &&
-                                    !props.members.some(
-                                      (m) =>
-                                        m.email.toLowerCase() ===
-                                        row.assigneeEmail.toLowerCase()
-                                    ) && (
-                                      <option
-                                        value={row.assigneeEmail}
-                                        disabled
-                                        className="bg-red-100 text-red-600"
-                                      >
-                                        {row.assigneeEmail} (Invalid/Not Member)
-                                      </option>
-                                    )}
+                                  {/* Render Invalid Email fallback */}
+                                  {row.assigneeEmail && !members.some((m) => m.email.toLowerCase() === row.assigneeEmail.toLowerCase()) && (
+                                    <option value={row.assigneeEmail} disabled className="bg-red-100 text-red-600">
+                                      {row.assigneeEmail} (Invalid)
+                                    </option>
+                                  )}
                                 </select>
                               </td>
 
                               {/* STATUS */}
                               <td className="p-2">
                                 <select
-                                  className="w-full bg-transparent border border-transparent hover:border-slate-300 focus:border-blue-500 rounded px-1 py-1 outline-none cursor-pointer"
+                                  className="w-full bg-transparent border border-transparent hover:border-slate-300 focus:border-[#2684FF] focus:bg-white rounded px-1.5 py-1.5 outline-none cursor-pointer text-[12px] font-bold text-slate-600"
                                   value={row.statusName || ""}
-                                  onChange={(e) =>
-                                    handleCellChange(
-                                      idx,
-                                      "statusName",
-                                      e.target.value
-                                    )
-                                  }
+                                  onChange={(e) => handleCellChange(idx, "statusName", e.target.value)}
                                   disabled={isLoading}
                                 >
-                                  {props.statuses.map((s) => (
+                                  {statuses.map((s) => (
                                     <option key={s.id} value={s.name}>
                                       {s.name}
                                     </option>
@@ -483,21 +483,14 @@ export default function ImportTaskModal(props: ImportTaskModalProps) {
                               {/* PRIORITY */}
                               <td className="p-2">
                                 <select
-                                  className={`w-full bg-transparent border rounded px-1 py-1 outline-none cursor-pointer uppercase ${
-                                    row.errors.some((e) =>
-                                      e.includes("Priority")
-                                    )
-                                      ? "border-red-300 bg-red-50 text-red-700"
-                                      : "border-transparent hover:border-slate-300 focus:border-blue-500"
-                                  }`}
+                                  className={cn(
+                                    "w-full bg-transparent border rounded px-1.5 py-1.5 outline-none cursor-pointer uppercase text-[11px] font-black tracking-wider",
+                                    row.errors.some((e) => e.includes("Priority"))
+                                      ? "border-red-300 bg-red-50 text-red-900 focus:border-red-500"
+                                      : "border-transparent hover:border-slate-300 focus:border-[#2684FF] focus:bg-white text-slate-600"
+                                  )}
                                   value={row.priority || "MEDIUM"}
-                                  onChange={(e) =>
-                                    handleCellChange(
-                                      idx,
-                                      "priority",
-                                      e.target.value
-                                    )
-                                  }
+                                  onChange={(e) => handleCellChange(idx, "priority", e.target.value)}
                                   disabled={isLoading}
                                 >
                                   {PRIORITIES.map((p) => (
@@ -512,21 +505,14 @@ export default function ImportTaskModal(props: ImportTaskModalProps) {
                               <td className="p-2">
                                 <input
                                   type="date"
-                                  className={`w-full bg-transparent border rounded px-1 py-1 outline-none ${
-                                    row.errors.some((e) =>
-                                      e.toLowerCase().includes("start date")
-                                    )
-                                      ? "border-red-300 bg-red-50 text-red-700"
-                                      : "border-transparent hover:border-slate-300 focus:border-blue-500"
-                                  }`}
+                                  className={cn(
+                                    "w-full bg-transparent border rounded px-1.5 py-1.5 outline-none text-[12px] font-medium text-slate-600",
+                                    row.errors.some((e) => e.toLowerCase().includes("start date"))
+                                      ? "border-red-300 bg-red-50 text-red-900 focus:border-red-500"
+                                      : "border-transparent hover:border-slate-300 focus:border-[#2684FF] focus:bg-white"
+                                  )}
                                   value={row.startDate || ""}
-                                  onChange={(e) =>
-                                    handleCellChange(
-                                      idx,
-                                      "startDate",
-                                      e.target.value
-                                    )
-                                  }
+                                  onChange={(e) => handleCellChange(idx, "startDate", e.target.value)}
                                   disabled={isLoading}
                                 />
                               </td>
@@ -535,73 +521,57 @@ export default function ImportTaskModal(props: ImportTaskModalProps) {
                               <td className="p-2">
                                 <input
                                   type="date"
-                                  className="w-full bg-transparent border border-transparent hover:border-slate-300 focus:border-blue-500 rounded px-1 py-1 outline-none"
+                                  className="w-full bg-transparent border border-transparent hover:border-slate-300 focus:border-[#2684FF] focus:bg-white rounded px-1.5 py-1.5 outline-none text-[12px] font-medium text-slate-600"
                                   value={row.dueDate || ""}
-                                  onChange={(e) =>
-                                    handleCellChange(
-                                      idx,
-                                      "dueDate",
-                                      e.target.value
-                                    )
-                                  }
+                                  onChange={(e) => handleCellChange(idx, "dueDate", e.target.value)}
                                   disabled={isLoading}
                                 />
                               </td>
 
-                              {/* METRICS (Story Points) */}
+                              {/* STORY POINTS */}
                               <td className="p-2">
                                 <input
                                   type="number"
-                                  className={`w-full text-center bg-transparent border rounded py-1 outline-none ${
+                                  className={cn(
+                                    "w-full text-center bg-transparent border rounded py-1.5 outline-none text-[12px] font-bold text-slate-600",
                                     row.errors.some((e) => e.includes("Points"))
-                                      ? "border-red-300 bg-red-50 text-red-700"
-                                      : "border-transparent hover:border-slate-300 focus:border-blue-500"
-                                  }`}
+                                      ? "border-red-300 bg-red-50 text-red-900 focus:border-red-500"
+                                      : "border-transparent hover:border-slate-300 focus:border-[#2684FF] focus:bg-white"
+                                  )}
                                   value={row.storyPoints || 0}
-                                  onChange={(e) =>
-                                    handleCellChange(
-                                      idx,
-                                      "storyPoints",
-                                      Number(e.target.value)
-                                    )
-                                  }
+                                  onChange={(e) => handleCellChange(idx, "storyPoints", Number(e.target.value))}
                                   disabled={isLoading}
                                 />
                               </td>
 
-                              {/* METRICS (Hours) */}
+                              {/* ESTIMATED HOURS */}
                               <td className="p-2">
                                 <input
                                   type="number"
-                                  className={`w-full text-center bg-transparent border rounded py-1 outline-none ${
+                                  className={cn(
+                                    "w-full text-center bg-transparent border rounded py-1.5 outline-none text-[12px] font-bold text-slate-600",
                                     row.errors.some((e) => e.includes("Hours"))
-                                      ? "border-red-300 bg-red-50 text-red-700"
-                                      : "border-transparent hover:border-slate-300 focus:border-blue-500"
-                                  }`}
+                                      ? "border-red-300 bg-red-50 text-red-900 focus:border-red-500"
+                                      : "border-transparent hover:border-slate-300 focus:border-[#2684FF] focus:bg-white"
+                                  )}
                                   value={row.estimatedHours || 0}
-                                  onChange={(e) =>
-                                    handleCellChange(
-                                      idx,
-                                      "estimatedHours",
-                                      Number(e.target.value)
-                                    )
-                                  }
+                                  onChange={(e) => handleCellChange(idx, "estimatedHours", Number(e.target.value))}
                                   disabled={isLoading}
                                 />
                               </td>
                             </tr>
 
-                            {/* ERROR MESSAGE ROW */}
+                            {/* ERROR MESSAGE SUB-ROW */}
                             {hasError && (
-                              <tr className="bg-red-50/30">
-                                <td colSpan={9} className="px-4 pb-2 pt-0">
+                              <tr className="bg-red-50/20 border-b border-red-100">
+                                <td colSpan={9} className="px-4 pb-3 pt-0">
                                   <div className="flex flex-wrap gap-2">
                                     {row.errors.map((err, i) => (
                                       <span
                                         key={i}
-                                        className="text-[10px] text-red-600 bg-red-100 px-2 py-0.5 rounded-full flex items-center"
+                                        className="text-[10px] font-bold tracking-wide text-red-600 bg-red-100/50 px-2 py-1 rounded-md flex items-center border border-red-200"
                                       >
-                                        <AlertTriangle className="w-3 h-3 mr-1" />{" "}
+                                        <AlertTriangle className="w-3 h-3 mr-1.5" />
                                         {err}
                                       </span>
                                     ))}
@@ -620,7 +590,7 @@ export default function ImportTaskModal(props: ImportTaskModalProps) {
           </div>
 
           {/* FOOTER */}
-          <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-between items-center shrink-0">
+          <div className="px-6 py-4 bg-white border-t border-slate-100 flex justify-between items-center shrink-0 rounded-b-2xl">
             <div>
               {step === 2 && (
                 <Button
@@ -631,7 +601,7 @@ export default function ImportTaskModal(props: ImportTaskModalProps) {
                     setPreviewData([]);
                     setFile(null);
                   }}
-                  className="text-slate-500 text-xs"
+                  className="text-slate-500 font-bold text-[11px] uppercase tracking-widest hover:bg-slate-100"
                   disabled={isLoading}
                 >
                   Back to Upload
@@ -641,8 +611,9 @@ export default function ImportTaskModal(props: ImportTaskModalProps) {
             <div className="flex gap-3">
               <Button
                 variant="ghost"
-                onClick={props.onClose}
+                onClick={onClose}
                 disabled={isLoading}
+                className="font-bold text-[11px] uppercase tracking-widest text-slate-500"
               >
                 Cancel
               </Button>
@@ -651,27 +622,27 @@ export default function ImportTaskModal(props: ImportTaskModalProps) {
                 <Button
                   onClick={handleFileUpload}
                   disabled={!file || isLoading}
-                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                  className="bg-[#0052CC] hover:bg-[#0047B3] text-white font-bold text-[11px] uppercase tracking-widest transition-all active:scale-95 shadow-sm"
                 >
                   {isLoading ? (
                     <Loader2 className="w-4 h-4 animate-spin mr-2" />
                   ) : (
                     <ArrowRight className="w-4 h-4 mr-2" />
                   )}
-                  Continue: Review
+                  Review Data
                 </Button>
               ) : (
                 <Button
                   onClick={onSaveClick}
                   disabled={isLoading}
-                  className="bg-green-600 hover:bg-green-700 text-white"
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] uppercase tracking-widest transition-all active:scale-95 shadow-sm"
                 >
                   {isLoading ? (
                     <Loader2 className="w-4 h-4 animate-spin mr-2" />
                   ) : (
                     <Save className="w-4 h-4 mr-2" />
                   )}
-                  Save {previewData.length} Tasks
+                  Import {previewData.length} Records
                 </Button>
               )}
             </div>
@@ -679,26 +650,24 @@ export default function ImportTaskModal(props: ImportTaskModalProps) {
         </div>
       </div>
 
-      {/* --- CONFIRMATION DIALOG (Small Modal on top) --- */}
+      {/* ==================== CONFIRMATION DIALOG ==================== */}
       {showConfirmModal && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div
-            className="bg-white rounded-lg shadow-xl max-w-sm w-full p-6 animate-in zoom-in-95 duration-200"
+            className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 animate-in zoom-in-95 duration-200 border border-slate-200"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center gap-3 mb-4">
-              <div className="bg-amber-100 p-2 rounded-full text-amber-600 shrink-0">
-                <AlertTriangle className="w-6 h-6" />
+              <div className="bg-amber-100 p-2.5 rounded-xl text-amber-600 shrink-0">
+                <AlertTriangle className="w-5 h-5" />
               </div>
-              <h3 className="text-lg font-bold text-slate-800">
-                Proceed with errors?
+              <h3 className="text-lg font-bold text-[#172B4D] tracking-tight">
+                Import with Errors?
               </h3>
             </div>
 
-            <p className="text-sm text-slate-600 mb-6">
-              Some rows still contain errors. If you continue, invalid fields
-              (like incorrect emails or dates) will be saved as{" "}
-              <strong>empty/null</strong> values.
+            <p className="text-[13px] text-slate-600 mb-6 leading-relaxed">
+              Some records still contain validation errors. If you proceed, invalid fields (like incorrect emails or unformatted dates) will be saved as <strong className="text-slate-900">empty values</strong>.
             </p>
 
             <div className="flex justify-end gap-3">
@@ -706,24 +675,33 @@ export default function ImportTaskModal(props: ImportTaskModalProps) {
                 variant="outline"
                 onClick={() => setShowConfirmModal(false)}
                 disabled={isLoading}
+                className="font-bold text-[11px] uppercase tracking-widest text-slate-600 hover:bg-slate-50"
               >
-                Go Back & Fix
+                Review Again
               </Button>
               <Button
-                className="bg-amber-600 hover:bg-amber-700 text-white"
+                className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-[11px] uppercase tracking-widest shadow-sm active:scale-95"
                 onClick={handleConfirmImport}
                 disabled={isLoading}
               >
                 {isLoading ? (
                   <Loader2 className="w-4 h-4 animate-spin mr-2" />
                 ) : (
-                  "Yes, Import Anyway"
+                  "Force Import"
                 )}
               </Button>
             </div>
           </div>
         </div>
       )}
+
+      {/* Global Style for scrollbar in this specific component */}
+      <style jsx global>{`
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+      `}</style>
     </>
   );
 }

@@ -1,20 +1,24 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useCallback } from "react";
 import {
   X,
   AlertTriangle,
   Loader2,
   Trash2,
   Info,
-  AlertCircle,
 } from "lucide-react";
+
+// Internal Components
 import { Button } from "@/components/ui/Buttons";
 
 // =============================================================================
-// 1. INTERFACES & CONFIG
+// INTERFACES & CONFIGURATION
 // =============================================================================
 
+/**
+ * Thuộc tính đầu vào cho thành phần cửa sổ xác nhận (Modal)
+ */
 interface ConfirmationModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -27,8 +31,10 @@ interface ConfirmationModalProps {
   modalVariant?: "danger" | "warning" | "info";
 }
 
-// --- CẤU HÌNH MÀU SẮC & ICON ---
-const VARIANTS = {
+/**
+ * Cấu hình định dạng hiển thị cho từng loại biến thể của Modal
+ */
+const MODAL_VARIANTS = {
   danger: {
     icon: <Trash2 className="w-5 h-5 text-red-600" />,
     bgIcon: "bg-red-50 border-red-100",
@@ -47,9 +53,13 @@ const VARIANTS = {
 };
 
 // =============================================================================
-// 2. MAIN COMPONENT
+// MAIN COMPONENT
 // =============================================================================
 
+/**
+ * Thành phần cửa sổ xác nhận dùng chung cho toàn hệ thống.
+ * Hỗ trợ các trạng thái nguy hiểm (Danger), cảnh báo (Warning) và thông tin (Info).
+ */
 export default function ConfirmationModal({
   isOpen,
   onClose,
@@ -57,35 +67,48 @@ export default function ConfirmationModal({
   isLoading,
   title,
   description,
-  confirmText = "Confirm", // Đổi default text sang English
+  confirmText = "Confirm",
   cancelText = "Cancel",
   modalVariant = "danger",
 }: ConfirmationModalProps) {
-  // Prevent scroll body khi modal mở
+  
+  // ---------------------------------------------------------------------------
+  // 1. SIDE EFFECTS
+  // ---------------------------------------------------------------------------
+
+  // Xử lý khóa thanh cuộn của trang khi cửa sổ modal đang mở
   useEffect(() => {
-    if (isOpen) document.body.style.overflow = "hidden";
-    else document.body.style.overflow = "unset";
+    if (isOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "unset";
+    }
+    
     return () => {
       document.body.style.overflow = "unset";
     };
   }, [isOpen]);
 
+  // ---------------------------------------------------------------------------
+  // 2. RENDER LOGIC
+  // ---------------------------------------------------------------------------
+
   if (!isOpen) return null;
 
-  const currentVariant = VARIANTS[modalVariant] || VARIANTS.danger;
+  const currentVariant = MODAL_VARIANTS[modalVariant] || MODAL_VARIANTS.danger;
 
   return (
-    // 1. BACKDROP
+    // Lớp nền mờ (Backdrop)
     <div
       className="fixed inset-0 z-[999] flex items-center justify-center bg-black/10 p-4 animate-in fade-in duration-200"
       onClick={onClose}
     >
-      {/* 2. CONTAINER */}
+      {/* Container chính của cửa sổ Modal */}
       <div
         onClick={(e) => e.stopPropagation()}
         className="relative w-full max-w-[420px] bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-200 ring-1 ring-slate-900/5"
       >
-        {/* Nút đóng nhanh */}
+        {/* Nút đóng nhanh ở góc trên bên phải */}
         <button
           onClick={onClose}
           className="absolute top-3 right-3 p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-full transition-colors z-10"
@@ -96,14 +119,14 @@ export default function ConfirmationModal({
 
         <div className="p-6">
           <div className="flex flex-col gap-4 text-center sm:text-left sm:flex-row">
-            {/* Icon Wrapper */}
+            {/* Vùng hiển thị Icon biến thể */}
             <div
               className={`mx-auto sm:mx-0 w-12 h-12 flex items-center justify-center rounded-full border ${currentVariant.bgIcon} shrink-0`}
             >
               {currentVariant.icon}
             </div>
 
-            {/* Content */}
+            {/* Vùng hiển thị nội dung thông báo */}
             <div className="flex-1 space-y-2">
               <h3 className="text-lg font-bold text-slate-900 leading-tight">
                 {title}
@@ -115,7 +138,7 @@ export default function ConfirmationModal({
           </div>
         </div>
 
-        {/* 3. FOOTER */}
+        {/* Khu vực các nút hành động (Footer) */}
         <div className="px-6 pb-6 pt-2 flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
           <Button
             onClick={onClose}

@@ -1,15 +1,31 @@
 "use client";
 
-import React, { useMemo } from 'react';
+// =============================================================================
+// 1. IMPORT
+// =============================================================================
+
+import React, { useMemo, useCallback } from 'react';
 import { 
-  Search, Filter, Users, AlertCircle, Layers, 
-  ChevronLeft, ChevronRight, X, LayoutGrid, List, Columns,
-  Calendar as CalendarIcon, Check, LucideIcon
+  Search, 
+  Filter, 
+  Users, 
+  AlertCircle, 
+  Layers, 
+  ChevronLeft, 
+  ChevronRight, 
+  X, 
+  LayoutGrid, 
+  List, 
+  Columns,
+  Calendar as CalendarIcon, 
+  Check, 
+  LucideIcon
 } from "lucide-react";
 import { ProjectMember } from "@/services/apiProject"; 
+import { cn } from "@/lib/utils";
 
 // =============================================================================
-// 1. CONSTANTS & CONFIG
+// 2. CONSTANTS & CONFIG
 // =============================================================================
 
 const PRIORITY_OPTIONS = [
@@ -32,7 +48,7 @@ const VIEW_MODES = [
 ];
 
 // =============================================================================
-// 2. INTERFACES
+// 3. INTERFACES
 // =============================================================================
 
 export interface FilterState {
@@ -56,7 +72,7 @@ interface CalendarFilterBarProps {
 }
 
 // =============================================================================
-// 3. SUB-COMPONENTS
+// 4. SUB-COMPONENTS
 // =============================================================================
 
 interface FilterDropdownProps {
@@ -69,13 +85,24 @@ interface FilterDropdownProps {
 }
 
 /**
- * Component Dropdown chung cho bộ lọc
+ * Dropdown box tiêu chuẩn cho các bộ lọc
  */
-const FilterDropdown = ({ icon: Icon, value, onChange, options, placeholder, minWidth = "min-w-[140px]" }: FilterDropdownProps) => (
-  <div className="relative">
-    <Icon className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 z-10" />
+const FilterDropdown = ({ 
+  icon: Icon, 
+  value, 
+  onChange, 
+  options, 
+  placeholder, 
+  minWidth = "min-w-[140px]" 
+}: FilterDropdownProps) => (
+  <div className="relative group">
+    <Icon className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 z-10 group-hover:text-blue-500 transition-colors" />
     <select 
-      className={`h-[34px] pl-9 pr-8 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 appearance-none cursor-pointer hover:border-blue-400 focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition-all shadow-sm ${minWidth}`}
+      className={cn(
+        "h-[34px] pl-9 pr-8 bg-white border border-slate-200 rounded-lg text-[11px] font-bold text-slate-700 uppercase tracking-tight",
+        "appearance-none cursor-pointer hover:border-blue-400 focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition-all shadow-sm",
+        minWidth
+      )}
       value={value || "ALL"} 
       onChange={(e) => onChange(e.target.value)}
     >
@@ -86,29 +113,50 @@ const FilterDropdown = ({ icon: Icon, value, onChange, options, placeholder, min
         </option>
       ))}
     </select>
-    {/* Custom Arrow Icon */}
-    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none opacity-50 text-slate-500">
+    {/* Biểu tượng mũi tên tùy chỉnh */}
+    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none opacity-50 text-slate-400 group-hover:text-slate-600 transition-colors">
         <svg width="8" height="5" viewBox="0 0 10 6" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M1 1L5 5L9 1"/></svg>
     </div>
   </div>
 );
 
 /**
- * Component nút chuyển đổi chế độ xem (Month/Week/Day)
+ * Nút chuyển đổi View Mode của lịch (Month / Week / Day)
  */
-const ViewToggleButton = ({ active, onClick, icon: Icon, label }: { active: boolean, onClick: () => void, icon: LucideIcon, label: string }) => (
+const ViewToggleButton = ({ 
+  active, 
+  onClick, 
+  icon: Icon, 
+  label 
+}: { 
+  active: boolean, 
+  onClick: () => void, 
+  icon: LucideIcon, 
+  label: string 
+}) => (
   <button 
     onClick={onClick} 
-    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-md transition-all ${active ? 'bg-blue-50 text-blue-700 shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}
+    className={cn(
+      "flex items-center gap-1.5 px-3 py-1.5 text-[10px] uppercase tracking-widest font-bold rounded-md transition-all active:scale-95",
+      active 
+        ? 'bg-blue-50 text-blue-700 shadow-sm' 
+        : 'text-slate-500 hover:bg-slate-100'
+    )}
+    title={`Switch to ${label} view`}
   >
-    <Icon className="w-3.5 h-3.5" /> {label}
+    <Icon className="w-3.5 h-3.5" /> 
+    <span className="hidden sm:inline-block">{label}</span>
   </button>
 );
 
 // =============================================================================
-// 4. MAIN COMPONENT
+// 5. MAIN COMPONENT
 // =============================================================================
 
+/**
+ * Thanh công cụ Lịch (Calendar Filter Bar).
+ * Quản lý cả bộ lọc công việc/sprint lẫn điều hướng thời gian hiển thị.
+ */
 export default function CalendarFilterBar({ 
   filters, 
   onFilterChange, 
@@ -119,40 +167,56 @@ export default function CalendarFilterBar({
   members = [] 
 }: CalendarFilterBarProps) {
 
-  // --- HANDLERS ---
+  // ---------------------------------------------------------------------------
+  // 6. LOGIC & HANDLERS
+  // ---------------------------------------------------------------------------
 
-  const handleFilterChange = (key: keyof FilterState, val: any) => {
-      // Nếu value là "ALL" thì gửi string rỗng để reset filter đó
+  /**
+   * Cập nhật từng trạng thái của filter
+   */
+  const handleFilterChange = useCallback((key: keyof FilterState, val: any) => {
       onFilterChange(key, val === "ALL" ? "" : val);
-  };
+  }, [onFilterChange]);
 
-  const clearFilters = () => {
+  /**
+   * Đặt lại tất cả các tham số tìm kiếm và filter về trạng thái ban đầu
+   */
+  const clearFilters = useCallback(() => {
       onFilterChange('keyword', '');
       onFilterChange('assigneeId', '');
       onFilterChange('priority', '');
       onFilterChange('taskType', '');
       onFilterChange('showSprints', true);
-  };
+  }, [onFilterChange]);
 
+  /**
+   * Đánh giá xem có đang áp dụng bất kì filter tuỳ biến nào không
+   */
   const hasFilters = useMemo(() => {
-    return !!filters.keyword || !!filters.assigneeId || !!filters.priority || !!filters.taskType || !filters.showSprints;
+    return !!(filters.keyword || filters.assigneeId || filters.priority || filters.taskType || !filters.showSprints);
   }, [filters]);
 
-  // Chuẩn bị options cho Assignee dropdown
+  /**
+   * Chuyển đổi format thành viên thành option dropdown
+   */
   const assigneeOptions = useMemo(() => {
     return members.map(m => ({ label: m.fullName, value: m.userId }));
   }, [members]);
 
-  // --- RENDER ---
+  // ---------------------------------------------------------------------------
+  // 7. RENDER
+  // ---------------------------------------------------------------------------
+
   return (
-    <div className="flex flex-col gap-4 mb-4 bg-slate-50/80 p-3 rounded-xl border border-slate-200 shadow-sm backdrop-blur-sm">
+    <div className="flex flex-col gap-4 mb-4 bg-slate-50/50 p-3 rounded-xl border border-slate-200 shadow-sm backdrop-blur-sm">
         
-        {/* === ROW 1: Navigation & Search === */}
+        {/* === HÀNG 1: ĐIỀU HƯỚNG THỜI GIAN & TÌM KIẾM (NAVIGATION & SEARCH) === */}
         <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
             
-            {/* Left: Calendar Controls */}
+            {/* Khối bên trái: Các công cụ thao tác trên Calendar */}
             <div className="flex flex-wrap items-center gap-3">
-                {/* View Switcher */}
+                
+                {/* 1. Nút chuyển đổi View Mode */}
                 <div className="flex bg-white p-1 rounded-lg border border-slate-200 shadow-sm items-center">
                     {VIEW_MODES.map((mode, index) => (
                       <React.Fragment key={mode.id}>
@@ -162,52 +226,78 @@ export default function CalendarFilterBar({
                           icon={mode.icon}
                           label={mode.label}
                         />
-                        {/* Divider giữa các nút */}
-                        {index < VIEW_MODES.length - 1 && <div className="w-px h-4 bg-slate-100 mx-0.5"></div>}
+                        {index < VIEW_MODES.length - 1 && <div className="w-px h-4 bg-slate-100 mx-0.5" />}
                       </React.Fragment>
                     ))}
                 </div>
 
-                {/* Date Navigator */}
+                {/* 2. Cụm điều hướng Ngày/Tháng (Date Navigator) */}
                 <div className="flex items-center bg-white px-1 py-1 border border-slate-200 rounded-lg shadow-sm h-[34px]">
-                    <button onClick={() => onNavigate('PREV')} className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-50 rounded-md transition-colors">
+                    <button 
+                      onClick={() => onNavigate('PREV')} 
+                      className="p-1.5 text-slate-400 hover:text-slate-800 hover:bg-slate-50 rounded-md transition-colors active:scale-95"
+                    >
                       <ChevronLeft className="w-4 h-4" />
                     </button>
-                    <span className="px-3 text-xs font-bold text-slate-700 min-w-[110px] text-center select-none">
+                    
+                    <span className="px-3 text-[13px] font-bold text-slate-700 min-w-[110px] text-center select-none uppercase tracking-wide">
                       {titleDate}
                     </span>
-                    <button onClick={() => onNavigate('NEXT')} className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-50 rounded-md transition-colors">
+                    
+                    <button 
+                      onClick={() => onNavigate('NEXT')} 
+                      className="p-1.5 text-slate-400 hover:text-slate-800 hover:bg-slate-50 rounded-md transition-colors active:scale-95"
+                    >
                       <ChevronRight className="w-4 h-4" />
                     </button>
                 </div>
 
-                <button onClick={() => onNavigate('TODAY')} className="text-xs font-bold text-slate-600 bg-white border border-slate-200 px-3 py-2 rounded-lg hover:bg-slate-50 hover:text-blue-600 transition-colors shadow-sm h-[34px]">
+                {/* 3. Nút trỏ về Hôm nay */}
+                <button 
+                  onClick={() => onNavigate('TODAY')} 
+                  className={cn(
+                    "text-[10px] uppercase tracking-widest font-bold text-slate-500 bg-white border border-slate-200",
+                    "px-4 py-2 rounded-lg hover:bg-slate-50 hover:text-blue-600 transition-colors shadow-sm h-[34px] active:scale-95"
+                  )}
+                >
                   Today
                 </button>
             </div>
 
-            {/* Right: Search Input */}
+            {/* Khối bên phải: Ô tìm kiếm (Search Input) */}
             <div className="relative group w-full xl:w-72">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
                 <input 
                   type="text" 
                   placeholder="Search tasks or sprints..." 
-                  className="w-full h-[34px] pl-9 pr-4 text-xs font-medium border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition-all bg-white shadow-sm placeholder:text-slate-400" 
+                  className={cn(
+                    "w-full h-[34px] pl-9 pr-4 text-[12px] font-medium border border-slate-200 rounded-lg bg-white shadow-sm transition-all outline-none",
+                    "focus:ring-2 focus:ring-blue-100 focus:border-blue-500 placeholder:text-slate-400"
+                  )}
                   value={filters.keyword} 
                   onChange={(e) => handleFilterChange('keyword', e.target.value)}
                 />
+                
+                {/* Nút xoá tìm kiếm nhanh */}
+                {filters.keyword && (
+                  <button 
+                    onClick={() => handleFilterChange('keyword', '')}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-red-500 rounded-full transition-colors"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
             </div>
         </div>
 
-        <div className="h-px bg-slate-200 w-full"></div>
+        <div className="h-px bg-slate-200 w-full" />
 
-        {/* === ROW 2: Detailed Filters === */}
+        {/* === HÀNG 2: BỘ LỌC CHI TIẾT (DETAILED FILTERS) === */}
         <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2 text-xs text-slate-500 mr-2 font-semibold uppercase tracking-wide">
-                <Filter className="w-3.5 h-3.5" /> Filters
+            <div className="flex items-center gap-1.5 text-[10px] text-slate-400 mr-2 font-bold uppercase tracking-widest">
+                <Filter className="w-3.5 h-3.5" /> Quick Filters
             </div>
 
-            {/* Assignee Filter */}
             <FilterDropdown 
               icon={Users}
               placeholder="All Assignees"
@@ -217,7 +307,6 @@ export default function CalendarFilterBar({
               minWidth="min-w-[160px]"
             />
 
-            {/* Priority Filter */}
             <FilterDropdown 
               icon={AlertCircle}
               placeholder="All Priorities"
@@ -226,7 +315,6 @@ export default function CalendarFilterBar({
               options={PRIORITY_OPTIONS}
             />
 
-            {/* Type Filter */}
             <FilterDropdown 
               icon={Layers}
               placeholder="All Types"
@@ -236,24 +324,35 @@ export default function CalendarFilterBar({
               minWidth="min-w-[130px]"
             />
 
-            {/* Show Sprints Toggle */}
+            {/* Nút bật/tắt hiển thị Sprints (Toggle) */}
             <button 
-              onClick={() => onFilterChange('showSprints', !filters.showSprints)} 
-              className={`flex items-center gap-2 h-[34px] pl-2 pr-3 rounded-lg border transition-all cursor-pointer select-none ${filters.showSprints ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'}`}
+              onClick={() => handleFilterChange('showSprints', !filters.showSprints)} 
+              className={cn(
+                "flex items-center gap-2 h-[34px] pl-2 pr-3 rounded-lg border transition-all cursor-pointer select-none active:scale-95 shadow-sm",
+                filters.showSprints 
+                  ? "bg-blue-50 border-blue-200 text-blue-700" 
+                  : "bg-white border-slate-200 text-slate-500 hover:bg-slate-50"
+              )}
             >
-                <div className={`w-5 h-5 rounded-md flex items-center justify-center transition-all ${filters.showSprints ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-400'}`}>
+                <div className={cn(
+                  "w-5 h-5 rounded-md flex items-center justify-center transition-all",
+                  filters.showSprints ? "bg-blue-600 text-white shadow-sm" : "bg-slate-100 text-slate-400"
+                )}>
                     {filters.showSprints ? <Check className="w-3 h-3" /> : <CalendarIcon className="w-3 h-3" />}
                 </div>
-                <span className="text-xs font-bold">Sprints</span>
+                <span className="text-[10px] font-bold uppercase tracking-widest">Sprints</span>
             </button>
 
-            {/* Reset Button */}
+            {/* Nút xóa bỏ toàn bộ filter */}
             {hasFilters && (
                 <button 
                   onClick={clearFilters} 
-                  className="ml-auto flex items-center gap-1.5 text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg transition-all border border-red-100"
+                  className={cn(
+                    "ml-auto flex items-center gap-1.5 text-[10px] uppercase tracking-widest font-bold text-red-600 bg-red-50 hover:bg-red-100",
+                    "px-4 py-1.5 rounded-lg transition-all border border-red-100 shadow-sm active:scale-95 h-[34px]"
+                  )}
                 >
-                    <X className="w-3.5 h-3.5" /> Clear
+                    <X className="w-3.5 h-3.5" /> Clear Filters
                 </button>
             )}
         </div>

@@ -1,7 +1,7 @@
 import apiClient from "@/lib/apiClient";
 
 // =============================================================================
-// INTERFACES & PAYLOAD TYPES (Định nghĩa kiểu dữ liệu đầu vào)
+// INTERFACES & PAYLOAD TYPES
 // =============================================================================
 
 export interface RegisterPayload {
@@ -36,49 +36,48 @@ export interface ResetPasswordPayload {
 // =============================================================================
 
 // -----------------------------------------------------------------------------
-// 1. Core Authentication (Đăng ký, Đăng nhập, Xác thực)
+// 1. Core Authentication
 // -----------------------------------------------------------------------------
 
 /**
- * Đăng ký tài khoản mới
+ * Đăng ký tài khoản người dùng mới
  */
 export const registerUser = async (payload: RegisterPayload) => {
   const res = await apiClient.post("/auth/register", payload);
   const data = res.data;
 
-  // Sử dụng field 'success' chuẩn của ApiResponse
+  // Kiểm tra trạng thái thành công từ Backend
   if (!data.success) {
-    throw new Error(data.message || "Registration failed.");
+    throw new Error(data.message || "Registration failed");
   }
   return data;
 };
 
 /**
- * Xác thực Email (OTP)
+ * Xác thực địa chỉ email qua mã OTP
  */
 export const verifyEmail = async (payload: VerifyEmailPayload) => {
   const res = await apiClient.post("/auth/verify-email", payload);
   const data = res.data;
 
   if (!data.success) {
-    throw new Error(data.message || "Email verification failed.");
+    throw new Error(data.message || "Email verification failed");
   }
   return data;
 };
 
 /**
- * Đăng nhập (Login)
+ * Đăng nhập hệ thống bằng Email và Password
  */
 export const loginUser = async (payload: LoginPayload) => {
   const res = await apiClient.post("/auth/login", payload);
   const data = res.data;
 
-  // Kiểm tra thành công dựa trên response chuẩn
   if (!data.success) {
-    throw new Error(data.message || "Login failed.");
+    throw new Error(data.message || "Login failed");
   }
 
-  // Lưu token ngay khi API trả về thành công
+  // Lưu trữ token xác thực vào bộ nhớ cục bộ
   if (data.data?.accessToken && data.data?.refreshToken) {
     localStorage.setItem("accessToken", data.data.accessToken);
     localStorage.setItem("refreshToken", data.data.refreshToken);
@@ -88,14 +87,14 @@ export const loginUser = async (payload: LoginPayload) => {
 };
 
 /**
- * Đăng nhập bằng Google
+ * Đăng nhập thông qua tài khoản Google
  */
 export const loginWithGoogle = async (googleToken: string) => {
   const res = await apiClient.post("/auth/google", { googleToken });
   const data = res.data;
 
   if (!data.success) {
-    throw new Error(data.message || "Google login failed.");
+    throw new Error(data.message || "Google login failed");
   }
 
   if (data.data?.accessToken && data.data?.refreshToken) {
@@ -107,32 +106,32 @@ export const loginWithGoogle = async (googleToken: string) => {
 };
 
 /**
- * Đăng xuất (Logout)
+ * Đăng xuất và làm sạch dữ liệu phiên làm việc
  */
 export const logoutUser = async () => {
   const refreshToken = localStorage.getItem("refreshToken");
   
   try {
-    // Gọi API logout để hủy token ở server (nếu có)
+    // Thông báo cho Server hủy bỏ phiên làm việc
     if (refreshToken) {
       await apiClient.post("/auth/logout", { refreshToken });
     }
   } catch (error: any) {
-    // Log lỗi tiếng Anh, ưu tiên message từ server
+    // Log lỗi phục vụ debug, ưu tiên thông báo từ server
     const msg = error?.response?.data?.message || error.message;
-    console.warn(`[AuthAPI] Logout warning: ${msg}`);
+    console.warn(`[Auth Service] Logout warning: ${msg}`);
   } finally {
-    // Luôn luôn xóa data ở client dù API có lỗi hay không
+    // Đảm bảo xóa sạch dữ liệu client trong mọi trường hợp
     localStorage.clear();
   }
 };
 
 // -----------------------------------------------------------------------------
-// 2. Invitation Logic (Đăng ký từ lời mời)
+// 2. Invitation Logic
 // -----------------------------------------------------------------------------
 
 /**
- * Đăng ký từ lời mời Company (Invitation)
+ * Đăng ký tài khoản thông qua lời mời gia nhập công ty
  */
 export const registerFromInvite = async (payload: InviteRegisterPayload) => {
   try {
@@ -140,19 +139,19 @@ export const registerFromInvite = async (payload: InviteRegisterPayload) => {
     const data = res.data;
 
     if (!data.success) {
-      throw new Error(data.message || "Registration from invitation failed.");
+      throw new Error(data.message || "Invitation registration failed");
     }
     return data.data;
 
   } catch (err: any) {
-    // Ưu tiên message lỗi chi tiết từ API trả về
+    // Truy xuất thông báo lỗi chi tiết từ Backend
     const serverMessage = err.response?.data?.message;
-    throw new Error(serverMessage || "System error during invitation registration.");
+    throw new Error(serverMessage || "System error during invitation registration");
   }
 };
 
 /**
- * Đăng ký từ lời mời Project
+ * Đăng ký tài khoản thông qua lời mời gia nhập dự án
  */
 export const registerFromProjectInvite = async (payload: InviteRegisterPayload) => {
   try {
@@ -160,34 +159,42 @@ export const registerFromProjectInvite = async (payload: InviteRegisterPayload) 
     const data = res.data;
 
     if (!data.success) {
-      throw new Error(data.message || "Registration from project invitation failed.");
+      throw new Error(data.message || "Project invitation registration failed");
     }
-    // Trả về { accessToken, refreshToken, ... }
     return data.data; 
 
   } catch (err: any) {
     const serverMessage = err.response?.data?.message;
-    throw new Error(serverMessage || "System error during project invitation registration.");
+    throw new Error(serverMessage || "System error during project invitation registration");
   }
 };
 
 // -----------------------------------------------------------------------------
-// 3. Password Management (Quên & Đổi mật khẩu)
+// 3. Password Management
 // -----------------------------------------------------------------------------
 
 /**
- * Quên mật khẩu - Gửi yêu cầu reset
+ * Gửi yêu cầu khôi phục mật khẩu qua Email
  */
 export const forgotPassword = async (email: string) => {
   const res = await apiClient.post("/auth/forgot-password", { email });
-  // Lưu ý: Nếu cần xử lý lỗi ở đây, nên thêm check !res.data.success
-  return res.data;
+  const data = res.data;
+
+  if (!data.success) {
+    throw new Error(data.message || "Failed to send reset request");
+  }
+  return data;
 };
 
 /**
- * Đặt lại mật khẩu mới
+ * Thiết lập mật khẩu mới bằng mã xác thực (Token)
  */
 export const resetPassword = async (payload: ResetPasswordPayload) => {
   const res = await apiClient.post("/auth/reset-password", payload);
-  return res.data;
+  const data = res.data;
+
+  if (!data.success) {
+    throw new Error(data.message || "Failed to reset password");
+  }
+  return data;
 };

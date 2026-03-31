@@ -1,8 +1,11 @@
 @import "tailwindcss";
 
+/* ==========================================================================
+   1. VARIABLES & THEME
+   ========================================================================== */
 :root {
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #172B4D; /* Mau chu dao Atlassian */
 }
 
 @theme inline {
@@ -14,8 +17,8 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #091E42; /* Mau nen toi Atlassian */
+    --foreground: #DFE1E6; /* Mau chu toi Atlassian */
   }
 }
 
@@ -25,7 +28,9 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
-/* --- ANIMATIONS --- */
+/* ==========================================================================
+   2. ANIMATIONS
+   ========================================================================== */
 @keyframes fadeDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
@@ -38,83 +43,87 @@ body {
 .animate-slideUp { animation: slideUp 1s ease-out both; }
 .animate-pulse-slow { animation: pulse-slow 6s infinite ease-in-out; }
 
-/* --- JIRA / ATLASSIAN STYLE BACKGROUND --- */
-/* Tạo lớp nền chấm bi mờ */
+/* ==========================================================================
+   3. ATLASSIAN / JIRA STYLES & OVERRIDES
+   ========================================================================== */
+
+/* Tao lop nen luoi cham bi */
 .bg-jira-mesh {
   background-color: transparent;
-  background-image: radial-gradient(rgba(100, 116, 139, 0.12) 1px, transparent 1px);
+  background-image: radial-gradient(rgba(66, 82, 110, 0.12) 1px, transparent 1px); /* Mau #42526E mờ */
   background-size: 24px 24px;
 }
 
 @media (prefers-color-scheme: dark) {
   .bg-jira-mesh {
-    background-image: radial-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px);
+    background-image: radial-gradient(rgba(223, 225, 230, 0.1) 1px, transparent 1px); /* Mau #DFE1E6 mờ */
   }
 }
 
-/* --- OVERRIDE CLASS (QUAN TRỌNG) --- */
-/* Class này buộc các section con phải trong suốt để nhìn thấy background */
+/* Ghi de class cho Landing Page de hien thi xuyen thau */
 .jira-landing-override section {
   background-color: transparent !important;
-  border-color: rgba(226, 232, 240, 0.5) !important; /* border-slate-200/50 */
+  border-color: rgba(223, 225, 230, 0.5) !important; /* Mau vien #DFE1E6 */
 }
 
-/* Nếu dark mode, chỉnh lại border cho đẹp */
 @media (prefers-color-scheme: dark) {
   .jira-landing-override section {
-    border-color: rgba(51, 65, 85, 0.5) !important; /* border-slate-700/50 */
+    border-color: rgba(66, 82, 110, 0.5) !important; /* Mau vien #42526E */
   }
 }
 
-/* --- JIRA / ATLASSIAN CALENDAR STYLE OVERRIDES --- */
+/* ==========================================================================
+   4. FULLCALENDAR CUSTOMIZATIONS (Atlassian Theme)
+   ========================================================================== */
 
-/* 1. Header Toolbar (Ẩn toolbar mặc định của FullCalendar vì ta dùng Custom Toolbar) */
+/* An thanh cong cu mac dinh cua FullCalendar */
 .fc-header-toolbar {
   display: none !important; 
 }
 
-/* 2. Grid & Border */
+/* Tuy chinh vien va luoi lich */
 .fc-theme-standard td, 
 .fc-theme-standard th {
-  border-color: #e2e8f0; /* slate-200 */
+  border-color: #DFE1E6; 
 }
 
 .fc-scrollgrid {
-  border: 1px solid #e2e8f0;
-  border-radius: 0.75rem; /* rounded-xl */
+  border: 1px solid #DFE1E6;
+  border-radius: 0.75rem; 
   overflow: hidden;
 }
 
-/* 3. Header Cells (Mon, Tue...) */
+/* Tuy chinh O tieu de cac ngay trong tuan */
 .fc-col-header-cell {
-  background-color: #f8fafc; /* slate-50 */
+  background-color: #FAFBFC; 
   padding: 12px 0 !important;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid #DFE1E6;
 }
 
 .fc-col-header-cell-cushion {
-  color: #64748b; /* slate-500 */
-  font-size: 0.75rem; /* text-xs */
-  font-weight: 700;
+  color: #6B778C; 
+  font-size: 0.75rem; 
+  font-weight: 900; /* font-black */
   text-transform: uppercase;
   letter-spacing: 0.05em;
   text-decoration: none !important;
 }
 
-/* 4. Body Cells */
+/* Tuy chinh O hien thi ngay */
 .fc-daygrid-day {
   transition: background-color 0.2s;
 }
+
 .fc-daygrid-day:hover {
-  background-color: #f8fafc;
+  background-color: #FAFBFC;
 }
 
-/* 5. Today Cell */
+/* Highlight O ngay hien tai */
 .fc-day-today {
-  background-color: #f0f9ff !important; /* sky-50 */
+  background-color: #DEEBFF !important; /* Xanh nhat Jira */
 }
 
-/* 6. Day Number */
+/* Tuy chinh so hien thi ngay */
 .fc-daygrid-day-top {
   flex-direction: row;
   padding: 8px;
@@ -122,8 +131,8 @@ body {
 
 .fc-daygrid-day-number {
   font-size: 0.875rem;
-  color: #475569; /* slate-600 */
-  font-weight: 500;
+  color: #42526E; 
+  font-weight: 700;
   text-decoration: none !important;
   width: 28px;
   height: 28px;
@@ -134,14 +143,14 @@ body {
   transition: all 0.2s;
 }
 
-/* Highlight Today Number */
+/* Highlight so cua ngay hien tai */
 .fc-day-today .fc-daygrid-day-number {
-  background-color: #2563eb; /* blue-600 */
+  background-color: #0052CC; /* Xanh dam Atlassian */
   color: white;
-  box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);
+  box-shadow: 0 2px 4px rgba(0, 82, 204, 0.2);
 }
 
-/* 7. Events Container */
+/* Tuy chinh vung chua su kien */
 .fc-daygrid-event {
   margin-top: 2px !important;
   margin-bottom: 2px !important;
@@ -154,27 +163,30 @@ body {
   padding: 0 !important;
 }
 
-/* 8. More Link (+2 more) */
+/* Tuy chinh lien ket xem them su kien (+2 more) */
 .fc-daygrid-more-link {
   font-size: 0.75rem;
-  font-weight: 600;
-  color: #64748b !important;
+  font-weight: 700;
+  color: #6B778C !important;
   text-decoration: none !important;
   padding-left: 8px;
   display: block;
   margin-top: 4px;
 }
+
 .fc-daygrid-more-link:hover {
-  color: #2563eb !important;
+  color: #0052CC !important;
   text-decoration: underline !important;
 }
 
-/* 9. TimeGrid Specific (Week/Day View) */
+/* Tuy chinh khung gio cho che do tuan/ngay */
 .fc-timegrid-slot {
-  height: 3rem !important; /* Các dòng giờ cao hơn cho thoáng */
+  height: 3rem !important; 
 }
+
 .fc-timegrid-slot-label-cushion {
   font-size: 0.75rem;
-  color: #64748b;
+  color: #6B778C;
+  font-weight: 700;
   text-transform: uppercase;
 }

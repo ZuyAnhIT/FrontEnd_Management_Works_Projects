@@ -4,7 +4,9 @@ import apiClient from "@/lib/apiClient";
 // INTERFACES & TYPES
 // =============================================================================
 
-// Định nghĩa cấu trúc dữ liệu Activity Log chuẩn
+/**
+ * Định nghĩa cấu trúc dữ liệu nhật ký hoạt động (Activity Log)
+ */
 export interface ActivityLog {
   id: number;
   
@@ -12,23 +14,23 @@ export interface ActivityLog {
   userName: string;
   userAvatar: string;
   
-  // Thông tin hành động
+  // Loại hành động thực hiện
   action: "CREATE" | "UPDATE" | "DELETE" | "MOVE_STATUS" | "START" | "COMPLETE" | "COMMENT" | string;
   
-  // Thông tin đối tượng bị tác động
+  // Thông tin đối tượng chịu tác động
   entityType: "TASK" | "PROJECT" | "WORKSPACE" | "SPRINT" | "USER" | "COMPANY" | string;
   entityName: string;
-  entityCode?: string | null; // Ví dụ: "ECOM-12"
+  entityCode?: string | null; // Ví dụ: ECOM-12
   entityId: number;
   
-  // Nội dung chi tiết (HTML)
+  // Nội dung chi tiết định dạng HTML
   description: string;
   
-  // Thời gian
+  // Thông tin thời gian
   timestamp: string;
   timeAgo: string;
   
-  // Context để điều hướng (quan trọng cho tính năng click)
+  // Định danh ngữ cảnh để điều hướng UI
   projectId?: number;
   workspaceId?: number;
 }
@@ -38,12 +40,12 @@ export interface ActivityLog {
 // =============================================================================
 
 /**
- * Lấy danh sách hoạt động dựa trên phạm vi (Scope)
- * * @param scope Phạm vi: "COMPANY" | "PROJECT" | "USER" | "WORKSPACE"
- * @param id ID của đối tượng scope (ví dụ: companyId, projectId...)
- * @param page Trang hiện tại (mặc định 0)
- * @param size Số lượng item (mặc định 20)
- * @returns Promise<ActivityLog[]> Danh sách hoạt động hoặc mảng rỗng nếu lỗi
+ * Lấy danh sách lịch sử hoạt động dựa trên phạm vi (Scope)
+ * @param scope Phạm vi truy vấn: COMPANY, PROJECT, USER, WORKSPACE
+ * @param id ID của đối tượng tương ứng với phạm vi
+ * @param page Số thứ tự trang (mặc định 0)
+ * @param size Số lượng bản ghi mỗi trang (mặc định 20)
+ * @returns Promise danh sách ActivityLog hoặc mảng rỗng nếu có lỗi
  */
 export const getActivities = async (
   scope: string, 
@@ -52,42 +54,40 @@ export const getActivities = async (
   size: number = 20
 ): Promise<ActivityLog[]> => {
   
-  // 1. Validation: Kiểm tra ID hợp lệ
+  // Kiểm tra tính hợp lệ của ID đầu vào
   if (!id || isNaN(id)) {
-    // Log cảnh báo nhẹ nhàng cho dev biết
-    console.warn(`[ActivityAPI] Invalid ID provided: ${id}`);
+    console.warn(`[Activity Service] Invalid ID provided: ${id}`);
     return [];
   }
 
   try {
-    // 2. Prepare Data: Chuẩn hóa dữ liệu đầu vào
+    // Chuẩn hóa tham số phạm vi và xây dựng URL
     const formattedScope = scope.toUpperCase(); 
     const url = `/activities/${formattedScope}/${id}`;
     
-    // 3. API Call
+    // Thực hiện gọi API với tham số phân trang
     const response = await apiClient.get(url, {
       params: { page, size }
     });
 
-    // Destructuring dữ liệu từ ApiResponse chuẩn (success, message, data)
+    // Trích xuất dữ liệu từ cấu trúc ApiResponse chuẩn
     const { success, message, data } = response.data;
     
-    // 4. Handle Success: Chỉ trả về data khi success = true
+    // Trả về dữ liệu nếu yêu cầu thành công và có dữ liệu
     if (success && data) {
       return data;
     }
     
-    // 5. Handle Logical Error: API trả về nhưng báo lỗi (success = false)
-    // Sử dụng 'message' từ API để log lý do
-    console.warn(`[ActivityAPI] Request failed. Server message: ${message}`);
+    // Ghi log cảnh báo nếu API phản hồi thất bại từ phía server
+    console.warn(`[Activity Service] Fetch failed: ${message}`);
     return [];
 
   } catch (error: any) {
-    // 6. Handle Network/System Error
-    // Ưu tiên lấy message từ response lỗi của API nếu có
-    const apiErrorMessage = error.response?.data?.message || error.message || "Unknown error";
+    // Xử lý lỗi hệ thống hoặc lỗi kết nối mạng
+    // Ưu tiên sử dụng thông báo lỗi từ phía Backend
+    const apiErrorMessage = error.response?.data?.message || error.message || "An unexpected error occurred";
     
-    console.error(`[ActivityAPI] Exception while fetching logs for ${scope}/${id}: ${apiErrorMessage}`);
+    console.error(`[Activity Service] Exception for ${scope}/${id}: ${apiErrorMessage}`);
     return []; 
   }
 };

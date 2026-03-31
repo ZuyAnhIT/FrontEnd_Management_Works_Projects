@@ -3,48 +3,54 @@
 import apiClient from "@/lib/apiClient";
 
 // =============================================================================
-// CONFIGURATION & CONSTANTS
+// INTERFACES & TYPES
 // =============================================================================
 
-// Base URL cho AI service (có thể override bằng env)
-const AI_BASE = process.env.NEXT_PUBLIC_AI_API_URL || "http://localhost:8001/api";
-
-// =============================================================================
-// INTERFACES
-// =============================================================================
-
+/**
+ * Cấu trúc yêu cầu gửi tin nhắn chat
+ */
 export interface ChatRequest {
   message: string;
   thread_id: string;
 }
 
+/**
+ * Cấu trúc phản hồi từ AI Service
+ */
 export interface ChatResponse {
   success?: boolean;
-  response?: string; // Nội dung trả lời từ AI
-  detail?: string;   // Thường dùng cho lỗi từ FastAPI/Python
-  message?: string;  // Thường dùng cho lỗi từ Java/Node
+  response?: string; // Nội dung phản hồi từ AI
+  detail?: string;   // Chi tiết lỗi từ backend Python/FastAPI
+  message?: string;  // Thông báo lỗi từ backend Java/NodeJS
 }
 
 // =============================================================================
-// ERROR HANDLING HELPER
+// CONFIGURATION & CONSTANTS
+// =============================================================================
+
+// Địa chỉ gốc của AI Service (ưu tiên từ biến môi trường)
+const AI_BASE = process.env.NEXT_PUBLIC_AI_API_URL || "http://localhost:8001/api";
+
+// =============================================================================
+// INTERNAL HELPERS
 // =============================================================================
 
 /**
- * Chuẩn hóa lỗi từ AI Service.
- * Ưu tiên lấy 'detail' hoặc 'message' từ response của Backend.
+ * Xử lý và chuẩn hóa thông báo lỗi từ AI Service
+ * Ưu tiên sử dụng thông tin lỗi trả về trực tiếp từ phía Backend
  */
 const handleServiceError = (error: any): never => {
   const responseData = error?.response?.data;
   
-  // Lấy message lỗi cụ thể từ server (hỗ trợ cả format Python 'detail' và chuẩn 'message')
+  // Trích xuất thông báo lỗi từ server (hỗ trợ cả định dạng detail và message)
   const serverMessage = responseData?.detail || responseData?.message;
 
   if (serverMessage && typeof serverMessage === "string") {
     throw new Error(serverMessage);
   }
 
-  // Nếu không có message từ server, ném lỗi gốc hoặc lỗi mặc định tiếng Anh
-  throw new Error(error.message || "AI Service is currently unavailable.");
+  // Trả về lỗi mặc định bằng tiếng Anh nếu không có phản hồi từ server
+  throw new Error(error.message || "AI service is unavailable");
 };
 
 // =============================================================================
@@ -52,13 +58,13 @@ const handleServiceError = (error: any): never => {
 // =============================================================================
 
 /**
- * Gửi tin nhắn chat dạng Text (JSON)
- * POST /api/chat
+ * Gửi tin nhắn văn bản đến hệ thống AI
  */
 export const sendChatMessage = async (payload: ChatRequest): Promise<ChatResponse> => {
   try {
-    // Axios tự động set Content-Type: application/json cho object
-    const res = await apiClient.post(`${AI_BASE}/chat`, payload);
+    const url = `${AI_BASE}/chat`;
+    const res = await apiClient.post(url, payload);
+    
     return res.data as ChatResponse;
   } catch (error) {
     return handleServiceError(error);
@@ -66,22 +72,22 @@ export const sendChatMessage = async (payload: ChatRequest): Promise<ChatRespons
 };
 
 /**
- * Gửi file kèm tin nhắn (Upload File)
- * POST /api/chat/upload
+ * Gửi tệp đính kèm kèm theo tin nhắn đến hệ thống AI (Upload File)
  */
 export const uploadChatFile = async (
   payload: ChatRequest,
   file: File
 ): Promise<ChatResponse> => {
-  // Tạo FormData để gửi file
+  // Khởi tạo FormData để truyền tải dữ liệu tệp tin và tin nhắn
   const formData = new FormData();
   formData.append("file", file);
   formData.append("message", payload.message);
   formData.append("thread_id", payload.thread_id);
 
   try {
-    // Không cần set thủ công Content-Type, trình duyệt và Axios sẽ tự xử lý boundary
-    const res = await apiClient.post(`${AI_BASE}/chat/upload`, formData);
+    const url = `${AI_BASE}/chat/upload`;
+    const res = await apiClient.post(url, formData);
+    
     return res.data as ChatResponse;
   } catch (error) {
     return handleServiceError(error);

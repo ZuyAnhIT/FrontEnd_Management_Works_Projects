@@ -1,147 +1,175 @@
-"use client"
+"use client";
 
-import React, { createContext, useContext, useState, useCallback, ReactNode } from "react"
-import { CheckCircle2, XCircle, AlertTriangle, Info, X } from "lucide-react"
-import clsx from "clsx" // Giữ nguyên clsx hoặc chuyển thành cn nếu bạn có sẵn
+import React, { createContext, useContext, useState, useCallback, ReactNode, useMemo } from "react";
+import { CheckCircle2, XCircle, AlertTriangle, Info, X } from "lucide-react";
+
+// Internal Utils
+import { cn } from "@/lib/utils";
 
 // =============================================================================
-// 1. INTERFACES & CONTEXT
+// INTERFACES & TYPES
 // =============================================================================
 
-type ToastType = "success" | "error" | "warning" | "info"
+export type ToastType = "success" | "error" | "warning" | "info";
 
 interface Toast {
-    id: string
-    message: string
-    type: ToastType
+  id: string;
+  message: string;
+  type: ToastType;
 }
 
 interface ToastContextType {
-    showToast: (message: string, type?: ToastType, duration?: number) => void
-    removeToast: (id: string) => void
+  /**
+   * Hiển thị thông báo Toast mới
+   * @param message Nội dung thông báo
+   * @param type Loại thông báo (mặc định: info)
+   * @param duration Thời gian hiển thị tính theo ms (mặc định: 4000)
+   */
+  showToast: (message: string, type?: ToastType, duration?: number) => void;
+  removeToast: (id: string) => void;
 }
 
-const ToastContext = createContext<ToastContextType | undefined>(undefined)
+const ToastContext = createContext<ToastContextType | undefined>(undefined);
 
 // =============================================================================
-// 2. TOAST PROVIDER
+// TOAST CONFIGURATIONS
 // =============================================================================
 
+/**
+ * Cấu hình định dạng và biểu tượng cho từng loại thông báo
+ */
+const TOAST_CONFIG = {
+  success: {
+    icon: <CheckCircle2 className="w-5 h-5 text-green-600" />,
+    borderClass: "border-l-green-500",
+    bgIconClass: "bg-green-50",
+    title: "Success",
+  },
+  error: {
+    icon: <XCircle className="w-5 h-5 text-red-600" />,
+    borderClass: "border-l-red-500",
+    bgIconClass: "bg-red-50",
+    title: "Error",
+  },
+  warning: {
+    icon: <AlertTriangle className="w-5 h-5 text-amber-600" />,
+    borderClass: "border-l-amber-500",
+    bgIconClass: "bg-amber-50",
+    title: "Warning",
+  },
+  info: {
+    icon: <Info className="w-5 h-5 text-blue-600" />,
+    borderClass: "border-l-blue-500",
+    bgIconClass: "bg-blue-50",
+    title: "Info",
+  },
+};
+
+// =============================================================================
+// TOAST PROVIDER
+// =============================================================================
+
+/**
+ * Thành phần cung cấp ngữ cảnh thông báo (Toast Context) cho toàn hệ thống.
+ * Quản lý danh sách các thông báo đang hiển thị và xử lý logic tự động đóng.
+ */
 export const ToastProvider = ({ children }: { children: ReactNode }) => {
-    const [toasts, setToasts] = useState<Toast[]>([])
+  const [toasts, setToasts] = useState<Toast[]>([]);
 
-    // Logic: Xóa toast khỏi state
-    const removeToast = useCallback((id: string) => {
-        setToasts((prev) => prev.filter((t) => t.id !== id))
-    }, [])
+  // ---------------------------------------------------------------------------
+  // LOGIC HANDLERS
+  // ---------------------------------------------------------------------------
 
-    // Logic: Thêm toast vào state và tự động xóa sau duration
-    const showToast = useCallback(
-        (message: string, type: ToastType = "info", duration = 4000) => {
-            const id = crypto.randomUUID()
-            setToasts((prev) => [...prev, { id, message, type }])
+  /**
+   * Gỡ bỏ một thông báo cụ thể dựa trên ID
+   */
+  const removeToast = useCallback((id: string) => {
+    setToasts((prev) => prev.filter((toast) => toast.id !== id));
+  }, []);
 
-            setTimeout(() => {
-                removeToast(id)
-            }, duration)
-        },
-        [removeToast]
-    )
+  /**
+   * Tạo và hiển thị một thông báo mới
+   */
+  const showToast = useCallback(
+    (message: string, type: ToastType = "info", duration = 4000) => {
+      const id = crypto.randomUUID();
+      setToasts((prev) => [...prev, { id, message, type }]);
 
-    // Cấu hình icon và màu sắc theo style Minimalist
-    const getToastStyles = (type: ToastType) => {
-        switch (type) {
-            case "success":
-                return {
-                    icon: <CheckCircle2 className="w-5 h-5 text-green-600" />,
-                    borderClass: "border-l-green-500",
-                    bgIconClass: "bg-green-50",
-                    title: "Success"
-                }
-            case "error":
-                return {
-                    icon: <XCircle className="w-5 h-5 text-red-600" />,
-                    borderClass: "border-l-red-500",
-                    bgIconClass: "bg-red-50",
-                    title: "Error"
-                }
-            case "warning":
-                return {
-                    icon: <AlertTriangle className="w-5 h-5 text-amber-600" />,
-                    borderClass: "border-l-amber-500",
-                    bgIconClass: "bg-amber-50",
-                    title: "Warning"
-                }
-            default: // info
-                return {
-                    icon: <Info className="w-5 h-5 text-blue-600" />,
-                    borderClass: "border-l-blue-500",
-                    bgIconClass: "bg-blue-50",
-                    title: "Info"
-                }
-        }
-    }
+      // Tự động xóa thông báo sau khoảng thời gian quy định
+      setTimeout(() => {
+        removeToast(id);
+      }, duration);
+    },
+    [removeToast]
+  );
 
-    return (
-        <ToastContext.Provider value={{ showToast, removeToast }}>
-            {children}
+  const contextValue = useMemo(() => ({ showToast, removeToast }), [showToast, removeToast]);
 
-            {/* Toast Container */}
-            {/* Vị trí cố định, lớp z-index cao */}
-            <div className="fixed top-4 right-4 z-[9999] flex flex-col gap-3 w-full max-w-sm pointer-events-none">
-                {toasts.map((toast) => {
-                    const style = getToastStyles(toast.type)
-                    
-                    return (
-                        <div
-                            key={toast.id}
-                            className={clsx(
-                                // Base styles: shadow, rounded, border-l-4
-                                "pointer-events-auto relative flex items-start gap-3 p-4 rounded-lg shadow-lg bg-white border border-slate-100",
-                                "animate-in slide-in-from-right-full duration-300", // Animation mượt mà
-                                "border-l-[4px]", // Viền trái màu để nhận diện nhanh
-                                style.borderClass
-                            )}
-                        >
-                            {/* Icon Wrapper */}
-                            <div className={clsx("p-1 rounded-full shrink-0", style.bgIconClass)}>
-                                {style.icon}
-                            </div>
+  // ---------------------------------------------------------------------------
+  // RENDER
+  // ---------------------------------------------------------------------------
+  return (
+    <ToastContext.Provider value={contextValue}>
+      {children}
 
-                            {/* Content */}
-                            <div className="flex-1 pt-0.5">
-                                {/* Tiêu đề Toast */}
-                                <p className="text-sm font-medium text-slate-800 leading-tight">
-                                    {style.title}
-                                </p>
-                                {/* Message */}
-                                <p className="text-sm text-slate-500 mt-1 leading-snug">
-                                    {toast.message}
-                                </p>
-                            </div>
+      {/* Vùng chứa danh sách các Toast (Toast Container) */}
+      <div className="fixed top-4 right-4 z-[9999] flex flex-col gap-3 w-full max-w-sm pointer-events-none">
+        {toasts.map((toast) => {
+          const config = TOAST_CONFIG[toast.type] || TOAST_CONFIG.info;
 
-                            {/* Close Button */}
-                            <button
-                                onClick={() => removeToast(toast.id)}
-                                className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-1 rounded transition-colors"
-                                title="Close Notification"
-                            >
-                                <X className="w-4 h-4" />
-                            </button>
-                        </div>
-                    )
-                })}
+          return (
+            <div
+              key={toast.id}
+              className={cn(
+                "pointer-events-auto relative flex items-start gap-3 p-4 rounded-lg shadow-lg bg-white border border-slate-100 transition-all",
+                "animate-in slide-in-from-right-full duration-300",
+                "border-l-[4px]",
+                config.borderClass
+              )}
+            >
+              {/* Vùng chứa biểu tượng đại diện */}
+              <div className={cn("p-1 rounded-full shrink-0", config.bgIconClass)}>
+                {config.icon}
+              </div>
+
+              {/* Nội dung thông báo */}
+              <div className="flex-1 pt-0.5 min-w-0">
+                <p className="text-sm font-bold text-slate-900 leading-tight">
+                  {config.title}
+                </p>
+                <p className="text-sm text-slate-500 mt-1 leading-snug break-words">
+                  {toast.message}
+                </p>
+              </div>
+
+              {/* Nút đóng thông báo nhanh */}
+              <button
+                onClick={() => removeToast(toast.id)}
+                className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-1 rounded transition-colors"
+                title="Close notification"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
-        </ToastContext.Provider>
-    )
-}
+          );
+        })}
+      </div>
+    </ToastContext.Provider>
+  );
+};
 
 // =============================================================================
-// 3. USE HOOK
+// CUSTOM HOOK
 // =============================================================================
 
+/**
+ * Hook sử dụng để kích hoạt thông báo Toast trong các thành phần UI.
+ * Phải được sử dụng bên trong ToastProvider.
+ */
 export const useToast = () => {
-    const ctx = useContext(ToastContext)
-    if (!ctx) throw new Error("useToast must be used within a ToastProvider")
-    return ctx
-}
+  const context = useContext(ToastContext);
+  if (!context) {
+    throw new Error("useToast must be used within a ToastProvider");
+  }
+  return context;
+};

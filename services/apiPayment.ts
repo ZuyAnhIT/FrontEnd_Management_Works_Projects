@@ -1,6 +1,12 @@
-// services/apiPayment.ts
 import apiClient from "@/lib/apiClient";
 
+// =============================================================================
+// INTERFACES & TYPES
+// =============================================================================
+
+/**
+ * Thông tin yêu cầu thanh toán gói cước
+ */
 export interface CheckoutRequest {
   companyId: number;
   planId: number;
@@ -9,11 +15,17 @@ export interface CheckoutRequest {
   cancelUrl: string;
 }
 
+/**
+ * Thông tin phản hồi khi khởi tạo phiên thanh toán
+ */
 export interface CheckoutResponse {
   transactionCode: string;
   checkoutUrl: string;
 }
 
+/**
+ * Thông tin gói dịch vụ hiện tại và hạn mức tài nguyên của công ty
+ */
 export interface MySubscriptionResponse {
   planName: string;
   planCode: string;
@@ -31,14 +43,20 @@ export interface MySubscriptionResponse {
   maxStorageBytes: number;
 }
 
+/**
+ * Thông tin tóm tắt giao dịch trong danh sách lịch sử
+ */
 export interface TransactionListResponse {
   transactionCode: string;
   planName: string;
   amount: number;
-  status: string; // "SUCCESS", "PENDING", "CANCELLED"
+  status: string; // SUCCESS, PENDING, CANCELLED
   createdAt: string;
 }
 
+/**
+ * Thông tin chi tiết của một giao dịch (Hóa đơn/Biên lai)
+ */
 export interface TransactionDetailResponse {
   transactionCode: string;
   createdAt: string;
@@ -56,6 +74,9 @@ export interface TransactionDetailResponse {
   isPendingCancel: boolean;
 }
 
+/**
+ * Các tham số dùng để lọc và phân trang lịch sử giao dịch
+ */
 export interface TransactionHistoryParams {
   companyId: number;
   page?: number;
@@ -65,83 +86,114 @@ export interface TransactionHistoryParams {
   endDate?: string;
 }
 
+/**
+ * Dữ liệu yêu cầu khi thực hiện hủy giao dịch
+ */
 export interface CancelTransactionPayload {
   companyId: number;
   cancellationReason?: string;
 }
 
+// =============================================================================
+// API METHODS
+// =============================================================================
+
 /**
- * Lấy danh sách lịch sử giao dịch của công ty
+ * Truy vấn danh sách lịch sử giao dịch của công ty
  */
 export const getTransactionHistory = async (params: TransactionHistoryParams) => {
   try {
-    const res = await apiClient.get(`/payments/checkout/history`, { params });
+    const res = await apiClient.get("/payments/checkout/history", { params });
     const { success, message, data } = res.data;
-    if (!success) throw new Error(message || "Không thể lấy lịch sử giao dịch.");
-    return data; // Trả về PageResponseDTO
+
+    if (!success) {
+      throw new Error(message || "Failed to fetch transaction history");
+    }
+    return data;
   } catch (err: any) {
-    throw new Error(err.response?.data?.message || "Lỗi khi tải lịch sử giao dịch.");
+    const errorMsg = err.response?.data?.message || "An error occurred while loading transaction history";
+    throw new Error(errorMsg);
   }
 };
 
 /**
- * Lấy chi tiết một giao dịch (Biên lai)
+ * Truy vấn thông tin chi tiết của một giao dịch cụ thể dựa trên mã giao dịch
  */
-export const getTransactionDetail = async (transactionCode: string, companyId: number): Promise<TransactionDetailResponse> => {
+export const getTransactionDetail = async (
+  transactionCode: string, 
+  companyId: number
+): Promise<TransactionDetailResponse> => {
   try {
     const res = await apiClient.get(`/payments/checkout/history/${transactionCode}`, {
       params: { companyId }
     });
     const { success, message, data } = res.data;
-    if (!success) throw new Error(message || "Không thể lấy chi tiết giao dịch.");
+
+    if (!success) {
+      throw new Error(message || "Failed to fetch transaction details");
+    }
     return data;
   } catch (err: any) {
-    throw new Error(err.response?.data?.message || "Lỗi khi tải chi tiết giao dịch.");
+    const errorMsg = err.response?.data?.message || "An error occurred while loading transaction details";
+    throw new Error(errorMsg);
   }
 };
 
 /**
- * Lấy thông tin Gói cước và Sức khỏe tài nguyên của Công ty hiện tại
+ * Truy vấn thông tin gói dịch vụ và tình trạng sử dụng tài nguyên hiện tại
  */
 export const getMySubscription = async (companyId: number): Promise<MySubscriptionResponse> => {
   try {
-    const res = await apiClient.get(`/plans/my-subscription`, { 
-        params: { companyId } 
+    const res = await apiClient.get("/plans/my-subscription", { 
+      params: { companyId } 
     });
     const { success, message, data } = res.data;
     
-    if (!success) throw new Error(message || "Không thể lấy thông tin gói cước.");
+    if (!success) {
+      throw new Error(message || "Failed to fetch subscription information");
+    }
     return data;
   } catch (err: any) {
-    throw new Error(err.response?.data?.message || "Lỗi kết nối khi lấy dữ liệu gói cước.");
+    const errorMsg = err.response?.data?.message || "An error occurred while loading subscription data";
+    throw new Error(errorMsg);
   }
 };
 
 /**
- * Gọi API tạo phiên thanh toán (Checkout Session) với PayOS
+ * Khởi tạo phiên thanh toán mới với cổng thanh toán trực tuyến
  */
 export const createCheckoutSession = async (payload: CheckoutRequest): Promise<CheckoutResponse> => {
   try {
-    const res = await apiClient.post(`/payments/checkout`, payload);
+    const res = await apiClient.post("/payments/checkout", payload);
     const { success, message, data } = res.data;
     
-    if (!success) throw new Error(message || "Failed to create checkout session.");
+    if (!success) {
+      throw new Error(message || "Failed to create checkout session");
+    }
     return data;
   } catch (err: any) {
-    throw new Error(err.response?.data?.message || "Lỗi khi kết nối đến cổng thanh toán.");
+    const errorMsg = err.response?.data?.message || "An error occurred while connecting to the payment gateway";
+    throw new Error(errorMsg);
   }
 };
 
 /**
- * Hủy một giao dịch đang ở trạng thái PENDING
+ * Thực hiện hủy bỏ một giao dịch đang ở trạng thái chờ thanh toán
  */
-export const cancelTransaction = async (transactionCode: string, payload: CancelTransactionPayload): Promise<void> => {
+export const cancelTransaction = async (
+  transactionCode: string, 
+  payload: CancelTransactionPayload
+): Promise<void> => {
   try {
-    // Lưu ý: Đảm bảo đường dẫn khớp với config backend của bạn
-    const res = await apiClient.post(`/payments/checkout/${transactionCode}/cancel`, payload);
+    const url = `/payments/checkout/${transactionCode}/cancel`;
+    const res = await apiClient.post(url, payload);
     const { success, message } = res.data;
-    if (!success) throw new Error(message || "Không thể hủy giao dịch.");
+
+    if (!success) {
+      throw new Error(message || "Failed to cancel transaction");
+    }
   } catch (err: any) {
-    throw new Error(err.response?.data?.message || "Lỗi khi thực hiện hủy giao dịch.");
+    const errorMsg = err.response?.data?.message || "An error occurred while canceling transaction";
+    throw new Error(errorMsg);
   }
 };

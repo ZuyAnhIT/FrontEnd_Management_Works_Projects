@@ -1,6 +1,10 @@
 "use client";
 
-import { useMemo } from "react";
+// =============================================================================
+// 1. IMPORT
+// =============================================================================
+
+import React, { useMemo } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { 
@@ -9,25 +13,31 @@ import {
   Flame, 
   CheckCircle2, 
   Bookmark, 
-  Bug,
-  LucideIcon
+  Bug
 } from "lucide-react";
+
+// Internal Services & Utils
 import { TaskSummary } from "@/services/apiProject";
+import { cn } from "@/lib/utils";
 
 // =============================================================================
-// 1. CONFIGURATION & HELPERS
+// 2. CONFIGURATION & HELPERS
 // =============================================================================
 
-// Cấu hình style cho mức độ ưu tiên
+/**
+ * Cấu hình màu sắc viền trái dựa trên mức độ ưu tiên của công việc.
+ */
 const PRIORITY_STYLES: Record<string, string> = {
-  URGENT: "border-l-4 border-l-red-500 bg-red-50/30",
-  HIGH: "border-l-4 border-l-orange-500 bg-orange-50/30",
-  MEDIUM: "border-l-4 border-l-blue-500",
-  LOW: "border-l-4 border-l-slate-400",
-  DEFAULT: "border-l-4 border-l-slate-300",
+  URGENT: "border-l-[3px] border-l-red-500 bg-red-50/20",
+  HIGH: "border-l-[3px] border-l-orange-500 bg-orange-50/20",
+  MEDIUM: "border-l-[3px] border-l-blue-500",
+  LOW: "border-l-[3px] border-l-slate-400",
+  DEFAULT: "border-l-[3px] border-l-slate-300",
 };
 
-// Hàm format ngày tháng (Tách ra để tái sử dụng và tránh tạo lại hàm)
+/**
+ * Định dạng ngày tháng hiển thị dạng ngắn gọn (Ví dụ: "Oct 24")
+ */
 const formatDate = (dateString?: string) => {
   if (!dateString) return null;
   try {
@@ -40,20 +50,25 @@ const formatDate = (dateString?: string) => {
   }
 };
 
-// Hàm tạo style động cho Badge (Epic, Status) dựa trên mã màu Hex
-const getDynamicBadgeStyle = (colorHex?: string) => {
-  const color = colorHex || "#64748b"; // Slate-500 fallback
+/**
+ * Hàm tạo CSS động cho các thẻ Badge (Epic, Status) dựa trên mã màu HEX từ API.
+ */
+const getDynamicBadgeStyle = (colorHex?: string): React.CSSProperties => {
+  const color = colorHex || "#64748b"; // Fallback to slate-500
   return {
     color: color,
-    borderColor: `${color}40`,     // Opacity 25%
-    backgroundColor: `${color}10`, // Opacity 10%
+    borderColor: `${color}40`,     // Opacity 25% for border
+    backgroundColor: `${color}10`, // Opacity 10% for background
   };
 };
 
 // =============================================================================
-// 2. SUB-COMPONENTS
+// 3. SUB-COMPONENTS
 // =============================================================================
 
+/**
+ * Biểu tượng thể hiện loại công việc (Story, Bug, Task).
+ */
 const TaskTypeIcon = ({ type }: { type: string }) => {
   switch (type) {
     case "BUG": 
@@ -66,40 +81,45 @@ const TaskTypeIcon = ({ type }: { type: string }) => {
 };
 
 // =============================================================================
-// 3. MAIN COMPONENT
+// 4. MAIN COMPONENT
 // =============================================================================
 
 interface BacklogTaskItemProps {
   task: TaskSummary;
   index: number;
   onClick?: () => void;
-  isOverlay?: boolean; // Cờ báo hiệu item này đang được kéo (Overlay)
+  isOverlay?: boolean; // Cờ báo hiệu component đang được render dưới dạng "bóng" khi kéo thả
 }
 
+/**
+ * Thành phần hiển thị một thẻ công việc trong danh sách Backlog.
+ * Hỗ trợ kéo thả (Drag and Drop) và hiển thị thông tin metadata đầy đủ.
+ */
 export default function BacklogTaskItem({ 
   task, 
   index, 
   onClick, 
-  isOverlay 
+  isOverlay = false 
 }: BacklogTaskItemProps) {
   
-  // --- PREPARE DATA ---
+  // ---------------------------------------------------------------------------
+  // 5. PREPARE DATA
+  // ---------------------------------------------------------------------------
   
-  // Style ưu tiên
   const priorityClass = PRIORITY_STYLES[task.priority] || PRIORITY_STYLES.DEFAULT;
-  
-  // Thông tin Status & Epic
   const statusName = task.status?.name || "Unknown";
   const epicName = task.epic?.name;
   
-  // Style động
-  const statusStyle = getDynamicBadgeStyle(task.status?.color);
-  const epicStyle = getDynamicBadgeStyle(task.epic?.color);
+  const statusStyle = useMemo(() => getDynamicBadgeStyle(task.status?.color), [task.status?.color]);
+  const epicStyle = useMemo(() => getDynamicBadgeStyle(task.epic?.color), [task.epic?.color]);
 
-  // ID cho dnd-kit
+  // Sinh ID duy nhất cho dnd-kit
   const sortableId = useMemo(() => task.id.toString(), [task.id]);
 
-  // --- DND-KIT HOOK ---
+  // ---------------------------------------------------------------------------
+  // 6. DND-KIT HOOK & STYLES
+  // ---------------------------------------------------------------------------
+  
   const {
     attributes,
     listeners,
@@ -110,58 +130,60 @@ export default function BacklogTaskItem({
   } = useSortable({
     id: sortableId,
     data: { type: "Task", task, index },
-    disabled: isOverlay, // Vô hiệu hóa sortable logic nếu đây là item overlay
+    disabled: isOverlay, 
   });
 
-  // --- DND STYLES ---
-  
-  // Style cơ bản
+  // Style áp dụng cho Item đang nằm trên luồng bình thường
   const baseStyle: React.CSSProperties = {
     transform: CSS.Translate.toString(transform),
     transition,
-    opacity: isDragging ? 0.3 : 1, // Làm mờ item gốc khi đang kéo
+    opacity: isDragging ? 0.4 : 1, // Làm mờ nhẹ phần tử gốc khi kéo
     cursor: isDragging ? 'grabbing' : 'grab',
     touchAction: 'none',
   };
 
-  // Style khi đang kéo (Overlay) - Nổi lên trên
+  // Style áp dụng cho Item "bóng" (Overlay) đang dính vào con trỏ chuột
   const overlayStyleConfig: React.CSSProperties = {
     cursor: 'grabbing',
     opacity: 1,
-    transform: 'scale(1.02)',
-    boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)',
+    transform: 'scale(1.02)', // Phóng to nhẹ để tạo cảm giác "nhấc lên"
+    boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)',
     zIndex: 999,
   };
 
   const finalStyle = isOverlay ? overlayStyleConfig : baseStyle;
 
-  // --- RENDER ---
+  // ---------------------------------------------------------------------------
+  // 7. RENDER
+  // ---------------------------------------------------------------------------
+  
   return (
     <div
       ref={setNodeRef}
       style={finalStyle}
       {...(!isOverlay ? { ...attributes, ...listeners } : {})}
       onClick={onClick}
-      className={`
-        group flex flex-col sm:flex-row sm:items-center gap-3 p-3 bg-white border rounded-r-lg select-none mb-2
-        ${priorityClass}
-        ${!isDragging && !isOverlay ? "hover:shadow-md hover:border-blue-300 transition-all" : ""}
-        ${isDragging ? "border-dashed border-slate-300 bg-slate-50" : "border-slate-200"}
-      `}
+      className={cn(
+        "group flex flex-col sm:flex-row sm:items-center gap-3 p-3 bg-white border rounded-r-xl select-none mb-2",
+        "outline-none", // Loại bỏ viền xanh mặc định của dnd-kit khi focus
+        priorityClass,
+        !isDragging && !isOverlay && "hover:shadow-md hover:border-blue-300 transition-all",
+        isDragging ? "border-dashed border-slate-300 bg-slate-50/80" : "border-slate-200"
+      )}
     >
       
-      {/* --- LEFT COLUMN: INFO --- */}
+      {/* KHỐI TRÁI: THÔNG TIN CHÍNH (IDENTIFICATION) */}
       <div className="flex-1 min-w-0 pointer-events-none"> 
-        {/* Meta Row: Type, Code, Epic */}
-        <div className="flex items-center gap-2 mb-1">
-           <div className="flex items-center gap-1.5 text-xs font-mono font-bold text-slate-500">
+        <div className="flex items-center gap-2.5 mb-1.5">
+           
+           <div className="flex items-center gap-1.5 text-xs font-mono font-bold text-slate-500 uppercase tracking-widest">
              <TaskTypeIcon type={task.taskType} />
              <span>{task.taskCode}</span>
            </div>
 
            {epicName && (
              <span 
-               className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide border truncate max-w-[120px]"
+               className="px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest border truncate max-w-[140px]"
                style={epicStyle}
              >
                {epicName}
@@ -169,49 +191,44 @@ export default function BacklogTaskItem({
            )}
         </div>
         
-        {/* Task Title */}
-        <h4 className="text-sm font-medium text-slate-800 truncate group-hover:text-blue-700">
+        <h4 className="text-sm font-semibold text-slate-800 truncate group-hover:text-blue-700 transition-colors">
            {task.title}
         </h4>
       </div>
 
-      {/* --- RIGHT COLUMN: META DATA --- */}
-      <div className="flex items-center gap-4 sm:justify-end w-full sm:w-auto mt-2 sm:mt-0 text-xs text-slate-500 shrink-0 pointer-events-none">
+      {/* KHỐI PHẢI: THÔNG TIN PHỤ & NGƯỜI THỰC HIỆN (META DATA) */}
+      <div className="flex items-center gap-3 sm:justify-end w-full sm:w-auto mt-3 sm:mt-0 text-xs text-slate-500 shrink-0 pointer-events-none">
           
-          {/* Status Badge */}
           <span 
-            className="px-2 py-0.5 rounded font-bold text-[10px] uppercase border"
+            className="px-2 py-1 rounded-md font-bold text-[9px] uppercase tracking-widest border"
             style={statusStyle}
           >
             {statusName}
           </span>
 
-          {/* Story Points */}
           {task.storyPoints != null && (
-             <div className="flex items-center gap-1 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
-                <Flame className="w-3 h-3 text-slate-400" />
-                <span className="font-mono font-bold text-slate-600">{task.storyPoints}</span>
+             <div className="flex items-center gap-1.5 bg-slate-50 px-2 py-1 rounded-md border border-slate-200">
+                <Flame className="w-3 h-3 text-orange-500" />
+                <span className="font-mono font-bold text-slate-600 text-[10px]">{task.storyPoints}</span>
              </div>
           )}
 
-          {/* Assignee Avatar */}
           {task.assignee?.avatarUrl ? (
              <img 
                src={task.assignee.avatarUrl} 
-               alt="Assignee" 
-               className="w-6 h-6 rounded-full border border-white shadow-sm object-cover" 
+               alt="Assignee Avatar" 
+               className="w-7 h-7 rounded-full border-2 border-white shadow-sm object-cover" 
              />
           ) : (
-             <div className="w-6 h-6 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center">
-                <User className="w-3 h-3 text-slate-400" />
+             <div className="w-7 h-7 rounded-full bg-slate-100 border-2 border-white shadow-sm flex items-center justify-center">
+                <User className="w-3.5 h-3.5 text-slate-400" />
              </div>
           )}
 
-          {/* Due Date */}
           {task.dueDate && (
-             <div className="hidden sm:flex items-center gap-1 text-slate-400">
-                <Calendar className="w-3.5 h-3.5" />
-                <span>{formatDate(task.dueDate)}</span>
+             <div className="hidden sm:flex items-center gap-1.5 text-slate-400 bg-slate-50 px-2 py-1 rounded-md border border-slate-100">
+                <Calendar className="w-3 h-3" />
+                <span className="text-[10px] font-bold uppercase tracking-widest">{formatDate(task.dueDate)}</span>
              </div>
           )}
       </div>

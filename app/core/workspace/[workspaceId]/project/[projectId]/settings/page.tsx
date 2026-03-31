@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
-import { useParams, useRouter } from "next/navigation";
+// =============================================================================
+// 1. IMPORT (Libraries -> Internal Components -> Services)
+// =============================================================================
 
+import React, { useEffect, useState, useRef, useCallback } from "react";
+import { useParams, useRouter } from "next/navigation";
 import {
     Settings,
     Loader2,
@@ -15,21 +18,30 @@ import {
     UploadCloud,
 } from "lucide-react";
 
+// Services & Hooks
 import {
     getProjectDetail,
     updateProject,
     deleteProject,
 } from "@/services/apiProject";
-
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/components/ui/ToastProvider";
-import LoadingButton from "@/components/ui/LoadingButton";
+import { useProjectRole } from "@/hooks/useProjectRole";
+
+// UI Components
+import { LoadingButton } from "@/components/ui/LoadingButton"; // ✅ Da sua loi Import
 import ConfirmationModal from "@/components/ui/ConfirmationModal";
 import { Chatbot } from "@/components/chatbot/chatbot";
-import { useProjectRole } from "@/hooks/useProjectRole"; // ✅ Import Hook
+import { cn } from "@/lib/utils";
 
-// Helper URL ảnh (Giữ nguyên logic)
-const getFullImageUrl = (path: string | null | undefined) => {
+// =============================================================================
+// 2. UTILS
+// =============================================================================
+
+/**
+ * Chuan hoa URL hinh anh tu may chu hoac local preview
+ */
+const getFullImageUrl = (path: string | null | undefined): string | null => {
     if (!path) return null;
     if (path.startsWith("blob:") || path.startsWith("http")) return path;
     const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8082";
@@ -38,32 +50,44 @@ const getFullImageUrl = (path: string | null | undefined) => {
     return `${API_URL}/${cleanPath}`;
 };
 
+// =============================================================================
+// 3. MAIN COMPONENT
+// =============================================================================
+
 export default function ProjectSettingsPage() {
+    
+    // ---------------------------------------------------------------------------
+    // 4. HOOKS & CONTEXT
+    // ---------------------------------------------------------------------------
+    
     const { showToast } = useToast();
     const params = useParams();
     const router = useRouter();
+    const { activeCompany, isLoading: isAuthLoading } = useAuth();
 
     const workspaceId = Number(params.workspaceId);
     const projectId = Number(params.projectId);
-
-    const { activeCompany, isLoading: isAuthLoading } = useAuth();
     const companyId = activeCompany?.companyId;
 
-    // ✅ Lấy role hiện tại
+    // Kiem tra phan quyen de bao ve tuyen duong
     const { isGuest } = useProjectRole(projectId);
 
-    const [loading, setLoading] = useState(true);
-    const [saving, setSaving] = useState(false);
+    // ---------------------------------------------------------------------------
+    // 5. STATE MANAGEMENT
+    // ---------------------------------------------------------------------------
 
-    // File State
+    const [isLoading, setIsLoading] = useState(true);
+    const [isSaving, setIsSaving] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
+
+    // File & Preview States
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [coverPreview, setCoverPreview] = useState<string | null>(null);
 
-    const [deleting, setDeleting] = useState(false);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
-    const [form, setForm] = useState({
+    const [formData, setFormData] = useState({
         name: "",
         projectCode: "",
         description: "",
@@ -73,335 +97,318 @@ export default function ProjectSettingsPage() {
         dueDate: "",
     });
 
-    // ===================================================
-    // 1. ROUTE PROTECTION (Logic mới)
-    // ===================================================
+    // ---------------------------------------------------------------------------
+    // 6. BUSINESS LOGIC (Handlers)
+    // ---------------------------------------------------------------------------
+
+    /**
+     * Chan nguoi dung vao trang settings neu khong co quyen (Guest)
+     */
     useEffect(() => {
         if (isGuest) {
             router.replace(`/core/workspace/${workspaceId}/project/${projectId}`);
         }
     }, [isGuest, router, workspaceId, projectId]);
 
-    // ===================================================
-    // 2. LOAD DETAIL (Logic nghiệp vụ quan trọng)
-    // ===================================================
-    useEffect(() => {
-        if (isAuthLoading) return;
-        if (!companyId || !workspaceId || !projectId) {
-            setLoading(false);
+    /**
+     * Tai thong tin chi tiet dự án
+     */
+    const fetchProjectDetails = useCallback(async () => {
+        if (!companyId || !workspaceId || !projectId || isGuest) {
+            setIsLoading(false);
             return;
         }
 
-        // Nếu là Guest thì không fetch data (vì sẽ redirect)
-        if (isGuest) return;
+        try {
+            setIsLoading(true);
+            const data = await getProjectDetail(companyId, workspaceId, projectId);
 
-        const fetchData = async () => {
-            try {
-                setLoading(true);
-                const data = await getProjectDetail(companyId, workspaceId, projectId);
+            setFormData({
+                name: data.name || "",
+                projectCode: data.projectCode || "",
+                description: data.description || "",
+                goal: data.goal || "",
+                priority: data.priority || "MEDIUM",
+                startDate: data.startDate ? data.startDate.split("T")[0] : "",
+                dueDate: data.dueDate ? data.dueDate.split("T")[0] : "",
+            });
+            setCoverPreview(getFullImageUrl(data.coverImageUrl));
+        } catch (err: any) {
+            showToast(err.response?.data?.message || "Failed to load project configuration", "error");
+        } finally {
+            setIsLoading(false);
+        }
+    }, [companyId, workspaceId, projectId, isGuest, showToast]);
 
-                setForm({
-                    name: data.name || "",
-                    projectCode: data.projectCode || "",
-                    description: data.description || "",
-                    goal: data.goal || "",
-                    priority: data.priority || "MEDIUM",
-                    // Loại bỏ phần T...Z nếu có để format cho input type="date"
-                    startDate: data.startDate ? data.startDate.split("T")[0] : "",
-                    dueDate: data.dueDate ? data.dueDate.split("T")[0] : "",
-                });
-                // Set preview ảnh từ server
-                setCoverPreview(getFullImageUrl(data.coverImageUrl));
-            } catch (err: any) {
-                const message = err.response?.data?.message || err.message || "Failed to load project details";
-                showToast(message, "error");
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchData();
-    }, [companyId, workspaceId, projectId, isAuthLoading, showToast, isGuest]);
+    useEffect(() => {
+        if (!isAuthLoading) fetchProjectDetails();
+    }, [isAuthLoading, fetchProjectDetails]);
 
-    // Cleanup URL blob
+    /**
+     * Don dep memory leak cho blob URL
+     */
     useEffect(() => {
         return () => {
-            if (coverPreview && coverPreview.startsWith("blob:")) {
-                URL.revokeObjectURL(coverPreview);
-            }
+            if (coverPreview?.startsWith("blob:")) URL.revokeObjectURL(coverPreview);
         };
     }, [coverPreview]);
 
-    // ===================================================
-    // 3. HANDLERS (Logic nghiệp vụ quan trọng)
-    // ===================================================
-    const handleChange = (field: string, value: string) => {
-        setForm((prev) => ({ ...prev, [field]: value }));
+    const handleInputChange = (field: string, value: string) => {
+        setFormData((prev) => ({ ...prev, [field]: value }));
     };
 
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    /**
+     * Xu ly chon hinh anh cover
+     */
+    const handleFileSelection = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
 
-        // Validation
         if (file.size > 5 * 1024 * 1024) {
-            showToast("File size must be less than 5MB", "error");
+            showToast("Asset size exceeds 5MB limit", "error");
             return;
         }
         if (!file.type.startsWith("image/")) {
-            showToast("Please select a valid image file", "error");
+            showToast("Invalid file format. Please use JPG or PNG", "error");
             return;
         }
 
-        const objectUrl = URL.createObjectURL(file);
-        setCoverPreview(objectUrl);
+        setCoverPreview(URL.createObjectURL(file));
         setSelectedFile(file);
     };
 
-    const handleSubmit = async (e: React.FormEvent) => {
+    /**
+     * Cap nhat toan bo thong tin du an
+     */
+    const handleUpdateExecution = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!form.name.trim()) {
-            showToast("Project name is required", "warning");
+        if (!formData.name.trim()) {
+            showToast("Identity (Name) is mandatory", "warning");
             return;
         }
         if (!companyId) return;
 
-        setSaving(true);
+        setIsSaving(true);
         try {
             await updateProject(companyId, workspaceId, projectId, {
-                ...form,
-                file: selectedFile, // Gửi file mới
+                ...formData,
+                file: selectedFile,
             });
-
-            showToast("Project updated successfully!", "success");
-            // Reset input file
+            showToast("Project identity updated", "success");
             setSelectedFile(null);
             if (fileInputRef.current) fileInputRef.current.value = "";
         } catch (err: any) {
-            const message = err.response?.data?.message || err.message || "Update failed";
-            showToast(message, "error");
+            showToast(err.message || "Execution failed", "error");
         } finally {
-            setSaving(false);
+            setIsSaving(false);
         }
     };
 
-    const handleConfirmDelete = async () => {
+    /**
+     * Xac nhan tieu huy dự án
+     */
+    const handleConfirmPurge = async () => {
         if (!companyId || !workspaceId || !projectId) return;
-        setDeleting(true);
+        setIsDeleting(true);
         try {
             await deleteProject(companyId, workspaceId, projectId);
-            showToast("Project deleted successfully!", "success");
-            setIsDeleteModalOpen(false);
-            // Quan trọng: Điều hướng về trang Project List
+            showToast("Project moved to archive", "success");
             router.push(`/core/workspace/${workspaceId}/project`); 
         } catch (err: any) {
-            const message = err.response?.data?.message || err.message || "Delete failed";
-            showToast(message, "error");
-            setDeleting(false);
+            showToast(err.message || "Purge execution failed", "error");
+            setIsDeleting(false);
         }
     };
 
-    // ===================================================
-    // 4. RENDER UI
-    // ===================================================
+    // ---------------------------------------------------------------------------
+    // 7. RENDER LOGIC
+    // ---------------------------------------------------------------------------
 
-    // ✅ Chặn render nếu là Guest (đang chờ redirect)
     if (isGuest) return null;
 
-    if (isAuthLoading || loading)
+    if (isAuthLoading || isLoading) {
         return (
-            <div className="min-h-[80vh] flex items-center justify-center">
-                <Loader2 className="w-12 h-12 text-blue-500 animate-spin" />
+            <div className="min-h-[80vh] flex flex-col items-center justify-center gap-3">
+                <Loader2 className="w-10 h-10 text-[#0052CC] animate-spin opacity-80" />
+                <span className="text-[11px] font-black uppercase tracking-[0.2em] text-[#6B778C]">Syncing Project Data</span>
             </div>
         );
+    }
 
-    if (!companyId) return <div className="p-8 text-center">No Active Company</div>;
+    if (!companyId) return <div className="p-20 text-center font-black uppercase text-[#6B778C]">No Active Context</div>;
 
     return (
-        <div className="max-w-4xl mx-auto py-8 space-y-8 px-4">
+        <div className="max-w-4xl mx-auto py-10 space-y-10 px-6 animate-in fade-in duration-500">
             
-            {/* Settings Card */}
-            <div className="bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden animate-fadeInUp">
-                <div className="p-6 border-b border-gray-200 flex items-center gap-4 bg-slate-50">
-                    <div className="w-12 h-12 bg-blue-100 flex items-center justify-center rounded-lg border border-blue-200">
-                        <Settings className="w-6 h-6 text-blue-600" />
+            {/* MAIN SETTINGS CARD */}
+            <div className="bg-white rounded-2xl shadow-sm border border-[#DFE1E6] overflow-hidden">
+                <header className="p-6 border-b border-[#DFE1E6] flex items-center justify-between bg-[#FAFBFC]">
+                    <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-[#E3F2FD] flex items-center justify-center rounded-xl border border-[#B3D4FF]">
+                            <Settings className="w-6 h-6 text-[#0052CC] stroke-[2.5]" />
+                        </div>
+                        <div>
+                            <h1 className="text-[18px] font-black text-[#172B4D] uppercase tracking-tight">Project Attributes</h1>
+                            <p className="text-[13px] text-[#42526E] font-medium">Configure global identity and timeline.</p>
+                        </div>
                     </div>
-                    <div>
-                        <h1 className="text-xl font-bold text-gray-900">Project Settings</h1>
-                        <p className="text-sm text-gray-500">Manage general information.</p>
-                    </div>
-                </div>
+                </header>
 
-                <form onSubmit={handleSubmit}>
-                    <div className="p-6 space-y-5">
-                        
-                        {/* Cover Image Upload */}
-                        <div className="flex flex-col sm:flex-row gap-6 items-start sm:items-center p-4 bg-slate-50 rounded-lg border border-dashed border-slate-200">
-                            <div 
-                                className="relative group cursor-pointer shrink-0 w-full sm:w-48 h-28 bg-white border-2 border-white shadow-sm rounded-lg overflow-hidden"
-                                onClick={() => fileInputRef.current?.click()}
-                            >
-                                {coverPreview ? (
-                                    <img src={coverPreview} alt="Cover" className="w-full h-full object-cover" />
-                                ) : (
-                                    <div className="w-full h-full flex items-center justify-center bg-slate-100 text-slate-400">
-                                        <ImageIcon className="w-8 h-8" />
-                                    </div>
-                                )}
-                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center">
-                                    <Camera className="w-8 h-8 text-white" />
+                <form onSubmit={handleUpdateExecution} className="p-8 space-y-8">
+                    
+                    {/* COVER UPLOAD BOX */}
+                    <div className="flex flex-col sm:flex-row gap-8 items-start sm:items-center p-6 bg-[#F4F5F7] rounded-2xl border border-dashed border-[#DFE1E6] transition-colors hover:border-[#0052CC]">
+                        <div 
+                            className="relative group cursor-pointer shrink-0 w-full sm:w-60 h-32 bg-white border-2 border-white shadow-md rounded-xl overflow-hidden"
+                            onClick={() => fileInputRef.current?.click()}
+                        >
+                            {coverPreview ? (
+                                <img src={coverPreview} alt="Project Brand" className="w-full h-full object-cover" />
+                            ) : (
+                                <div className="w-full h-full flex items-center justify-center bg-[#F4F5F7] text-[#DFE1E6]">
+                                    <ImageIcon className="w-10 h-10" />
                                 </div>
-                                <div className="absolute bottom-2 right-2 bg-blue-600 text-white p-1.5 rounded-full shadow-md">
-                                    <UploadCloud className="w-3.5 h-3.5" />
-                                </div>
+                            )}
+                            <div className="absolute inset-0 bg-[#091E42]/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[1px]">
+                                <Camera className="w-8 h-8 text-white drop-shadow-md" />
                             </div>
-                            <div className="space-y-1">
-                                <h3 className="font-semibold text-slate-900">Project Cover</h3>
-                                <p className="text-xs text-slate-500 max-w-xs">Click image to upload. Max 5MB.</p>
-                                <input 
-                                    type="file" 
-                                    ref={fileInputRef} 
-                                    className="hidden" 
-                                    accept="image/png, image/jpeg, image/jpg"
-                                    onChange={handleFileChange}
-                                />
+                            <div className="absolute bottom-2 right-2 bg-[#0052CC] text-white p-2 rounded-xl shadow-lg border-2 border-white">
+                                <UploadCloud className="w-4 h-4 stroke-[3]" />
                             </div>
                         </div>
+                        <div className="space-y-2">
+                            <h3 className="font-black text-[#172B4D] text-base uppercase tracking-wide">Visual Identity</h3>
+                            <p className="text-[12px] text-[#6B778C] font-medium leading-relaxed max-w-xs">Recommended: 1200x400px. JPG, PNG formats supported. Max size 5MB.</p>
+                            <input 
+                                type="file" 
+                                ref={fileInputRef} 
+                                className="hidden" 
+                                accept="image/*"
+                                onChange={handleFileSelection}
+                            />
+                        </div>
+                    </div>
 
-                        {/* Name */}
-                        <div>
-                            <label className="font-semibold text-gray-700 text-sm mb-1.5 block">Project Name *</label>
+                    {/* CORE FIELDS */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2 md:col-span-1">
+                            <label className="text-[11px] font-black text-[#42526E] uppercase tracking-wider px-1">Project Name <span className="text-[#FF5630]">*</span></label>
                             <input
                                 type="text"
-                                value={form.name}
-                                onChange={(e) => handleChange("name", e.target.value)}
-                                className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all"
+                                value={formData.name}
+                                onChange={(e) => handleInputChange("name", e.target.value)}
+                                className="w-full h-12 border border-[#DFE1E6] rounded-xl px-4 font-bold text-[#172B4D] focus:border-[#0052CC] focus:ring-2 focus:ring-blue-50 outline-none transition-all"
                                 required
                             />
                         </div>
 
-                        {/* Code */}
-                        <div>
-                            <label className="font-semibold text-gray-700 text-sm mb-1.5 block">Project Code</label>
+                        <div className="space-y-2 md:col-span-1">
+                            <label className="text-[11px] font-black text-[#42526E] uppercase tracking-wider px-1">Internal Code</label>
                             <div className="relative">
-                                <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                <Hash className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6B778C]" />
                                 <input
                                     type="text"
-                                    value={form.projectCode}
-                                    onChange={(e) => handleChange("projectCode", e.target.value)}
-                                    className="w-full border border-gray-300 rounded-xl px-4 pl-10 py-3 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 uppercase"
+                                    value={formData.projectCode}
+                                    onChange={(e) => handleInputChange("projectCode", e.target.value)}
+                                    className="w-full h-12 border border-[#DFE1E6] rounded-xl px-4 pl-11 font-black text-[#172B4D] focus:border-[#0052CC] uppercase outline-none"
                                 />
                             </div>
                         </div>
 
-                        {/* Description */}
-                        <div>
-                            <label className="font-semibold text-gray-700 text-sm mb-1.5 block">Description</label>
+                        <div className="space-y-2 md:col-span-2">
+                            <label className="text-[11px] font-black text-[#42526E] uppercase tracking-wider px-1">Mission Statement / Description</label>
                             <textarea
                                 rows={3}
-                                value={form.description}
-                                onChange={(e) => handleChange("description", e.target.value)}
-                                className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 resize-none"
+                                value={formData.description}
+                                onChange={(e) => handleInputChange("description", e.target.value)}
+                                className="w-full border border-[#DFE1E6] rounded-xl px-4 py-3 font-medium text-[#42526E] focus:border-[#0052CC] outline-none resize-none"
                             />
                         </div>
-
-                        {/* Goal */}
-                        <div>
-                            <label className="font-semibold text-gray-700 text-sm mb-1.5 block">Goal</label>
-                            <textarea
-                                rows={2}
-                                value={form.goal}
-                                onChange={(e) => handleChange("goal", e.target.value)}
-                                className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 resize-none"
-                            />
-                        </div>
-
-                        {/* Other Fields */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                            <div>
-                                <label className="font-semibold text-gray-700 text-sm mb-1.5 block">Priority</label>
-                                <select
-                                    value={form.priority}
-                                    onChange={(e) => handleChange("priority", e.target.value)}
-                                    className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500 bg-white"
-                                >
-                                    <option value="LOW">Low</option>
-                                    <option value="MEDIUM">Medium</option>
-                                    <option value="HIGH">High</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label className="font-semibold text-gray-700 text-sm mb-1.5 block">Start Date</label>
-                                <input
-                                    type="date"
-                                    value={form.startDate}
-                                    onChange={(e) => handleChange("startDate", e.target.value)}
-                                    className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500"
-                                />
-                            </div>
-                            <div>
-                                <label className="font-semibold text-gray-700 text-sm mb-1.5 block">Due Date</label>
-                                <input
-                                    type="date"
-                                    value={form.dueDate}
-                                    onChange={(e) => handleChange("dueDate", e.target.value)}
-                                    className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500"
-                                />
-                            </div>
-                        </div>
-
                     </div>
 
-                    {/* Footer */}
-                    <div className="bg-gray-50 px-6 py-4 border-t border-gray-200 flex justify-end rounded-b-xl">
-                         <LoadingButton
+                    {/* TIMELINE & CRITICALITY */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4">
+                        <div className="space-y-2">
+                            <label className="text-[11px] font-black text-[#42526E] uppercase tracking-wider px-1">Priority Level</label>
+                            <select
+                                value={formData.priority}
+                                onChange={(e) => handleInputChange("priority", e.target.value)}
+                                className="w-full h-11 border border-[#DFE1E6] rounded-xl px-4 font-bold text-[#172B4D] bg-white outline-none cursor-pointer appearance-none focus:border-[#0052CC]"
+                            >
+                                <option value="LOW">Low</option>
+                                <option value="MEDIUM">Medium</option>
+                                <option value="HIGH">High</option>
+                            </select>
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-[11px] font-black text-[#42526E] uppercase tracking-wider px-1">Kick-off Date</label>
+                            <input
+                                type="date"
+                                value={formData.startDate}
+                                onChange={(e) => handleInputChange("startDate", e.target.value)}
+                                className="w-full h-11 border border-[#DFE1E6] rounded-xl px-4 font-medium text-[#172B4D] focus:border-[#0052CC] outline-none"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-[11px] font-black text-[#42526E] uppercase tracking-wider px-1">Target Deadline</label>
+                            <input
+                                type="date"
+                                value={formData.dueDate}
+                                onChange={(e) => handleInputChange("dueDate", e.target.value)}
+                                className="w-full h-11 border border-[#DFE1E6] rounded-xl px-4 font-medium text-[#172B4D] focus:border-[#0052CC] outline-none"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="pt-6 flex justify-end border-t border-[#F4F5F7]">
+                        <LoadingButton
                             type="submit"
-                            isLoading={saving}
-                            text="Save Changes"
-                            loadingText="Saving..."
-                            className="bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-sm px-8 py-2.5 rounded-lg"
-                            icon={<Save className="w-4 h-4 mr-2" />}
-                         />
+                            isLoading={isSaving}
+                            text="Update Settings"
+                            loadingText="Committing Changes..."
+                            className="bg-[#0052CC] hover:bg-[#0747A6] text-white font-black text-[12px] uppercase tracking-widest h-11 px-10 rounded-lg shadow-md active:scale-95 transition-all"
+                        />
                     </div>
                 </form>
             </div>
 
-            {/* Danger Zone */}
-            <div className="bg-white rounded-xl shadow-xl border border-red-200 overflow-hidden animate-fadeInUp delay-100">
-                <div className="p-6 border-b border-red-200 flex items-center gap-4 bg-red-50">
-                    <div className="w-12 h-12 bg-red-100 flex items-center justify-center rounded-lg border border-red-200">
-                        <AlertTriangle className="w-6 h-6 text-red-600" />
+            {/* DANGER ZONE (Jira Style) */}
+            <div className="bg-white rounded-2xl shadow-sm border border-[#FFEBE6] overflow-hidden">
+                <div className="p-6 border-b border-[#FFEBE6] flex items-center gap-4 bg-[#FFF5F2]">
+                    <div className="w-12 h-12 bg-[#FFEBE6] flex items-center justify-center rounded-xl border border-[#FFBDAD]">
+                        <AlertTriangle className="w-6 h-6 text-[#BF2600]" />
                     </div>
                     <div>
-                        <h1 className="text-xl font-bold text-red-900">Danger Zone</h1>
-                        <p className="text-sm text-red-700">Irreversible actions.</p>
+                        <h1 className="text-[16px] font-black text-[#BF2600] uppercase tracking-tight">Critical Actions</h1>
+                        <p className="text-[13px] text-[#DE350B] font-medium">Operations with irreversible impact.</p>
                     </div>
                 </div>
-                <div className="p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                    <div>
-                         <h3 className="font-bold text-gray-900">Delete Project</h3>
-                         <p className="text-sm text-gray-600 mt-1">This action will move the project to trash.</p>
+                <div className="p-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+                    <div className="space-y-1">
+                        <h3 className="font-black text-[#172B4D] text-sm uppercase tracking-wide">Decommission Project</h3>
+                        <p className="text-[13px] text-[#6B778C] font-medium leading-relaxed max-w-lg">
+                            Move this project to the trash. All tasks, cycles, and assets will be restricted and queued for archival.
+                        </p>
                     </div>
                     <LoadingButton
                         type="button"
-                        onClick={() => { if (form.name) setIsDeleteModalOpen(true); }}
-                        isLoading={deleting}
-                        text="Delete Project"
-                        className="bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-sm px-8 py-2.5 rounded-lg bg-red-600 hover:bg-red-700"
+                        onClick={() => setIsDeleteModalOpen(true)}
+                        isLoading={isDeleting}
+                        text="Archive Project"
+                        className="bg-[#FF5630] hover:bg-[#DE350B] text-white font-black text-[12px] uppercase tracking-widest h-11 px-8 rounded-lg active:scale-95 transition-all"
                         icon={<Trash2 className="w-4 h-4 mr-2" />}
                     />
                 </div>
             </div>
 
-            {/* Modal Delete */}
             <ConfirmationModal
                 isOpen={isDeleteModalOpen}
                 onClose={() => setIsDeleteModalOpen(false)}
-                onConfirm={handleConfirmDelete}
-                isLoading={deleting}
-                title="Delete Project?"
-                description={`Are you sure you want to delete "${form.name}"?`}
-                confirmText="Delete Project"
-                cancelText="Cancel"
+                onConfirm={handleConfirmPurge}
+                isLoading={isDeleting}
+                title="Archive Project?"
+                description={`This will move "${formData.name}" to the global recycle bin. Access for all members will be revoked.`}
+                confirmText="Execute Deletion"
                 modalVariant="danger"
             />
             <Chatbot />

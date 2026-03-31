@@ -1,9 +1,12 @@
 import apiClient from "@/lib/apiClient";
 
-// ============================================================================
-// 1. INTERFACES & TYPES
-// ============================================================================
+// =============================================================================
+// INTERFACES & TYPES
+// =============================================================================
 
+/**
+ * Các tính năng chi tiết của gói cước
+ */
 export interface PlanFeatures {
   api_access: boolean;
   custom_domain: boolean;
@@ -11,6 +14,9 @@ export interface PlanFeatures {
   dedicated_support: boolean;
 }
 
+/**
+ * Thông tin gói cước trong hệ thống quản trị
+ */
 export interface SystemPlan {
   id: number;
   planCode: string;
@@ -29,6 +35,9 @@ export interface SystemPlan {
   updatedAt: string;
 }
 
+/**
+ * Tham số tìm kiếm và lọc danh sách gói cước
+ */
 export interface SystemPlanSearchParams {
   page?: number;
   size?: number;
@@ -39,6 +48,9 @@ export interface SystemPlanSearchParams {
   searchStatus?: boolean; 
 }
 
+/**
+ * Cấu trúc phản hồi phân trang hệ thống
+ */
 export interface SystemPageResponse<T> {
   content: T[];
   pageNumber: number; 
@@ -49,6 +61,9 @@ export interface SystemPageResponse<T> {
   first: boolean;
 }
 
+/**
+ * Chi tiết cấu hình một gói cước
+ */
 export interface PlanDetail {
   id: number;
   planCode: string;
@@ -66,6 +81,9 @@ export interface PlanDetail {
   updatedAt: string;
 }
 
+/**
+ * Dữ liệu yêu cầu để tạo gói cước mới
+ */
 export interface CreatePlanPayload {
   planCode: string;
   name: string;
@@ -80,6 +98,9 @@ export interface CreatePlanPayload {
   isActive: boolean;
 }
 
+/**
+ * Dữ liệu yêu cầu để cập nhật gói cước
+ */
 export interface UpdatePlanPayload {
   name: string;
   description?: string;
@@ -93,97 +114,107 @@ export interface UpdatePlanPayload {
   isActive: boolean;
 }
 
-// ============================================================================
-// HELPER: XỬ LÝ LỖI VALIDATION TỪ BACKEND
-// ============================================================================
+// =============================================================================
+// INTERNAL HELPERS
+// =============================================================================
 
 /**
- * Hàm hỗ trợ "bóc tách" lỗi. 
- * CẬP NHẬT: Trả về một đối tượng Error thay vì throw trực tiếp
+ * Xử lý và chuẩn hóa lỗi trả về từ API
+ * Trích xuất các lỗi kiểm tra dữ liệu (Validation) từ Backend nếu có
  */
 const handleApiError = (err: any, defaultMessage: string): Error => {
   if (err.response && err.response.data) {
     const { message, data } = err.response.data;
     let finalErrorMessage = message || defaultMessage;
 
-    // Bóc tách lỗi Validation
-    if (data && typeof data === 'object' && !Array.isArray(data)) {
+    // Bóc tách lỗi Validation chi tiết từ phía Server
+    if (data && typeof data === "object" && !Array.isArray(data)) {
       const validationErrors = Object.values(data)
-        .filter(val => typeof val === 'string')
+        .filter((val) => typeof val === "string")
         .join(" | ");
         
       if (validationErrors) {
         finalErrorMessage = `${finalErrorMessage}: ${validationErrors}`;
       }
     }
-    return new Error(finalErrorMessage); // Return Error
+    return new Error(finalErrorMessage);
   }
-  return new Error(err.message || defaultMessage); // Return Error
+  return new Error(err.message || defaultMessage);
 };
 
-// ============================================================================
-// 🚀 API METHODS
-// ============================================================================
+// =============================================================================
+// API METHODS
+// =============================================================================
 
 /**
- * Lấy danh sách / Tìm kiếm gói cước
+ * Tìm kiếm và liệt kê danh sách các gói cước hệ thống
  */
 export const searchSystemPlans = async (
   params: SystemPlanSearchParams
 ): Promise<SystemPageResponse<SystemPlan>> => {
   try {
-    const res = await apiClient.get(`/admin/plans/search`, { params });
+    const res = await apiClient.get("/admin/plans/search", { params });
     const { success, message, data } = res.data;
     
-    if (!success) throw new Error(message || "Failed to fetch plans.");
+    if (!success) {
+      throw new Error(message || "Failed to fetch plans");
+    }
     return data;
   } catch (err: any) {
-    throw handleApiError(err, "Unable to load plans.");
+    throw handleApiError(err, "Unable to load plans");
   }
 };
 
 /**
- * Lấy chi tiết cấu hình của một gói cước
+ * Truy vấn thông tin chi tiết của một gói cước theo định danh
  */
 export const getPlanById = async (planId: number): Promise<PlanDetail> => {
   try {
     const res = await apiClient.get(`/admin/plans/${planId}`);
     const { success, message, data } = res.data;
     
-    if (!success) throw new Error(message || "Failed to fetch plan details.");
+    if (!success) {
+      throw new Error(message || "Failed to fetch plan details");
+    }
     return data;
   } catch (err: any) {
-    throw handleApiError(err, "Unable to load plan details.");
+    throw handleApiError(err, "Unable to load plan details");
   }
 };
 
 /**
- * Tạo mới gói cước
+ * Khởi tạo một gói cước dịch vụ mới trong hệ thống
  */
 export const createSystemPlan = async (payload: CreatePlanPayload): Promise<PlanDetail> => {
   try {
-    const res = await apiClient.post(`/admin/plans`, payload);
+    const res = await apiClient.post("/admin/plans", payload);
     const { success, message, data } = res.data;
     
-    if (!success) throw new Error(message || "Failed to create plan.");
+    if (!success) {
+      throw new Error(message || "Failed to create plan");
+    }
     return data;
   } catch (err: any) {
-
-    throw handleApiError(err, "Unable to create plan."); 
+    throw handleApiError(err, "Unable to create plan"); 
   }
 };
 
 /**
- * Cập nhật cấu hình gói cước
+ * Cập nhật các thông số cấu hình cho gói cước hiện có
  */
-export const updateSystemPlan = async (planId: number, payload: UpdatePlanPayload): Promise<PlanDetail> => {
+export const updateSystemPlan = async (
+  planId: number, 
+  payload: UpdatePlanPayload
+): Promise<PlanDetail> => {
   try {
     const res = await apiClient.put(`/admin/plans/${planId}`, payload);
     const { success, message, data } = res.data;
     
-    if (!success) throw new Error(message || "Failed to update plan.");
+    if (!success) {
+      throw new Error(message || "Failed to update plan");
+    }
     return data;
   } catch (err: any) {
-    throw handleApiError(err, "Unable to update plan."); 
+    throw handleApiError(err, "Unable to update plan"); 
   }
 };

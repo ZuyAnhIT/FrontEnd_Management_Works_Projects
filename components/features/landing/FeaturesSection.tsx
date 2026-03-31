@@ -1,15 +1,54 @@
-"use client"; 
+"use client";
 
+// =============================================================================
+// 1. IMPORTS
+// =============================================================================
+
+import React, { useMemo } from "react";
 import { Users, Zap, Shield } from "lucide-react";
 import { motion } from "framer-motion";
 import { useTranslation } from "react-i18next";
-import { useTheme } from "@/context/ThemeContext";
 
+// Internal Hooks & Utils
+import { useTheme } from "@/context/ThemeContext";
+import { cn } from "@/lib/utils";
+
+// =============================================================================
+// 2. INTERFACES
+// =============================================================================
+
+interface FeatureItem {
+  icon: React.ElementType;
+  title: string;
+  desc: string;
+}
+
+// =============================================================================
+// 3. MAIN COMPONENT
+// =============================================================================
+
+/**
+ * Thành phần hiển thị danh sách tính năng nổi bật (Features Section) trên Landing Page.
+ * Tích hợp hiệu ứng hoạt ảnh mượt mà (framer-motion) và hỗ trợ đa ngôn ngữ (i18n).
+ */
 export default function FeaturesSection() {
+  
+  // ---------------------------------------------------------------------------
+  // 4. HOOKS & STATE
+  // ---------------------------------------------------------------------------
+  
   const { t } = useTranslation();
+  
+  // Trích xuất theme từ Context (Lưu ý: Biến này đảm bảo component re-render 
+  // đúng cách khi người dùng chuyển đổi giữa chế độ Sáng/Tối)
   const { theme } = useTheme(); 
 
-  const features = [
+  // ---------------------------------------------------------------------------
+  // 5. DATA PREPARATION
+  // ---------------------------------------------------------------------------
+
+  // Ghi nhớ cấu hình danh sách tính năng để tránh cấp phát lại bộ nhớ ở mỗi lần render
+  const features: FeatureItem[] = useMemo(() => [
     {
       icon: Users,
       title: t("features.teamCollabTitle"),
@@ -25,22 +64,30 @@ export default function FeaturesSection() {
       title: t("features.securityTitle"),
       desc: t("features.securityDesc"),
     },
-  ];
+  ], [t]);
+
+  // ---------------------------------------------------------------------------
+  // 6. RENDER LOGIC
+  // ---------------------------------------------------------------------------
 
   return (
     <motion.section
       id="features"
-      className="py-24 px-6 text-center scroll-mt-24 
-                 bg-white dark:bg-slate-900 transition-colors duration-300"
+      className={cn(
+        "py-24 px-6 text-center scroll-mt-24 transition-colors duration-300",
+        "bg-white dark:bg-slate-900"
+      )}
       initial={{ opacity: 0, y: 50 }}
       whileInView={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, ease: "easeInOut" }}
       viewport={{ once: true, amount: 0.3 }}
     >
-      <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-10">
+      {/* Tiêu đề phần (Section Heading) */}
+      <h2 className="text-[28px] md:text-[32px] font-black text-[#172B4D] dark:text-white tracking-tight mb-14">
         {t("features.heading")}
       </h2>
 
+      {/* Lưới hiển thị danh sách tính năng (Features Grid) */}
       <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
         {features.map(({ icon: Icon, title, desc }, i) => (
           <motion.div
@@ -49,30 +96,29 @@ export default function FeaturesSection() {
             whileInView={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: i * 0.1 }}
             viewport={{ once: true, amount: 0.5 }}
-            className="
-              p-6 rounded-2xl border transition-all duration-300 ease-in-out 
-              bg-gradient-to-b from-white to-blue-50 
-              dark:bg-gradient-to-b dark:from-slate-800 dark:to-slate-900
-              border-gray-100 dark:border-slate-700
-              hover:border-blue-300 dark:hover:border-blue-500
-              hover:shadow-lg hover:-translate-y-1
-            "
+            className={cn(
+              "group p-8 rounded-2xl border transition-all duration-300 ease-in-out cursor-default",
+              "bg-white dark:bg-slate-800/50",
+              "border-slate-200 dark:border-slate-700",
+              "hover:border-[#2684FF] dark:hover:border-[#4C9AFF]",
+              "hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] dark:hover:shadow-[0_8px_30px_rgb(0,0,0,0.4)]",
+              "hover:-translate-y-1.5"
+            )}
           >
-            <Icon
-              className="
-                w-10 h-10 mx-auto mb-3 
-                text-blue-500 dark:text-blue-400
-              "
-            />
-            <h3
-              className="
-                text-lg font-semibold mb-2 
-                text-gray-900 dark:text-white
-              "
-            >
+            {/* Khối biểu tượng (Icon Box) */}
+            <div className={cn(
+              "w-16 h-16 mx-auto mb-6 rounded-2xl flex items-center justify-center transition-colors duration-300",
+              "bg-[#E3F2FD] dark:bg-[#0052CC]/20 text-[#0052CC] dark:text-[#4C9AFF]",
+              "group-hover:bg-[#0052CC] group-hover:text-white dark:group-hover:bg-[#4C9AFF] dark:group-hover:text-white"
+            )}>
+              <Icon className="w-7 h-7 stroke-[2.5]" />
+            </div>
+            
+            {/* Nội dung tính năng (Content) */}
+            <h3 className="text-[18px] font-bold text-[#172B4D] dark:text-slate-100 mb-3 tracking-tight">
               {title}
             </h3>
-            <p className="text-gray-600 dark:text-gray-300 text-sm">
+            <p className="text-[14px] text-[#42526E] dark:text-slate-400 leading-relaxed font-medium">
               {desc}
             </p>
           </motion.div>
