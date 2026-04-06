@@ -1,7 +1,7 @@
 "use client";
 
 // =============================================================================
-// 1. IMPORT (Thu vien -> Noi bo -> Component con)
+// 1. IMPORT (Libraries -> Internal -> Components)
 // =============================================================================
 
 import React, { useState, useEffect, useCallback } from "react";
@@ -36,8 +36,8 @@ interface SidebarWorkspace {
 
 /**
  * Core Layout Wrapper.
- * Cung cap bo khung cho cac trang cot loi, xu ly viec an/hien thanh dieu huong
- * va tai danh sach khong gian lam viec dua tren quyen han nguoi dung.
+ * Cung cap bo khung dieu huong chung cho toan bo phan he Core (Workspace, My Tasks, Overview).
+ * Xu ly viec an/hien thanh dieu huong khi nguoi dung di vao vung lam viec cua mot du an cu the.
  */
 export default function CoreLayout({ children }: CoreLayoutProps) {
     
@@ -54,7 +54,8 @@ export default function CoreLayout({ children }: CoreLayoutProps) {
     // Data States
     const [workspaces, setWorkspaces] = useState<SidebarWorkspace[]>([]);
     
-    // Kiem tra xem nguoi dung co dang o ben trong mot du an cu the khong
+    // Kiem tra xem nguoi dung co dang o ben trong mot du an cu the khong de an Sidebar chung
+    // Luu y: Route "/core/my-tasks" khong chua "/project/" nen Sidebar van se hien thi binh thuong
     const isInsideProject = pathname?.includes("/project/");
 
     // ---------------------------------------------------------------------------
@@ -65,14 +66,14 @@ export default function CoreLayout({ children }: CoreLayoutProps) {
      * Tai danh sach khong gian lam viec hien thi tren Sidebar
      * Logic duoc phan nhanh dua tren vai tro cua nguoi dung
      */
-    const fetchWorkspaces = useCallback(async () => {
+    const fetchAuthorizedWorkspaces = useCallback(async () => {
         // Neu chua xac thuc hoac thieu du lieu co ban, xoa trang danh sach
         if (!isAuthenticated || !activeCompany?.companyId || !user) {
             setWorkspaces([]);
             return;
         }
 
-        // KICH BAN 1: Quan tri vien cong ty (Truy cap toan bo)
+        // KICH BAN 1: Quan tri vien cong ty (Company Admin) co quyen thay toan bo Workspace
         if (role === "COMPANY_ADMIN") {
             try {
                 const response = await getCompanyWorkspaces(activeCompany.companyId, {
@@ -94,7 +95,7 @@ export default function CoreLayout({ children }: CoreLayoutProps) {
             return;
         } 
         
-        // KICH BAN 2: Cac vai tro thong thuong (Lay tu ho so nguoi dung)
+        // KICH BAN 2: Nguoi dung thong thuong (Chi thay nhung workspace duoc chi dinh tu profile)
         const validMemberRoles = ["COMPANY_MEMBER", "WORKSPACE_ADMIN", "WORKSPACE_MEMBER", "GUEST_WORKSPACE"];
         
         if (role && validMemberRoles.includes(role)) {
@@ -109,7 +110,7 @@ export default function CoreLayout({ children }: CoreLayoutProps) {
             return;
         }
         
-        // KICH BAN 3: Cac truong hop ngoai le khac
+        // KICH BAN 3: Cac truong hop ngoai le khac (Vi du: Guest chua duoc assign)
         setWorkspaces([]);
         
     }, [isAuthenticated, activeCompany, user, role]);
@@ -119,8 +120,8 @@ export default function CoreLayout({ children }: CoreLayoutProps) {
     // ---------------------------------------------------------------------------
 
     useEffect(() => {
-        fetchWorkspaces();
-    }, [fetchWorkspaces]);
+        fetchAuthorizedWorkspaces();
+    }, [fetchAuthorizedWorkspaces]);
 
     // ---------------------------------------------------------------------------
     // 7. RENDER LOGIC
@@ -138,15 +139,15 @@ export default function CoreLayout({ children }: CoreLayoutProps) {
         );
     }
 
-    // MAN HINH 2: Loi xac thuc (Fallback Error)
+    // MAN HINH 2: Loi xac thuc hoac phien het han (Fallback Error)
     if (!user) {
         return (
             <div className="flex flex-col items-center justify-center min-h-screen bg-[#F4F5F7] gap-4 animate-in fade-in duration-300">
-                <div className="p-4 bg-red-50 rounded-full border border-red-100 shadow-sm">
-                    <ShieldAlert className="w-12 h-12 text-[#FF5630]" />
+                <div className="p-4 bg-[#FFEBE6] rounded-full border border-[#FFBDAD] shadow-sm">
+                    <ShieldAlert className="w-12 h-12 text-[#BF2600]" />
                 </div>
-                <h2 className="text-lg font-black text-[#172B4D] uppercase tracking-tight">Access Denied</h2>
-                <p className="text-[14px] text-[#42526E] font-medium">Session expired or invalid. Please log in again.</p>
+                <h2 className="text-[18px] font-black text-[#172B4D] uppercase tracking-tight">Access Denied</h2>
+                <p className="text-[14px] text-[#42526E] font-medium">Session has expired or is invalid. Please log in again.</p>
             </div>
         );
     }
@@ -155,7 +156,7 @@ export default function CoreLayout({ children }: CoreLayoutProps) {
     return (
         <div className="h-screen w-full bg-[#F4F5F7] flex flex-col font-sans text-[#172B4D] overflow-hidden">
             
-            {/* CORE HEADER: An di khi nguoi dung vao trong mot du an cu the */}
+            {/* SYSTEM HEADER: An di khi nguoi dung vao trong mot du an cu the */}
             {!isInsideProject && (
                 <div className="flex-shrink-0 z-50">
                     <AdminHeader
@@ -180,7 +181,7 @@ export default function CoreLayout({ children }: CoreLayoutProps) {
                     </div>
                 )}
 
-                {/* KHU VUC NOI DUNG CHINH */}
+                {/* KHU VUC NOI DUNG CHINH (Chua cac trang nhu Overview, My Tasks, Workspace Settings) */}
                 <main className="flex-1 overflow-y-auto scroll-smooth relative custom-scrollbar bg-[#F4F5F7]">
                     {children}
                 </main>

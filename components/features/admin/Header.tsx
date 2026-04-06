@@ -1,21 +1,29 @@
 "use client";
 
+// =============================================================================
+// 1. IMPORTS
+// =============================================================================
+
 import React, { useState, useMemo, useCallback, useEffect } from "react";
-import { 
-  Menu, Bell, Crown, 
-  LayoutGrid, Layers, FolderKanban 
+import {
+  Menu,
+  Bell,
+  Crown,
+  LayoutGrid,
+  Layers,
+  FolderKanban,
 } from "lucide-react";
 import { usePathname, useRouter, useParams } from "next/navigation";
 
-// Internal Components & Contexts
 import UserMenu from "@/components/ui/UserMenu";
 import NotificationPopover from "@/components/features/admin/NotificationPopover";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/Avatars";
+import GlobalSearch from "@/components/features/core/search/GlobalSearch";
 import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/utils";
 
 // =============================================================================
-// TYPES & INTERFACES
+// 2. INTERFACES
 // =============================================================================
 
 interface HeaderProps {
@@ -25,180 +33,185 @@ interface HeaderProps {
 type HeaderMode = "PORTAL" | "PROJECT" | "WORKSPACE" | "ADMIN";
 
 // =============================================================================
-// MAIN COMPONENT
+// 3. MAIN COMPONENT
 // =============================================================================
 
 export default function AdminHeader({ onMenuToggle }: HeaderProps) {
-  const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [notifOpen, setNotifOpen] = useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
 
   const pathname = usePathname();
   const router = useRouter();
   const params = useParams();
-  
   const { user, logout, activeCompany } = useAuth();
 
   // ---------------------------------------------------------------------------
-  // CONTEXT DETECTION
+  // 4. CONTEXT DETECTION
   // ---------------------------------------------------------------------------
 
-  const currentMode: HeaderMode = useMemo(() => {
+  const determineMode = useMemo<HeaderMode>(() => {
     if (pathname?.startsWith("/portal")) return "PORTAL";
     if (pathname?.includes("/project/") && params.projectId) return "PROJECT";
     if (pathname?.startsWith("/core") && !params.projectId) return "WORKSPACE";
     return "ADMIN";
   }, [pathname, params]);
 
-  const currentProject = useMemo(() => {
-    if (currentMode !== "PROJECT" || !user?.projectMemberships) return null;
-    const pId = Number(params.projectId);
-    return user.projectMemberships.find((p) => p.projectId === pId);
-  }, [currentMode, params.projectId, user?.projectMemberships]);
+  const activeProject = useMemo(() => {
+    if (determineMode !== "PROJECT" || !user?.projectMemberships) return null;
+    const targetId = Number(params.projectId);
+    return user.projectMemberships.find((p) => p.projectId === targetId);
+  }, [determineMode, params.projectId, user?.projectMemberships]);
 
-  // ---------------------------------------------------------------------------
-  // UI CONFIGURATION
-  // ---------------------------------------------------------------------------
-
-  const headerConfig = useMemo(() => {
+  const uiConfig = useMemo(() => {
     const configs = {
       PORTAL: {
         icon: <LayoutGrid className="w-4 h-4 text-white" />,
         label: "Member Portal",
         title: activeCompany?.companyName || "My Portal",
-        bgColor: "bg-blue-600",
+        bgColor: "bg-[#0052CC]", // Atlassian Blue
         href: "/portal",
       },
       PROJECT: {
         icon: <FolderKanban className="w-4 h-4 text-white" />,
-        label: "Project Workspace",
-        title: currentProject?.projectName || "Project",
-        bgColor: "bg-emerald-600",
+        label: "Project Context",
+        title: activeProject?.projectName || "Active Project",
+        bgColor: "bg-[#006644]", // Atlassian Green
         href: `/core/workspace/${params.workspaceId}/project/${params.projectId}`,
       },
       WORKSPACE: {
         icon: <Layers className="w-4 h-4 text-white" />,
-        label: "Workspace Core",
+        label: "Department",
         title: activeCompany?.companyName || "Workspace",
-        bgColor: "bg-indigo-600",
+        bgColor: "bg-[#403294]", // Atlassian Purple
         href: `/core/workspace/${params.workspaceId}`,
       },
       ADMIN: {
-        icon: <Crown className="w-4 h-4 text-yellow-400" />,
-        label: "Admin Panel",
-        title: "WorkNet",
-        bgColor: "bg-slate-900",
+        icon: <Crown className="w-4 h-4 text-[#FF8B00]" />, // Atlassian Orange
+        label: "Administration",
+        title: "WorkNet Platform",
+        bgColor: "bg-[#172B4D]", // Atlassian Dark Slate
         href: "/admin",
-      }
+      },
     };
-    return configs[currentMode];
-  }, [currentMode, activeCompany, currentProject, params]);
+    return configs[determineMode];
+  }, [determineMode, activeCompany, activeProject, params]);
 
   // ---------------------------------------------------------------------------
-  // HANDLERS
+  // 5. EVENT HANDLERS
   // ---------------------------------------------------------------------------
 
-  const toggleUserMenu = useCallback((e: React.MouseEvent) => {
+  const handleUserMenuToggle = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
-    setUserMenuOpen((prev) => !prev);
-    setNotifOpen(false);
+    setIsUserMenuOpen((prev) => !prev);
+    setIsNotificationOpen(false);
   }, []);
 
-  const toggleNotifications = useCallback((e: React.MouseEvent) => {
+  const handleNotificationToggle = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
-    setNotifOpen((prev) => !prev);
-    setUserMenuOpen(false);
+    setIsNotificationOpen((prev) => !prev);
+    setIsUserMenuOpen(false);
   }, []);
 
   useEffect(() => {
-    setUserMenuOpen(false);
-    setNotifOpen(false);
+    setIsUserMenuOpen(false);
+    setIsNotificationOpen(false);
   }, [pathname]);
 
   // ---------------------------------------------------------------------------
-  // RENDER
+  // 6. RENDER LOGIC
   // ---------------------------------------------------------------------------
+
   return (
-    <header className="sticky top-0 z-40 bg-white border-b border-slate-200 h-14 flex items-center shadow-sm shrink-0">
-      <div className="w-full px-4 flex items-center justify-between">
-        
-        <div className="flex items-center gap-4">
+    <header className="sticky top-0 z-40 bg-white border-b border-[#DFE1E6] h-16 flex items-center shadow-sm shrink-0">
+      <div className="w-full px-5 flex items-center justify-between">
+        {/* LEFT: Context Information */}
+        <div className="flex items-center gap-5">
           <button
             onClick={onMenuToggle}
-            className="p-2 hover:bg-slate-100 rounded-md transition-colors lg:hidden text-slate-500"
-            title="Toggle Sidebar"
+            className="p-2 hover:bg-[#F4F5F7] rounded-md transition-colors lg:hidden text-[#42526E]"
+            title="Toggle Navigation"
           >
             <Menu className="w-5 h-5" />
           </button>
 
           <div
             className="flex items-center gap-3 cursor-pointer group select-none"
-            onClick={() => router.push(headerConfig.href)}
+            onClick={() => router.push(uiConfig.href)}
           >
-            <div className={cn(
-              "w-8 h-8 rounded-md flex items-center justify-center shadow-sm transition-all group-hover:scale-105",
-              headerConfig.bgColor
-            )}>
-              {headerConfig.icon}
+            <div
+              className={cn(
+                "w-9 h-9 rounded-lg flex items-center justify-center shadow-sm transition-transform group-hover:scale-105",
+                uiConfig.bgColor,
+              )}
+            >
+              {uiConfig.icon}
             </div>
-
-            <div className="hidden sm:block">
-              <span className="font-bold text-base text-slate-900 tracking-tight block leading-none max-w-[220px] truncate">
-                {headerConfig.title}
+            <div className="hidden sm:flex flex-col justify-center">
+              <span className="font-black text-[15px] text-[#172B4D] tracking-tight block leading-tight max-w-[220px] truncate uppercase">
+                {uiConfig.title}
               </span>
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5 block">
-                {headerConfig.label}
+              <span className="text-[10px] font-black text-[#6B778C] uppercase tracking-[0.2em] block leading-none">
+                {uiConfig.label}
               </span>
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          
+        {/* CENTER: Global Search */}
+        <div className="hidden md:flex flex-1 max-w-xl mx-6">
+          <GlobalSearch />
+        </div>
+
+        {/* RIGHT: User Actions */}
+        <div className="flex items-center gap-3">
+          {/* Notifications */}
           <div className="relative">
             <button
-              onClick={toggleNotifications}
+              onClick={handleNotificationToggle}
               className={cn(
-                "p-2 rounded-full transition-all relative",
-                notifOpen 
-                  ? "bg-blue-50 text-blue-600 shadow-inner" 
-                  : "text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                "p-2 rounded-full transition-all relative outline-none",
+                isNotificationOpen
+                  ? "bg-[#DEEBFF] text-[#0052CC]"
+                  : "text-[#42526E] hover:bg-[#F4F5F7] hover:text-[#172B4D]",
               )}
             >
-              <Bell className="w-5 h-5" />
-              <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white" />
+              <Bell className="w-5 h-5 stroke-[2]" />
+              <span className="absolute top-1.5 right-2 w-2 h-2 bg-[#FF5630] rounded-full border-2 border-white shadow-sm" />
             </button>
-
             <NotificationPopover
-              isOpen={notifOpen}
-              onClose={() => setNotifOpen(false)}
+              isOpen={isNotificationOpen}
+              onClose={() => setIsNotificationOpen(false)}
             />
           </div>
 
-          <div className="w-px h-6 bg-slate-200 mx-1 hidden sm:block" />
+          <div className="w-px h-6 bg-[#DFE1E6] mx-2 hidden sm:block" />
 
+          {/* User Profile */}
           <div className="relative ml-1">
             <button
-              onClick={toggleUserMenu}
+              onClick={handleUserMenuToggle}
               className="focus:outline-none transition-transform active:scale-95"
             >
-              <Avatar className="w-8 h-8 border-2 border-white shadow-sm ring-1 ring-slate-200 hover:ring-blue-400 transition-all">
-                {/* FIX: Chuyển null thành undefined cho prop src */}
-                <AvatarImage src={user?.avatarUrl ?? undefined} alt={user?.fullName || "User"} />
-                <AvatarFallback className="bg-slate-800 text-white text-[10px] font-bold uppercase">
-                  {user?.fullName?.charAt(0) || "U"}
+              <Avatar className="w-9 h-9 border-2 border-white shadow-sm ring-1 ring-[#DFE1E6] hover:ring-[#0052CC] transition-all">
+                <AvatarImage
+                  src={user?.avatarUrl ?? undefined}
+                  alt={user?.fullName || "User"}
+                  className="object-cover"
+                />
+                <AvatarFallback className="bg-[#172B4D] text-white text-[11px] font-black uppercase tracking-wider">
+                  {user?.fullName?.substring(0, 2) || "U"}
                 </AvatarFallback>
               </Avatar>
             </button>
 
-            {userMenuOpen && (
+            {isUserMenuOpen && (
               <UserMenu
                 user={{
                   name: user?.fullName || "User",
                   email: user?.email || "user@worknet.com",
-                  // FIX: Chuyển null thành undefined cho prop avatarUrl
-                  avatarUrl: user?.avatarUrl ?? undefined
+                  avatarUrl: user?.avatarUrl ?? undefined,
                 }}
-                onClose={() => setUserMenuOpen(false)}
+                onClose={() => setIsUserMenuOpen(false)}
                 onLogout={logout}
               />
             )}
