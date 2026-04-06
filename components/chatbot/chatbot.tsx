@@ -1,25 +1,22 @@
 ﻿"use client";
 
+// =============================================================================
+// 1. IMPORTS
+// =============================================================================
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { useParams, usePathname } from "next/navigation";
-import {
-  MessageSquare,
-  X,
-  Send,
-  History,
-  Minimize2,
-  Paperclip,
-} from "lucide-react";
+import ReactMarkdown from "react-markdown"; // THƯ VIỆN RENDER MARKDOWN
+import { MessageSquare, X, Send, History, Minimize2, Paperclip } from "lucide-react";
 
-// Internal components and services
+// Internal
 import { Button } from "@/components/ui/Buttons";
-import { sendChatMessage, uploadChatFile } from "@/services/apiChat";
+import { sendChatMessage, uploadChatFile, ChatContext } from "@/services/apiChat";
+import { useAuth } from "@/context/AuthContext"; // DÙNG ĐỂ LẤY CONTEXT
 
 // =============================================================================
-// INTERFACES & TYPES
+// 2. INTERFACES
 // =============================================================================
-
 interface Message {
   id: string;
   role: "user" | "bot" | "system";
@@ -34,53 +31,29 @@ interface ChatSession {
 }
 
 // =============================================================================
-// HELPERS & CUSTOM HOOKS
+// 3. HELPERS
 // =============================================================================
-
-/**
- * Chuẩn hóa phản hồi từ Bot AI để hiển thị lên UI
- */
 const normalizeBotResponse = (data: any): string => {
   if (!data) return "No response received";
-  
   const rawContent = data.response || data.detail || data.message;
   
   if (typeof rawContent === "string") return rawContent;
-  
   if (typeof rawContent === "object") {
-    if (rawContent.text && typeof rawContent.text === "string") {
-      return rawContent.text;
-    }
-    try {
-      return JSON.stringify(rawContent);
-    } catch {
-      return "Unsupported response format";
-    }
+    return rawContent.text && typeof rawContent.text === "string" ? rawContent.text : JSON.stringify(rawContent);
   }
-  
   return String(rawContent);
 };
 
-/**
- * Hook xử lý logic kéo thả cửa sổ chatbot
- */
 const useDraggableWindow = () => {
   const [isDragging, setIsDragging] = useState(false);
   const bubbleRef = useRef<HTMLDivElement>(null);
-  const dragRef = useRef<{ 
-    startX: number; 
-    startY: number; 
-    initialLeft: number; 
-    initialTop: number; 
-  } | null>(null);
+  const dragRef = useRef<{ startX: number; startY: number; initialLeft: number; initialTop: number; } | null>(null);
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (!isDragging || !dragRef.current || !bubbleRef.current) return;
-      
       const deltaX = e.clientX - dragRef.current.startX;
       const deltaY = e.clientY - dragRef.current.startY;
-      
       bubbleRef.current.style.left = `${dragRef.current.initialLeft + deltaX}px`;
       bubbleRef.current.style.top = `${dragRef.current.initialTop + deltaY}px`;
       bubbleRef.current.style.right = "auto";
@@ -89,24 +62,16 @@ const useDraggableWindow = () => {
 
     const handleMouseUp = () => {
       if (!isDragging || !bubbleRef.current) return;
-      
       setIsDragging(false);
-      
-      // Tự động hút vào cạnh màn hình (Snap logic)
       const rect = bubbleRef.current.getBoundingClientRect();
       if (rect.left < (window.innerWidth - rect.right)) {
-        bubbleRef.current.style.left = "20px";
-        bubbleRef.current.style.right = "auto";
+        bubbleRef.current.style.left = "20px"; bubbleRef.current.style.right = "auto";
       } else {
-        bubbleRef.current.style.left = "auto";
-        bubbleRef.current.style.right = "20px";
+        bubbleRef.current.style.left = "auto"; bubbleRef.current.style.right = "20px";
       }
-
       let newTop = rect.top;
       if (newTop < 20) newTop = 20;
-      if (newTop > window.innerHeight - rect.height - 20) {
-        newTop = window.innerHeight - rect.height - 20;
-      }
+      if (newTop > window.innerHeight - rect.height - 20) newTop = window.innerHeight - rect.height - 20;
       bubbleRef.current.style.top = `${newTop}px`;
     };
 
@@ -125,61 +90,41 @@ const useDraggableWindow = () => {
     if (!bubbleRef.current) return;
     const rect = bubbleRef.current.getBoundingClientRect();
     setIsDragging(true);
-    dragRef.current = {
-      startX: e.clientX,
-      startY: e.clientY,
-      initialLeft: rect.left,
-      initialTop: rect.top,
-    };
+    dragRef.current = { startX: e.clientX, startY: e.clientY, initialLeft: rect.left, initialTop: rect.top };
   };
 
   return { bubbleRef, isDragging, handleMouseDown };
 };
 
 // =============================================================================
-// MAIN COMPONENT
+// 4. MAIN COMPONENT
 // =============================================================================
 
 export function Chatbot() {
-  // ---------------------------------------------------------------------------
-  // 1. HOOKS & PARAMS
-  // ---------------------------------------------------------------------------
   const params = useParams();
   const pathname = usePathname();
   const { bubbleRef, isDragging, handleMouseDown } = useDraggableWindow();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // TÍCH HỢP AUTH CONTEXT ĐỂ LẤY COMPANY ID CHUẨN XÁC
+  const { activeCompany } = useAuth();
 
-  // ---------------------------------------------------------------------------
-  // 2. STATE
-  // ---------------------------------------------------------------------------
   const [isOpen, setIsOpen] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [companyId, setCompanyId] = useState<number | null>(null);
+  
   const [input, setInput] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [threadId, setThreadId] = useState<string>("");
 
   const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "welcome",
-      role: "bot",
-      text: "Hello! How can I help you with your project today?",
-      timestamp: new Date(),
-    },
+    { id: "welcome", role: "bot", text: "Hello! I am your AI Assistant. How can I help you today?", timestamp: new Date() }
   ]);
 
-  const [sessions] = useState<ChatSession[]>([
-    { id: "h1", title: "Default Session", date: "Today" },
-  ]);
+  const [sessions] = useState<ChatSession[]>([{ id: "h1", title: "Current Session", date: "Today" }]);
 
-  // ---------------------------------------------------------------------------
-  // 3. EFFECTS
-  // ---------------------------------------------------------------------------
-
-  // Khởi tạo phiên làm việc và lấy thông tin ngữ cảnh
+  // Khởi tạo Thread ID
   useEffect(() => {
-    // Quản lý Thread ID cho chatbot
     const storedThread = localStorage.getItem("chat_session_id");
     if (storedThread) {
       setThreadId(storedThread);
@@ -188,57 +133,27 @@ export function Chatbot() {
       localStorage.setItem("chat_session_id", newId);
       setThreadId(newId);
     }
-
-    // Lấy định danh công ty hiện tại
-    const storedCompany = localStorage.getItem("current_company_id");
-    if (storedCompany) {
-      setCompanyId(parseInt(storedCompany));
-    }
   }, []);
 
-  // ---------------------------------------------------------------------------
-  // 4. HANDLERS
-  // ---------------------------------------------------------------------------
-
-  /**
-   * Xử lý khi người dùng chọn tệp tin đính kèm
-   */
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setSelectedFile(e.target.files[0]);
-    }
+    if (e.target.files && e.target.files[0]) setSelectedFile(e.target.files[0]);
   };
 
-  /**
-   * Gỡ bỏ tệp tin đã chọn
-   */
   const clearFile = useCallback(() => {
     setSelectedFile(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   }, []);
 
-  /**
-   * Xử lý gửi tin nhắn và tệp tin đến AI
-   */
   const handleSend = async () => {
     if (!input.trim() && !selectedFile) return;
     if (loading) return;
 
     const currentInput = input;
     const currentFile = selectedFile;
-    const now = new Date();
 
-    // Hiển thị tin nhắn người dùng ngay lập tức (Optimistic Update)
-    const optimisticText = currentFile
-      ? `File: ${currentFile.name}${currentInput ? `\n${currentInput}` : ""}`
-      : currentInput;
-
-    const userMsg: Message = {
-      id: Date.now().toString(),
-      role: "user",
-      text: optimisticText,
-      timestamp: now,
-    };
+    // Optimistic Update
+    const optimisticText = currentFile ? `**Attached File:** ${currentFile.name}\n\n${currentInput}` : currentInput;
+    const userMsg: Message = { id: Date.now().toString(), role: "user", text: optimisticText, timestamp: new Date() };
 
     setMessages((prev) => [...prev, userMsg]);
     setInput("");
@@ -246,225 +161,146 @@ export function Chatbot() {
     setLoading(true);
 
     try {
-      const safeThreadId = threadId || "default_session";
-      
-      // Chuẩn bị dữ liệu ngữ cảnh từ URL và LocalStorage
-      const contextData = {
-        company_id: companyId,
+      // THIẾT LẬP NGỮ CẢNH (CONTEXT) ĐỂ GỬI LÊN BACKEND
+      const contextData: ChatContext = {
+        company_id: activeCompany?.companyId || null,
         workspace_id: params?.workspaceId ? Number(params.workspaceId) : null,
         project_id: params?.projectId ? Number(params.projectId) : null,
-        current_page: pathname
       };
 
       const payload = {
         message: currentInput,
-        thread_id: safeThreadId,
+        thread_id: threadId || "default_session",
         context: contextData,
       };
 
-      // Gọi service tương ứng tùy theo có file đính kèm hay không
       const data = currentFile
         ? await uploadChatFile(payload, currentFile)
         : await sendChatMessage(payload);
 
-      const botText = normalizeBotResponse(data);
       const botMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: "bot",
-        text: botText,
+        text: normalizeBotResponse(data),
         timestamp: new Date(),
       };
       
       setMessages((prev) => [...prev, botMsg]);
 
     } catch (err: any) {
-      const errorMsg = err.message || "Connection error";
       setMessages((prev) => [
         ...prev,
-        {
-          id: (Date.now() + 2).toString(),
-          role: "system",
-          text: `Error: ${errorMsg}`,
-          timestamp: new Date(),
-        },
+        { id: (Date.now() + 2).toString(), role: "system", text: `**System Error:** ${err.message}`, timestamp: new Date() }
       ]);
     } finally {
       setLoading(false);
     }
   };
 
-  /**
-   * Xác định style cho bong bóng tin nhắn dựa trên vai trò
-   */
-  const getMessageBubbleClass = (role: string) => {
-    switch (role) {
-      case "user":
-        return "bg-blue-600 text-white rounded-br-none";
-      case "system":
-        return "bg-red-50 text-red-600 border border-red-200 rounded-bl-none";
-      default:
-        return "bg-white text-slate-800 border border-slate-200 rounded-bl-none";
-    }
-  };
-
-  // ---------------------------------------------------------------------------
-  // 5. RENDER
-  // ---------------------------------------------------------------------------
   return (
-    <div
-      ref={bubbleRef}
-      className={`fixed z-50 flex flex-col items-end transition-all duration-300 ease-out ${
-        isDragging ? "cursor-grabbing" : ""
-      }`}
-      style={{ bottom: "20px", right: "20px" }}
-    >
-      {/* Cửa sổ chat chính */}
-      <div
-        className={`
-          bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-200 mb-4
-          transition-all duration-300 origin-bottom-right flex
-          ${
-            isOpen
-              ? "w-[380px] h-[520px] opacity-100 scale-100"
-              : "w-0 h-0 opacity-0 scale-90 pointer-events-none"
-          }
-        `}
-      >
+    <div ref={bubbleRef} className={`fixed z-50 flex flex-col items-end transition-all duration-300 ease-out ${isDragging ? "cursor-grabbing" : ""}`} style={{ bottom: "20px", right: "20px" }}>
+      
+      {/* Cửa sổ chat */}
+      <div className={`bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-200 mb-4 transition-all duration-300 origin-bottom-right flex ${isOpen ? "w-[420px] h-[600px] opacity-100 scale-100" : "w-0 h-0 opacity-0 scale-90 pointer-events-none"}`}>
         <div className="flex-1 flex flex-col w-full bg-white relative">
-          {/* Tiêu đề cửa sổ */}
-          <div
-            className="p-4 border-b border-slate-100 bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex justify-between items-center cursor-move select-none"
-            onMouseDown={handleMouseDown}
-          >
+          
+          <div className="p-4 border-b border-slate-100 bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex justify-between items-center cursor-move select-none" onMouseDown={handleMouseDown}>
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-              <span className="font-semibold text-sm">AI Support</span>
+              <span className="font-semibold text-sm">WorkNet Intelligence</span>
             </div>
             <div className="flex items-center gap-1">
-              <button
-                onClick={() => setShowHistory(!showHistory)}
-                className="p-1.5 hover:bg-white/20 rounded-full transition-colors"
-                title="History"
-              >
-                <History className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => setIsOpen(false)}
-                className="p-1.5 hover:bg-white/20 rounded-full transition-colors"
-                title="Minimize"
-              >
-                <Minimize2 className="w-4 h-4" />
-              </button>
+              <button onClick={() => setShowHistory(!showHistory)} className="p-1.5 hover:bg-white/20 rounded-full transition-colors"><History className="w-4 h-4" /></button>
+              <button onClick={() => setIsOpen(false)} className="p-1.5 hover:bg-white/20 rounded-full transition-colors"><Minimize2 className="w-4 h-4" /></button>
             </div>
           </div>
 
-          {/* Danh sách tin nhắn */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50">
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50 custom-scrollbar">
             {messages.map((msg) => (
-              <div
-                key={msg.id}
-                className={`flex ${
-                  msg.role === "user" ? "justify-end" : "justify-start"
-                }`}
-              >
-                <div
-                  className={`max-w-[80%] rounded-2xl px-4 py-2 text-sm shadow-sm whitespace-pre-wrap ${getMessageBubbleClass(
-                    msg.role
-                  )}`}
-                >
-                  {msg.text}
+              <div key={msg.id} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-[13px] shadow-sm ${
+                    msg.role === "user" ? "bg-blue-600 text-white rounded-br-none" : 
+                    msg.role === "system" ? "bg-[#FFEBE6] text-[#BF2600] border border-[#FFBDAD] rounded-bl-none" : 
+                    "bg-white text-slate-800 border border-slate-200 rounded-bl-none"
+                }`}>
+                  
+                  {/* BỌC THẺ DIV Ở ĐÂY ĐỂ TRÁNH LỖI CLASSNAME CỦA REACT-MARKDOWN */}
+                  <div className="prose prose-sm max-w-none dark:prose-invert prose-p:leading-relaxed prose-pre:m-0">
+                    <ReactMarkdown 
+                      components={{
+                          p: ({node, ...props}) => <p className="m-0" {...props} />,
+                          ul: ({node, ...props}) => <ul className="list-disc pl-4 m-0" {...props} />,
+                          ol: ({node, ...props}) => <ol className="list-decimal pl-4 m-0" {...props} />,
+                          li: ({node, ...props}) => <li className="mt-1" {...props} />
+                      }}
+                    >
+                      {msg.text}
+                    </ReactMarkdown>
+                  </div>
+
                 </div>
               </div>
             ))}
+            
             {loading && (
-              <div className="flex justify-start animate-pulse">
-                <div className="bg-slate-200 rounded-full h-2 w-2 mr-1"></div>
-                <div className="bg-slate-200 rounded-full h-2 w-2 mr-1"></div>
-                <div className="bg-slate-200 rounded-full h-2 w-2"></div>
+              <div className="flex justify-start">
+                <div className="bg-white border border-slate-200 rounded-2xl rounded-bl-none px-4 py-3 flex gap-1 shadow-sm">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" />
+                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }} />
+                </div>
               </div>
             )}
           </div>
 
           {/* Khu vực nhập liệu */}
-          <div className="p-3 bg-white border-t border-slate-100 space-y-2">
+          <div className="p-3 bg-white border-t border-slate-200">
             {selectedFile && (
-              <div className="flex items-center justify-between text-xs bg-blue-50 border border-blue-200 text-blue-700 px-3 py-2 rounded">
-                <span className="truncate max-w-[200px]">
-                  File: {selectedFile.name}
-                </span>
-                <button onClick={clearFile} className="hover:text-red-500 p-1">
-                  <X className="w-3 h-3" />
-                </button>
+              <div className="flex items-center justify-between text-xs bg-indigo-50 border border-indigo-100 text-indigo-700 px-3 py-2 rounded-lg mb-2">
+                <span className="truncate font-medium">📎 {selectedFile.name}</span>
+                <button onClick={clearFile} className="hover:bg-indigo-200 p-1 rounded-full transition-colors"><X className="w-3 h-3" /></button>
               </div>
             )}
-
-            <div className="flex gap-2 items-center">
-              <input
-                ref={fileInputRef}
-                type="file"
-                className="hidden"
-                accept=".xlsx,.xls,.pdf,.doc,.docx,.txt"
-                onChange={handleFileSelect}
-              />
-
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="p-2 rounded-full border border-slate-200 text-slate-500 hover:text-blue-600 hover:border-blue-300 transition-colors"
-                title="Attach file"
-              >
+            
+            <div className="flex items-end gap-2 bg-[#F4F5F7] p-1.5 rounded-2xl border border-slate-200 focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+              <input ref={fileInputRef} type="file" className="hidden" accept=".xlsx,.xls,.csv" onChange={handleFileSelect} />
+              
+              <button onClick={() => fileInputRef.current?.click()} className="p-2.5 rounded-xl text-slate-500 hover:bg-slate-200 hover:text-blue-600 transition-colors shrink-0">
                 <Paperclip className="w-4 h-4" />
               </button>
 
-              <input
-                type="text"
+              <textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && !loading && handleSend()}
-                placeholder={
-                  selectedFile
-                    ? "Add note for the file..."
-                    : "Type your request..."
-                }
-                className="flex-1 px-4 py-2 bg-slate-100 rounded-full text-sm outline-none focus:ring-2 focus:ring-blue-500/50 transition-all disabled:opacity-50"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    if (!loading) handleSend();
+                  }
+                }}
+                placeholder={selectedFile ? "Add a message about this file..." : "Ask me to create tasks, assign work..."}
+                className="flex-1 bg-transparent border-none outline-none text-[13px] text-slate-700 resize-none max-h-32 py-2.5 custom-scrollbar"
+                rows={input.split("\n").length > 1 ? Math.min(input.split("\n").length, 4) : 1}
                 disabled={loading}
               />
 
-              <Button
-                onClick={handleSend}
-                size="icon"
-                className="rounded-full w-9 h-9 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300"
-                disabled={loading || (!input.trim() && !selectedFile)}
-              >
-                <Send className="w-4 h-4" />
+              <Button onClick={handleSend} disabled={loading || (!input.trim() && !selectedFile)} className="shrink-0 w-10 h-10 rounded-xl bg-blue-600 hover:bg-blue-700 p-0 flex items-center justify-center">
+                <Send className="w-4 h-4 text-white" />
               </Button>
             </div>
           </div>
-
-          {/* Thanh bên lịch sử trò chuyện */}
-          <div
-            className={`absolute inset-y-0 left-0 w-64 bg-slate-900 text-slate-300 transform transition-transform duration-300 z-10 ${
-              showHistory ? "translate-x-0" : "-translate-x-full"
-            }`}
-          >
+          
+          {/* Sidebar Lịch sử */}
+          <div className={`absolute inset-y-0 left-0 w-64 bg-slate-900 text-slate-300 transform transition-transform duration-300 z-10 ${showHistory ? "translate-x-0" : "-translate-x-full"}`}>
             <div className="p-4 border-b border-slate-800 flex justify-between items-center">
               <span className="font-semibold text-white">History</span>
-              <button
-                onClick={() => setShowHistory(false)}
-                className="hover:text-white"
-              >
-                <X className="w-4 h-4" />
-              </button>
+              <button onClick={() => setShowHistory(false)} className="hover:bg-slate-700 p-1.5 rounded-full transition-colors"><X className="w-4 h-4 text-white" /></button>
             </div>
             <div className="p-2 space-y-1">
               {sessions.map((s) => (
-                <button
-                  key={s.id}
-                  className="w-full text-left p-3 rounded hover:bg-slate-800 transition-colors text-sm"
-                >
-                  <div className="text-white font-medium truncate">
-                    {s.title}
-                  </div>
-                  <div className="text-xs text-slate-500">{s.date}</div>
+                <button key={s.id} className="w-full text-left p-3 rounded-lg hover:bg-slate-800 transition-colors text-sm group">
+                  <div className="text-white font-medium truncate group-hover:text-blue-400 transition-colors">{s.title}</div>
+                  <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest mt-1">{s.date}</div>
                 </button>
               ))}
             </div>
@@ -472,25 +308,8 @@ export function Chatbot() {
         </div>
       </div>
 
-      {/* Nút bong bóng kích hoạt chatbot */}
-      <button
-        onMouseDown={handleMouseDown}
-        onClick={() => !isDragging && setIsOpen(true)}
-        className={`
-          w-14 h-14 bg-gradient-to-tr from-blue-600 to-indigo-500 rounded-full shadow-xl shadow-blue-500/30 
-          flex items-center justify-center text-white 
-          hover:scale-110 transition-transform duration-200 cursor-move group relative
-          ${isOpen ? "hidden" : "flex"}
-        `}
-      >
-        <MessageSquare className="w-7 h-7" />
-        <span className="absolute -top-1 -right-1 flex h-3 w-3">
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-          <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
-        </span>
-        <div className="absolute right-full mr-3 bg-slate-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
-          Drag me!
-        </div>
+      <button onMouseDown={handleMouseDown} onClick={() => !isDragging && setIsOpen(true)} className={`w-14 h-14 bg-[#0052CC] rounded-full shadow-lg flex items-center justify-center text-white hover:scale-110 transition-transform duration-200 cursor-move group relative ${isOpen ? "hidden" : "flex"}`}>
+        <MessageSquare className="w-6 h-6" />
       </button>
     </div>
   );
