@@ -1,11 +1,11 @@
 import apiClient from "@/lib/apiClient";
 
 // =============================================================================
-// INTERFACES & TYPES
+// 1. INTERFACES & TYPES (MODELS)
 // =============================================================================
 
 /**
- * Thông tin công ty trong hệ thống quản trị
+ * Thông tin công ty tóm tắt hiển thị trên bảng danh sách quản trị
  */
 export interface SystemCompany {
   id: number;
@@ -39,7 +39,7 @@ export interface SystemCompanySearchParams {
 }
 
 /**
- * Cấu trúc phản hồi phân trang dành riêng cho hệ thống quản trị
+ * Cấu trúc phản hồi phân trang dùng chung cho hệ thống quản trị
  */
 export interface SystemPageResponse<T> {
   content: T[];
@@ -83,12 +83,42 @@ export interface Tenant360View {
   isStorageLimitExceeded: boolean;
 }
 
+/**
+ * Dữ liệu lịch sử giao dịch thanh toán của công ty
+ */
+export interface TransactionDTO {
+    id: number;
+    transactionCode: string;
+    gatewayTransactionId: string | null;
+    planName: string;
+    amount: number;
+    currency: string;
+    billingCycle: string;
+    paymentMethod: string;
+    status: "SUCCESS" | "FAILED" | "PENDING";
+    paidAt: string | null;
+    createdAt: string;
+}
+
+/**
+ * Tham số lọc lịch sử giao dịch
+ */
+export interface TransactionFilterParams {
+    status?: string;
+    startDate?: string;
+    endDate?: string;
+    page?: number;
+    size?: number;
+    sortBy?: string;
+    sortDir?: "asc" | "desc";
+}
+
 // =============================================================================
-// SYSTEM ADMINISTRATION APIs
+// 2. SYSTEM ADMINISTRATION APIs
 // =============================================================================
 
 /**
- * Tìm kiếm và lọc nâng cao danh sách công ty (Dành cho System Admin)
+ * Tìm kiếm và lọc nâng cao danh sách công ty
  */
 export const searchSystemCompanies = async (
   params: SystemCompanySearchParams
@@ -102,7 +132,6 @@ export const searchSystemCompanies = async (
     }
     return data;
   } catch (err: any) {
-    // Ưu tiên thông báo lỗi từ phía backend
     const errorMsg = err.response?.data?.message || "An error occurred while fetching companies";
     throw new Error(errorMsg);
   }
@@ -113,8 +142,7 @@ export const searchSystemCompanies = async (
  */
 export const getCompany360View = async (companyId: number): Promise<Tenant360View> => {
   try {
-    const url = `/admin/companies/${companyId}/detail`;
-    const res = await apiClient.get(url);
+    const res = await apiClient.get(`/admin/companies/${companyId}/detail`);
     const { success, message, data } = res.data;
 
     if (!success) {
@@ -132,8 +160,7 @@ export const getCompany360View = async (companyId: number): Promise<Tenant360Vie
  */
 export const suspendCompany = async (companyId: number): Promise<void> => {
   try {
-    const url = `/admin/companies/${companyId}/suspend`;
-    const res = await apiClient.put(url);
+    const res = await apiClient.put(`/admin/companies/${companyId}/suspend`);
     const { success, message } = res.data;
 
     if (!success) {
@@ -150,8 +177,7 @@ export const suspendCompany = async (companyId: number): Promise<void> => {
  */
 export const activateCompany = async (companyId: number): Promise<void> => {
   try {
-    const url = `/admin/companies/${companyId}/activate`;
-    const res = await apiClient.put(url);
+    const res = await apiClient.put(`/admin/companies/${companyId}/activate`);
     const { success, message } = res.data;
 
     if (!success) {
@@ -161,4 +187,29 @@ export const activateCompany = async (companyId: number): Promise<void> => {
     const errorMsg = err.response?.data?.message || "Unable to activate company";
     throw new Error(errorMsg);
   }
+};
+
+/**
+ * Lấy danh sách lịch sử giao dịch (thanh toán gói cước) của công ty
+ */
+export const getCompanyTransactions = async (
+    companyId: number, 
+    params: TransactionFilterParams
+): Promise<SystemPageResponse<TransactionDTO>> => {
+    try {
+        const res = await apiClient.get(`/admin/companies/${companyId}/transactions`, { params });
+        
+        // Hỗ trợ linh hoạt cho cả 2 chuẩn trả về từ Backend: { data: ... } hoặc trả thẳng { content: ... }
+        const data = res.data?.data || res.data;
+        
+        // Bắt lỗi nếu Backend trả về success: false
+        if (res.data?.success === false) {
+            throw new Error(res.data?.message || "Failed to retrieve transaction history.");
+        }
+        
+        return data as SystemPageResponse<TransactionDTO>;
+    } catch (err: any) {
+        const errorMessage = err.response?.data?.message || "Failed to retrieve transaction history.";
+        throw new Error(errorMessage);
+    }
 };
