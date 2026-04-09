@@ -51,3 +51,33 @@ export const getGlobalUsers = async (params: UserSearchParams): Promise<UserPage
     throw new Error(errorMsg);
   }
 };
+
+/**
+ * Thay đổi trạng thái tài khoản người dùng (Khóa / Mở khóa)
+ */
+export const toggleUserStatus = async (userId: number, status: "ACTIVE" | "LOCKED"): Promise<void> => {
+  try {
+    const res = await apiClient.put(`/admin/users/${userId}/status`, null, {
+      params: { status }
+    });
+    if (!res.data?.success) throw new Error(res.data?.message || "Failed to update user status");
+  } catch (err: any) {
+    const errorMsg = err.response?.data?.message || "Action denied or service unavailable";
+    throw new Error(errorMsg);
+  }
+};
+
+/**
+ * Cấp hoặc thu hồi quyền SYSTEM_ADMIN của người dùng
+ */
+export const toggleSystemAdminRole = async (userId: number, assign: boolean): Promise<void> => {
+  try {
+    const res = await apiClient.put(`/admin/users/${userId}/roles/system-admin`, null, {
+      params: { assign }
+    });
+    if (!res.data?.success) throw new Error(res.data?.message || "Failed to update admin privileges");
+  } catch (err: any) {
+    const errorMsg = err.response?.data?.message || "Action denied or service unavailable";
+    throw new Error(errorMsg);
+  }
+};

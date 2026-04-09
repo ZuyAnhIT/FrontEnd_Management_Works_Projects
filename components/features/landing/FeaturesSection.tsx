@@ -4,7 +4,7 @@
 // 1. IMPORTS
 // =============================================================================
 
-import React, { useMemo } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { Users, Zap, Shield } from "lucide-react";
 import { motion } from "framer-motion";
 import { useTranslation } from "react-i18next";
@@ -38,16 +38,19 @@ export default function FeaturesSection() {
   // ---------------------------------------------------------------------------
   
   const { t } = useTranslation();
-  
-  // Trích xuất theme từ Context (Lưu ý: Biến này đảm bảo component re-render 
-  // đúng cách khi người dùng chuyển đổi giữa chế độ Sáng/Tối)
   const { theme } = useTheme(); 
+
+  // ✅ STATE CHỐNG HYDRATION MISMATCH
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // ---------------------------------------------------------------------------
   // 5. DATA PREPARATION
   // ---------------------------------------------------------------------------
 
-  // Ghi nhớ cấu hình danh sách tính năng để tránh cấp phát lại bộ nhớ ở mỗi lần render
   const features: FeatureItem[] = useMemo(() => [
     {
       icon: Users,
@@ -70,6 +73,14 @@ export default function FeaturesSection() {
   // 6. RENDER LOGIC
   // ---------------------------------------------------------------------------
 
+  // ✅ NẾU CHƯA MOUNT (ĐANG Ở SERVER), RENDER KHUNG TRỐNG ĐỂ TRÁNH LỖI LỆCH DOM
+  if (!mounted) {
+    return (
+      <section id="features" className="py-24 px-6 min-h-[400px] opacity-0 bg-white dark:bg-slate-900" />
+    );
+  }
+
+  // ✅ CHỈ RENDER UI CHÍNH THỨC KHI ĐÃ LÊN CLIENT
   return (
     <motion.section
       id="features"
